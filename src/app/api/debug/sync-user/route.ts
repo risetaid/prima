@@ -3,6 +3,11 @@ import { currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 
 export async function POST() {
+  // Disable debug routes in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Debug routes disabled in production' }, { status: 404 })
+  }
+
   try {
     const user = await currentUser()
     
