@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "next dev --turbo",
     "dev:next": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.30.1",
