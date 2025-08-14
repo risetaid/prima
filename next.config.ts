@@ -4,16 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
-    reactCompiler: false,
-  },
-  // Turbopack configuration (stable in Next 15.4+)
-  turbopack: {
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'],
-        as: '*.js',
-      },
-    },
+    // No experimental features for Next.js 14
   },
   // Performance optimizations  
   compiler: {
@@ -23,11 +14,6 @@ const nextConfig: NextConfig = {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
-  serverExternalPackages: [
-    // Fix import-in-the-middle warnings
-    'import-in-the-middle',
-    'require-in-the-middle',
-  ],
 };
 
 // Only enable Sentry in production to avoid dev warnings
