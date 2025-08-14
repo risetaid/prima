@@ -6,6 +6,11 @@ import { prisma } from '@/lib/prisma'
 const webhookSecret = process.env.CLERK_WEBHOOK_SECRET || ''
 
 export async function POST(request: Request) {
+  // Skip database operations during build time
+  if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
+    return NextResponse.json({ message: 'Build time skip' })
+  }
+
   if (!webhookSecret) {
     return NextResponse.json(
       { error: 'No CLERK_WEBHOOK_SECRET found' },
@@ -91,7 +96,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Database error:', error)
     return NextResponse.json(
-      { error: 'Database error occurred' },
+      { error: 'Database error occurred', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
