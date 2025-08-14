@@ -28,7 +28,7 @@ export async function GET() {
     })
   } catch (error) {
     return NextResponse.json(
-      { error: 'Failed to fetch users', details: error },
+      { error: 'Failed to fetch users', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

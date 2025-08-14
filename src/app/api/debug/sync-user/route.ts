@@ -41,7 +41,7 @@ export async function POST() {
   } catch (error) {
     console.error('Sync user error:', error)
     return NextResponse.json(
-      { error: 'Failed to sync user', details: error },
+      { error: 'Failed to sync user', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
