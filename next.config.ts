@@ -1,7 +1,43 @@
+import {withSentryConfig} from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  experimental: {
+    reactCompiler: false,
+  },
+  // Turbopack configuration (stable in Next 15.4+)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+  // Performance optimizations  
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
+  },
+  serverExternalPackages: [
+    // Fix import-in-the-middle warnings
+    'import-in-the-middle',
+    'require-in-the-middle',
+  ],
 };
 
-export default nextConfig;
+// Only enable Sentry in production to avoid dev warnings
+export default process.env.NODE_ENV === 'production' 
+  ? withSentryConfig(nextConfig, {
+      org: "universitas-ma-chung",
+      project: "javascript-nextjs",
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      disableLogger: true,
+      automaticVercelMonitors: true
+    })
+  : nextConfig;
