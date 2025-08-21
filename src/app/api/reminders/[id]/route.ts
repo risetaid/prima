@@ -23,7 +23,7 @@ export async function GET(
         reminderLogs: {
           orderBy: { createdAt: 'desc' }
         },
-        createdBy: {
+        createdByUser: {
           select: {
             firstName: true,
             lastName: true,
