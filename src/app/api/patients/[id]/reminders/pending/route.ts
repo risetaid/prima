@@ -13,20 +13,32 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get reminders that have been sent but need manual confirmation
+    
+    // Get confirmed reminder schedule IDs to exclude
+    const confirmedScheduleIds = await prisma.manualConfirmation.findMany({
+      where: { 
+        patientId: id,
+        confirmedAt: {
+          gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+        }
+      },
+      select: { reminderScheduleId: true }
+    }).then(confirmations => 
+      confirmations
+        .filter(c => c.reminderScheduleId)
+        .map(c => c.reminderScheduleId!)
+    )
+    
+    // Get reminder logs that haven't been confirmed
     const pendingReminders = await prisma.reminderLog.findMany({
       where: {
         patientId: id,
         status: 'DELIVERED',
-        // Only get reminders that don't have manual confirmation yet
-        reminderSchedule: {
-          manualConfirmations: {
-            none: {
-              visitDate: {
-                gte: new Date(new Date().setHours(0, 0, 0, 0))
-              }
-            }
-          }
+        reminderScheduleId: {
+          notIn: confirmedScheduleIds
+        },
+        sentAt: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
         }
       },
       include: {

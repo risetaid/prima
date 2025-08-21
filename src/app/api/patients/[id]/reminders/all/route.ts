@@ -38,16 +38,22 @@ export async function GET(
       const latestLog = schedule.reminderLogs[0]
       const latestConfirmation = schedule.manualConfirmations[0]
       
-      // Determine status based on what's available
+      // Determine status based on what's available and recency
       let status = 'scheduled'
       let reminderDate = schedule.startDate.toISOString().split('T')[0]
       let id_suffix = schedule.id
 
-      if (latestConfirmation) {
+      // Check if there's a recent confirmation (within last 7 days)
+      const recentConfirmation = latestConfirmation && 
+        latestConfirmation.confirmedAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+      if (recentConfirmation) {
         status = latestConfirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
         reminderDate = latestConfirmation.visitDate.toISOString().split('T')[0]
         id_suffix = `completed-${latestConfirmation.id}`
-      } else if (latestLog && latestLog.status === 'DELIVERED') {
+      } else if (latestLog && latestLog.status === 'DELIVERED' && 
+                 latestLog.sentAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) {
+        // Only show as pending if sent recently and no recent confirmation
         status = 'pending'
         reminderDate = latestLog.sentAt.toISOString().split('T')[0]
         id_suffix = `pending-${latestLog.id}`
