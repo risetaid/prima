@@ -13,86 +13,57 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get all types of reminders and combine them
-    const [scheduledReminders, pendingLogs, completedConfirmations] = await Promise.all([
-      // Scheduled reminders
-      prisma.reminderSchedule.findMany({
-        where: {
-          patientId: id,
-          isActive: true
-        }
-      }),
-
-      // Pending reminder logs
-      prisma.reminderLog.findMany({
-        where: {
-          patientId: id,
-          status: 'DELIVERED'
+    
+    // Get all reminder schedules with their logs and confirmations
+    const reminderSchedules = await prisma.reminderSchedule.findMany({
+      where: {
+        patientId: id,
+        isActive: true
+      },
+      include: {
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 1 // Latest log only
         },
-        include: {
-          reminderSchedule: true
+        manualConfirmations: {
+          orderBy: { visitDate: 'desc' },
+          take: 1 // Latest confirmation only
         }
-      }),
+      },
+      orderBy: { startDate: 'desc' }
+    })
 
-      // Completed manual confirmations
-      prisma.manualConfirmation.findMany({
-        where: {
-          patientId: id
-        }
-      })
-    ])
+    // Transform to unified format
+    const allReminders = reminderSchedules.map(schedule => {
+      const latestLog = schedule.reminderLogs[0]
+      const latestConfirmation = schedule.manualConfirmations[0]
+      
+      // Determine status based on what's available
+      let status = 'scheduled'
+      let reminderDate = schedule.startDate.toISOString().split('T')[0]
+      let id_suffix = schedule.id
 
-    // Transform and combine all reminders
-    const allReminders = [
-      // Scheduled reminders
-      ...scheduledReminders.map(reminder => ({
-        id: `scheduled-${reminder.id}`,
-        medicationName: reminder.medicationName,
-        scheduledTime: reminder.scheduledTime,
-        reminderDate: reminder.startDate.toISOString().split('T')[0],
-        customMessage: reminder.customMessage,
-        status: 'scheduled' as const,
-        sortDate: reminder.startDate
-      })),
+      if (latestConfirmation) {
+        status = latestConfirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
+        reminderDate = latestConfirmation.visitDate.toISOString().split('T')[0]
+        id_suffix = `completed-${latestConfirmation.id}`
+      } else if (latestLog && latestLog.status === 'DELIVERED') {
+        status = 'pending'
+        reminderDate = latestLog.sentAt.toISOString().split('T')[0]
+        id_suffix = `pending-${latestLog.id}`
+      }
 
-      // Pending logs
-      ...pendingLogs.map(log => ({
-        id: `pending-${log.id}`,
-        medicationName: log.reminderSchedule?.medicationName || 'Obat',
-        scheduledTime: log.reminderSchedule?.scheduledTime || '12:00',
-        reminderDate: log.sentAt.toISOString().split('T')[0],
-        customMessage: log.reminderSchedule?.customMessage || log.message,
-        status: 'pending' as const,
-        sortDate: log.sentAt
-      })),
+      return {
+        id: `${status}-${id_suffix}`,
+        medicationName: schedule.medicationName,
+        scheduledTime: schedule.scheduledTime,
+        reminderDate,
+        customMessage: schedule.customMessage,
+        status
+      }
+    })
 
-      // Completed confirmations
-      ...completedConfirmations.map(confirmation => ({
-        id: `completed-${confirmation.id}`,
-        medicationName: confirmation.medicationsMissed.length > 0 
-          ? confirmation.medicationsMissed[0] 
-          : 'candesartan',
-        scheduledTime: confirmation.visitTime,
-        reminderDate: confirmation.visitDate.toISOString().split('T')[0],
-        customMessage: `Minum obat ${confirmation.medicationsMissed.length > 0 
-          ? confirmation.medicationsMissed[0] 
-          : 'candesartan'}`,
-        status: confirmation.medicationsTaken 
-          ? 'completed_taken' as const
-          : 'completed_not_taken' as const,
-        sortDate: confirmation.visitDate
-      }))
-    ]
-
-    // Sort by date (most recent first)
-    const sortedReminders = allReminders.sort((a, b) => 
-      new Date(b.sortDate).getTime() - new Date(a.sortDate).getTime()
-    )
-
-    // Remove sortDate from response
-    const responseReminders = sortedReminders.map(({ sortDate, ...reminder }) => reminder)
-
-    return NextResponse.json(responseReminders)
+    return NextResponse.json(allReminders)
   } catch (error) {
     console.error('Error fetching all reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

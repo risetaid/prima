@@ -47,22 +47,26 @@ export default function PendingUpdatePage() {
   const handleConfirmation = async (reminderId: string, taken: boolean) => {
     try {
       // API call to update reminder status
-      // const response = await fetch(`/api/patients/${params.id}/reminders/${reminderId}/confirm`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ medicationTaken: taken })
-      // })
+      const response = await fetch(`/api/patients/${params.id}/reminders/${reminderId}/confirm`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medicationTaken: taken })
+      })
 
-      // For now, just remove from list
-      setReminders(prev => prev.filter(r => r.id !== reminderId))
-      
-      // Show success message
-      const message = taken 
-        ? 'Berhasil dikonfirmasi: Pasien sudah minum obat'
-        : 'Berhasil dikonfirmasi: Pasien belum minum obat'
-      
-      // Could show a toast notification here
-      console.log(message)
+      if (response.ok) {
+        // Remove from pending list since it's now confirmed
+        setReminders(prev => prev.filter(r => r.id !== reminderId))
+        
+        // Show success message
+        const message = taken 
+          ? 'Berhasil dikonfirmasi: Pasien sudah minum obat'
+          : 'Berhasil dikonfirmasi: Pasien belum minum obat'
+        
+        console.log(message)
+      } else {
+        console.error('Failed to confirm reminder')
+        alert('Gagal mengupdate status pengingat')
+      }
       
     } catch (error) {
       console.error('Error confirming reminder:', error)
