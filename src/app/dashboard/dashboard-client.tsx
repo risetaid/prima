@@ -109,39 +109,33 @@ function DashboardClient() {
 
   return (
     <>
-      {/* Blue Section with 3 Feature Cards */}
-      <div className="bg-blue-500 rounded-2xl p-6 mb-6">
+      {/* Blue Background Section */}
+      <div className="bg-blue-500 rounded-2xl p-6 mb-6 -mx-4">
         <div className="grid grid-cols-3 gap-4">
           {/* Pengingat Card */}
           <div 
             onClick={handlePengingatClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer transform transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="bg-blue-100 rounded-2xl p-4 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-              <Bell className="w-8 h-8 text-blue-500" />
-            </div>
+            <Bell className="w-8 h-8 text-blue-500 mx-auto mb-3" />
             <h3 className="font-semibold text-sm text-gray-900">Pengingat</h3>
           </div>
 
           {/* Berita Card */}
           <div 
             onClick={handleBeritaClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer transform transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="bg-blue-100 rounded-2xl p-4 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-              <FileText className="w-8 h-8 text-blue-500" />
-            </div>
+            <FileText className="w-8 h-8 text-blue-500 mx-auto mb-3" />
             <h3 className="font-semibold text-sm text-gray-900">Berita</h3>
           </div>
 
           {/* Video Edukasi Card */}
           <div 
             onClick={handleVideoClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer transform transition-transform duration-200 hover:scale-105 active:scale-95"
+            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <div className="bg-blue-100 rounded-2xl p-4 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-              <Play className="w-8 h-8 text-blue-500" />
-            </div>
+            <Play className="w-8 h-8 text-blue-500 mx-auto mb-3" />
             <h3 className="font-semibold text-sm text-gray-900">Video Edukasi</h3>
           </div>
         </div>

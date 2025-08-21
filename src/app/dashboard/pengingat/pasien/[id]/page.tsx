@@ -33,15 +33,27 @@ export default function PatientReminderDashboard() {
 
   const fetchReminderStats = async (patientId: string) => {
     try {
-      // For now, use sample data until reminder system is fully implemented
-      setStats({
-        terjadwal: 5,
-        perluDiperbarui: 3,
-        selesai: 10,
-        semua: 18
-      })
+      const response = await fetch(`/api/patients/${patientId}/reminders/stats`)
+      if (response.ok) {
+        const statsData = await response.json()
+        setStats(statsData)
+      } else {
+        // Fallback to empty stats if API fails
+        setStats({
+          terjadwal: 0,
+          perluDiperbarui: 0,
+          selesai: 0,
+          semua: 0
+        })
+      }
     } catch (error) {
       console.error('Error fetching reminder stats:', error)
+      setStats({
+        terjadwal: 0,
+        perluDiperbarui: 0,
+        selesai: 0,
+        semua: 0
+      })
     }
   }
 

@@ -217,7 +217,7 @@ export default function ScheduledRemindersPage() {
                 className="bg-red-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-red-600 transition-colors cursor-pointer flex items-center space-x-2"
               >
                 <Trash2 className="w-5 h-5" />
-                <span>Hapus Gejala</span>
+                <span>Hapus Pengingat</span>
               </button>
             )}
           </>
