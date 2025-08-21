@@ -30,11 +30,7 @@ export async function POST(
     const reminder = await prisma.reminderSchedule.findUnique({
       where: { id },
       include: {
-        patientMedication: {
-          include: {
-            patient: true
-          }
-        }
+        patient: true
       }
     })
 
@@ -63,7 +59,7 @@ export async function POST(
       await prisma.reminderLog.create({
         data: {
           scheduleId: id,
-          patientId: reminder.patientMedication.patientId,
+          patientId: reminder.patientId,
           scheduledFor: new Date(),
           sentAt: new Date(),
           status: action === 'ya' ? 'DELIVERED' : 'SENT',

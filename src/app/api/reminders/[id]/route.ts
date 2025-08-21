@@ -19,16 +19,11 @@ export async function GET(
     const reminder = await prisma.reminderSchedule.findUnique({
       where: { id },
       include: {
-        patientMedication: {
-          include: {
-            patient: true,
-            medication: true
-          }
-        },
+        patient: true,
         reminderLogs: {
           orderBy: { createdAt: 'desc' }
         },
-        createdByUser: {
+        createdBy: {
           select: {
             firstName: true,
             lastName: true,
@@ -83,12 +78,7 @@ export async function PUT(
         isActive
       },
       include: {
-        patientMedication: {
-          include: {
-            patient: true,
-            medication: true
-          }
-        }
+        patient: true
       }
     })
 
