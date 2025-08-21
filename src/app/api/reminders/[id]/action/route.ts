@@ -40,7 +40,7 @@ export async function POST(
 
     // Create or update the latest reminder log
     const latestLog = await prisma.reminderLog.findFirst({
-      where: { scheduleId: id },
+      where: { reminderScheduleId: id },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -58,9 +58,10 @@ export async function POST(
       // Create new log entry
       await prisma.reminderLog.create({
         data: {
-          scheduleId: id,
+          reminderScheduleId: id,
           patientId: reminder.patientId,
-          scheduledFor: new Date(),
+          message: `Pengingat minum obat ${reminder.medicationName}`,
+          phoneNumber: reminder.patient?.phoneNumber || '',
           sentAt: new Date(),
           status: action === 'ya' ? 'DELIVERED' : 'SENT',
           patientResponse: action === 'ya' ? 'Dipatuhi' : 'Tidak dipatuhi',
