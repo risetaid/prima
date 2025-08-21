@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/twilio'
+import { shouldSendReminderNow, getWIBTime } from '@/lib/timezone'
 
 export async function GET(
   request: NextRequest,
@@ -94,9 +95,8 @@ export async function POST(
       }
     })
 
-    // Send first reminder immediately if start date is today
-    const today = new Date().toISOString().split('T')[0]
-    if (startDate === today) {
+    // Send first reminder only if it's time to send (WIB timezone)
+    if (shouldSendReminderNow(startDate, time)) {
       const whatsappNumber = formatWhatsAppNumber(patient.phoneNumber)
       
       const twilioResult = await sendWhatsAppMessage({
@@ -104,12 +104,12 @@ export async function POST(
         body: message
       })
 
-      // Log the reminder
+      // Log the reminder with WIB time
       await prisma.reminderLog.create({
         data: {
           reminderScheduleId: reminderSchedule.id,
           patientId: id,
-          sentAt: new Date(),
+          sentAt: getWIBTime(),
           status: twilioResult.success ? 'DELIVERED' : 'FAILED',
           twilioMessageId: twilioResult.messageId,
           message: message,
