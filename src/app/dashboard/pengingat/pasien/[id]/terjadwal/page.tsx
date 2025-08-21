@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Calendar, Clock, Trash2, X } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB } from '@/lib/datetime'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { toast } from '@/components/ui/toast'
 
 interface ScheduledReminder {
   id: string
@@ -21,6 +23,7 @@ export default function ScheduledRemindersPage() {
   const [loading, setLoading] = useState(true)
   const [isDeleteMode, setIsDeleteMode] = useState(false)
   const [selectedReminders, setSelectedReminders] = useState<string[]>([])
+  const { confirm, ConfirmComponent } = useConfirm()
 
   useEffect(() => {
     if (params.id) {
@@ -57,24 +60,44 @@ export default function ScheduledRemindersPage() {
   const handleDeleteReminders = async () => {
     if (selectedReminders.length === 0) return
 
-    const confirmed = window.confirm(`Apakah Anda yakin ingin menghapus ${selectedReminders.length} pengingat?`)
-    if (!confirmed) return
+    confirm({
+      title: 'Hapus Pengingat',
+      description: `Apakah Anda yakin ingin menghapus ${selectedReminders.length} pengingat? Tindakan ini tidak dapat dibatalkan.`,
+      confirmText: 'Hapus',
+      cancelText: 'Batal',
+      variant: 'destructive',
+      onConfirm: async () => {
+        try {
+          const response = await fetch(`/api/patients/${params.id}/reminders/scheduled`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ reminderIds: selectedReminders })
+          })
 
-    try {
-      // API call to delete reminders would go here
-      // const response = await fetch(`/api/patients/${params.id}/reminders`, {
-      //   method: 'DELETE',
-      //   body: JSON.stringify({ reminderIds: selectedReminders })
-      // })
-
-      // For now, just remove from local state
-      setReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)))
-      setSelectedReminders([])
-      setIsDeleteMode(false)
-    } catch (error) {
-      console.error('Error deleting reminders:', error)
-      alert('Gagal menghapus pengingat')
-    }
+          if (response.ok) {
+            // Remove from local state after successful API call
+            setReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)))
+            setSelectedReminders([])
+            setIsDeleteMode(false)
+            toast.success('Pengingat berhasil dihapus', {
+              description: `${selectedReminders.length} pengingat telah dihapus`
+            })
+          } else {
+            const error = await response.json()
+            toast.error('Gagal menghapus pengingat', {
+              description: error.error || 'Terjadi kesalahan pada server'
+            })
+          }
+        } catch (error) {
+          console.error('Error deleting reminders:', error)
+          toast.error('Gagal menghapus pengingat', {
+            description: 'Terjadi kesalahan jaringan'
+          })
+        }
+      }
+    })
   }
 
   const formatDate = (dateString: string) => {
@@ -104,6 +127,7 @@ export default function ScheduledRemindersPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <ConfirmComponent />
       {/* Header */}
       <header className="bg-white">
         <div className="flex justify-between items-center px-4 py-4">
@@ -167,35 +191,37 @@ export default function ScheduledRemindersPage() {
       {/* Floating Action Buttons */}
       <div className="fixed bottom-6 right-6 flex flex-col space-y-3">
         {isDeleteMode ? (
-          <>
+          <div className="flex flex-col space-y-3">
+            {/* Delete Selected Button - Show first when items are selected */}
+            {selectedReminders.length > 0 && (
+              <button
+                onClick={handleDeleteReminders}
+                className="bg-red-500 text-white px-4 py-3 rounded-full shadow-lg hover:bg-red-600 transition-colors cursor-pointer flex items-center space-x-2"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Hapus ({selectedReminders.length})</span>
+              </button>
+            )}
+            
             {/* Cancel Button */}
             <button
               onClick={() => {
                 setIsDeleteMode(false)
                 setSelectedReminders([])
               }}
-              className="bg-red-500 text-white rounded-full p-4 shadow-lg hover:bg-red-600 transition-colors cursor-pointer"
+              className="bg-gray-500 text-white px-4 py-3 rounded-full shadow-lg hover:bg-gray-600 transition-colors cursor-pointer flex items-center space-x-2"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" />
+              <span className="text-sm font-medium">Batal</span>
             </button>
-            
-            {/* Delete Selected Button */}
-            {selectedReminders.length > 0 && (
-              <button
-                onClick={handleDeleteReminders}
-                className="bg-red-500 text-white px-6 py-3 rounded-full shadow-lg hover:bg-red-600 transition-colors cursor-pointer flex items-center space-x-2"
-              >
-                <Trash2 className="w-5 h-5" />
-                <span>Hapus Pengingat</span>
-              </button>
-            )}
-          </>
+          </div>
         ) : (
           /* Delete Mode Button */
           <button
             onClick={() => setIsDeleteMode(true)}
             disabled={reminders.length === 0}
             className="bg-red-500 text-white rounded-full p-4 shadow-lg hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
+            title="Hapus Pengingat"
           >
             <Trash2 className="w-6 h-6" />
           </button>

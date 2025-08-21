@@ -54,10 +54,12 @@ export const formatTimeWIB = (dateString?: string | Date) => {
 }
 
 /**
- * Get current date/time in WIB timezone
+ * Get current date/time in WIB timezone (UTC+7)
  */
 export const nowWIB = () => {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: TIMEZONE_WIB }))
+  const now = new Date()
+  // Add 7 hours to UTC to get WIB
+  return new Date(now.getTime() + (7 * 60 * 60 * 1000))
 }
 
 /**
@@ -65,7 +67,8 @@ export const nowWIB = () => {
  */
 export const toWIB = (date: Date | string) => {
   const dateObj = typeof date === 'string' ? new Date(date) : date
-  return new Date(dateObj.toLocaleString('en-US', { timeZone: TIMEZONE_WIB }))
+  // Add 7 hours to UTC to get WIB
+  return new Date(dateObj.getTime() + (7 * 60 * 60 * 1000))
 }
 
 /**
@@ -90,14 +93,42 @@ export const formatRelativeTimeWIB = (dateString?: string | Date) => {
 }
 
 /**
+ * Get current date in YYYY-MM-DD format (WIB timezone)
+ */
+export const getCurrentDateWIB = () => {
+  const wibNow = nowWIB()
+  const year = wibNow.getUTCFullYear()
+  const month = String(wibNow.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(wibNow.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Get current time in HH:MM format (WIB timezone)
+ */
+export const getCurrentTimeWIB = () => {
+  const wibNow = nowWIB()
+  const hours = String(wibNow.getUTCHours()).padStart(2, '0')
+  const minutes = String(wibNow.getUTCMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+/**
  * Format date input value (YYYY-MM-DD) for HTML input fields
- * This ensures the date appears correctly in Indonesian timezone
  */
 export const formatDateInputWIB = (dateString?: string | Date) => {
-  if (!dateString) return ''
+  if (!dateString) return getCurrentDateWIB()
   
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  const wibDate = toWIB(date)
+  return date.toISOString().split('T')[0]
+}
+
+/**
+ * Format time input value (HH:MM) for HTML input fields
+ */
+export const formatTimeInputWIB = (dateString?: string | Date) => {
+  if (!dateString) return getCurrentTimeWIB()
   
-  return wibDate.toISOString().split('T')[0]
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString
+  return date.toTimeString().slice(0, 5)
 }

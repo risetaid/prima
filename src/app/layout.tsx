@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs'
+import { Toaster } from 'sonner'
 import "./globals.css";
 
 const inter = Inter({
@@ -55,6 +56,12 @@ export default function RootLayout({
           className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
         >
           {children}
+          <Toaster 
+            position="top-center"
+            toastOptions={{
+              style: { background: 'white', color: 'black', border: '1px solid #e5e7eb' },
+            }}
+          />
           <script
             dangerouslySetInnerHTML={{
               __html: `

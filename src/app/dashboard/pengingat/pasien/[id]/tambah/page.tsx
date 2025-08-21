@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Clock, Calendar, ChevronDown } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { formatDateInputWIB, nowWIB } from '@/lib/datetime'
+import { getCurrentDateWIB, getCurrentTimeWIB } from '@/lib/datetime'
+import { toast } from '@/components/ui/toast'
 
 interface Patient {
   id: string
@@ -23,8 +24,8 @@ export default function AddReminderPage() {
   const [formData, setFormData] = useState({
     message: '',
     interval: 'Harian',
-    time: '12:00',
-    startDate: '',
+    time: getCurrentTimeWIB(),
+    startDate: getCurrentDateWIB(),
     totalReminders: 5
   })
 
@@ -32,13 +33,6 @@ export default function AddReminderPage() {
     if (params.id) {
       fetchPatient(params.id as string)
     }
-    
-    // Set default start date to today
-    const today = nowWIB()
-    setFormData(prev => ({
-      ...prev,
-      startDate: formatDateInputWIB(today)
-    }))
   }, [params.id])
 
   const fetchPatient = async (patientId: string) => {
@@ -68,6 +62,10 @@ export default function AddReminderPage() {
     e.preventDefault()
     setSubmitting(true)
 
+    console.log('=== FRONTEND SUBMIT ===')
+    console.log('params.id:', params.id)
+    console.log('formData:', formData)
+
     try {
       const response = await fetch(`/api/patients/${params.id}/reminders`, {
         method: 'POST',
@@ -84,14 +82,22 @@ export default function AddReminderPage() {
       })
 
       if (response.ok) {
+        const result = await response.json()
+        toast.success('Pengingat berhasil dibuat', {
+          description: `${result.count || 1} pengingat telah dijadwalkan`
+        })
         router.back()
       } else {
         const error = await response.json()
-        alert(`Error: ${error.error || 'Gagal membuat pengingat'}`)
+        toast.error('Gagal membuat pengingat', {
+          description: error.error || 'Terjadi kesalahan pada server'
+        })
       }
     } catch (error) {
       console.error('Error creating reminder:', error)
-      alert('Gagal membuat pengingat')
+      toast.error('Gagal membuat pengingat', {
+        description: 'Terjadi kesalahan jaringan'
+      })
     } finally {
       setSubmitting(false)
     }

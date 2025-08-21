@@ -14,52 +14,39 @@ export async function GET(
 
     const { id } = await params
     
-    // Get all active reminder schedules to analyze their status
-    const reminderSchedules = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id,
-        isActive: true
-      },
-      include: {
-        reminderLogs: {
-          orderBy: { sentAt: 'desc' },
-          take: 1,
-          include: {
-            manualConfirmations: true
+    // Count each type directly with same logic as individual endpoints
+    const [scheduledCount, pendingCount, completedCount] = await Promise.all([
+      // Scheduled: No DELIVERED logs yet
+      prisma.reminderSchedule.count({
+        where: {
+          patientId: id,
+          isActive: true,
+          reminderLogs: {
+            none: {
+              status: 'DELIVERED'
+            }
           }
-        },
-        manualConfirmations: {
-          orderBy: { visitDate: 'desc' },
-          take: 1
         }
-      }
-    })
+      }),
 
-    // Count each status type
-    let scheduledCount = 0
-    let pendingCount = 0  
-    let completedCount = 0
-
-    reminderSchedules.forEach(schedule => {
-      const latestLog = schedule.reminderLogs[0]
-      const scheduleConfirmation = schedule.manualConfirmations[0]
-      
-      if (latestLog) {
-        const logConfirmation = latestLog.manualConfirmations[0]
-        
-        if (logConfirmation) {
-          completedCount++
-        } else if (latestLog.status === 'DELIVERED') {
-          pendingCount++
-        } else {
-          scheduledCount++
+      // Pending: DELIVERED logs without manual confirmations
+      prisma.reminderLog.count({
+        where: {
+          patientId: id,
+          status: 'DELIVERED',
+          manualConfirmations: {
+            none: {}
+          }
         }
-      } else if (scheduleConfirmation) {
-        completedCount++
-      } else {
-        scheduledCount++
-      }
-    })
+      }),
+
+      // Completed: All manual confirmations
+      prisma.manualConfirmation.count({
+        where: {
+          patientId: id
+        }
+      })
+    ])
 
     const stats = {
       terjadwal: scheduledCount,

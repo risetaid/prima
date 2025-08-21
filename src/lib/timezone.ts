@@ -18,7 +18,10 @@ export const getWIBDateString = (): string => {
  * Get WIB time string in HH:MM format
  */
 export const getWIBTimeString = (): string => {
-  return getWIBTime().toTimeString().slice(0, 5)
+  const wibTime = getWIBTime()
+  const hours = String(wibTime.getUTCHours()).padStart(2, '0')
+  const minutes = String(wibTime.getUTCMinutes()).padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 /**
@@ -38,11 +41,28 @@ export const createWIBDateTime = (dateStr: string, timeStr: string): Date => {
 
 /**
  * Check if reminder should be sent now based on WIB timezone
+ * Only send within a 5-minute window after the scheduled time
  */
 export const shouldSendReminderNow = (startDate: string, scheduledTime: string): boolean => {
   const nowWIB = getWIBTime()
   const todayWIB = getWIBDateString()
   const currentTimeWIB = getWIBTimeString()
   
-  return startDate === todayWIB && currentTimeWIB >= scheduledTime
+  // Only send if it's the scheduled date
+  if (startDate !== todayWIB) {
+    return false
+  }
+  
+  // Compare times properly - convert to minutes for accurate comparison
+  const [currentHour, currentMinute] = currentTimeWIB.split(':').map(Number)
+  const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number)
+  
+  const currentTotalMinutes = currentHour * 60 + currentMinute
+  const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
+  
+  // Only send if current time is within 5 minutes AFTER scheduled time
+  const timeDifferenceMinutes = currentTotalMinutes - scheduledTotalMinutes
+  
+  // Send if: 0 <= timeDifference <= 5 (within 5 minutes after scheduled time)
+  return timeDifferenceMinutes >= 0 && timeDifferenceMinutes <= 5
 }

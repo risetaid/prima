@@ -13,13 +13,17 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get scheduled reminders for patient
+    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs
     const scheduledReminders = await prisma.reminderSchedule.findMany({
       where: {
         patientId: id,
         isActive: true,
-        startDate: { lte: new Date() },
-        endDate: { gte: new Date() }
+        // Only include schedules that don't have DELIVERED logs yet
+        reminderLogs: {
+          none: {
+            status: 'DELIVERED'
+          }
+        }
       },
       include: {
         patient: {
