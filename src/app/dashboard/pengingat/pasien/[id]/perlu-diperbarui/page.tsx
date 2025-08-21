@@ -28,37 +28,17 @@ export default function PendingUpdatePage() {
 
   const fetchPendingReminders = async (patientId: string) => {
     try {
-      // Sample data for reminders that need manual confirmation
-      const sampleReminders: PendingReminder[] = [
-        {
-          id: '1',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          sentDate: '2025-08-03',
-          customMessage: 'Minum obat candesartan',
-          status: 'PENDING_UPDATE'
-        },
-        {
-          id: '2',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          sentDate: '2025-08-04',
-          customMessage: 'Minum obat candesartan',
-          status: 'PENDING_UPDATE'
-        },
-        {
-          id: '3',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          sentDate: '2025-08-05',
-          customMessage: 'Minum obat candesartan',
-          status: 'PENDING_UPDATE'
-        }
-      ]
-      
-      setReminders(sampleReminders)
+      const response = await fetch(`/api/patients/${patientId}/reminders/pending`)
+      if (response.ok) {
+        const data = await response.json()
+        setReminders(data)
+      } else {
+        console.error('Failed to fetch pending reminders')
+        setReminders([])
+      }
     } catch (error) {
       console.error('Error fetching pending reminders:', error)
+      setReminders([])
     } finally {
       setLoading(false)
     }

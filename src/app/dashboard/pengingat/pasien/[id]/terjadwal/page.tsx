@@ -30,48 +30,17 @@ export default function ScheduledRemindersPage() {
 
   const fetchScheduledReminders = async (patientId: string) => {
     try {
-      // For now, using sample data as reminder system is being built
-      const sampleReminders: ScheduledReminder[] = [
-        {
-          id: '1',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          nextReminderDate: '2025-08-17',
-          customMessage: 'Minum obat candesartan'
-        },
-        {
-          id: '2',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          nextReminderDate: '2025-08-18',
-          customMessage: 'Minum obat candesartan'
-        },
-        {
-          id: '3',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          nextReminderDate: '2025-08-19',
-          customMessage: 'Minum obat candesartan'
-        },
-        {
-          id: '4',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          nextReminderDate: '2025-08-20',
-          customMessage: 'Minum obat candesartan'
-        },
-        {
-          id: '5',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          nextReminderDate: '2025-08-21',
-          customMessage: 'Minum obat candesartan'
-        }
-      ]
-      
-      setReminders(sampleReminders)
+      const response = await fetch(`/api/patients/${patientId}/reminders/scheduled`)
+      if (response.ok) {
+        const data = await response.json()
+        setReminders(data)
+      } else {
+        console.error('Failed to fetch scheduled reminders')
+        setReminders([])
+      }
     } catch (error) {
       console.error('Error fetching scheduled reminders:', error)
+      setReminders([])
     } finally {
       setLoading(false)
     }

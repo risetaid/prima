@@ -28,68 +28,17 @@ export default function AllRemindersPage() {
 
   const fetchAllReminders = async (patientId: string) => {
     try {
-      // Sample data combining all reminder statuses
-      const sampleReminders: AllReminder[] = [
-        // Scheduled (future)
-        {
-          id: '1',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-17',
-          customMessage: 'Minum obat candesartan',
-          status: 'scheduled'
-        },
-        {
-          id: '2',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-18',
-          customMessage: 'Minum obat candesartan',
-          status: 'scheduled'
-        },
-        {
-          id: '3',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-19',
-          customMessage: 'Minum obat candesartan',
-          status: 'scheduled'
-        },
-        {
-          id: '4',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-20',
-          customMessage: 'Minum obat candesartan',
-          status: 'scheduled'
-        },
-        {
-          id: '5',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-21',
-          customMessage: 'Minum obat candesartan',
-          status: 'scheduled'
-        },
-        // Pending (need manual update)
-        {
-          id: '6',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          reminderDate: '2025-08-03',
-          customMessage: 'Minum obat candesartan',
-          status: 'pending'
-        }
-      ]
-      
-      // Sort by date (most recent first)
-      const sortedReminders = sampleReminders.sort((a, b) => 
-        new Date(b.reminderDate).getTime() - new Date(a.reminderDate).getTime()
-      )
-      
-      setReminders(sortedReminders)
+      const response = await fetch(`/api/patients/${patientId}/reminders/all`)
+      if (response.ok) {
+        const data = await response.json()
+        setReminders(data)
+      } else {
+        console.error('Failed to fetch all reminders')
+        setReminders([])
+      }
     } catch (error) {
       console.error('Error fetching all reminders:', error)
+      setReminders([])
     } finally {
       setLoading(false)
     }

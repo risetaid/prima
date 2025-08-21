@@ -29,58 +29,17 @@ export default function CompletedRemindersPage() {
 
   const fetchCompletedReminders = async (patientId: string) => {
     try {
-      // Sample data for completed reminders
-      const sampleReminders: CompletedReminder[] = [
-        {
-          id: '1',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          completedDate: '2025-07-20',
-          customMessage: 'Minum obat candesartan',
-          medicationTaken: true,
-          confirmedAt: '2025-07-20T14:30:00Z'
-        },
-        {
-          id: '2',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          completedDate: '2025-07-21',
-          customMessage: 'Minum obat candesartan',
-          medicationTaken: false,
-          confirmedAt: '2025-07-21T13:15:00Z'
-        },
-        {
-          id: '3',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          completedDate: '2025-07-22',
-          customMessage: 'Minum obat candesartan',
-          medicationTaken: true,
-          confirmedAt: '2025-07-22T12:45:00Z'
-        },
-        {
-          id: '4',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          completedDate: '2025-07-23',
-          customMessage: 'Minum obat candesartan',
-          medicationTaken: true,
-          confirmedAt: '2025-07-23T15:20:00Z'
-        },
-        {
-          id: '5',
-          medicationName: 'candesartan',
-          scheduledTime: '12:00',
-          completedDate: '2025-07-24',
-          customMessage: 'Minum obat candesartan',
-          medicationTaken: true,
-          confirmedAt: '2025-07-24T11:30:00Z'
-        }
-      ]
-      
-      setReminders(sampleReminders)
+      const response = await fetch(`/api/patients/${patientId}/reminders/completed`)
+      if (response.ok) {
+        const data = await response.json()
+        setReminders(data)
+      } else {
+        console.error('Failed to fetch completed reminders')
+        setReminders([])
+      }
     } catch (error) {
       console.error('Error fetching completed reminders:', error)
+      setReminders([])
     } finally {
       setLoading(false)
     }
