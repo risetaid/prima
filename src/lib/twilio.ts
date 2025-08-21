@@ -158,5 +158,5 @@ export const validateTwilioWebhook = (
   const bodyParams = typeof body === 'string' ? 
     Object.fromEntries(new URLSearchParams(body)) : body
   
-  return twilio.validateRequest(webhookSignature, bodyParams, url, signature)
+  return twilio.validateRequest(webhookSignature, url, bodyParams, signature)
 }
