@@ -45,9 +45,9 @@ export async function GET(request: NextRequest) {
     const reminders = await prisma.reminderSchedule.findMany({
       where: whereClause,
       include: {
-        patientMedication: {
+        patient: true,
+        PatientMedication: {
           include: {
-            patient: true,
             medication: true
           }
         },
@@ -80,14 +80,14 @@ export async function GET(request: NextRequest) {
 
       return {
         id: reminder.id,
-        messageTemplate: reminder.messageTemplate,
-        timeOfDay: reminder.timeOfDay,
-        daysOfWeek: reminder.daysOfWeek,
-        educationLink: reminder.educationLink,
+        customMessage: reminder.customMessage,
+        scheduledTime: reminder.scheduledTime,
+        frequency: reminder.frequency,
+        medicationName: reminder.medicationName,
         isActive: reminder.isActive,
         status,
-        patient: reminder.patientMedication.patient,
-        medication: reminder.patientMedication.medication,
+        patient: reminder.patient,
+        medication: reminder.PatientMedication?.medication,
         latestLog,
         createdAt: reminder.createdAt,
         createdBy: reminder.createdByUser
@@ -114,12 +114,11 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const {
-      patientMedicationId,
-      messageTemplate,
-      timeOfDay,
-      interval,
-      educationLink,
-      daysOfWeek
+      patientId,
+      medicationName,
+      scheduledTime,
+      frequency,
+      customMessage
     } = body
 
     // Get current user from database
@@ -132,51 +131,42 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    if (!patientMedicationId || !messageTemplate || !timeOfDay) {
+    if (!patientId || !medicationName || !scheduledTime) {
       return NextResponse.json(
-        { error: 'Patient medication, message template, and time are required' },
+        { error: 'Patient, medication, and time are required' },
         { status: 400 }
       )
     }
 
-    // Check if patient medication exists
-    const patientMedication = await prisma.patientMedication.findUnique({
-      where: { id: patientMedicationId },
-      include: { patient: true }
+    // Check if patient exists
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId }
     })
 
-    if (!patientMedication) {
+    if (!patient) {
       return NextResponse.json(
-        { error: 'Patient medication not found' },
+        { error: 'Patient not found' },
         { status: 404 }
       )
     }
 
-    // Default days of week for daily reminders
-    let reminderDaysOfWeek = daysOfWeek || [1, 2, 3, 4, 5, 6, 7]
-
-    // Adjust days based on interval
-    if (interval === 'Mingguan') {
-      reminderDaysOfWeek = [1] // Only Monday
-    }
+    // Set frequency
+    const reminderFrequency = frequency || 'DAILY'
 
     const reminder = await prisma.reminderSchedule.create({
       data: {
-        patientMedicationId,
-        messageTemplate,
-        timeOfDay,
-        daysOfWeek: reminderDaysOfWeek,
-        educationLink,
+        patientId,
+        medicationName,
+        scheduledTime,
+        frequency: reminderFrequency,
+        customMessage,
         isActive: true,
-        createdBy: currentUser.id
+        createdById: currentUser.id,
+        startDate: new Date(),
+        endDate: null
       },
       include: {
-        patientMedication: {
-          include: {
-            patient: true,
-            medication: true
-          }
-        }
+        patient: true
       }
     })
 
