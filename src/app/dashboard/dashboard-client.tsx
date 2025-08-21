@@ -1,10 +1,11 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Bell, FileText, Play, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useCallback, memo, useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import AddPatientDialog from '@/components/AddPatientDialog'
+import Image from 'next/image'
 
 interface Patient {
   id: string
@@ -19,7 +20,7 @@ function DashboardClient() {
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('all')
+  const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [showAddPatientModal, setShowAddPatientModal] = useState(false)
 
   useEffect(() => {
@@ -28,7 +29,7 @@ function DashboardClient() {
 
   useEffect(() => {
     filterPatients()
-  }, [patients, searchQuery, activeFilter])
+  }, [patients, searchQuery, activeFilters])
 
   const fetchPatients = async () => {
     try {
@@ -53,10 +54,15 @@ function DashboardClient() {
       )
     }
 
-    if (activeFilter === 'active') {
-      filtered = filtered.filter(patient => patient.isActive)
-    } else if (activeFilter === 'inactive') {
-      filtered = filtered.filter(patient => !patient.isActive)
+    // Apply multiple status filters
+    if (activeFilters.length > 0) {
+      filtered = filtered.filter(patient => {
+        const isActive = patient.isActive
+        return (
+          (activeFilters.includes('active') && isActive) ||
+          (activeFilters.includes('inactive') && !isActive)
+        )
+      })
     }
 
     setFilteredPatients(filtered)
@@ -80,6 +86,18 @@ function DashboardClient() {
 
   const handleAddPatientSuccess = useCallback(() => {
     fetchPatients()
+  }, [])
+
+  const toggleFilter = useCallback((filterType: string) => {
+    setActiveFilters(prev => {
+      if (prev.includes(filterType)) {
+        // Remove filter if already active
+        return prev.filter(f => f !== filterType)
+      } else {
+        // Add filter if not active
+        return [...prev, filterType]
+      }
+    })
   }, [])
 
   const handlePatientClick = useCallback((patientId: string) => {
@@ -117,7 +135,15 @@ function DashboardClient() {
             onClick={handlePengingatClick}
             className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <Bell className="w-8 h-8 text-blue-500 mx-auto mb-3" />
+            <div className="w-8 h-8 mx-auto mb-3 relative">
+              <Image 
+                src="/btn_pengingat.png" 
+                alt="Pengingat" 
+                width={32} 
+                height={32}
+                className="object-contain"
+              />
+            </div>
             <h3 className="font-semibold text-sm text-gray-900">Pengingat</h3>
           </div>
 
@@ -126,7 +152,15 @@ function DashboardClient() {
             onClick={handleBeritaClick}
             className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <FileText className="w-8 h-8 text-blue-500 mx-auto mb-3" />
+            <div className="w-8 h-8 mx-auto mb-3 relative">
+              <Image 
+                src="/btn_berita.png" 
+                alt="Berita" 
+                width={32} 
+                height={32}
+                className="object-contain"
+              />
+            </div>
             <h3 className="font-semibold text-sm text-gray-900">Berita</h3>
           </div>
 
@@ -135,7 +169,15 @@ function DashboardClient() {
             onClick={handleVideoClick}
             className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <Play className="w-8 h-8 text-blue-500 mx-auto mb-3" />
+            <div className="w-8 h-8 mx-auto mb-3 relative">
+              <Image 
+                src="/btn_videoEdukasi.png" 
+                alt="Video Edukasi" 
+                width={32} 
+                height={32}
+                className="object-contain"
+              />
+            </div>
             <h3 className="font-semibold text-sm text-gray-900">Video Edukasi</h3>
           </div>
         </div>
@@ -177,20 +219,20 @@ function DashboardClient() {
         {/* Filter Buttons */}
         <div className="flex space-x-2 mb-4">
           <button
-            onClick={() => setActiveFilter('active')}
+            onClick={() => toggleFilter('active')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeFilter === 'active' 
-                ? 'bg-gray-900 text-white' 
+              activeFilters.includes('active')
+                ? 'bg-blue-500 text-white' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
             Aktif
           </button>
           <button
-            onClick={() => setActiveFilter('inactive')}
+            onClick={() => toggleFilter('inactive')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeFilter === 'inactive' 
-                ? 'bg-gray-900 text-white' 
+              activeFilters.includes('inactive')
+                ? 'bg-blue-500 text-white' 
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
           >
