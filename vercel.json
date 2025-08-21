@@ -1,9 +1,10 @@
 {
-  "env": {
-    "NODE_ENV": "production"
-  },
+  "crons": [{
+    "path": "/api/cron",
+    "schedule": "* * * * *"
+  }],
   "functions": {
-    "src/app/api/cron/send-reminders/route.ts": {
+    "src/app/api/cron/route.ts": {
       "maxDuration": 60
     }
   }

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     
     // Call the actual cron endpoint
     const baseUrl = process.env.NEXTJS_URL || 'http://localhost:3000'
-    const response = await fetch(`${baseUrl}/api/cron/send-reminders`, {
+    const response = await fetch(`${baseUrl}/api/cron`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
