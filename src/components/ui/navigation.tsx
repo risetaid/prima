@@ -56,7 +56,7 @@ export function Navigation() {
                 <span className="text-sm text-gray-600">Hi, {user.firstName || user.emailAddresses[0].emailAddress}</span>
                 <button
                   onClick={() => handleNavigation('/dashboard')}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200"
+                  className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                 >
                   Dashboard
                 </button>
@@ -64,7 +64,7 @@ export function Navigation() {
             ) : (
               <button
                 onClick={() => handleNavigation('/sign-in')}
-                className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200"
+                className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
               >
                 Masuk
               </button>
@@ -75,7 +75,7 @@ export function Navigation() {
           <div className="md:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-gray-600 hover:text-blue-600 transition-colors"
+              className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
             >
               {isMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -110,7 +110,7 @@ export function Navigation() {
                   <p className="text-center text-sm text-gray-600">Hi, {user.firstName || user.emailAddresses[0].emailAddress}</p>
                   <button
                     onClick={() => handleNavigation('/dashboard')}
-                    className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200"
+                    className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                   >
                     Dashboard
                   </button>
@@ -118,7 +118,7 @@ export function Navigation() {
               ) : (
                 <button
                   onClick={() => handleNavigation('/sign-in')}
-                  className="w-full mt-4 bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200"
+                  className="w-full mt-4 bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                 >
                   Masuk
                 </button>

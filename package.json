@@ -36,6 +36,7 @@
     "sharp": "^0.34.3",
     "svix": "^1.71.0",
     "tailwind-merge": "^3.3.1",
+    "twilio": "^5.8.0",
     "zod": "^4.0.17"
   },
   "devDependencies": {
@@ -44,10 +45,17 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.15.5",
+    "@types/twilio": "^3.19.3",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5"
-  }
+  },
+  "trustedDependencies": [
+    "@clerk/shared",
+    "@sentry/cli",
+    "@tailwindcss/oxide",
+    "unrs-resolver"
+  ]
 }

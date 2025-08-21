@@ -16,7 +16,22 @@ export default function DashboardPage() {
     if (isLoaded && !user) {
       router.push('/sign-in')
     }
+    
+    // Update last login when user is loaded and authenticated
+    if (isLoaded && user) {
+      updateLastLogin()
+    }
   }, [isLoaded, user, router])
+
+  const updateLastLogin = async () => {
+    try {
+      await fetch('/api/auth/update-last-login', {
+        method: 'POST'
+      })
+    } catch (error) {
+      console.error('Failed to update last login:', error)
+    }
+  }
 
   if (!isLoaded) {
     return (

@@ -1,0 +1,258 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, MessageSquare, Clock } from 'lucide-react'
+import { UserButton } from '@clerk/nextjs'
+
+interface AllReminder {
+  id: string
+  medicationName: string
+  scheduledTime: string
+  reminderDate: string
+  customMessage?: string
+  status: 'scheduled' | 'pending' | 'completed_taken' | 'completed_not_taken'
+}
+
+export default function AllRemindersPage() {
+  const router = useRouter()
+  const params = useParams()
+  const [reminders, setReminders] = useState<AllReminder[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (params.id) {
+      fetchAllReminders(params.id as string)
+    }
+  }, [params.id])
+
+  const fetchAllReminders = async (patientId: string) => {
+    try {
+      // Sample data combining all reminder statuses
+      const sampleReminders: AllReminder[] = [
+        // Scheduled (future)
+        {
+          id: '1',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-17',
+          customMessage: 'Minum obat candesartan',
+          status: 'scheduled'
+        },
+        {
+          id: '2',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-18',
+          customMessage: 'Minum obat candesartan',
+          status: 'scheduled'
+        },
+        {
+          id: '3',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-19',
+          customMessage: 'Minum obat candesartan',
+          status: 'scheduled'
+        },
+        {
+          id: '4',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-20',
+          customMessage: 'Minum obat candesartan',
+          status: 'scheduled'
+        },
+        {
+          id: '5',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-21',
+          customMessage: 'Minum obat candesartan',
+          status: 'scheduled'
+        },
+        // Pending (need manual update)
+        {
+          id: '6',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          reminderDate: '2025-08-03',
+          customMessage: 'Minum obat candesartan',
+          status: 'pending'
+        }
+      ]
+      
+      // Sort by date (most recent first)
+      const sortedReminders = sampleReminders.sort((a, b) => 
+        new Date(b.reminderDate).getTime() - new Date(a.reminderDate).getTime()
+      )
+      
+      setReminders(sortedReminders)
+    } catch (error) {
+      console.error('Error fetching all reminders:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    
+    const dayName = days[date.getDay()]
+    const day = date.getDate()
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+    
+    return `${dayName}, ${day} ${month} ${year}`
+  }
+
+  const getCardStyle = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-500 text-white'
+      case 'pending':
+        return 'bg-orange-500 text-white'
+      case 'completed_taken':
+        return 'bg-green-500 text-white'
+      case 'completed_not_taken':
+        return 'bg-red-500 text-white'
+      default:
+        return 'bg-blue-500 text-white'
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return { text: 'Terjadwal', color: 'bg-blue-100 text-blue-800' }
+      case 'pending':
+        return { text: 'Perlu Update', color: 'bg-orange-100 text-orange-800' }
+      case 'completed_taken':
+        return { text: 'Dipatuhi', color: 'bg-green-100 text-green-800' }
+      case 'completed_not_taken':
+        return { text: 'Tidak Dipatuhi', color: 'bg-red-100 text-red-800' }
+      default:
+        return { text: 'Unknown', color: 'bg-gray-100 text-gray-800' }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white">
+        <div className="flex justify-between items-center px-4 py-4">
+          <button 
+            onClick={() => router.back()}
+            className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+          >
+            <ArrowLeft className="w-6 h-6 text-blue-600" />
+          </button>
+          <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="px-4 py-6">
+        <div className="flex items-center space-x-2 mb-6">
+          <MessageSquare className="w-5 h-5 text-gray-700" />
+          <h2 className="text-lg font-semibold text-gray-900">Semua</h2>
+        </div>
+
+        {/* Reminders List */}
+        <div className="space-y-3">
+          {reminders.map((reminder) => {
+            const cardStyle = getCardStyle(reminder.status)
+            const statusBadge = getStatusBadge(reminder.status)
+            
+            return (
+              <div key={reminder.id} className="space-y-2">
+                {/* Status Badge */}
+                {reminder.status !== 'scheduled' && (
+                  <div className="flex justify-start">
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
+                      {statusBadge.text}
+                    </span>
+                  </div>
+                )}
+                
+                {/* Reminder Card */}
+                <div className={`${cardStyle} rounded-2xl p-4`}>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <h3 className="font-semibold mb-1">
+                        {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                      </h3>
+                      <p className="text-sm opacity-90">
+                        {formatDate(reminder.reminderDate)}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Clock className="w-4 h-4" />
+                      <span className="font-semibold">{reminder.scheduledTime}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {reminders.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Belum ada pengingat</p>
+            </div>
+          )}
+        </div>
+
+        {/* Summary Statistics */}
+        {reminders.length > 0 && (
+          <div className="mt-8 p-4 bg-white rounded-xl shadow-sm border border-gray-200">
+            <h3 className="font-semibold text-gray-900 mb-4">Ringkasan</h3>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-lg font-bold text-blue-600">
+                  {reminders.filter(r => r.status === 'scheduled').length}
+                </div>
+                <div className="text-sm text-gray-600">Terjadwal</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-orange-600">
+                  {reminders.filter(r => r.status === 'pending').length}
+                </div>
+                <div className="text-sm text-gray-600">Perlu Update</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center mt-4 pt-4 border-t border-gray-200">
+              <div>
+                <div className="text-lg font-bold text-green-600">
+                  {reminders.filter(r => r.status === 'completed_taken').length}
+                </div>
+                <div className="text-sm text-gray-600">Dipatuhi</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-red-600">
+                  {reminders.filter(r => r.status === 'completed_not_taken').length}
+                </div>
+                <div className="text-sm text-gray-600">Tidak Dipatuhi</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

@@ -1,0 +1,210 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter, useParams } from 'next/navigation'
+import { ArrowLeft, CheckSquare, Clock } from 'lucide-react'
+import { UserButton } from '@clerk/nextjs'
+
+interface CompletedReminder {
+  id: string
+  medicationName: string
+  scheduledTime: string
+  completedDate: string
+  customMessage?: string
+  medicationTaken: boolean
+  confirmedAt: string
+}
+
+export default function CompletedRemindersPage() {
+  const router = useRouter()
+  const params = useParams()
+  const [reminders, setReminders] = useState<CompletedReminder[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (params.id) {
+      fetchCompletedReminders(params.id as string)
+    }
+  }, [params.id])
+
+  const fetchCompletedReminders = async (patientId: string) => {
+    try {
+      // Sample data for completed reminders
+      const sampleReminders: CompletedReminder[] = [
+        {
+          id: '1',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          completedDate: '2025-07-20',
+          customMessage: 'Minum obat candesartan',
+          medicationTaken: true,
+          confirmedAt: '2025-07-20T14:30:00Z'
+        },
+        {
+          id: '2',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          completedDate: '2025-07-21',
+          customMessage: 'Minum obat candesartan',
+          medicationTaken: false,
+          confirmedAt: '2025-07-21T13:15:00Z'
+        },
+        {
+          id: '3',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          completedDate: '2025-07-22',
+          customMessage: 'Minum obat candesartan',
+          medicationTaken: true,
+          confirmedAt: '2025-07-22T12:45:00Z'
+        },
+        {
+          id: '4',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          completedDate: '2025-07-23',
+          customMessage: 'Minum obat candesartan',
+          medicationTaken: true,
+          confirmedAt: '2025-07-23T15:20:00Z'
+        },
+        {
+          id: '5',
+          medicationName: 'candesartan',
+          scheduledTime: '12:00',
+          completedDate: '2025-07-24',
+          customMessage: 'Minum obat candesartan',
+          medicationTaken: true,
+          confirmedAt: '2025-07-24T11:30:00Z'
+        }
+      ]
+      
+      setReminders(sampleReminders)
+    } catch (error) {
+      console.error('Error fetching completed reminders:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
+                   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    
+    const dayName = days[date.getDay()]
+    const day = date.getDate()
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+    
+    return `${dayName}, ${day} ${month} ${year}`
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <header className="bg-white">
+        <div className="flex justify-between items-center px-4 py-4">
+          <button 
+            onClick={() => router.back()}
+            className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+          >
+            <ArrowLeft className="w-6 h-6 text-blue-600" />
+          </button>
+          <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="px-4 py-6">
+        <div className="flex items-center space-x-2 mb-6">
+          <CheckSquare className="w-5 h-5 text-gray-700" />
+          <h2 className="text-lg font-semibold text-gray-900">Selesai</h2>
+        </div>
+
+        {/* Reminders List */}
+        <div className="space-y-4">
+          {reminders.map((reminder) => (
+            <div key={reminder.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
+              {/* Main Card */}
+              <div className="bg-gray-50 p-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                    </h3>
+                    <p className="text-gray-500 text-sm">
+                      {formatDate(reminder.completedDate)}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-1 text-gray-600">
+                    <Clock className="w-4 h-4" />
+                    <span className="font-semibold">{reminder.scheduledTime}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Button */}
+              <div className="p-0">
+                <div className={`w-full py-3 text-center font-semibold text-white ${
+                  reminder.medicationTaken 
+                    ? 'bg-green-500' 
+                    : 'bg-red-500'
+                }`}>
+                  {reminder.medicationTaken ? 'Dipatuhi' : 'Tidak Dipatuhi'}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {reminders.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Belum ada pengingat yang selesai</p>
+            </div>
+          )}
+        </div>
+
+        {/* Statistics */}
+        {reminders.length > 0 && (
+          <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <h3 className="font-semibold text-gray-900 mb-3">Statistik Kepatuhan</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {reminders.filter(r => r.medicationTaken).length}
+                </div>
+                <div className="text-sm text-gray-600">Dipatuhi</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {reminders.filter(r => !r.medicationTaken).length}
+                </div>
+                <div className="text-sm text-gray-600">Tidak Dipatuhi</div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-blue-200">
+              <div className="text-center">
+                <div className="text-lg font-bold text-blue-600">
+                  {Math.round((reminders.filter(r => r.medicationTaken).length / reminders.length) * 100)}%
+                </div>
+                <div className="text-sm text-gray-600">Tingkat Kepatuhan</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}
