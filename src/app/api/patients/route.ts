@@ -52,9 +52,17 @@ export async function GET(request: NextRequest) {
             email: true
           }
         },
-        patientMetrics: {
-          orderBy: { metricDate: 'desc' },
-          take: 1
+        manualConfirmations: true,
+        reminderLogs: {
+          where: { 
+            status: 'DELIVERED',
+            reminderSchedule: {
+              isActive: true  // Only count logs from active schedules
+            }
+          },
+          include: {
+            reminderSchedule: true
+          }
         }
       },
       orderBy: [
@@ -64,8 +72,13 @@ export async function GET(request: NextRequest) {
     })
 
     const patientsWithCompliance = patients.map(patient => {
-      const latestMetric = patient.patientMetrics[0]
-      const complianceRate = latestMetric?.complianceRate || 0
+      // Calculate real-time compliance rate
+      const totalDeliveredReminders = patient.reminderLogs.length
+      const totalConfirmations = patient.manualConfirmations.length
+      
+      const complianceRate = totalDeliveredReminders > 0 
+        ? Math.round((totalConfirmations / totalDeliveredReminders) * 100)
+        : 0
 
       return {
         id: patient.id,

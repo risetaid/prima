@@ -1,6 +1,3 @@
-// PRIMA Project - Prisma Schema
-// Palliative Remote Integrated Monitoring and Assistance
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -11,206 +8,152 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ===== USERS & AUTHENTICATION =====
-
 model User {
-  id          String    @id @default(uuid())
-  clerkId     String    @unique @map("clerk_id")
-  email       String    @unique
-  firstName   String?   @map("first_name")
-  lastName    String?   @map("last_name")
-  phoneNumber String?   @map("phone_number")
-  role        UserRole  @default(VOLUNTEER)
-  isActive    Boolean   @default(true) @map("is_active")
-  lastLoginAt DateTime? @map("last_login_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  patientsManaged           Patient[]            @relation("VolunteerPatients")
-  manualConfirmations       ManualConfirmation[]
-  reminderSchedulesCreated  ReminderSchedule[]
-  patientMedicationsCreated PatientMedication[]
-  medicalRecords            MedicalRecord[]
-  volunteerMetrics          VolunteerMetric[]
-  loginLogs                 UserLoginLog[]
+  id                        String               @id @default(uuid())
+  clerkId                   String               @unique @map("clerk_id")
+  email                     String               @unique
+  firstName                 String?              @map("first_name")
+  lastName                  String?              @map("last_name")
+  phoneNumber               String?              @map("phone_number")
+  role                      UserRole             @default(VOLUNTEER)
+  isActive                  Boolean              @default(true) @map("is_active")
+  lastLoginAt               DateTime?            @map("last_login_at")
+  createdAt                 DateTime             @default(now()) @map("created_at")
+  updatedAt                 DateTime             @updatedAt @map("updated_at")
   educationalArticles       EducationalArticle[]
+  manualConfirmations       ManualConfirmation[]
+  medicalRecords            MedicalRecord[]
+  patientMedicationsCreated PatientMedication[]
+  patientsManaged           Patient[]            @relation("VolunteerPatients")
+  reminderSchedulesCreated  ReminderSchedule[]
+  loginLogs                 UserLoginLog[]
+  volunteerMetrics          VolunteerMetric[]
 
   @@map("users")
 }
 
-enum UserRole {
-  ADMIN
-  VOLUNTEER
-}
-
-// ===== PATIENT MANAGEMENT =====
-
 model Patient {
-  id                    String       @id @default(uuid())
+  id                    String               @id @default(uuid())
   name                  String
-  phoneNumber           String       @map("phone_number")
+  phoneNumber           String               @map("phone_number")
   address               String?
-  birthDate             DateTime?    @map("birth_date")
-  diagnosisDate         DateTime?    @map("diagnosis_date")
-  cancerStage           CancerStage? @map("cancer_stage")
-  assignedVolunteerId   String?      @map("assigned_volunteer_id")
-  emergencyContactName  String?      @map("emergency_contact_name")
-  emergencyContactPhone String?      @map("emergency_contact_phone")
+  birthDate             DateTime?            @map("birth_date")
+  diagnosisDate         DateTime?            @map("diagnosis_date")
+  cancerStage           CancerStage?         @map("cancer_stage")
+  assignedVolunteerId   String?              @map("assigned_volunteer_id")
+  emergencyContactName  String?              @map("emergency_contact_name")
+  emergencyContactPhone String?              @map("emergency_contact_phone")
   notes                 String?
-  isActive              Boolean      @default(true) @map("is_active")
-  deletedAt             DateTime?    @map("deleted_at")
-  createdAt             DateTime     @default(now()) @map("created_at")
-  updatedAt             DateTime     @updatedAt @map("updated_at")
-
-  // Relations
-  assignedVolunteer   User?                @relation("VolunteerPatients", fields: [assignedVolunteerId], references: [id])
-  medicalRecords      MedicalRecord[]
-  patientMedications  PatientMedication[]
-  patientSymptoms     PatientSymptom[]
-  reminderSchedules   ReminderSchedule[]
-  manualConfirmations ManualConfirmation[]
-  appointments        Appointment[]
-  reminderLogs        ReminderLog[]
-  patientMetrics      PatientMetric[]
-  contentAccessLogs   ContentAccessLog[]
+  isActive              Boolean              @default(true) @map("is_active")
+  deletedAt             DateTime?            @map("deleted_at")
+  createdAt             DateTime             @default(now()) @map("created_at")
+  updatedAt             DateTime             @updatedAt @map("updated_at")
+  appointments          Appointment[]
+  contentAccessLogs     ContentAccessLog[]
+  manualConfirmations   ManualConfirmation[]
+  medicalRecords        MedicalRecord[]
+  patientMedications    PatientMedication[]
+  patientMetrics        PatientMetric[]
+  patientSymptoms       PatientSymptom[]
+  assignedVolunteer     User?                @relation("VolunteerPatients", fields: [assignedVolunteerId], references: [id])
+  reminderLogs          ReminderLog[]
+  reminderSchedules     ReminderSchedule[]
 
   @@map("patients")
 }
 
-enum CancerStage {
-  I
-  II
-  III
-  IV
-}
-
 model MedicalRecord {
-  id           String            @id @default(uuid())
-  patientId    String            @map("patient_id")
-  recordType   MedicalRecordType @map("record_type")
-  title        String
-  description  String
-  recordedDate DateTime          @map("recorded_date")
-  recordedBy   String            @map("recorded_by")
-  createdAt    DateTime          @default(now()) @map("created_at")
-
-  // Relations
-  patient        Patient @relation(fields: [patientId], references: [id])
-  recordedByUser User    @relation(fields: [recordedBy], references: [id])
+  id             String            @id @default(uuid())
+  patientId      String            @map("patient_id")
+  recordType     MedicalRecordType @map("record_type")
+  title          String
+  description    String
+  recordedDate   DateTime          @map("recorded_date")
+  recordedBy     String            @map("recorded_by")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  recordedByUser User              @relation(fields: [recordedBy], references: [id])
 
   @@map("medical_records")
 }
 
-enum MedicalRecordType {
-  DIAGNOSIS
-  TREATMENT
-  PROGRESS
-}
-
-// ===== MEDICATION MANAGEMENT =====
-
 model Medication {
-  id            String   @id @default(uuid())
-  name          String
-  genericName   String?  @map("generic_name")
-  description   String?
-  commonDosages String[] @map("common_dosages")
-  sideEffects   String?  @map("side_effects")
-  instructions  String?
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  // Relations
+  id                 String              @id @default(uuid())
+  name               String
+  genericName        String?             @map("generic_name")
+  description        String?
+  commonDosages      String[]            @map("common_dosages")
+  sideEffects        String?             @map("side_effects")
+  instructions       String?
+  createdAt          DateTime            @default(now()) @map("created_at")
   patientMedications PatientMedication[]
 
   @@map("medications")
 }
 
 model PatientMedication {
-  id           String    @id @default(uuid())
-  patientId    String    @map("patient_id")
-  medicationId String    @map("medication_id")
-  dosage       String
-  frequency    String
-  instructions String?
-  startDate    DateTime  @map("start_date")
-  endDate      DateTime? @map("end_date")
-  isActive     Boolean   @default(true) @map("is_active")
-  prescribedBy String?   @map("prescribed_by")
-  createdBy    String    @map("created_by")
-  createdAt    DateTime  @default(now()) @map("created_at")
-
-  // Relations
-  patient           Patient            @relation(fields: [patientId], references: [id])
-  medication        Medication         @relation(fields: [medicationId], references: [id])
+  id                String             @id @default(uuid())
+  patientId         String             @map("patient_id")
+  medicationId      String             @map("medication_id")
+  dosage            String
+  frequency         String
+  instructions      String?
+  startDate         DateTime           @map("start_date")
+  endDate           DateTime?          @map("end_date")
+  isActive          Boolean            @default(true) @map("is_active")
+  prescribedBy      String?            @map("prescribed_by")
+  createdBy         String             @map("created_by")
+  createdAt         DateTime           @default(now()) @map("created_at")
   createdByUser     User               @relation(fields: [createdBy], references: [id])
+  medication        Medication         @relation(fields: [medicationId], references: [id])
+  patient           Patient            @relation(fields: [patientId], references: [id])
   reminderSchedules ReminderSchedule[]
 
   @@map("patient_medications")
 }
 
-// ===== REMINDER & SCHEDULING SYSTEM =====
-
 model ReminderSchedule {
-  id             String    @id @default(uuid())
-  patientId      String    @map("patient_id")
-  medicationName String    @map("medication_name")
-  scheduledTime  String    @map("scheduled_time") // Format: "07:00"
-  frequency      Frequency @default(DAILY)
-  startDate      DateTime  @map("start_date")
-  endDate        DateTime? @map("end_date")
-  customMessage  String?   @map("custom_message")
-  isActive       Boolean   @default(true) @map("is_active")
-  createdById    String    @map("created_by_id")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  patient             Patient              @relation(fields: [patientId], references: [id])
-  createdByUser       User                 @relation(fields: [createdById], references: [id])
-  reminderLogs        ReminderLog[]
-  manualConfirmations ManualConfirmation[]
-  PatientMedication   PatientMedication?   @relation(fields: [patientMedicationId], references: [id])
+  id                  String               @id @default(uuid())
+  patientId           String               @map("patient_id")
+  medicationName      String               @map("medication_name")
+  scheduledTime       String               @map("scheduled_time")
+  frequency           Frequency            @default(DAILY)
+  startDate           DateTime             @map("start_date")
+  endDate             DateTime?            @map("end_date")
+  customMessage       String?              @map("custom_message")
+  isActive            Boolean              @default(true) @map("is_active")
+  createdById         String               @map("created_by_id")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
   patientMedicationId String?
+  manualConfirmations ManualConfirmation[]
+  reminderLogs        ReminderLog[]
+  createdByUser       User                 @relation(fields: [createdById], references: [id])
+  PatientMedication   PatientMedication?   @relation(fields: [patientMedicationId], references: [id])
+  patient             Patient              @relation(fields: [patientId], references: [id])
 
   @@map("reminder_schedules")
 }
 
-enum Frequency {
-  DAILY
-  WEEKLY
-}
-
 model ReminderLog {
-  id                 String         @id @default(uuid())
-  reminderScheduleId String?        @map("reminder_schedule_id")
-  patientId          String         @map("patient_id")
-  message            String
-  phoneNumber        String         @map("phone_number")
-  sentAt             DateTime       @map("sent_at")
-  twilioMessageId    String?        @map("twilio_message_id")
-  status             ReminderStatus @default(PENDING)
-  errorMessage       String?        @map("error_message")
-  patientResponse    String?        @map("patient_response")
-  responseReceivedAt DateTime?      @map("response_received_at")
-  createdAt          DateTime       @default(now()) @map("created_at")
-
-  // Relations
-  reminderSchedule    ReminderSchedule?   @relation(fields: [reminderScheduleId], references: [id])
-  patient             Patient             @relation(fields: [patientId], references: [id])
+  id                  String               @id @default(uuid())
+  reminderScheduleId  String?              @map("reminder_schedule_id")
+  patientId           String               @map("patient_id")
+  message             String
+  phoneNumber         String               @map("phone_number")
+  sentAt              DateTime             @map("sent_at")
+  twilioMessageId     String?              @map("twilio_message_id")
+  status              ReminderStatus       @default(PENDING)
+  errorMessage        String?              @map("error_message")
+  patientResponse     String?              @map("patient_response")
+  responseReceivedAt  DateTime?            @map("response_received_at")
+  createdAt           DateTime             @default(now()) @map("created_at")
   manualConfirmations ManualConfirmation[]
+  patient             Patient              @relation(fields: [patientId], references: [id])
+  reminderSchedule    ReminderSchedule?    @relation(fields: [reminderScheduleId], references: [id])
 
   @@map("reminder_logs")
 }
-
-enum ReminderStatus {
-  PENDING
-  SENT
-  DELIVERED
-  FAILED
-}
-
-// ===== MANUAL CONFIRMATIONS & VISITS =====
 
 model PatientSymptom {
   id          String   @id @default(uuid())
@@ -218,43 +161,33 @@ model PatientSymptom {
   symptomText String   @map("symptom_text")
   recordedAt  DateTime @map("recorded_at")
   createdAt   DateTime @default(now()) @map("created_at")
-
-  // Relations
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient     Patient  @relation(fields: [patientId], references: [id])
 
   @@map("patient_symptoms")
 }
 
 model ManualConfirmation {
-  id                 String           @id @default(uuid())
-  patientId          String           @map("patient_id")
-  volunteerId        String           @map("volunteer_id")
-  reminderScheduleId String?          @map("reminder_schedule_id")
-  reminderLogId      String?          @map("reminder_log_id")  // ADD: Link to specific ReminderLog
-  visitDate          DateTime         @map("visit_date")
-  visitTime          String           @map("visit_time")
-  medicationsTaken   Boolean          @map("medications_taken")
-  medicationsMissed  String[]         @map("medications_missed")
-  patientCondition   PatientCondition @map("patient_condition")
-  symptomsReported   String[]         @map("symptoms_reported")
+  id                 String            @id @default(uuid())
+  patientId          String            @map("patient_id")
+  volunteerId        String            @map("volunteer_id")
+  reminderScheduleId String?           @map("reminder_schedule_id")
+  reminderLogId      String?           @map("reminder_log_id")
+  visitDate          DateTime          @map("visit_date")
+  visitTime          String            @map("visit_time")
+  medicationsTaken   Boolean           @map("medications_taken")
+  medicationsMissed  String[]          @map("medications_missed")
+  patientCondition   PatientCondition  @map("patient_condition")
+  symptomsReported   String[]          @map("symptoms_reported")
   notes              String?
-  followUpNeeded     Boolean          @default(false) @map("follow_up_needed")
-  followUpNotes      String?          @map("follow_up_notes")
-  confirmedAt        DateTime         @default(now()) @map("confirmed_at")
-
-  // Relations
-  patient          Patient           @relation(fields: [patientId], references: [id])
-  volunteer        User              @relation(fields: [volunteerId], references: [id])
-  reminderSchedule ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
-  reminderLog      ReminderLog?      @relation(fields: [reminderLogId], references: [id])
+  followUpNeeded     Boolean           @default(false) @map("follow_up_needed")
+  followUpNotes      String?           @map("follow_up_notes")
+  confirmedAt        DateTime          @default(now()) @map("confirmed_at")
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  reminderLog        ReminderLog?      @relation(fields: [reminderLogId], references: [id])
+  reminderSchedule   ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
+  volunteer          User              @relation(fields: [volunteerId], references: [id])
 
   @@map("manual_confirmations")
-}
-
-enum PatientCondition {
-  GOOD
-  FAIR
-  POOR
 }
 
 model Appointment {
@@ -270,26 +203,10 @@ model Appointment {
   notes           String?
   createdBy       String            @map("created_by")
   createdAt       DateTime          @default(now()) @map("created_at")
-
-  // Relations
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient         Patient           @relation(fields: [patientId], references: [id])
 
   @@map("appointments")
 }
-
-enum AppointmentType {
-  CHECKUP
-  CHEMOTHERAPY
-  CONSULTATION
-}
-
-enum AppointmentStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-}
-
-// ===== ANALYTICS & METRICS =====
 
 model PatientMetric {
   id                    String   @id @default(uuid())
@@ -301,9 +218,7 @@ model PatientMetric {
   medicationsMissed     Int      @default(0) @map("medications_missed")
   complianceRate        Float    @default(0) @map("compliance_rate")
   calculatedAt          DateTime @default(now()) @map("calculated_at")
-
-  // Relations
-  patient Patient @relation(fields: [patientId], references: [id])
+  patient               Patient  @relation(fields: [patientId], references: [id])
 
   @@map("patient_metrics")
 }
@@ -318,14 +233,10 @@ model VolunteerMetric {
   averagePatientCompliance Float    @default(0) @map("average_patient_compliance")
   postsCreated             Int      @default(0) @map("posts_created")
   calculatedAt             DateTime @default(now()) @map("calculated_at")
-
-  // Relations
-  volunteer User @relation(fields: [volunteerId], references: [id])
+  volunteer                User     @relation(fields: [volunteerId], references: [id])
 
   @@map("volunteer_metrics")
 }
-
-// ===== CONTENT ACCESS TRACKING =====
 
 model ContentAccessLog {
   id          String       @id @default(uuid())
@@ -333,21 +244,11 @@ model ContentAccessLog {
   patientId   String?      @map("patient_id")
   accessedVia AccessSource @map("accessed_via")
   accessedAt  DateTime     @default(now()) @map("accessed_at")
-  timeSpent   Int?         @map("time_spent") // in seconds
-
-  // Relations
-  patient Patient? @relation(fields: [patientId], references: [id])
+  timeSpent   Int?         @map("time_spent")
+  patient     Patient?     @relation(fields: [patientId], references: [id])
 
   @@map("content_access_logs")
 }
-
-enum AccessSource {
-  REMINDER
-  DIRECT
-  SEARCH
-}
-
-// ===== SYSTEM CONFIGURATION =====
 
 model SystemSetting {
   key         String   @id
@@ -363,7 +264,7 @@ model WhatsAppTemplate {
   id           String           @id @default(uuid())
   templateName String           @unique @map("template_name")
   templateText String           @map("template_text")
-  variables    String[] // ['{patient_name}', '{medication}']
+  variables    String[]
   category     TemplateCategory
   isActive     Boolean          @default(true) @map("is_active")
   createdBy    String           @map("created_by")
@@ -372,55 +273,101 @@ model WhatsAppTemplate {
   @@map("whatsapp_templates")
 }
 
-enum TemplateCategory {
-  REMINDER
-  APPOINTMENT
-  EDUCATIONAL
-}
-
-// ===== USER LOGIN TRACKING =====
-
 model UserLoginLog {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   loginTime DateTime @default(now()) @map("login_time")
   ipAddress String?  @map("ip_address")
   userAgent String?  @map("user_agent")
-  location  String? // Optional: city/country from IP
-  device    String? // mobile/desktop/tablet
-
-  // Relations
-  user User @relation(fields: [userId], references: [id])
+  location  String?
+  device    String?
+  user      User     @relation(fields: [userId], references: [id])
 
   @@map("user_login_logs")
 }
 
-// ===== EDUCATIONAL ARTICLES =====
-
 model EducationalArticle {
-  id          String          @id @default(uuid())
-  title       String
-  description String?
-  url         String // Link/URL artikel
-  category    ArticleCategory
-  tags        String[] // Array of tags
-  isActive    Boolean         @default(true) @map("is_active")
-  createdBy   String          @map("created_by")
-  createdAt   DateTime        @default(now()) @map("created_at")
-  updatedAt   DateTime        @updatedAt @map("updated_at")
-
-  // Relations
-  createdByUser User @relation(fields: [createdBy], references: [id])
+  id            String          @id @default(uuid())
+  title         String
+  description   String?
+  url           String
+  category      ArticleCategory
+  tags          String[]
+  isActive      Boolean         @default(true) @map("is_active")
+  createdBy     String          @map("created_by")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  createdByUser User            @relation(fields: [createdBy], references: [id])
 
   @@map("educational_articles")
 }
 
+enum UserRole {
+  ADMIN
+  VOLUNTEER
+}
+
+enum CancerStage {
+  I
+  II
+  III
+  IV
+}
+
+enum MedicalRecordType {
+  DIAGNOSIS
+  TREATMENT
+  PROGRESS
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum PatientCondition {
+  GOOD
+  FAIR
+  POOR
+}
+
+enum AppointmentType {
+  CHECKUP
+  CHEMOTHERAPY
+  CONSULTATION
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum AccessSource {
+  REMINDER
+  DIRECT
+  SEARCH
+}
+
+enum TemplateCategory {
+  REMINDER
+  APPOINTMENT
+  EDUCATIONAL
+}
+
 enum ArticleCategory {
-  MEDICATION // Informasi obat-obatan
-  NUTRITION // Nutrisi dan diet
-  EXERCISE // Olahraga dan aktivitas
-  MENTAL_HEALTH // Kesehatan mental
-  SYMPTOMS // Gejala dan penanganan
-  TREATMENT // Informasi pengobatan
-  LIFESTYLE // Gaya hidup sehat
+  MEDICATION
+  NUTRITION
+  EXERCISE
+  MENTAL_HEALTH
+  SYMPTOMS
+  TREATMENT
+  LIFESTYLE
 }

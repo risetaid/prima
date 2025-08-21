@@ -25,9 +25,17 @@ export async function GET(
             email: true
           }
         },
-        patientMetrics: {
-          orderBy: { metricDate: 'desc' },
-          take: 1
+        manualConfirmations: true,
+        reminderLogs: {
+          where: { 
+            status: 'DELIVERED',
+            reminderSchedule: {
+              isActive: true  // Only count logs from active schedules
+            }
+          },
+          include: {
+            reminderSchedule: true
+          }
         },
         patientMedications: {
           where: { isActive: true },
@@ -45,12 +53,17 @@ export async function GET(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
-    const latestMetric = patient.patientMetrics[0]
-    const complianceRate = latestMetric?.complianceRate || 0
+    // Calculate real-time compliance rate
+    const totalDeliveredReminders = patient.reminderLogs.length
+    const totalConfirmations = patient.manualConfirmations.length
+    
+    const complianceRate = totalDeliveredReminders > 0 
+      ? Math.round((totalConfirmations / totalDeliveredReminders) * 100)
+      : 0
 
     const patientWithCompliance = {
       ...patient,
-      complianceRate: Math.round(complianceRate)
+      complianceRate
     }
 
     return NextResponse.json(patientWithCompliance)

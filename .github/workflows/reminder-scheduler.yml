@@ -1,0 +1,21 @@
+name: Reminder Scheduler
+
+on:
+  schedule:
+    # Run every 20 minutes (optimal for free tier: ~2160 minutes/month)
+    - cron: '*/20 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Send reminders via webhook
+      run: |
+        curl -X POST \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer ${{ secrets.CRON_SECRET_KEY }}" \
+          ${{ vars.APP_URL }}/api/cron
+      env:
+        CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
