@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -15,6 +15,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const { action } = body // 'ya' or 'tidak'
 
@@ -27,7 +28,7 @@ export async function POST(
 
     // Find the reminder
     const reminder = await prisma.reminderSchedule.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patientMedication: {
           include: {
@@ -43,7 +44,7 @@ export async function POST(
 
     // Create or update the latest reminder log
     const latestLog = await prisma.reminderLog.findFirst({
-      where: { scheduleId: params.id },
+      where: { scheduleId: id },
       orderBy: { createdAt: 'desc' }
     })
 
@@ -61,7 +62,7 @@ export async function POST(
       // Create new log entry
       await prisma.reminderLog.create({
         data: {
-          scheduleId: params.id,
+          scheduleId: id,
           patientId: reminder.patientMedication.patientId,
           scheduledFor: new Date(),
           sentAt: new Date(),

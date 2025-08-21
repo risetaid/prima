@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -15,8 +15,9 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const reminder = await prisma.reminderSchedule.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         patientMedication: {
           include: {
@@ -53,7 +54,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -62,6 +63,7 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const {
       messageTemplate,
@@ -72,7 +74,7 @@ export async function PUT(
     } = body
 
     const reminder = await prisma.reminderSchedule.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         messageTemplate,
         timeOfDay,
@@ -102,7 +104,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth()
@@ -111,9 +113,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const { id } = await params
     // Soft delete by setting isActive to false
     const reminder = await prisma.reminderSchedule.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         isActive: false
       }
