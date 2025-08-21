@@ -13,34 +13,53 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get reminder statistics for the patient
-    const [scheduledCount, pendingCount, completedCount] = await Promise.all([
-      // Scheduled (future reminders)
-      prisma.reminderSchedule.count({
-        where: {
-          patientId: id,
-          isActive: true,
-          startDate: { lte: new Date() },
-          endDate: { gte: new Date() }
+    
+    // Get all active reminder schedules to analyze their status
+    const reminderSchedules = await prisma.reminderSchedule.findMany({
+      where: {
+        patientId: id,
+        isActive: true
+      },
+      include: {
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 1,
+          include: {
+            manualConfirmations: true
+          }
+        },
+        manualConfirmations: {
+          orderBy: { visitDate: 'desc' },
+          take: 1
         }
-      }),
+      }
+    })
 
-      // Pending (sent but need manual confirmation)
-      prisma.reminderLog.count({
-        where: {
-          patientId: id,
-          status: 'DELIVERED',
-          // Add condition for logs that need manual confirmation
-        }
-      }),
+    // Count each status type
+    let scheduledCount = 0
+    let pendingCount = 0  
+    let completedCount = 0
 
-      // Completed (manually confirmed)
-      prisma.manualConfirmation.count({
-        where: {
-          patientId: id
+    reminderSchedules.forEach(schedule => {
+      const latestLog = schedule.reminderLogs[0]
+      const scheduleConfirmation = schedule.manualConfirmations[0]
+      
+      if (latestLog) {
+        const logConfirmation = latestLog.manualConfirmations[0]
+        
+        if (logConfirmation) {
+          completedCount++
+        } else if (latestLog.status === 'DELIVERED') {
+          pendingCount++
+        } else {
+          scheduledCount++
         }
-      })
-    ])
+      } else if (scheduleConfirmation) {
+        completedCount++
+      } else {
+        scheduledCount++
+      }
+    })
 
     const stats = {
       terjadwal: scheduledCount,

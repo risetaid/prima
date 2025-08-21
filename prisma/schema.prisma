@@ -196,8 +196,9 @@ model ReminderLog {
   createdAt          DateTime       @default(now()) @map("created_at")
 
   // Relations
-  reminderSchedule ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
-  patient          Patient           @relation(fields: [patientId], references: [id])
+  reminderSchedule    ReminderSchedule?   @relation(fields: [reminderScheduleId], references: [id])
+  patient             Patient             @relation(fields: [patientId], references: [id])
+  manualConfirmations ManualConfirmation[]
 
   @@map("reminder_logs")
 }
@@ -229,6 +230,7 @@ model ManualConfirmation {
   patientId          String           @map("patient_id")
   volunteerId        String           @map("volunteer_id")
   reminderScheduleId String?          @map("reminder_schedule_id")
+  reminderLogId      String?          @map("reminder_log_id")  // ADD: Link to specific ReminderLog
   visitDate          DateTime         @map("visit_date")
   visitTime          String           @map("visit_time")
   medicationsTaken   Boolean          @map("medications_taken")
@@ -244,6 +246,7 @@ model ManualConfirmation {
   patient          Patient           @relation(fields: [patientId], references: [id])
   volunteer        User              @relation(fields: [volunteerId], references: [id])
   reminderSchedule ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
+  reminderLog      ReminderLog?      @relation(fields: [reminderLogId], references: [id])
 
   @@map("manual_confirmations")
 }

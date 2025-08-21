@@ -12,13 +12,17 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { medicationTaken } = await request.json()
+    const { medicationTaken, reminderLogId } = await request.json()
 
     if (typeof medicationTaken !== 'boolean') {
       return NextResponse.json({ error: 'medicationTaken must be boolean' }, { status: 400 })
     }
 
     const { id, reminderId } = await params
+    
+    // Use reminderLogId from request body if provided, otherwise use reminderId from URL
+    const logId = reminderLogId || reminderId
+    
     // Get current user from database
     const user = await prisma.user.findFirst({
       where: { clerkId: userId }
@@ -31,7 +35,7 @@ export async function PUT(
     // Get the reminder log to find the related schedule
     const reminderLog = await prisma.reminderLog.findUnique({
       where: { 
-        id: reminderId,
+        id: logId,
         patientId: id
       },
       include: {
@@ -43,11 +47,24 @@ export async function PUT(
       return NextResponse.json({ error: 'Reminder not found' }, { status: 404 })
     }
 
-    // Create manual confirmation
+    // Check if this ReminderLog is already confirmed
+    const existingConfirmation = await prisma.manualConfirmation.findFirst({
+      where: {
+        reminderLogId: logId
+      }
+    })
+
+    if (existingConfirmation) {
+      return NextResponse.json({ error: 'Reminder already confirmed' }, { status: 400 })
+    }
+
+    // Create manual confirmation with proper relations
     const manualConfirmation = await prisma.manualConfirmation.create({
       data: {
         patientId: id,
         volunteerId: user.id,
+        reminderScheduleId: reminderLog.reminderScheduleId,
+        reminderLogId: logId,  // Link to specific ReminderLog
         visitDate: new Date(),
         visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
         medicationsTaken: medicationTaken,

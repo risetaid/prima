@@ -46,11 +46,14 @@ export default function PendingUpdatePage() {
 
   const handleConfirmation = async (reminderId: string, taken: boolean) => {
     try {
-      // API call to update reminder status
+      // API call to update reminder status - reminderId here is actually ReminderLog ID
       const response = await fetch(`/api/patients/${params.id}/reminders/${reminderId}/confirm`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ medicationTaken: taken })
+        body: JSON.stringify({ 
+          medicationTaken: taken,
+          reminderLogId: reminderId  // Pass the ReminderLog ID
+        })
       })
 
       if (response.ok) {
