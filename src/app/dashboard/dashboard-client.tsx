@@ -134,13 +134,13 @@ function DashboardClient() {
           <div className="text-center">
             <div 
               onClick={handlePengingatClick}
-              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
             >
               <Image 
                 src="/btn_pengingat.png" 
                 alt="Pengingat" 
-                width={64} 
-                height={64}
+                width={80} 
+                height={80}
                 className="mx-auto"
               />
             </div>
@@ -151,13 +151,13 @@ function DashboardClient() {
           <div className="text-center">
             <div 
               onClick={handleBeritaClick}
-              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
             >
               <Image 
                 src="/btn_berita.png" 
                 alt="Berita" 
-                width={64} 
-                height={64}
+                width={80} 
+                height={80}
                 className="mx-auto"
               />
             </div>
@@ -168,13 +168,13 @@ function DashboardClient() {
           <div className="text-center">
             <div 
               onClick={handleVideoClick}
-              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
             >
               <Image 
                 src="/btn_videoEdukasi.png" 
                 alt="Video Edukasi" 
-                width={64} 
-                height={64}
+                width={80} 
+                height={80}
                 className="mx-auto"
               />
             </div>
