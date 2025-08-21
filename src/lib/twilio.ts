@@ -155,8 +155,8 @@ export const validateTwilioWebhook = (
   if (!webhookSignature) return false
   
   // Convert body to Record<string, any> if it's a string
-  const bodyParams = typeof body === 'string' ? 
-    Object.fromEntries(new URLSearchParams(body)) : body
+  const bodyParams: Record<string, any> = typeof body === 'string' ? 
+    Object.fromEntries(new URLSearchParams(body)) : (body as Record<string, any>)
   
   return twilio.validateRequest(webhookSignature, url, bodyParams, signature)
 }
