@@ -61,20 +61,18 @@ export async function PUT(
     const { id } = await params
     const body = await request.json()
     const {
-      messageTemplate,
-      timeOfDay,
-      daysOfWeek,
-      educationLink,
+      customMessage,
+      scheduledTime,
+      frequency,
       isActive
     } = body
 
     const reminder = await prisma.reminderSchedule.update({
       where: { id },
       data: {
-        messageTemplate,
-        timeOfDay,
-        daysOfWeek,
-        educationLink,
+        customMessage,
+        scheduledTime,
+        frequency,
         isActive
       },
       include: {
