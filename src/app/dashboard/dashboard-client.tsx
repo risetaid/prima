@@ -130,55 +130,55 @@ function DashboardClient() {
       {/* Blue Background Section */}
       <div className="bg-blue-500 p-6 mb-6" style={{ marginLeft: '-1.5rem', marginRight: '-1.5rem' }}>
         <div className="grid grid-cols-3 gap-4">
-          {/* Pengingat Card */}
-          <div 
-            onClick={handlePengingatClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <div className="w-8 h-8 mx-auto mb-3 relative">
+          {/* Pengingat */}
+          <div className="text-center">
+            <div 
+              onClick={handlePengingatClick}
+              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+            >
               <Image 
                 src="/btn_pengingat.png" 
                 alt="Pengingat" 
-                width={32} 
-                height={32}
-                className="object-contain"
+                width={64} 
+                height={64}
+                className="mx-auto"
               />
             </div>
-            <h3 className="font-semibold text-sm text-gray-900">Pengingat</h3>
+            <h3 className="font-semibold text-sm text-white">Pengingat</h3>
           </div>
 
-          {/* Berita Card */}
-          <div 
-            onClick={handleBeritaClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <div className="w-8 h-8 mx-auto mb-3 relative">
+          {/* Berita */}
+          <div className="text-center">
+            <div 
+              onClick={handleBeritaClick}
+              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+            >
               <Image 
                 src="/btn_berita.png" 
                 alt="Berita" 
-                width={32} 
-                height={32}
-                className="object-contain"
+                width={64} 
+                height={64}
+                className="mx-auto"
               />
             </div>
-            <h3 className="font-semibold text-sm text-gray-900">Berita</h3>
+            <h3 className="font-semibold text-sm text-white">Berita</h3>
           </div>
 
-          {/* Video Edukasi Card */}
-          <div 
-            onClick={handleVideoClick}
-            className="bg-white rounded-2xl p-4 text-center cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <div className="w-8 h-8 mx-auto mb-3 relative">
+          {/* Video Edukasi */}
+          <div className="text-center">
+            <div 
+              onClick={handleVideoClick}
+              className="bg-white rounded-2xl p-4 cursor-pointer hover:bg-gray-50 transition-colors mb-3"
+            >
               <Image 
                 src="/btn_videoEdukasi.png" 
                 alt="Video Edukasi" 
-                width={32} 
-                height={32}
-                className="object-contain"
+                width={64} 
+                height={64}
+                className="mx-auto"
               />
             </div>
-            <h3 className="font-semibold text-sm text-gray-900">Video Edukasi</h3>
+            <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
           </div>
         </div>
       </div>
