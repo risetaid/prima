@@ -110,8 +110,8 @@ function DashboardClient() {
   return (
     <>
       {/* Blue Background Section */}
-      <div className="bg-blue-500 rounded-2xl p-6 mb-6 -mx-4 w-screen relative left-1/2 transform -translate-x-1/2">
-        <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto">
+      <div className="bg-blue-500 p-6 mb-6" style={{ marginLeft: '-1.5rem', marginRight: '-1.5rem' }}>
+        <div className="grid grid-cols-3 gap-4">
           {/* Pengingat Card */}
           <div 
             onClick={handlePengingatClick}
