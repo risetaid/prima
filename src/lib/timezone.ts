@@ -61,6 +61,7 @@ export const shouldSendReminderNow = (startDate: string, scheduledTime: string):
   const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
   
   // Only send if current time is within 5 minutes AFTER scheduled time
+  // (matches GitHub Actions cron interval of 5 minutes)
   const timeDifferenceMinutes = currentTotalMinutes - scheduledTotalMinutes
   
   // Send if: 0 <= timeDifference <= 5 (within 5 minutes after scheduled time)

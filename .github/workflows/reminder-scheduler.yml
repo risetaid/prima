@@ -2,8 +2,8 @@ name: Reminder Scheduler
 
 on:
   schedule:
-    # Run every 20 minutes (optimal for free tier: ~2160 minutes/month)
-    - cron: '*/20 * * * *'
+    # Run every 5 minutes (unlimited for public repos)
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
