@@ -88,6 +88,13 @@ async function processReminders() {
             body: schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
           })
 
+          console.log(`🔍 Twilio result for ${schedule.patient.name}:`, {
+            success: twilioResult.success,
+            messageId: twilioResult.messageId,
+            error: twilioResult.error,
+            phoneNumber: whatsappNumber
+          })
+
           // Create reminder log
           await prisma.reminderLog.create({
             data: {
