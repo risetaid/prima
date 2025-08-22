@@ -32,10 +32,12 @@ async function processReminders() {
   let processedCount = 0
   let sentCount = 0
   let errorCount = 0
+  const debugLogs: string[] = []
 
   try {
-    console.log('🔄 Starting reminder cron job...')
-    console.log('Current WIB Time:', getWIBDateString(), getWIBTimeString())
+    const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`
+    console.log(logMessage)
+    debugLogs.push(logMessage)
 
     // Get all active reminder schedules for today
     const todayWIB = getWIBDateString()
@@ -88,12 +90,9 @@ async function processReminders() {
             body: schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
           })
 
-          console.log(`🔍 Twilio result for ${schedule.patient.name}:`, {
-            success: twilioResult.success,
-            messageId: twilioResult.messageId,
-            error: twilioResult.error,
-            phoneNumber: whatsappNumber
-          })
+          const twilioLogMessage = `🔍 Twilio result for ${schedule.patient.name}: success=${twilioResult.success}, messageId=${twilioResult.messageId}, error=${twilioResult.error}, phone=${whatsappNumber}`
+          console.log(twilioLogMessage)
+          debugLogs.push(twilioLogMessage)
 
           // Create reminder log
           await prisma.reminderLog.create({
@@ -133,7 +132,8 @@ async function processReminders() {
         sent: sentCount,
         errors: errorCount,
         total_schedules: reminderSchedules.length
-      }
+      },
+      debugLogs: debugLogs
     }
 
     console.log('✅ Cron job completed:', summary)
