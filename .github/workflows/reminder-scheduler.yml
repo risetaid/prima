@@ -13,9 +13,15 @@ jobs:
     steps:
     - name: Send reminders via webhook
       run: |
-        curl -X POST \
+        response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X POST \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.CRON_SECRET_KEY }}" \
-          ${{ vars.APP_URL }}/api/cron
-      env:
-        CRON_SECRET_KEY: ${{ secrets.CRON_SECRET_KEY }}
+          "${{ vars.APP_URL }}/api/cron")
+        echo "Response: $response"
+        http_code=$(echo "$response" | tail -n1 | cut -d: -f2)
+        if [ "$http_code" != "200" ]; then
+          echo "❌ HTTP Error: $http_code"
+          exit 1
+        else
+          echo "✅ Cron job completed successfully"
+        fi
