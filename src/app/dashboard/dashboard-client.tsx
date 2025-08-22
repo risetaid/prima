@@ -36,7 +36,34 @@ function DashboardClient() {
       const response = await fetch('/api/patients')
       if (response.ok) {
         const data = await response.json()
-        setPatients(data)
+        
+        // Calculate real-time compliance rate for each patient
+        const patientsWithRealTimeCompliance = await Promise.all(
+          data.map(async (patient: Patient) => {
+            try {
+              const completedResponse = await fetch(`/api/patients/${patient.id}/reminders/completed`)
+              if (completedResponse.ok) {
+                const completedReminders = await completedResponse.json()
+                const totalReminders = completedReminders.length
+                const completedCount = completedReminders.filter((r: any) => r.medicationTaken).length
+                const realTimeComplianceRate = totalReminders > 0 
+                  ? Math.round((completedCount / totalReminders) * 100)
+                  : 0
+                
+                return {
+                  ...patient,
+                  complianceRate: realTimeComplianceRate
+                }
+              }
+              return patient // Fallback to original data if API fails
+            } catch (error) {
+              console.error(`Error fetching compliance for patient ${patient.id}:`, error)
+              return patient // Fallback to original data if API fails
+            }
+          })
+        )
+        
+        setPatients(patientsWithRealTimeCompliance)
       }
     } catch (error) {
       console.error('Error fetching patients:', error)
