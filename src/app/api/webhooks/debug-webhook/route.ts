@@ -28,6 +28,24 @@ export async function POST(request: NextRequest) {
       queryParams[key] = value
     })
 
+    // Extract Fonnte webhook data if available
+    let fonnteData = null
+    if (parsedBody && typeof parsedBody === 'object') {
+      // Check if this looks like a Fonnte webhook
+      if (parsedBody.device || parsedBody.sender || parsedBody.message) {
+        fonnteData = {
+          device: parsedBody.device || 'Unknown',
+          sender: parsedBody.sender || 'Unknown',
+          message: parsedBody.message || '',
+          member: parsedBody.member || null, // for group messages
+          name: parsedBody.name || 'Unknown',
+          location: parsedBody.location || null,
+          messageType: 'text', // default
+          provider: 'fonnte'
+        }
+      }
+    }
+
     // Create debug response
     const debugInfo = {
       timestamp: new Date().toISOString(),
@@ -36,7 +54,8 @@ export async function POST(request: NextRequest) {
       url: request.url,
       headers,
       queryParams,
-      body: parsedBody,
+      rawBody: parsedBody,
+      fonnteData,
       contentType: request.headers.get('content-type'),
       contentLength: request.headers.get('content-length'),
     }

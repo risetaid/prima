@@ -49,16 +49,30 @@ export default function DebugWebhookPage() {
 
   // Simulate webhook data for demo (in real app, this would come from server-sent events or polling)
   const addMockWebhook = () => {
+    const mockResponses = [
+      'MINUM',
+      'SUDAH',
+      'BELUM',
+      'BANTUAN',
+      'Sudah minum obat pagi ini',
+      'Lupa minum obat kemarin',
+      'Terima kasih remindernya'
+    ]
+    
     const mockData = {
       id: Date.now().toString(),
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
       data: {
-        from: '6281234567890',
-        to: 'whatsapp:+14155238886',
-        body: 'MINUM',
+        // Fonnte webhook format
+        device: '628594257362',
+        sender: '6281333852187',
+        message: mockResponses[Math.floor(Math.random() * mockResponses.length)],
+        member: null,
+        name: 'David Yusaku',
+        location: null,
         messageType: 'text',
         provider: 'fonnte',
-        timestamp: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+        receivedAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
       }
     }
     setWebhookLogs(prev => [mockData, ...prev].slice(0, 20)) // Keep only last 20 logs
