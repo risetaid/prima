@@ -282,8 +282,10 @@ export default function UserManagement() {
                       {actionLoading === user.id ? (
                         <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
-                        <span className="sm:hidden">{user.isActive ? '❌' : '✅'}</span>
+                        <>
+                          <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
+                          <span className="sm:hidden">{user.isActive ? '❌' : '✅'}</span>
+                        </>
                       )}
                     </Button>
                   )}
