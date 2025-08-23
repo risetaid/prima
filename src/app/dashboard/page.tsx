@@ -27,12 +27,23 @@ export default function DashboardPage() {
 
   const checkApprovalStatus = async () => {
     try {
+      // First ensure user exists and is synced
+      const syncResponse = await fetch('/api/auth/update-last-login', {
+        method: 'POST'
+      })
+      
+      if (!syncResponse.ok) {
+        console.error('Failed to sync user')
+        setApprovalStatus('error')
+        return
+      }
+
+      // Then check user profile
       const response = await fetch('/api/user/profile')
       if (response.ok) {
         const userData = await response.json()
         if (userData.isApproved) {
           setApprovalStatus('approved')
-          updateLastLogin()
         } else {
           setApprovalStatus('pending')
           router.push('/pending-approval')
@@ -46,15 +57,6 @@ export default function DashboardPage() {
     }
   }
 
-  const updateLastLogin = async () => {
-    try {
-      await fetch('/api/auth/update-last-login', {
-        method: 'POST'
-      })
-    } catch (error) {
-      console.error('Failed to update last login:', error)
-    }
-  }
 
   if (!isLoaded || approvalStatus === 'loading') {
     return (
