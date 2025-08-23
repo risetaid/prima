@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/auth-utils'
+import { requireAdmin, type AdminUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(
@@ -7,11 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const admin = await requireAdmin()
-    
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
-    }
+    const admin: AdminUser = await requireAdmin()
 
     const { userId } = await params
 

@@ -1,11 +1,16 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
-import type { User } from '@prisma/client'
+import type { User } from '../generated/prisma'
 
 export interface AuthUser extends User {
   canAccessDashboard: boolean
   needsApproval: boolean
+}
+
+export interface AdminUser extends AuthUser {
+  id: string
+  role: 'ADMIN'
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -68,14 +73,14 @@ export async function requireApprovedUser(): Promise<AuthUser> {
   return user
 }
 
-export async function requireAdmin(): Promise<AuthUser> {
+export async function requireAdmin(): Promise<AdminUser> {
   const user = await requireApprovedUser()
   
   if (user.role !== 'ADMIN') {
     redirect('/unauthorized')
   }
 
-  return user
+  return user as AdminUser
 }
 
 export async function getUserPatients(userId: string) {
