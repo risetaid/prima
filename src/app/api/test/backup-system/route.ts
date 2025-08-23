@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
 import { sendUniversalWhatsApp } from '@/lib/fonnte'
 import { sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
 
@@ -7,14 +8,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Test endpoint disabled in production' }, { status: 403 })
   }
 
+  // Require authentication even in development
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
   try {
-    const { phoneNumber, testProvider } = await request.json()
+    const { phoneNumber, testProvider, patientName, medicationName, dosage } = await request.json()
 
     if (!phoneNumber) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
     }
 
-    const testMessage = `🧪 *PRIMA Backup System Test*\n\nTest message sent at: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\nProvider: ${testProvider || 'AUTO'}\n\nJika Anda menerima pesan ini, backup system berfungsi dengan baik! ✅\n\n_Test dari PRIMA - Sistem Backup_`
+    // Use form data or defaults
+    const name = patientName || 'Testing User'
+    const medication = medicationName || 'Tamoxifen'
+    const medicationDose = dosage || '20mg - 1 tablet'
+
+    const currentHour = new Date().toLocaleTimeString('id-ID', { 
+      timeZone: 'Asia/Jakarta', 
+      hour: '2-digit', 
+      minute: '2-digit'
+    })
+
+    const greeting = (() => {
+      const hour = new Date().getHours()
+      if (hour < 12) return 'Selamat Pagi'
+      if (hour < 15) return 'Selamat Siang' 
+      if (hour < 18) return 'Selamat Sore'
+      return 'Selamat Malam'
+    })()
+
+    const testMessage = `🏥 *PRIMA Reminder*
+
+${greeting}, ${name}! 👋
+
+⏰ Waktunya minum obat:
+💊 ${medication}
+📝 Dosis: ${medicationDose}
+🕐 Jam: ${currentHour} WIB
+
+📌 Catatan Penting:
+Minum setelah makan dengan air putih
+
+✅ Balas "MINUM" jika sudah minum obat
+❓ Balas "BANTUAN" untuk bantuan
+📞 Darurat: 0341-550171
+
+Semangat sembuh! 💪
+Tim PRIMA - Berbagi Kasih`
 
     let result
 

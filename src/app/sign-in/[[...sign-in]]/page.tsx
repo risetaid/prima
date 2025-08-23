@@ -3,11 +3,13 @@
 import { SignIn } from '@clerk/nextjs'
 import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
 
 export default function Page() {
   const { user, isLoaded } = useUser()
   const router = useRouter()
+  const [showTroubleshoot, setShowTroubleshoot] = useState(true) // Always show initially
 
   useEffect(() => {
     // Redirect to dashboard if already signed in
@@ -15,6 +17,22 @@ export default function Page() {
       router.push('/dashboard')
     }
   }, [isLoaded, user, router])
+
+  const handleClearCache = () => {
+    // Clear localStorage and sessionStorage
+    localStorage.clear()
+    sessionStorage.clear()
+    
+    // Clear cookies by setting them to expire
+    document.cookie.split(";").forEach((c) => {
+      const eqPos = c.indexOf("=")
+      const name = eqPos > -1 ? c.substr(0, eqPos) : c
+      document.cookie = `${name.trim()}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+    })
+    
+    // Reload page
+    window.location.reload()
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -47,6 +65,26 @@ export default function Page() {
             }
           }}
         />
+        
+        {/* Always Available Troubleshooting Help */}
+        {showTroubleshoot && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">
+              💡 Bantuan Login
+            </h3>
+            <p className="text-xs text-blue-700 mb-3">
+              Jika tombol login tidak muncul atau bermasalah, coba refresh halaman ini.
+            </p>
+            <Button
+              onClick={handleClearCache}
+              variant="outline" 
+              size="sm"
+              className="w-full bg-white border-blue-300 text-blue-800 hover:bg-blue-50 cursor-pointer"
+            >
+              🔄 Refresh & Clear Cache
+            </Button>
+          </div>
+        )}
         
         {/* Footer */}
         <div className="text-center mt-6 space-y-2">

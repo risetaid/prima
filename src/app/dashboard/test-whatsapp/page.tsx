@@ -2,19 +2,22 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Send, Settings } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
+import { Button } from '@/components/ui/button'
+
+type TestProvider = 'auto' | 'fonnte' | 'twilio'
 
 export default function TestWhatsAppPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [testProvider, setTestProvider] = useState<TestProvider>('auto')
   const [formData, setFormData] = useState({
-    phoneNumber: '', // Format: 08123456789
-    patientName: 'Test User',
-    medicationName: 'Paracetamol',
-    dosage: '500mg',
-    educationLink: 'https://prima-system.com/posts/paracetamol-info'
+    phoneNumber: '081234567890', // Default test number
+    patientName: 'Testing User',
+    medicationName: 'Tamoxifen',
+    dosage: '20mg - 1 tablet'
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -31,33 +34,51 @@ export default function TestWhatsAppPage() {
     setResult(null)
 
     try {
-      // For testing, we'll create a mock patient or use direct Twilio call
-      // In real implementation, this would use existing patient data
-      
-      const testMessage = `🏥 *TEST - Pengingat Minum Obat PRIMA*
+      const currentHour = new Date().toLocaleTimeString('id-ID', { 
+        timeZone: 'Asia/Jakarta', 
+        hour: '2-digit', 
+        minute: '2-digit'
+      })
 
-Halo ${formData.patientName},
+      const greeting = (() => {
+        const hour = new Date().getHours()
+        if (hour < 12) return 'Selamat Pagi'
+        if (hour < 15) return 'Selamat Siang' 
+        if (hour < 18) return 'Selamat Sore'
+        return 'Selamat Malam'
+      })()
 
-⏰ Ini adalah pesan test:
-💊 *${formData.medicationName}* 
-📏 Dosis: ${formData.dosage}
+      const testMessage = `🏥 *PRIMA Reminder*
 
-✅ Balas "SUDAH" jika sudah minum obat
-❌ Balas "BELUM" jika belum sempat
+${greeting}, ${formData.patientName}! 👋
 
-📖 Info: ${formData.educationLink}
+⏰ Waktunya minum obat:
+💊 ${formData.medicationName}
+📝 Dosis: ${formData.dosage}
+🕐 Jam: ${currentHour} WIB
 
-_Test pesan dari PRIMA - Sistem Monitoring Pasien_`
+📌 Catatan Penting:
+Minum setelah makan dengan air putih
 
-      // Direct Twilio test call
-      const response = await fetch('/api/test/twilio-whatsapp', {
+✅ Balas "MINUM" jika sudah minum obat
+❓ Balas "BANTUAN" untuk bantuan
+📞 Darurat: 0341-550171
+
+Semangat sembuh! 💪
+Tim PRIMA - Berbagi Kasih`
+
+      // Use backup system test endpoint
+      const response = await fetch('/api/test/backup-system', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           phoneNumber: formData.phoneNumber,
-          message: testMessage
+          testProvider: testProvider === 'auto' ? undefined : testProvider,
+          patientName: formData.patientName,
+          medicationName: formData.medicationName,
+          dosage: formData.dosage
         }),
       })
 
@@ -87,7 +108,7 @@ _Test pesan dari PRIMA - Sistem Monitoring Pasien_`
             >
               <ArrowLeft className="w-6 h-6 text-blue-600" />
             </button>
-            <h1 className="text-2xl font-bold text-blue-600">Test WhatsApp</h1>
+            <h1 className="text-2xl font-bold text-blue-600">Test WhatsApp System</h1>
           </div>
           <UserButton afterSignOutUrl="/" />
         </div>
@@ -96,7 +117,54 @@ _Test pesan dari PRIMA - Sistem Monitoring Pasien_`
       {/* Main Content */}
       <main className="px-4 py-6">
         <div className="bg-white rounded-lg p-6 shadow-sm mb-6">
-          <h2 className="text-lg font-semibold mb-4">Test Twilio WhatsApp API</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Test PRIMA Backup System</h2>
+            <div className="flex items-center space-x-2">
+              <Settings className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-600">
+                Current: {process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'}
+              </span>
+            </div>
+          </div>
+
+          {/* Provider Selection */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              🔧 Test Provider
+            </label>
+            <div className="flex space-x-4">
+              <Button
+                type="button"
+                variant={testProvider === 'auto' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTestProvider('auto')}
+                className="cursor-pointer"
+              >
+                AUTO (Environment)
+              </Button>
+              <Button
+                type="button"
+                variant={testProvider === 'fonnte' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTestProvider('fonnte')}
+                className="cursor-pointer"
+              >
+                🟢 FONNTE
+              </Button>
+              <Button
+                type="button"
+                variant={testProvider === 'twilio' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setTestProvider('twilio')}
+                className="cursor-pointer"
+              >
+                🔵 TWILIO
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              AUTO menggunakan WHATSAPP_PROVIDER dari environment ({process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'})
+            </p>
+          </div>
           
           <form onSubmit={handleTestSend} className="space-y-4">
             {/* Phone Number */}
@@ -114,7 +182,7 @@ _Test pesan dari PRIMA - Sistem Monitoring Pasien_`
                 required
               />
               <p className="text-xs text-gray-500 mt-1">
-                Format: 08xxxxxxxx (nomor HP Indonesia)
+                Format: 08xxxxxxxx atau 628xxxxxxxx (nomor HP Indonesia)
               </p>
             </div>
 
@@ -160,19 +228,6 @@ _Test pesan dari PRIMA - Sistem Monitoring Pasien_`
               />
             </div>
 
-            {/* Education Link */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Link Edukasi
-              </label>
-              <input
-                type="url"
-                name="educationLink"
-                value={formData.educationLink}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
 
             {/* Submit Button */}
             <button
@@ -211,15 +266,38 @@ _Test pesan dari PRIMA - Sistem Monitoring Pasien_`
           </div>
         )}
 
+        {/* System Status */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="font-medium text-green-800 mb-2">🟢 FONNTE Status</h3>
+            <ul className="text-sm text-green-700 space-y-1">
+              <li>{process.env.NEXT_PUBLIC_FONNTE_CONFIGURED === 'true' ? '✅' : '❌'} Token: {process.env.NEXT_PUBLIC_FONNTE_CONFIGURED === 'true' ? 'Configured' : 'Missing'}</li>
+              <li>✅ Primary provider (default)</li>
+              <li>✅ Ready for production use</li>
+              <li>✅ No sandbox limitations</li>
+            </ul>
+          </div>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-medium text-blue-800 mb-2">🔵 TWILIO Status</h3>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>{process.env.NEXT_PUBLIC_TWILIO_CONFIGURED === 'true' ? '✅' : '❌'} Credentials: {process.env.NEXT_PUBLIC_TWILIO_CONFIGURED === 'true' ? 'Configured' : 'Missing'}</li>
+              <li>✅ Backup provider (fallback)</li>
+              <li>⚠️ Sandbox mode active</li>
+              <li>⚠️ Requires number whitelisting</li>
+            </ul>
+          </div>
+        </div>
+
         {/* Instructions */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-medium text-blue-800 mb-2">📋 Setup Instructions</h3>
-          <ol className="text-sm text-blue-700 space-y-1">
-            <li>1. Pastikan Twilio credentials sudah di set di .env</li>
-            <li>2. Nomor WhatsApp Twilio sudah di approve (sandbox atau production)</li>
-            <li>3. Nomor tujuan sudah di whitelist di Twilio Console</li>
-            <li>4. Credit Twilio masih tersisa ($15 - usage)</li>
-          </ol>
+        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 className="font-medium text-amber-800 mb-2">📋 System Information</h3>
+          <div className="text-sm text-amber-700 space-y-2">
+            <p><strong>Current Provider:</strong> {process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'}</p>
+            <p><strong>Backup System:</strong> Fonnte (Primary) + Twilio (Fallback)</p>
+            <p><strong>Cron Provider:</strong> FastCron (3-minute intervals)</p>
+            <p><strong>Reliability:</strong> Dual-provider medical-grade system</p>
+          </div>
         </div>
       </main>
     </div>
