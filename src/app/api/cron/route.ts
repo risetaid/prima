@@ -49,10 +49,13 @@ async function processReminders() {
           gte: new Date(todayWIB + 'T00:00:00.000Z'),
           lt: new Date(todayWIB + 'T23:59:59.999Z')
         },
-        // Only get schedules that don't have DELIVERED logs yet
+        // Only get schedules that haven't been sent yet today
         reminderLogs: {
           none: {
-            status: 'DELIVERED'
+            status: 'DELIVERED',
+            sentAt: {
+              gte: new Date(todayWIB + 'T00:00:00.000Z')
+            }
           }
         }
       },
