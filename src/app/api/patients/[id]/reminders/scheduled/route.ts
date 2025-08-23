@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
+import { getWIBDateString } from '@/lib/timezone'
 
 export async function GET(
   request: NextRequest,
@@ -13,15 +14,20 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs
+    const todayWIB = getWIBDateString()
+    
+    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs today
     const scheduledReminders = await prisma.reminderSchedule.findMany({
       where: {
         patientId: id,
         isActive: true,
-        // Only include schedules that don't have DELIVERED logs yet
+        // Only include schedules that don't have DELIVERED logs yet today
         reminderLogs: {
           none: {
-            status: 'DELIVERED'
+            status: 'DELIVERED',
+            sentAt: {
+              gte: new Date(todayWIB + 'T00:00:00.000Z')
+            }
           }
         }
       },
