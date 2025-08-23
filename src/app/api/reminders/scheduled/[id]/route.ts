@@ -50,7 +50,7 @@ export async function PUT(
     const updatedReminder = await prisma.reminderSchedule.update({
       where: { id: reminderId },
       data: { 
-        reminderTime: reminderTime,
+        scheduledTime: reminderTime,
         updatedAt: new Date()
       },
       include: {

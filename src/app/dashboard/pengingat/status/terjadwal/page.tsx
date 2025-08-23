@@ -11,7 +11,7 @@ interface ScheduledReminder {
   id: string
   patientName: string
   medicationName: string
-  reminderTime: string
+  scheduledTime: string
   createdAt: string
   patient: {
     id: string
@@ -103,7 +103,7 @@ export default function TerjadwalPage() {
 
   const startEdit = (reminder: ScheduledReminder) => {
     setEditingReminder(reminder.id)
-    setEditTime(reminder.reminderTime)
+    setEditTime(reminder.scheduledTime)
   }
 
   const cancelEdit = () => {
@@ -187,7 +187,7 @@ export default function TerjadwalPage() {
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
                         <Clock className="w-4 h-4" />
-                        <span className="text-sm font-medium">{reminder.reminderTime}</span>
+                        <span className="text-sm font-medium">{reminder.scheduledTime}</span>
                       </div>
                       <button
                         onClick={() => startEdit(reminder)}
