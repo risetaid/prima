@@ -109,12 +109,27 @@ async function processReminders() {
 
           // Store message ID in appropriate field based on provider
           if (provider === 'fonnte') {
-            logData.fontteMessageId = result.messageId
+            logData.fonnteMessageId = result.messageId
           } else {
             logData.twilioMessageId = result.messageId
           }
 
-          await prisma.reminderLog.create({ data: logData })
+          console.log(`🔍 Attempting to create log with data:`, JSON.stringify({
+            ...logData,
+            sentAt: logData.sentAt.toISOString(),
+            provider: provider
+          }, null, 2))
+
+          // Create reminder log with error handling
+          try {
+            const createdLog = await prisma.reminderLog.create({ data: logData })
+            console.log(`📝 Created log for ${schedule.patient.name}: ${createdLog.id}`)
+          } catch (logError) {
+            console.error(`❌ Failed to create reminder log for ${schedule.patient.name}:`, logError)
+            console.error(`❌ Log data that failed:`, logData)
+            errorCount++
+            continue // Skip to next schedule
+          }
 
           if (result.success) {
             sentCount++

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendWhatsAppMessageFonnte, formatFontteNumber } from '@/lib/fonnte'
+import { sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
 
 // Hidden backup cron endpoint - Force Fonnte provider
@@ -77,21 +77,21 @@ async function processBackupReminders() {
         console.log(`⏰ [BACKUP] Schedule ${schedule.id}: ${schedule.scheduledTime} - Should send: ${shouldSend}`)
 
         if (shouldSend) {
-          const fontteNumber = formatFontteNumber(schedule.patient.phoneNumber)
+          const fonnteNumber = formatFonnteNumber(schedule.patient.phoneNumber)
           
-          console.log(`📱 [BACKUP] Sending via FONNTE to ${schedule.patient.name} (${fontteNumber})`)
+          console.log(`📱 [BACKUP] Sending via FONNTE to ${schedule.patient.name} (${fonnteNumber})`)
           
           // Force send via Fonnte
           const messageBody = schedule.customMessage || `🏥 *Pengingat Minum Obat - PRIMA*\n\nHalo ${schedule.patient.name},\n\n⏰ Saatnya minum obat:\n💊 *${schedule.medicationName}*\n\nJangan lupa minum obat sesuai jadwal ya!\n\n✅ Balas "SUDAH" jika sudah minum obat\n❌ Balas "BELUM" jika belum sempat\n\nSemoga lekas sembuh! 🙏\n\n_Pesan backup dari PRIMA - Sistem Monitoring Pasien_`
           
-          const fontteResult = await sendWhatsAppMessageFonnte({
-            to: fontteNumber,
+          const fonnteResult = await sendWhatsAppMessageFonnte({
+            to: fonnteNumber,
             body: messageBody
           })
 
-          const fontteLogMessage = `🔍 [BACKUP] Fonnte result for ${schedule.patient.name}: success=${fontteResult.success}, messageId=${fontteResult.messageId}, error=${fontteResult.error}, phone=${fontteNumber}`
-          console.log(fontteLogMessage)
-          debugLogs.push(fontteLogMessage)
+          const fonnteLogMessage = `🔍 [BACKUP] Fonnte result for ${schedule.patient.name}: success=${fonnteResult.success}, messageId=${fonnteResult.messageId}, error=${fonnteResult.error}, phone=${fonnteNumber}`
+          console.log(fonnteLogMessage)
+          debugLogs.push(fonnteLogMessage)
 
           // Create reminder log with Fonnte-specific data
           await prisma.reminderLog.create({
@@ -99,19 +99,19 @@ async function processBackupReminders() {
               reminderScheduleId: schedule.id,
               patientId: schedule.patient.id,
               sentAt: getWIBTime(),
-              status: fontteResult.success ? 'DELIVERED' : 'FAILED',
-              fontteMessageId: fontteResult.messageId,
+              status: fonnteResult.success ? 'DELIVERED' : 'FAILED',
+              fonnteMessageId: fonnteResult.messageId,
               message: messageBody,
-              phoneNumber: fontteNumber
+              phoneNumber: fonnteNumber
             }
           })
 
-          if (fontteResult.success) {
+          if (fonnteResult.success) {
             sentCount++
             console.log(`✅ [BACKUP] Successfully sent reminder to ${schedule.patient.name}`)
           } else {
             errorCount++
-            console.log(`❌ [BACKUP] Failed to send reminder to ${schedule.patient.name}: ${fontteResult.error}`)
+            console.log(`❌ [BACKUP] Failed to send reminder to ${schedule.patient.name}: ${fonnteResult.error}`)
           }
         }
       } catch (scheduleError) {

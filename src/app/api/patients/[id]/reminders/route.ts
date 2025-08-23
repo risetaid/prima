@@ -142,7 +142,7 @@ export async function POST(
 
         // Store message ID based on provider
         if (provider === 'fonnte') {
-          logData.fontteMessageId = result.messageId
+          logData.fonnteMessageId = result.messageId
         } else {
           logData.twilioMessageId = result.messageId
         }

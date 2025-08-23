@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendUniversalWhatsApp } from '@/lib/fonnte'
-import { sendWhatsAppMessageFonnte, formatFontteNumber } from '@/lib/fonnte'
+import { sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
 
 export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
 
     if (testProvider === 'fonnte') {
       // Force Fonnte
-      console.log('🧪 Testing FONTTE provider specifically')
+      console.log('🧪 Testing FONNTE provider specifically')
       result = await sendWhatsAppMessageFonnte({
-        to: formatFontteNumber(phoneNumber),
+        to: formatFonnteNumber(phoneNumber),
         body: testMessage
       })
     } else {

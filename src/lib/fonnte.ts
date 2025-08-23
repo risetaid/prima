@@ -1,13 +1,13 @@
 // Fonnte WhatsApp API integration for PRIMA (Backup System)
 // Hidden backup untuk medical-grade reliability
 
-export interface FontteMessage {
+export interface FonnteMessage {
   to: string           // Format: 6281234567890 (no + prefix)
   body: string
   mediaUrl?: string    // Optional image/document URL
 }
 
-export interface FontteMessageResult {
+export interface FonnteMessageResult {
   success: boolean
   messageId?: string
   error?: string
@@ -17,8 +17,8 @@ export interface FontteMessageResult {
  * Send WhatsApp message via Fonnte API
  */
 export const sendWhatsAppMessageFonnte = async (
-  message: FontteMessage
-): Promise<FontteMessageResult> => {
+  message: FonnteMessage
+): Promise<FonnteMessageResult> => {
   const fonnte_token = process.env.FONNTE_TOKEN
   
   if (!fonnte_token) {
@@ -51,9 +51,11 @@ export const sendWhatsAppMessageFonnte = async (
     const result = await response.json()
 
     if (result.status) {
+      // FONNTE API returns messageId as array, convert to string
+      const messageId = Array.isArray(result.id) ? result.id[0] : result.id
       return {
         success: true,
-        messageId: result.id || 'fonnte_' + Date.now()
+        messageId: messageId || 'fonnte_' + Date.now()
       }
     } else {
       return {
@@ -73,7 +75,7 @@ export const sendWhatsAppMessageFonnte = async (
 /**
  * Format phone number for Fonnte (remove prefixes, Indonesia format)
  */
-export const formatFontteNumber = (phoneNumber: string): string => {
+export const formatFonnteNumber = (phoneNumber: string): string => {
   // Remove all non-numeric characters
   let cleaned = phoneNumber.replace(/\D/g, '')
   
@@ -96,12 +98,12 @@ export const sendUniversalWhatsApp = async (
   to: string,
   body: string,
   mediaUrl?: string
-): Promise<FontteMessageResult> => {
+): Promise<FonnteMessageResult> => {
   const provider = process.env.WHATSAPP_PROVIDER || 'fonnte'
   
   if (provider === 'fonnte') {
     return await sendWhatsAppMessageFonnte({
-      to: formatFontteNumber(to),
+      to: formatFonnteNumber(to),
       body,
       mediaUrl
     })

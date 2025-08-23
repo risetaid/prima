@@ -143,7 +143,7 @@ model ReminderLog {
   phoneNumber         String               @map("phone_number")
   sentAt              DateTime             @map("sent_at")
   twilioMessageId     String?              @map("twilio_message_id")
-  fontteMessageId     String?              @map("fontte_message_id")
+  fonnteMessageId     String?              @map("fonnte_message_id")
   status              ReminderStatus       @default(PENDING)
   errorMessage        String?              @map("error_message")
   patientResponse     String?              @map("patient_response")
