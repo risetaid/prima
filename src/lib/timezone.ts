@@ -41,7 +41,7 @@ export const createWIBDateTime = (dateStr: string, timeStr: string): Date => {
 
 /**
  * Check if reminder should be sent now based on WIB timezone
- * Only send within a 5-minute window after the scheduled time
+ * Only send within a 10-minute window after the scheduled time
  */
 export const shouldSendReminderNow = (startDate: string, scheduledTime: string): boolean => {
   const nowWIB = getWIBTime()
@@ -60,11 +60,11 @@ export const shouldSendReminderNow = (startDate: string, scheduledTime: string):
   const currentTotalMinutes = currentHour * 60 + currentMinute
   const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
   
-  // Only send if current time is within 5 minutes AFTER scheduled time
-  // (matches GitHub Actions cron interval of 5 minutes)
+  // Only send if current time is within 10 minutes AFTER scheduled time
+  // (matches FastCron interval of 3 minutes with buffer)
   const timeDifferenceMinutes = currentTotalMinutes - scheduledTotalMinutes
   
-  // Send if: 0 <= timeDifference <= 7 (within 7 minutes after scheduled time)
-  // Using 2-minute cron interval to avoid exact timing conflicts
-  return timeDifferenceMinutes >= 0 && timeDifferenceMinutes <= 7
+  // Send if: 0 <= timeDifference <= 10 (within 10 minutes after scheduled time)
+  // Using 3-minute FastCron interval with generous window to avoid timing conflicts
+  return timeDifferenceMinutes >= 0 && timeDifferenceMinutes <= 10
 }

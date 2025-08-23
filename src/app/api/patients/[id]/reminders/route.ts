@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/twilio'
+import { sendUniversalWhatsApp } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
 
 export async function GET(
@@ -126,25 +126,28 @@ export async function POST(
       if (shouldSendReminderNow(scheduleDate, time)) {
         console.log('Sending immediate reminder for date:', scheduleDate)
         
-        const whatsappNumber = formatWhatsAppNumber(patient.phoneNumber)
-        
-        const twilioResult = await sendWhatsAppMessage({
-          to: whatsappNumber,
-          body: message
-        })
+        // Send via universal sender (respects WHATSAPP_PROVIDER)
+        const result = await sendUniversalWhatsApp(patient.phoneNumber, message)
+        const provider = process.env.WHATSAPP_PROVIDER || 'fonnte'
 
-        // Log the reminder with WIB time
-        await prisma.reminderLog.create({
-          data: {
-            reminderScheduleId: schedule.id,
-            patientId: id,
-            sentAt: getWIBTime(),
-            status: twilioResult.success ? 'DELIVERED' : 'FAILED',
-            twilioMessageId: twilioResult.messageId,
-            message: message,
-            phoneNumber: whatsappNumber
-          }
-        })
+        // Log the reminder with appropriate provider field
+        const logData: any = {
+          reminderScheduleId: schedule.id,
+          patientId: id,
+          sentAt: getWIBTime(),
+          status: result.success ? 'DELIVERED' : 'FAILED',
+          message: message,
+          phoneNumber: patient.phoneNumber
+        }
+
+        // Store message ID based on provider
+        if (provider === 'fonnte') {
+          logData.fontteMessageId = result.messageId
+        } else {
+          logData.twilioMessageId = result.messageId
+        }
+
+        await prisma.reminderLog.create({ data: logData })
         
         break // Only send one immediate reminder
       }

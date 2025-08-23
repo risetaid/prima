@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendUniversalWhatsApp } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/twilio'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
 
-// GET endpoint for Vercel Cron Functions
+// Fallback cron endpoint - Force Twilio provider (if Fonnte blocked)
 export async function GET(request: NextRequest) {
-  // Verify this is called by Vercel Cron with secret
   const authHeader = request.headers.get('Authorization')
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  return await processReminders()
+  return await processTwilioFallback()
 }
 
-// POST endpoint for manual trigger during development/testing
 export async function POST(request: NextRequest) {
-  // For development/testing - no auth required in dev mode
   if (process.env.NODE_ENV === 'production') {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -24,10 +21,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return await processReminders()
+  return await processTwilioFallback()
 }
 
-async function processReminders() {
+async function processTwilioFallback() {
   const startTime = Date.now()
   let processedCount = 0
   let sentCount = 0
@@ -35,7 +32,7 @@ async function processReminders() {
   const debugLogs: string[] = []
 
   try {
-    const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`
+    const logMessage = `🔄 [TWILIO FALLBACK] Starting Twilio fallback cron at ${getWIBDateString()} ${getWIBTimeString()}`
     console.log(logMessage)
     debugLogs.push(logMessage)
 
@@ -67,7 +64,7 @@ async function processReminders() {
       }
     })
 
-    console.log(`📋 Found ${reminderSchedules.length} reminder schedules for today`)
+    console.log(`📋 [FALLBACK] Found ${reminderSchedules.length} reminder schedules for today`)
 
     for (const schedule of reminderSchedules) {
       processedCount++
@@ -77,59 +74,56 @@ async function processReminders() {
         const scheduleDate = schedule.startDate.toISOString().split('T')[0]
         const shouldSend = shouldSendReminderNow(scheduleDate, schedule.scheduledTime)
 
-        console.log(`⏰ Schedule ${schedule.id}: ${schedule.scheduledTime} - Should send: ${shouldSend}`)
+        console.log(`⏰ [FALLBACK] Schedule ${schedule.id}: ${schedule.scheduledTime} - Should send: ${shouldSend}`)
 
         if (shouldSend) {
-          const provider = process.env.WHATSAPP_PROVIDER || 'twilio'
-          console.log(`📱 Sending reminder to ${schedule.patient.name} via ${provider.toUpperCase()}`)
+          const whatsappNumber = formatWhatsAppNumber(schedule.patient.phoneNumber)
           
-          // Send WhatsApp message via universal sender
-          const messageBody = schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
-          const result = await sendUniversalWhatsApp(
-            schedule.patient.phoneNumber,
-            messageBody
-          )
+          console.log(`📱 [FALLBACK] Sending via TWILIO to ${schedule.patient.name} (${whatsappNumber})`)
+          
+          // Force send via Twilio
+          const messageBody = schedule.customMessage || `🏥 *Pengingat Minum Obat - PRIMA*\n\nHalo ${schedule.patient.name},\n\n⏰ Saatnya minum obat:\n💊 *${schedule.medicationName}*\n\nJangan lupa minum obat sesuai jadwal ya!\n\n✅ Balas "SUDAH" jika sudah minum obat\n❌ Balas "BELUM" jika belum sempat\n\nSemoga lekas sembuh! 🙏\n\n_Pesan fallback dari PRIMA - Sistem Monitoring Pasien_`
+          
+          const twilioResult = await sendWhatsAppMessage({
+            to: whatsappNumber,
+            body: messageBody
+          })
 
-          const providerLogMessage = `🔍 ${provider.toUpperCase()} result for ${schedule.patient.name}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
-          console.log(providerLogMessage)
-          debugLogs.push(providerLogMessage)
+          const twilioLogMessage = `🔍 [FALLBACK] Twilio result for ${schedule.patient.name}: success=${twilioResult.success}, messageId=${twilioResult.messageId}, error=${twilioResult.error}, phone=${whatsappNumber}`
+          console.log(twilioLogMessage)
+          debugLogs.push(twilioLogMessage)
 
-          // Create reminder log with appropriate field
-          const logData: any = {
-            reminderScheduleId: schedule.id,
-            patientId: schedule.patient.id,
-            sentAt: getWIBTime(),
-            status: result.success ? 'DELIVERED' : 'FAILED',
-            message: messageBody,
-            phoneNumber: schedule.patient.phoneNumber
-          }
+          // Create reminder log with Twilio-specific data
+          await prisma.reminderLog.create({
+            data: {
+              reminderScheduleId: schedule.id,
+              patientId: schedule.patient.id,
+              sentAt: getWIBTime(),
+              status: twilioResult.success ? 'DELIVERED' : 'FAILED',
+              twilioMessageId: twilioResult.messageId,
+              message: messageBody,
+              phoneNumber: whatsappNumber
+            }
+          })
 
-          // Store message ID in appropriate field based on provider
-          if (provider === 'fonnte') {
-            logData.fontteMessageId = result.messageId
-          } else {
-            logData.twilioMessageId = result.messageId
-          }
-
-          await prisma.reminderLog.create({ data: logData })
-
-          if (result.success) {
+          if (twilioResult.success) {
             sentCount++
-            console.log(`✅ Successfully sent reminder to ${schedule.patient.name}`)
+            console.log(`✅ [FALLBACK] Successfully sent reminder to ${schedule.patient.name}`)
           } else {
             errorCount++
-            console.log(`❌ Failed to send reminder to ${schedule.patient.name}: ${result.error}`)
+            console.log(`❌ [FALLBACK] Failed to send reminder to ${schedule.patient.name}: ${twilioResult.error}`)
           }
         }
       } catch (scheduleError) {
         errorCount++
-        console.error(`❌ Error processing schedule ${schedule.id}:`, scheduleError)
+        console.error(`❌ [FALLBACK] Error processing schedule ${schedule.id}:`, scheduleError)
       }
     }
 
     const duration = Date.now() - startTime
     const summary = {
       success: true,
+      provider: 'TWILIO_FALLBACK',
       timestamp: new Date().toISOString(),
       wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
       duration: `${duration}ms`,
@@ -142,14 +136,15 @@ async function processReminders() {
       debugLogs: debugLogs
     }
 
-    console.log('✅ Cron job completed:', summary)
+    console.log('✅ [FALLBACK] Twilio fallback cron job completed:', summary)
     return NextResponse.json(summary)
 
   } catch (error) {
-    console.error('❌ Cron job failed:', error)
+    console.error('❌ [FALLBACK] Twilio fallback cron job failed:', error)
     
     return NextResponse.json({
       success: false,
+      provider: 'TWILIO_FALLBACK',
       error: 'Internal server error',
       timestamp: new Date().toISOString(),
       wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
