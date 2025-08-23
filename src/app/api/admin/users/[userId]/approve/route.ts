@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
     const admin = await requireAdmin()
@@ -13,7 +13,7 @@ export async function POST(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    const { userId } = params
+    const { userId } = await params
 
     // Check if user exists and is pending approval
     const user = await prisma.user.findUnique({

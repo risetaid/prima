@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireApprovedUser()
@@ -26,7 +26,7 @@ export async function PUT(
       )
     }
 
-    const reminderId = params.id
+    const { id: reminderId } = await params
 
     // Check if reminder exists and user has access
     const existingReminder = await prisma.reminderSchedule.findFirst({
@@ -81,11 +81,11 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireApprovedUser()
-    const reminderId = params.id
+    const { id: reminderId } = await params
 
     // Check if reminder exists and user has access
     const existingReminder = await prisma.reminderSchedule.findFirst({
