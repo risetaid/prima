@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendUniversalWhatsApp } from '@/lib/fonnte'
-import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
+import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 
 // GET endpoint for Vercel Cron Functions
 export async function GET(request: NextRequest) {
@@ -49,12 +49,12 @@ async function processReminders() {
           gte: new Date(todayWIB + 'T00:00:00.000Z'),
           lt: new Date(todayWIB + 'T23:59:59.999Z')
         },
-        // Only get schedules that haven't been sent yet today
+        // Only get schedules that haven't been sent yet today (WIB timezone)
         reminderLogs: {
           none: {
             status: 'DELIVERED',
             sentAt: {
-              gte: new Date(todayWIB + 'T00:00:00.000Z')
+              gte: getWIBTodayStart()
             }
           }
         }

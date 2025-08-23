@@ -25,6 +25,16 @@ export const getWIBTimeString = (): string => {
 }
 
 /**
+ * Get start of today in WIB timezone as UTC Date object
+ * This is for database queries that expect UTC but we want WIB logic
+ */
+export const getWIBTodayStart = (): Date => {
+  const todayWIB = getWIBDateString()
+  // Create UTC date but offset by -7 hours to represent WIB start-of-day
+  return new Date(todayWIB + 'T00:00:00.000+07:00')
+}
+
+/**
  * Convert date string and time string to WIB Date object
  * @param dateStr YYYY-MM-DD format
  * @param timeStr HH:MM format
