@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
     if (!existingUser) {
       console.log(`User with Clerk ID ${user.id} not found in database. Auto-syncing user...`)
       
+      // Check if this is the first user (should be admin)
+      const userCount = await prisma.user.count()
+      const isFirstUser = userCount === 0
+
       // Use upsert to handle potential email conflicts
       try {        
         await prisma.user.upsert({
@@ -29,7 +33,9 @@ export async function POST(request: NextRequest) {
             firstName: user.firstName || '',
             lastName: user.lastName || '',
             phoneNumber: user.phoneNumbers[0]?.phoneNumber || null,
-            role: 'VOLUNTEER',
+            role: isFirstUser ? 'ADMIN' : 'MEMBER',
+            isApproved: isFirstUser, // First user auto-approved
+            approvedAt: isFirstUser ? new Date() : null,
             lastLoginAt: nowWIB()
           },
           update: {
