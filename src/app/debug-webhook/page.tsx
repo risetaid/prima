@@ -145,6 +145,26 @@ export default function DebugWebhookPage() {
               >
                 + Add Mock Data
               </Button>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/webhooks/test-webhook', { method: 'POST' })
+                    const result = await response.json()
+                    console.log('Test webhook result:', result)
+                    if (result.success) {
+                      alert('Test webhook sent! Check console for details.')
+                    }
+                  } catch (error) {
+                    console.error('Test webhook error:', error)
+                    alert('Test webhook failed!')
+                  }
+                }}
+                variant="outline"
+                size="sm"
+                className="cursor-pointer"
+              >
+                🧪 Test Webhook
+              </Button>
               <span className="text-sm text-gray-600">
                 Total logs: {webhookLogs.length}
               </span>

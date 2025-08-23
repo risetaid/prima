@@ -62,6 +62,17 @@ export async function POST(request: NextRequest) {
 
     console.log('📱 Webhook Debug Info:', JSON.stringify(debugInfo, null, 2))
 
+    // Also log to help with debugging
+    console.log('🔍 Raw body received:', body)
+    console.log('🔍 Headers received:', JSON.stringify(headers, null, 2))
+    
+    // Force log to Vercel logs
+    if (fonnteData) {
+      console.log('✅ FONNTE MESSAGE DETECTED:', JSON.stringify(fonnteData, null, 2))
+    } else {
+      console.log('❌ No Fonnte data detected in webhook')
+    }
+
     // Return success response (required for webhook providers)
     return NextResponse.json({
       success: true,
