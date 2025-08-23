@@ -18,12 +18,54 @@ export default function DebugWebhookPage() {
   const [isListening, setIsListening] = useState(false)
   const [webhookUrl, setWebhookUrl] = useState('/api/webhooks/debug-webhook')
   const [isMounted, setIsMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
+  // Fetch logs from API
+  const fetchLogs = async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch('/api/webhooks/logs')
+      const result = await response.json()
+      
+      if (result.success) {
+        setWebhookLogs(result.logs)
+        console.log(`📊 Fetched ${result.count} webhook logs`)
+      }
+    } catch (error) {
+      console.error('Error fetching logs:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Clear logs via API
+  const clearLogsAPI = async () => {
+    try {
+      const response = await fetch('/api/webhooks/logs', { method: 'DELETE' })
+      const result = await response.json()
+      
+      if (result.success) {
+        setWebhookLogs([])
+        console.log('🗑️ Logs cleared via API')
+      }
+    } catch (error) {
+      console.error('Error clearing logs:', error)
+    }
+  }
 
   useEffect(() => {
     setIsMounted(true)
     if (typeof window !== 'undefined') {
       setWebhookUrl(`${window.location.origin}/api/webhooks/debug-webhook`)
     }
+    
+    // Initial fetch
+    fetchLogs()
+    
+    // Poll for new logs every 3 seconds
+    const interval = setInterval(fetchLogs, 3000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   // Don't render until component is mounted to avoid hydration mismatch
@@ -44,7 +86,7 @@ export default function DebugWebhookPage() {
   }
 
   const clearLogs = () => {
-    setWebhookLogs([])
+    clearLogsAPI()
   }
 
   // Simulate webhook data for demo (in real app, this would come from server-sent events or polling)
@@ -165,8 +207,9 @@ export default function DebugWebhookPage() {
               >
                 🧪 Test Webhook
               </Button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 flex items-center gap-2">
                 Total logs: {webhookLogs.length}
+                {isLoading && <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>}
               </span>
             </div>
             

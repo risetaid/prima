@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { webhookStore } from '@/lib/webhook-store'
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,8 +70,20 @@ export async function POST(request: NextRequest) {
     // Force log to Vercel logs
     if (fonnteData) {
       console.log('✅ FONNTE MESSAGE DETECTED:', JSON.stringify(fonnteData, null, 2))
+      
+      // Store in webhook store
+      const storedLog = webhookStore.addLog(fonnteData)
+      console.log(`📝 Webhook stored with ID: ${storedLog.id}`)
     } else {
       console.log('❌ No Fonnte data detected in webhook')
+      
+      // Store raw data anyway for debugging
+      webhookStore.addLog({
+        rawData: parsedBody,
+        provider: 'unknown',
+        message: 'Raw webhook data (not Fonnte format)',
+        receivedAt: new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+      })
     }
 
     // Return success response (required for webhook providers)
