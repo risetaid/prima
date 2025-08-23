@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
         }
       },
       orderBy: {
-        reminderTime: 'asc'
+        scheduledTime: 'asc'
       }
     })
 
