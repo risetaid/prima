@@ -23,6 +23,10 @@ export async function POST() {
       })
     }
 
+    // Check if this is the first user (should be admin)
+    const userCount = await prisma.user.count()
+    const isFirstUser = userCount === 0
+
     // Create user in database
     const newUser = await prisma.user.create({
       data: {
@@ -31,7 +35,9 @@ export async function POST() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         phoneNumber: user.phoneNumbers[0]?.phoneNumber || null,
-        role: 'VOLUNTEER',
+        role: isFirstUser ? 'ADMIN' : 'MEMBER',
+        isApproved: isFirstUser, // First user auto-approved
+        approvedAt: isFirstUser ? new Date() : null,
       },
     })
 
