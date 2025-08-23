@@ -48,7 +48,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   }
 }
 
-export async function requireAuth() {
+export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser()
   
   if (!user) {
@@ -58,7 +58,7 @@ export async function requireAuth() {
   return user
 }
 
-export async function requireApprovedUser() {
+export async function requireApprovedUser(): Promise<AuthUser> {
   const user = await requireAuth()
   
   if (!user.canAccessDashboard) {
@@ -68,7 +68,7 @@ export async function requireApprovedUser() {
   return user
 }
 
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<AuthUser> {
   const user = await requireApprovedUser()
   
   if (user.role !== 'ADMIN') {
