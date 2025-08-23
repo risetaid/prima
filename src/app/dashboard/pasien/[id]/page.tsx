@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Trash2, User, ChevronRight } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
+import Image from 'next/image'
 
 interface Patient {
   id: string
@@ -17,6 +18,7 @@ interface Patient {
   emergencyContactName?: string
   emergencyContactPhone?: string
   notes?: string
+  photoUrl?: string
   complianceRate: number
   isActive: boolean
   createdAt: string
@@ -183,11 +185,23 @@ export default function PatientDetailPage() {
 
         {/* Profile Picture */}
         <div className="flex justify-center mb-8">
-          <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-2xl">
-              {getInitials(patient.name)}
-            </span>
-          </div>
+          {patient.photoUrl ? (
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200">
+              <Image
+                src={patient.photoUrl}
+                alt={patient.name}
+                width={96}
+                height={96}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-2xl">
+                {getInitials(patient.name)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Patient Information Forms */}

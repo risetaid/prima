@@ -1,35 +1,52 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, Settings } from 'lucide-react'
 import { useCallback, memo, useState, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import AddPatientDialog from '@/components/AddPatientDialog'
 import Image from 'next/image'
+import { useUser } from '@clerk/nextjs'
 
 interface Patient {
   id: string
   name: string
   complianceRate: number
   isActive: boolean
+  photoUrl?: string
 }
 
 function DashboardClient() {
   const router = useRouter()
+  const { user } = useUser()
   const [patients, setPatients] = useState<Patient[]>([])
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
   const [showAddPatientModal, setShowAddPatientModal] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPatients()
+    fetchUserRole()
   }, [])
 
   useEffect(() => {
     filterPatients()
   }, [patients, searchQuery, activeFilters])
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await fetch('/api/user/profile')
+      if (response.ok) {
+        const data = await response.json()
+        setUserRole(data.role)
+      }
+    } catch (error) {
+      console.error('Error fetching user role:', error)
+    }
+  }
 
   const fetchPatients = async () => {
     try {
@@ -191,21 +208,34 @@ function DashboardClient() {
             <h3 className="font-semibold text-sm text-white">Berita</h3>
           </div>
 
-          {/* Video Edukasi */}
+          {/* Video Edukasi / Admin (conditionally rendered) */}
           <div className="text-center">
-            <div 
-              onClick={handleVideoClick}
-              className="cursor-pointer hover:scale-105 transition-transform mb-3"
-            >
-              <Image 
-                src="/btn_videoEdukasi.png" 
-                alt="Video Edukasi" 
-                width={80} 
-                height={80}
-                className="mx-auto"
-              />
-            </div>
-            <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
+            {userRole === 'ADMIN' ? (
+              <div 
+                onClick={() => router.push('/dashboard/admin/users')}
+                className="cursor-pointer hover:scale-105 transition-transform mb-3"
+              >
+                <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto">
+                  <Settings className="w-10 h-10 text-white" />
+                </div>
+              </div>
+            ) : (
+              <div 
+                onClick={handleVideoClick}
+                className="cursor-pointer hover:scale-105 transition-transform mb-3"
+              >
+                <Image 
+                  src="/btn_videoEdukasi.png" 
+                  alt="Video Edukasi" 
+                  width={80} 
+                  height={80}
+                  className="mx-auto"
+                />
+              </div>
+            )}
+            <h3 className="font-semibold text-sm text-white">
+              {userRole === 'ADMIN' ? 'Admin Panel' : 'Video Edukasi'}
+            </h3>
           </div>
         </div>
       </div>
@@ -287,11 +317,23 @@ function DashboardClient() {
                   className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-center space-x-3">
-                    <div className={`w-12 h-12 ${getComplianceColor(patient.complianceRate)} rounded-full flex items-center justify-center`}>
-                      <span className="text-white font-bold text-sm">
-                        {getInitials(patient.name)}
-                      </span>
-                    </div>
+                    {patient.photoUrl ? (
+                      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                        <Image
+                          src={patient.photoUrl}
+                          alt={patient.name}
+                          width={48}
+                          height={48}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`w-12 h-12 ${getComplianceColor(patient.complianceRate)} rounded-full flex items-center justify-center`}>
+                        <span className="text-white font-bold text-sm">
+                          {getInitials(patient.name)}
+                        </span>
+                      </div>
+                    )}
                     <div>
                       <h3 className="font-semibold text-gray-900 text-base">{patient.name}</h3>
                       <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>

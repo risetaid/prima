@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { User, X } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { User, X, Camera, Upload } from 'lucide-react'
+import Image from 'next/image'
 
 interface AddPatientDialogProps {
   isOpen: boolean
@@ -15,12 +16,34 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
     whatsappNumber: ''
   })
   const [loading, setLoading] = useState(false)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      let photoUrl = null
+
+      // Upload photo first if selected
+      if (photoFile) {
+        const photoFormData = new FormData()
+        photoFormData.append('photo', photoFile)
+        
+        const photoResponse = await fetch('/api/upload/patient-photo', {
+          method: 'POST',
+          body: photoFormData,
+        })
+
+        if (photoResponse.ok) {
+          const photoData = await photoResponse.json()
+          photoUrl = photoData.url
+        }
+      }
+
+      // Create patient with photo URL
       const response = await fetch('/api/patients', {
         method: 'POST',
         headers: {
@@ -29,12 +52,15 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         body: JSON.stringify({
           name: formData.name,
           phoneNumber: formData.whatsappNumber,
+          photoUrl: photoUrl,
           isActive: true
         }),
       })
 
       if (response.ok) {
         setFormData({ name: '', whatsappNumber: '' })
+        setPhotoPreview(null)
+        setPhotoFile(null)
         onClose()
         if (onSuccess) onSuccess()
       } else {
@@ -49,7 +75,45 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
 
   const handleCancel = () => {
     setFormData({ name: '', whatsappNumber: '' })
+    setPhotoPreview(null)
+    setPhotoFile(null)
     onClose()
+  }
+
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Ukuran file terlalu besar. Maksimal 5MB.')
+        return
+      }
+
+      if (!file.type.startsWith('image/')) {
+        alert('File harus berupa gambar.')
+        return
+      }
+
+      setPhotoFile(file)
+      
+      // Create preview URL
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const removePhoto = () => {
+    setPhotoPreview(null)
+    setPhotoFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
   if (!isOpen) return null
@@ -73,6 +137,50 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Photo Upload */}
+          <div>
+            <label className="block text-gray-600 text-sm mb-2">
+              Foto Pasien (Opsional)
+            </label>
+            <div className="flex items-center justify-center">
+              {photoPreview ? (
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-blue-200">
+                    <Image
+                      src={photoPreview}
+                      alt="Preview"
+                      width={96}
+                      height={96}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={removePhoto}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600 transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div 
+                  onClick={handlePhotoClick}
+                  className="w-24 h-24 border-4 border-dashed border-blue-300 rounded-full flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                >
+                  <Camera className="w-6 h-6 text-blue-400 mb-1" />
+                  <span className="text-xs text-blue-400">Foto</span>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoSelect}
+              className="hidden"
+            />
+          </div>
+
           {/* Name Field */}
           <div>
             <label className="block text-gray-600 text-sm mb-2">

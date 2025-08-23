@@ -7,51 +7,14 @@ import { UserButton } from '@clerk/nextjs'
 export default function SemuaPage() {
   const router = useRouter()
 
-  // Sample data based on mockup 10 - combination of all statuses
-  const reminders = [
-    {
-      id: '1',
-      message: 'Minum obat candesartan',
-      date: 'Minggu, 17 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    },
-    {
-      id: '2',
-      message: 'Minum obat candesartan',
-      date: 'Senin, 18 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    },
-    {
-      id: '3',
-      message: 'Minum obat candesartan',
-      date: 'Selasa, 19 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    },
-    {
-      id: '4',
-      message: 'Minum obat candesartan',
-      date: 'Rabu, 20 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    },
-    {
-      id: '5',
-      message: 'Minum obat candesartan',
-      date: 'Kamis, 21 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    },
-    {
-      id: '6',
-      message: 'Minum obat candesartan',
-      date: 'Minggu, 3 Agustus 2025',
-      time: '12.00',
-      status: 'terjadwal'
-    }
-  ]
+  // Empty reminders - will be populated from API
+  const reminders: Array<{
+    id: string
+    message: string
+    date: string
+    time: string
+    status: string
+  }> = []
 
   return (
     <div className="min-h-screen bg-gray-50">

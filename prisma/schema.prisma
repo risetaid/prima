@@ -15,11 +15,16 @@ model User {
   firstName                 String?              @map("first_name")
   lastName                  String?              @map("last_name")
   phoneNumber               String?              @map("phone_number")
-  role                      UserRole             @default(VOLUNTEER)
+  role                      UserRole             @default(MEMBER)
   isActive                  Boolean              @default(true) @map("is_active")
+  isApproved                Boolean              @default(false) @map("is_approved")
+  approvedAt                DateTime?            @map("approved_at")
+  approvedBy                String?              @map("approved_by")
   lastLoginAt               DateTime?            @map("last_login_at")
   createdAt                 DateTime             @default(now()) @map("created_at")
   updatedAt                 DateTime             @updatedAt @map("updated_at")
+  approver                  User?                @relation("UserApprovals", fields: [approvedBy], references: [id])
+  approvedUsers             User[]               @relation("UserApprovals")
   educationalArticles       EducationalArticle[]
   manualConfirmations       ManualConfirmation[]
   medicalRecords            MedicalRecord[]
@@ -44,6 +49,7 @@ model Patient {
   emergencyContactName  String?              @map("emergency_contact_name")
   emergencyContactPhone String?              @map("emergency_contact_phone")
   notes                 String?
+  photoUrl              String?              @map("photo_url")
   isActive              Boolean              @default(true) @map("is_active")
   deletedAt             DateTime?            @map("deleted_at")
   createdAt             DateTime             @default(now()) @map("created_at")
@@ -305,7 +311,7 @@ model EducationalArticle {
 
 enum UserRole {
   ADMIN
-  VOLUNTEER
+  MEMBER
 }
 
 enum CancerStage {

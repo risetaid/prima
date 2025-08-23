@@ -143,7 +143,7 @@ export default function AddReminderPage() {
             <textarea
               value={formData.message}
               onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              placeholder="Minum obat candesartan"
+              placeholder=""
               className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
               rows={3}
               required
@@ -226,10 +226,17 @@ export default function AddReminderPage() {
             </label>
             <input
               type="number"
-              value={formData.totalReminders}
-              onChange={(e) => setFormData({ ...formData, totalReminders: parseInt(e.target.value) || 0 })}
+              value={formData.totalReminders === 0 ? '' : formData.totalReminders}
+              onChange={(e) => {
+                const value = e.target.value
+                setFormData({ 
+                  ...formData, 
+                  totalReminders: value === '' ? 0 : parseInt(value) || 0 
+                })
+              }}
               min="1"
               max="365"
+              placeholder="Masukkan jumlah pengingat"
               className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
               required
             />

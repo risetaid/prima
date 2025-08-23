@@ -56,17 +56,31 @@ export async function POST(request: Request) {
 
   try {
     if (eventType === 'user.created') {
+      const email = evt.data.email_addresses[0]?.email_address || ''
+      
+      // Check if this is the first user (should be admin)
+      const userCount = await prisma.user.count()
+      const isFirstUser = userCount === 0
+      
       await prisma.user.create({
         data: {
           clerkId: evt.data.id,
-          email: evt.data.email_addresses[0]?.email_address || '',
+          email,
           firstName: evt.data.first_name || '',
           lastName: evt.data.last_name || '',
           phoneNumber: evt.data.phone_numbers[0]?.phone_number || null,
-          role: 'VOLUNTEER', // Default role for new users
+          role: isFirstUser ? 'ADMIN' : 'MEMBER', // First user is admin
+          isApproved: isFirstUser, // First user auto-approved
+          approvedAt: isFirstUser ? new Date() : null,
+          approvedBy: isFirstUser ? null : null, // Will be set when approved by admin
         },
       })
-      console.log(`✅ User created: ${evt.data.email_addresses[0]?.email_address}`)
+      
+      if (isFirstUser) {
+        console.log(`👑 First user created as ADMIN: ${email}`)
+      } else {
+        console.log(`👤 User created as MEMBER (pending approval): ${email}`)
+      }
     }
 
     if (eventType === 'user.updated') {

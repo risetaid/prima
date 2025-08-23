@@ -122,10 +122,17 @@ export default function TambahPengingatPage() {
             <label className="block text-gray-600 mb-2">Jumlah Pengingat</label>
             <input
               type="number"
-              value={formData.jumlah}
-              onChange={(e) => setFormData({ ...formData, jumlah: e.target.value })}
+              value={formData.jumlah === '0' ? '' : formData.jumlah}
+              onChange={(e) => {
+                const value = e.target.value
+                setFormData({ 
+                  ...formData, 
+                  jumlah: value === '' ? '' : value 
+                })
+              }}
               className="w-full px-4 py-3 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none bg-blue-50"
               placeholder="Masukkan jumlah"
+              min="1"
             />
           </div>
 
