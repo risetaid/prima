@@ -155,57 +155,61 @@ export default function TerjadwalPage() {
             </div>
           ) : (
             reminders.map((reminder) => (
-              <div key={reminder.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-900">{reminder.patient.name}</h3>
-                    <p className="text-sm text-gray-600">{reminder.medicationName}</p>
+              <div key={reminder.id} className="bg-white rounded-lg p-3 sm:p-4 shadow-sm border border-gray-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 space-y-2 sm:space-y-0">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-base sm:text-lg text-gray-900 truncate">{reminder.patient.name}</h3>
+                    <p className="text-sm text-gray-600 truncate">{reminder.medicationName}</p>
                   </div>
                   
                   {editingReminder === reminder.id ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 sm:flex-shrink-0">
                       <input
                         type="time"
                         value={editTime}
                         onChange={(e) => setEditTime(e.target.value)}
-                        className="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
                       />
-                      <button
-                        onClick={() => handleEditReminder(reminder.id)}
-                        className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors cursor-pointer"
-                      >
-                        Simpan
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors cursor-pointer"
-                      >
-                        Batal
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEditReminder(reminder.id)}
+                          className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors cursor-pointer flex-1 sm:flex-none"
+                        >
+                          Simpan
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 transition-colors cursor-pointer flex-1 sm:flex-none"
+                        >
+                          Batal
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex items-center space-x-2">
-                      <div className="flex items-center space-x-1 bg-blue-100 text-blue-800 px-3 py-1 rounded-full">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm font-medium">{reminder.scheduledTime}</span>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 sm:flex-shrink-0">
+                      <div className="flex items-center justify-center sm:justify-start space-x-1 bg-blue-100 text-blue-800 px-2 sm:px-3 py-1 rounded-full">
+                        <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="text-xs sm:text-sm font-medium">{reminder.scheduledTime}</span>
                       </div>
-                      <button
-                        onClick={() => startEdit(reminder)}
-                        className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReminder(reminder.id)}
-                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex space-x-1 sm:space-x-2 justify-center sm:justify-start">
+                        <button
+                          onClick={() => startEdit(reminder)}
+                          className="p-1.5 sm:p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer"
+                        >
+                          <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteReminder(reminder.id)}
+                          className="p-1.5 sm:p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
                 
-                <div className="text-sm text-gray-500">
+                <div className="text-xs sm:text-sm text-gray-500 space-y-1">
                   <p>Dibuat: {formatDateWIB(new Date(reminder.createdAt))}</p>
                   <p>Status: {reminder.isActive ? 'Aktif' : 'Nonaktif'}</p>
                 </div>

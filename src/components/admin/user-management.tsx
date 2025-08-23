@@ -118,18 +118,24 @@ export default function UserManagement() {
 
   const getStatusBadge = (user: User) => {
     if (!user.isApproved) {
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pending Approval</Badge>
+      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs whitespace-nowrap">
+        <span className="hidden sm:inline">Pending</span><span className="sm:hidden">⏳</span>
+      </Badge>
     }
     if (!user.isActive) {
-      return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Inactive</Badge>
+      return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs whitespace-nowrap">
+        <span className="hidden sm:inline">Inactive</span><span className="sm:hidden">❌</span>
+      </Badge>
     }
-    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>
+    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
+      <span className="hidden sm:inline">Active</span><span className="sm:hidden">✅</span>
+    </Badge>
   }
 
   const getRoleBadge = (role: string) => {
     return (
-      <Badge variant={role === 'ADMIN' ? 'default' : 'outline'}>
-        {role === 'ADMIN' ? '👑 Admin' : '👤 Member'}
+      <Badge variant={role === 'ADMIN' ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
+        {role === 'ADMIN' ? '👑' : '👤'} <span className="hidden sm:inline">{role === 'ADMIN' ? 'Admin' : 'Member'}</span>
       </Badge>
     )
   }
@@ -159,40 +165,43 @@ export default function UserManagement() {
           <CardContent>
             <div className="space-y-4">
               {pendingUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-yellow-50 rounded-lg border border-yellow-200 space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <User className="w-5 h-5 text-yellow-700" />
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-gray-900 truncate">
                         {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Unnamed User'}
                       </div>
-                      <div className="text-sm text-gray-600 flex items-center gap-1">
-                        <Mail className="w-3 h-3" />
-                        {user.email}
+                      <div className="text-sm text-gray-600 flex items-center gap-1 truncate">
+                        <Mail className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate">{user.email}</span>
                       </div>
                       <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                        <Calendar className="w-3 h-3" />
-                        Registered: {formatDate(user.createdAt)}
+                        <Calendar className="w-3 h-3 flex-shrink-0" />
+                        <span className="hidden sm:inline">Registered: </span>{formatDate(user.createdAt)}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-3">
-                    {getRoleBadge(user.role)}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                    <div className="flex justify-center sm:justify-start">
+                      {getRoleBadge(user.role)}
+                    </div>
                     <div className="flex space-x-2">
                       <Button
                         onClick={() => handleApproval(user.id, 'approve')}
                         disabled={actionLoading === user.id}
                         size="sm"
-                        className="bg-green-600 hover:bg-green-700 cursor-pointer"
+                        className="bg-green-600 hover:bg-green-700 cursor-pointer flex-1 sm:flex-none"
                       >
                         {actionLoading === user.id ? (
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <>
                             <CheckCircle className="w-4 h-4 mr-1" />
-                            Approve
+                            <span className="hidden sm:inline">Approve</span>
+                            <span className="sm:hidden">✓</span>
                           </>
                         )}
                       </Button>
@@ -201,14 +210,15 @@ export default function UserManagement() {
                         disabled={actionLoading === user.id}
                         size="sm"
                         variant="outline"
-                        className="border-red-300 text-red-700 hover:bg-red-50 cursor-pointer"
+                        className="border-red-300 text-red-700 hover:bg-red-50 cursor-pointer flex-1 sm:flex-none"
                       >
                         {actionLoading === user.id ? (
                           <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <>
                             <XCircle className="w-4 h-4 mr-1" />
-                            Reject
+                            <span className="hidden sm:inline">Reject</span>
+                            <span className="sm:hidden">✗</span>
                           </>
                         )}
                       </Button>
@@ -232,41 +242,48 @@ export default function UserManagement() {
         <CardContent>
           <div className="space-y-4">
             {users.map((user) => (
-              <div key={user.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <User className="w-5 h-5 text-blue-700" />
                   </div>
-                  <div>
-                    <div className="font-medium text-gray-900">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-900 truncate">
                       {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Unnamed User'}
                     </div>
-                    <div className="text-sm text-gray-600 flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      {user.email}
+                    <div className="text-sm text-gray-600 flex items-center gap-1 truncate">
+                      <Mail className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{user.email}</span>
                     </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                      <Calendar className="w-3 h-3" />
-                      Joined: {formatDate(user.createdAt)}
-                      {user.approvedAt && ` • Approved: ${formatDate(user.approvedAt)}`}
+                    <div className="text-xs text-gray-500 flex flex-wrap items-center gap-1 mt-1">
+                      <Calendar className="w-3 h-3 flex-shrink-0" />
+                      <span className="hidden sm:inline">Joined: </span>{formatDate(user.createdAt)}
+                      {user.approvedAt && (
+                        <span className="hidden sm:inline">
+                          {` • Approved: ${formatDate(user.approvedAt)}`}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  {getRoleBadge(user.role)}
-                  {getStatusBadge(user)}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                  <div className="flex justify-center sm:justify-start space-x-1 sm:space-x-2 flex-wrap">
+                    {getRoleBadge(user.role)}
+                    {getStatusBadge(user)}
+                  </div>
                   {user.role !== 'ADMIN' && (
                     <Button
                       onClick={() => toggleUserStatus(user.id, user.isActive)}
                       disabled={actionLoading === user.id}
                       size="sm"
                       variant="outline"
-                      className="cursor-pointer"
+                      className="cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1 whitespace-nowrap"
                     >
                       {actionLoading === user.id ? (
-                        <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        user.isActive ? 'Deactivate' : 'Activate'
+                        <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
+                        <span className="sm:hidden">{user.isActive ? '❌' : '✅'}</span>
                       )}
                     </Button>
                   )}
