@@ -194,15 +194,17 @@ export default function TerjadwalPage() {
                       <div className="flex space-x-1 sm:space-x-2 justify-center sm:justify-start">
                         <button
                           onClick={() => startEdit(reminder)}
-                          className="p-1.5 sm:p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer"
+                          className="p-1.5 sm:p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-full transition-colors cursor-pointer border border-blue-200 bg-blue-50"
+                          title="Edit waktu pengingat"
                         >
-                          <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <Edit className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                         <button
                           onClick={() => handleDeleteReminder(reminder.id)}
-                          className="p-1.5 sm:p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors cursor-pointer"
+                          className="p-1.5 sm:p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full transition-colors cursor-pointer border border-red-200 bg-red-50"
+                          title="Hapus pengingat"
                         >
-                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                          <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                       </div>
                     </div>
