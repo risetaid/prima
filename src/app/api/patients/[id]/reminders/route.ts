@@ -44,17 +44,14 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log('=== POST REMINDER ENDPOINT HIT ===')
   try {
     const user = await getCurrentUser()
-    console.log('user:', user?.id)
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { id } = await params
     const requestBody = await request.json()
-    console.log('requestBody:', requestBody)
     const { message, interval, time, startDate, totalReminders } = requestBody
 
     if (!message || !interval || !time || !startDate || !totalReminders) {
