@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(
@@ -7,9 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const user = await getCurrentUser()
     
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -81,9 +81,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const user = await getCurrentUser()
     
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -99,7 +99,8 @@ export async function PUT(
       emergencyContactName,
       emergencyContactPhone,
       notes,
-      isActive
+      isActive,
+      photoUrl
     } = body
 
     // Check if patient exists and is not soft deleted
@@ -126,7 +127,8 @@ export async function PUT(
         emergencyContactName,
         emergencyContactPhone,
         notes,
-        isActive
+        isActive,
+        photoUrl
       },
       include: {
         assignedVolunteer: {
@@ -155,9 +157,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
+    const user = await getCurrentUser()
     
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

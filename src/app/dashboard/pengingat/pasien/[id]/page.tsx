@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 
 interface ReminderStats {
   terjadwal: number
@@ -102,7 +102,7 @@ export default function PatientReminderDashboard() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

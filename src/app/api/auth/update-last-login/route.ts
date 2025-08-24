@@ -1,74 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
+import { stackServerApp } from '@/stack'
 import { prisma } from '@/lib/prisma'
 import { nowWIB } from '@/lib/datetime'
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser()
+    const user = await stackServerApp.getUser()
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Try to update user, if not found then user hasn't been synced from webhook yet
+    // Try to find user by Stack ID, if not found create user
     const existingUser = await prisma.user.findUnique({
-      where: { clerkId: user.id }
+      where: { stackId: user.id }
     })
 
     if (!existingUser) {
-      console.log(`User with Clerk ID ${user.id} not found in database. Auto-syncing user...`)
+      console.log(`User with Stack ID ${user.id} not found in database. Auto-syncing user...`)
       
       // Check if this is the first user (should be admin)
       const userCount = await prisma.user.count()
       const isFirstUser = userCount === 0
 
-      // Use upsert to handle potential email conflicts
+      // Create new user for Stack Auth
       try {        
-        await prisma.user.upsert({
-          where: { clerkId: user.id },
-          create: {
-            clerkId: user.id,
-            email: user.emailAddresses[0]?.emailAddress || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            phoneNumber: user.phoneNumbers[0]?.phoneNumber || null,
+        await prisma.user.create({
+          data: {
+            stackId: user.id,
+            email: user.primaryEmail || '',
+            firstName: user.displayName?.split(' ')[0] || '',
+            lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
+            phoneNumber: null, // Stack Auth doesn't provide phone by default
             role: isFirstUser ? 'ADMIN' : 'MEMBER',
             isApproved: isFirstUser, // First user auto-approved
             approvedAt: isFirstUser ? new Date() : null,
             lastLoginAt: nowWIB()
-          },
-          update: {
-            lastLoginAt: nowWIB()
           }
         })
         
-        console.log(`✅ User auto-synced: ${user.emailAddresses[0]?.emailAddress}`)
+        console.log(`✅ User auto-synced: ${user.primaryEmail}`)
         return NextResponse.json({ success: true, message: 'User synced and login updated' })
       } catch (syncError) {
         console.error('Auto-sync failed:', syncError)
-        
-        // If still failing, might be email constraint issue
-        // Try to find user by email and update clerkId
-        const emailUser = await prisma.user.findUnique({
-          where: { email: user.emailAddresses[0]?.emailAddress || '' }
-        })
-        
-        if (emailUser && (emailUser.clerkId !== user.id || !emailUser.isActive)) {
-          console.log('Found existing user by email, updating with new clerkId and reactivating...')
-          await prisma.user.update({
-            where: { email: user.emailAddresses[0]?.emailAddress || '' },
-            data: {
-              clerkId: user.id,
-              firstName: user.firstName || emailUser.firstName,
-              lastName: user.lastName || emailUser.lastName,
-              isActive: true,
-              lastLoginAt: nowWIB()
-            }
-          })
-          return NextResponse.json({ success: true, message: 'Existing user updated with new clerkId and reactivated' })
-        }
-        
         return NextResponse.json({ 
           success: false, 
           message: 'User not synced and auto-sync failed',
@@ -79,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Update last login timestamp
     await prisma.user.update({
-      where: { clerkId: user.id },
+      where: { stackId: user.id },
       data: {
         lastLoginAt: nowWIB()
       }

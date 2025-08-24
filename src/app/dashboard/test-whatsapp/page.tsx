@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Send, Settings } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 import { Button } from '@/components/ui/button'
 
 type TestProvider = 'auto' | 'fonnte' | 'twilio'
@@ -110,7 +110,7 @@ Tim PRIMA - Berbagi Kasih`
             </button>
             <h1 className="text-2xl font-bold text-blue-600">Test WhatsApp System</h1>
           </div>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

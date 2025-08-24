@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 import { toast } from 'sonner'
 
 export default function AddPatientPage() {
@@ -74,7 +74,7 @@ export default function AddPatientPage() {
             </button>
             <h1 className="text-2xl font-bold text-blue-600">Tambah Pasien</h1>
           </div>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

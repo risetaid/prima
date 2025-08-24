@@ -1,0 +1,16 @@
+import { StackHandler } from "@stackframe/stack";
+import { stackServerApp } from "../../../stack.ts";
+
+export default function Handler(props: any) {
+  return (
+    <StackHandler 
+      fullPage 
+      app={stackServerApp} 
+      routeProps={props}
+      urls={{
+        afterSignIn: '/dashboard',
+        afterSignUp: '/dashboard'
+      }}
+    />
+  );
+}

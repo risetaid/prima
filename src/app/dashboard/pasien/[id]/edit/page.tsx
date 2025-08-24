@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 import { formatDateInputWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 
@@ -152,7 +152,7 @@ export default function EditPatientPage() {
             </button>
             <h1 className="text-2xl font-bold text-blue-600">Edit Pasien</h1>
           </div>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

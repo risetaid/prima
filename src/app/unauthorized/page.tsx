@@ -1,4 +1,4 @@
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 import Link from 'next/link'
 
 export default function UnauthorizedPage() {
@@ -34,7 +34,7 @@ export default function UnauthorizedPage() {
             </Link>
             
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4 pt-3 sm:pt-4 border-t border-gray-200">
-              <UserButton afterSignOutUrl="/" />
+              <UserMenu />
               <span className="text-xs sm:text-sm text-gray-500 text-center">
                 atau keluar untuk ganti akun
               </span>

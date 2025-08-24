@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Trash2, User, ChevronRight } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { ArrowLeft, Edit, Trash2, User, ChevronRight, Camera, Upload, X } from 'lucide-react'
+import { UserMenu } from '@/components/ui/user-menu'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -32,7 +32,9 @@ export default function PatientDetailPage() {
   const [loading, setLoading] = useState(true)
   const [patient, setPatient] = useState<Patient | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [editData, setEditData] = useState({ name: '', phoneNumber: '' })
+  const [editData, setEditData] = useState({ name: '', phoneNumber: '', photoUrl: '' })
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (params.id) {
@@ -46,7 +48,7 @@ export default function PatientDetailPage() {
       if (response.ok) {
         const data = await response.json()
         setPatient(data)
-        setEditData({ name: data.name, phoneNumber: data.phoneNumber })
+        setEditData({ name: data.name, phoneNumber: data.phoneNumber, photoUrl: data.photoUrl || '' })
       } else {
         console.error('Patient not found')
         router.push('/dashboard/pasien')
@@ -68,6 +70,20 @@ export default function PatientDetailPage() {
       .slice(0, 2)
   }
 
+  const getRandomAvatarColor = (name: string) => {
+    const colors = [
+      "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
+      "bg-cyan-500", "bg-teal-500", "bg-emerald-500", "bg-lime-500",
+      "bg-orange-500", "bg-rose-500", "bg-violet-500", "bg-sky-500"
+    ];
+    // Use name hash to ensure consistent color per person
+    const hash = name.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
   const handleEdit = () => {
     if (isEditMode) {
       handleSave()
@@ -78,8 +94,10 @@ export default function PatientDetailPage() {
 
   const handleCancel = () => {
     setIsEditMode(false)
+    setSelectedPhoto(null)
+    setPhotoPreview(null)
     if (patient) {
-      setEditData({ name: patient.name, phoneNumber: patient.phoneNumber })
+      setEditData({ name: patient.name, phoneNumber: patient.phoneNumber, photoUrl: patient.photoUrl || '' })
     }
   }
 
@@ -87,6 +105,33 @@ export default function PatientDetailPage() {
     if (!patient) return
 
     try {
+      let photoUrl = patient.photoUrl
+
+      // Upload photo if a new one is selected
+      if (selectedPhoto) {
+        const formData = new FormData()
+        formData.append('photo', selectedPhoto)
+        formData.append('patientId', patient.id)
+
+        const photoResponse = await fetch('/api/upload/patient-photo', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (photoResponse.ok) {
+          const photoData = await photoResponse.json()
+          console.log('Photo upload response:', photoData)
+          photoUrl = photoData.url
+        } else {
+          console.error('Photo upload failed:', photoResponse.status)
+          toast.error('Gagal Upload Foto', {
+            description: 'Foto tidak dapat diupload. Data lain akan tetap disimpan.'
+          })
+        }
+      }
+
+      console.log('Updating patient with photoUrl:', photoUrl)
+
       const response = await fetch(`/api/patients/${params.id}`, {
         method: 'PUT',
         headers: {
@@ -94,14 +139,21 @@ export default function PatientDetailPage() {
         },
         body: JSON.stringify({
           name: editData.name,
-          phoneNumber: editData.phoneNumber
+          phoneNumber: editData.phoneNumber,
+          photoUrl: selectedPhoto ? photoUrl : (editData.photoUrl === '' ? null : editData.photoUrl)
         })
       })
 
       if (response.ok) {
         const updatedPatient = await response.json()
+        console.log('Updated patient response:', updatedPatient)
         setPatient(updatedPatient)
         setIsEditMode(false)
+        setSelectedPhoto(null)
+        setPhotoPreview(null)
+        toast.success('Berhasil Disimpan', {
+          description: 'Data pasien telah diperbarui.'
+        })
       } else {
         toast.error('Gagal Menyimpan', {
           description: 'Tidak dapat menyimpan perubahan data pasien. Coba lagi.'
@@ -115,19 +167,40 @@ export default function PatientDetailPage() {
     }
   }
 
+  const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setSelectedPhoto(file)
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null)
+    setPhotoPreview(null)
+    setEditData({ ...editData, photoUrl: '' })
+  }
+
   const handleSymptomsClick = () => {
     router.push(`/dashboard/pasien/${params.id}/gejala`)
   }
 
-  const handleDelete = async () => {
+  const handleToggleStatus = async () => {
     if (!patient) return
     
-    // Show confirmation toast instead of native confirm
+    const action = patient.isActive ? 'nonaktifkan' : 'aktifkan'
+    const actionTitle = patient.isActive ? 'Nonaktifkan' : 'Aktifkan'
+    
+    // Show confirmation toast
     const confirmed = await new Promise<boolean>((resolve) => {
-      toast.warning(`Hapus ${patient.name}?`, {
-        description: 'Tindakan ini tidak dapat dibatalkan. Semua data terkait akan dihapus.',
+      toast.warning(`${actionTitle} ${patient.name}?`, {
+        description: `Pasien akan di${action} dan ${patient.isActive ? 'tidak muncul di daftar' : 'muncul kembali di daftar'}.`,
         action: {
-          label: 'Hapus',
+          label: actionTitle,
           onClick: () => resolve(true)
         },
         cancel: {
@@ -142,21 +215,32 @@ export default function PatientDetailPage() {
 
     try {
       const response = await fetch(`/api/patients/${params.id}`, {
-        method: 'DELETE',
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...patient,
+          isActive: !patient.isActive
+        })
       })
 
       if (response.ok) {
-        router.push('/dashboard/pasien')
+        const updatedPatient = await response.json()
+        setPatient(updatedPatient)
+        toast.success(`Pasien ${action}`, {
+          description: `${patient.name} berhasil di${action}.`
+        })
       } else {
         const error = await response.json()
-        toast.error('Gagal Menghapus', {
+        toast.error(`Gagal ${actionTitle}`, {
           description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
         })
       }
     } catch (error) {
-      console.error('Error deleting patient:', error)
+      console.error('Error toggling patient status:', error)
       toast.error('Kesalahan Jaringan', {
-        description: 'Tidak dapat menghapus pasien. Periksa koneksi internet Anda.'
+        description: 'Tidak dapat mengubah status pasien. Periksa koneksi internet Anda.'
       })
     }
   }
@@ -196,7 +280,7 @@ export default function PatientDetailPage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 
@@ -208,23 +292,68 @@ export default function PatientDetailPage() {
         </div>
 
         {/* Profile Picture */}
-        <div className="flex justify-center mb-8">
-          {patient.photoUrl ? (
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200">
+        <div className="flex justify-center mb-8 relative">
+          {console.log('Current patient.photoUrl:', patient.photoUrl, 'photoPreview:', photoPreview)}
+          {(photoPreview || patient.photoUrl) ? (
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200 relative">
               <Image
-                src={patient.photoUrl}
+                src={photoPreview || patient.photoUrl!}
                 alt={patient.name}
                 width={96}
                 height={96}
                 className="w-full h-full object-cover"
               />
+              {isEditMode && (
+                <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <label htmlFor="photo-upload" className="cursor-pointer">
+                    <Camera className="w-6 h-6 text-white" />
+                  </label>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center">
+            <div className={`w-24 h-24 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center relative`}>
               <span className="text-white font-bold text-2xl">
                 {getInitials(patient.name)}
               </span>
+              {isEditMode && (
+                <div className="absolute inset-0 bg-black bg-opacity-30 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <label htmlFor="photo-upload" className="cursor-pointer">
+                    <Camera className="w-6 h-6 text-white" />
+                  </label>
+                </div>
+              )}
             </div>
+          )}
+          
+          {isEditMode && (
+            <>
+              <input
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+              <div className="absolute -bottom-2 flex space-x-2">
+                <button
+                  onClick={() => document.getElementById('photo-upload')?.click()}
+                  className="bg-blue-500 text-white rounded-full p-2 hover:bg-blue-600 transition-colors cursor-pointer"
+                  title="Upload Foto"
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+                {(photoPreview || patient.photoUrl) && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    className="bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors cursor-pointer"
+                    title="Hapus Foto"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
 
@@ -298,11 +427,24 @@ export default function PatientDetailPage() {
               </button>
               
               <button
-                onClick={handleDelete}
-                className="flex-1 bg-red-500 text-white py-4 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:bg-red-600 transition-colors cursor-pointer"
+                onClick={handleToggleStatus}
+                className={`flex-1 py-4 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-colors cursor-pointer ${
+                  patient.isActive 
+                    ? 'bg-red-500 text-white hover:bg-red-600' 
+                    : 'bg-green-500 text-white hover:bg-green-600'
+                }`}
               >
-                <Trash2 className="w-5 h-5" />
-                <span>Hapus Pasien</span>
+                {patient.isActive ? (
+                  <>
+                    <Trash2 className="w-5 h-5" />
+                    <span>Nonaktifkan Pasien</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="w-5 h-5" />
+                    <span>Aktifkan Pasien</span>
+                  </>
+                )}
               </button>
             </>
           )}

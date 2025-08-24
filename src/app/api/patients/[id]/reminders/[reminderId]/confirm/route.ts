@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 
 export async function PUT(
@@ -7,8 +7,8 @@ export async function PUT(
   { params }: { params: Promise<{ id: string; reminderId: string }> }
 ) {
   try {
-    const { userId } = await auth()
-    if (!userId) {
+    const user = await getCurrentUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -22,15 +22,6 @@ export async function PUT(
     
     // Use reminderLogId from request body if provided, otherwise use reminderId from URL
     const logId = reminderLogId || reminderId
-    
-    // Get current user from database
-    const user = await prisma.user.findFirst({
-      where: { clerkId: userId }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
 
     // Get the reminder log to find the related schedule
     const reminderLog = await prisma.reminderLog.findUnique({

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 
 interface Patient {
   id: string
@@ -81,6 +81,20 @@ export default function ReminderPage() {
     return 'bg-red-500'
   }
 
+  const getRandomAvatarColor = (name: string) => {
+    const colors = [
+      "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
+      "bg-cyan-500", "bg-teal-500", "bg-emerald-500", "bg-lime-500",
+      "bg-orange-500", "bg-rose-500", "bg-violet-500", "bg-sky-500"
+    ];
+    // Use name hash to ensure consistent color per person
+    const hash = name.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
   const getComplianceLabel = (rate: number) => {
     if (rate >= 80) return { text: 'Tinggi', bg: 'bg-green-100', color: 'text-green-800' }
     if (rate >= 50) return { text: 'Sedang', bg: 'bg-yellow-100', color: 'text-yellow-800' }
@@ -110,7 +124,7 @@ export default function ReminderPage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 
@@ -131,7 +145,7 @@ export default function ReminderPage() {
                 className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center space-x-3">
-                  <div className={`w-12 h-12 ${getComplianceColor(patient.complianceRate)} rounded-full flex items-center justify-center`}>
+                  <div className={`w-12 h-12 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center`}>
                     <span className="text-white font-bold text-sm">
                       {getInitials(patient.name)}
                     </span>
@@ -141,11 +155,11 @@ export default function ReminderPage() {
                     <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium`}>
+                <div className="flex flex-col items-end space-y-1">
+                  <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}>
                     {statusLabel.text}
                   </span>
-                  <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium`}>
+                  <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}>
                     {complianceLabel.text}
                   </span>
                 </div>

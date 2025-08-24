@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser, getUserPatients } from '@/lib/auth-utils'
 
@@ -118,9 +117,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth()
+    const user = await getCurrentUser()
     
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -147,15 +146,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get current user from database
-    const currentUser = await prisma.user.findUnique({
-      where: { clerkId: userId }
-    })
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
     const patient = await prisma.patient.create({
       data: {
         name,
@@ -168,7 +158,7 @@ export async function POST(request: NextRequest) {
         emergencyContactPhone,
         notes,
         photoUrl,
-        assignedVolunteerId: assignedVolunteerId || currentUser.id,
+        assignedVolunteerId: assignedVolunteerId || user.id,
         isActive: true
       },
       include: {

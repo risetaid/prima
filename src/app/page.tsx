@@ -1,34 +1,26 @@
 'use client'
 
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@stackframe/stack'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function LandingPage() {
-  const { user, isLoaded } = useUser()
+  const user = useUser()
   const router = useRouter()
 
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (isLoaded && user) {
-      router.push('/dashboard')
-    }
-  }, [isLoaded, user, router])
+  // No need for manual redirect - Stack Auth handles this automatically
+  // The sign-in flow will redirect to dashboard after successful authentication
 
   const handleSignIn = () => {
-    router.push('/sign-in')
+    // If user is already signed in, redirect to dashboard
+    if (user) {
+      router.push('/dashboard')
+    } else {
+      router.push('/handler/signin')
+    }
   }
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  // No loading state needed - Stack Auth handles this automatically
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -69,7 +61,7 @@ export default function LandingPage() {
             onClick={handleSignIn}
             className="w-full max-w-xs bg-blue-500 text-white py-4 px-8 rounded-lg font-semibold text-lg hover:bg-blue-600 transition-colors duration-200 shadow-lg cursor-pointer"
           >
-            Masuk
+            {user ? 'Ke Dashboard' : 'Masuk'}
           </button>
         </div>
       </div>

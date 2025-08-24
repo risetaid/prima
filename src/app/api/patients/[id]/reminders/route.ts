@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { sendUniversalWhatsApp } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
@@ -9,8 +9,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
-    if (!userId) {
+    const user = await getCurrentUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -46,8 +46,8 @@ export async function POST(
 ) {
   console.log('=== POST REMINDER ENDPOINT HIT ===')
   try {
-    const { userId } = await auth()
-    console.log('userId:', userId)
+    const user = await getCurrentUser()
+    console.log('user:', user?.id)
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -75,14 +75,7 @@ export async function POST(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
-    // Get current user from database
-    const user = await prisma.user.findFirst({
-      where: { clerkId: userId }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+    // User is already available from getCurrentUser()
 
     // Create multiple reminder schedules based on totalReminders
     const reminderSchedules = []

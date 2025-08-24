@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@stackframe/stack'
 import { Menu, X, User } from 'lucide-react'
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const router = useRouter()
-  const { user } = useUser()
+  const user = useUser()
 
   const menuItems = [
     { name: 'Beranda', href: '/', active: false },
@@ -53,7 +53,7 @@ export function Navigation() {
             {/* Desktop Auth Button */}
             {user ? (
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">Hi, {user.firstName || user.emailAddresses[0].emailAddress}</span>
+                <span className="text-sm text-gray-600">Hi, {user.displayName || user.primaryEmail}</span>
                 <button
                   onClick={() => handleNavigation('/dashboard')}
                   className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
@@ -63,7 +63,7 @@ export function Navigation() {
               </div>
             ) : (
               <button
-                onClick={() => handleNavigation('/sign-in')}
+                onClick={() => handleNavigation('/handler/signin')}
                 className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
               >
                 Masuk
@@ -107,7 +107,7 @@ export function Navigation() {
               {/* Mobile Auth Button */}
               {user ? (
                 <div className="mt-4 space-y-2">
-                  <p className="text-center text-sm text-gray-600">Hi, {user.firstName || user.emailAddresses[0].emailAddress}</p>
+                  <p className="text-center text-sm text-gray-600">Hi, {user.displayName || user.primaryEmail}</p>
                   <button
                     onClick={() => handleNavigation('/dashboard')}
                     className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
@@ -117,7 +117,7 @@ export function Navigation() {
                 </div>
               ) : (
                 <button
-                  onClick={() => handleNavigation('/sign-in')}
+                  onClick={() => handleNavigation('/handler/signin')}
                   className="w-full mt-4 bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                 >
                   Masuk

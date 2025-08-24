@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, Settings, Shield } from "lucide-react";
+import { Plus, Settings, Shield, Bug } from "lucide-react";
 import { useCallback, memo, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import AddPatientDialog from "@/components/AddPatientDialog";
 import Image from "next/image";
-import { useUser } from "@clerk/nextjs";
+import { useUser } from "@stackframe/stack";
 
 interface Patient {
   id: string;
@@ -18,7 +18,7 @@ interface Patient {
 
 function DashboardClient() {
   const router = useRouter();
-  const { user } = useUser();
+  const user = useUser();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +174,20 @@ function DashboardClient() {
     return "bg-red-500";
   };
 
+  const getRandomAvatarColor = (name: string) => {
+    const colors = [
+      "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
+      "bg-cyan-500", "bg-teal-500", "bg-emerald-500", "bg-lime-500",
+      "bg-orange-500", "bg-rose-500", "bg-violet-500", "bg-sky-500"
+    ];
+    // Use name hash to ensure consistent color per person
+    const hash = name.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
   const getComplianceLabel = (rate: number) => {
     if (rate >= 80)
       return { text: "Tinggi", bg: "bg-green-100", color: "text-green-800" };
@@ -186,7 +200,7 @@ function DashboardClient() {
     <>
       {/* Blue Background Section */}
       <div className="bg-blue-500 p-6">
-        <div className="flex space-x-4 overflow-x-auto pb-2">
+        <div className={`flex space-x-4 overflow-x-auto pb-2 ${userRole !== "ADMIN" ? "justify-center" : ""}`}>
           {/* Pengingat */}
           <div className="text-center flex-shrink-0 min-w-[80px]">
             <div
@@ -240,17 +254,31 @@ function DashboardClient() {
 
           {/* Admin Panel - only for admins */}
           {userRole === "ADMIN" && (
-            <div className="text-center flex-shrink-0 min-w-[80px]">
-              <div
-                onClick={() => router.push("/dashboard/admin/users")}
-                className="cursor-pointer hover:scale-105 transition-transform mb-3"
-              >
-                <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
-                  <Shield className="w-12 h-12 text-blue-500" />
+            <>
+              <div className="text-center flex-shrink-0 min-w-[80px]">
+                <div
+                  onClick={() => router.push("/dashboard/admin/users")}
+                  className="cursor-pointer hover:scale-105 transition-transform mb-3"
+                >
+                  <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                    <Shield className="w-12 h-12 text-blue-500" />
+                  </div>
                 </div>
+                <h3 className="font-semibold text-sm text-white">Admin Panel</h3>
               </div>
-              <h3 className="font-semibold text-sm text-white">Admin Panel</h3>
-            </div>
+              
+              <div className="text-center flex-shrink-0 min-w-[80px]">
+                <div
+                  onClick={() => router.push("/debug-webhook")}
+                  className="cursor-pointer hover:scale-105 transition-transform mb-3"
+                >
+                  <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                    <Bug className="w-12 h-12 text-orange-500" />
+                  </div>
+                </div>
+                <h3 className="font-semibold text-sm text-white">Debug Webhook</h3>
+              </div>
+            </>
           )}
         </div>
       </div>
@@ -348,8 +376,8 @@ function DashboardClient() {
                       </div>
                     ) : (
                       <div
-                        className={`w-12 h-12 ${getComplianceColor(
-                          patient.complianceRate
+                        className={`w-12 h-12 ${getRandomAvatarColor(
+                          patient.name
                         )} rounded-full flex items-center justify-center`}
                       >
                         <span className="text-white font-bold text-sm">
@@ -366,14 +394,14 @@ function DashboardClient() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex flex-col items-end space-y-1">
                     <span
-                      className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium`}
+                      className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
                     >
                       {statusLabel.text}
                     </span>
                     <span
-                      className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium`}
+                      className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
                     >
                       {complianceLabel.text}
                     </span>

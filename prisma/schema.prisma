@@ -10,7 +10,8 @@ datasource db {
 
 model User {
   id                        String               @id @default(uuid())
-  clerkId                   String               @unique @map("clerk_id")
+  stackId                   String               @unique @map("stack_id") // Changed from clerkId to stackId
+  clerkId                   String?              @map("clerk_id") // Keep for migration, make optional
   email                     String               @unique
   firstName                 String?              @map("first_name")
   lastName                  String?              @map("last_name")

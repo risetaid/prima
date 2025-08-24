@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(
@@ -7,8 +7,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { userId } = await auth()
-    if (!userId) {
+    const user = await getCurrentUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -30,6 +30,16 @@ export async function GET(
             firstName: true,
             lastName: true
           }
+        },
+        reminderLog: {
+          include: {
+            reminderSchedule: {
+              select: {
+                customMessage: true,
+                medicationName: true
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -38,19 +48,22 @@ export async function GET(
     })
 
     // Transform to match frontend interface
-    const formattedReminders = completedReminders.map(confirmation => ({
-      id: confirmation.id,
-      medicationName: confirmation.medicationsMissed.length > 0 
-        ? confirmation.medicationsMissed[0] 
-        : 'candesartan',
-      scheduledTime: confirmation.visitTime,
-      completedDate: confirmation.visitDate.toISOString().split('T')[0],
-      customMessage: `Minum obat ${confirmation.medicationsMissed.length > 0 
-        ? confirmation.medicationsMissed[0] 
-        : 'candesartan'}`,
-      medicationTaken: confirmation.medicationsTaken,
-      confirmedAt: confirmation.confirmedAt.toISOString()
-    }))
+    const formattedReminders = completedReminders.map(confirmation => {
+      // Get original custom message from reminder schedule if available
+      const originalMessage = confirmation.reminderLog?.reminderSchedule?.customMessage
+      const medicationName = confirmation.reminderLog?.reminderSchedule?.medicationName || 
+                            (confirmation.medicationsMissed.length > 0 ? confirmation.medicationsMissed[0] : 'candesartan')
+      
+      return {
+        id: confirmation.id,
+        medicationName,
+        scheduledTime: confirmation.visitTime,
+        completedDate: confirmation.visitDate.toISOString().split('T')[0],
+        customMessage: originalMessage || `Minum obat ${medicationName}`,
+        medicationTaken: confirmation.medicationsTaken,
+        confirmedAt: confirmation.confirmedAt.toISOString()
+      }
+    })
 
     return NextResponse.json(formattedReminders)
   } catch (error) {

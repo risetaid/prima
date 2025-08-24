@@ -1,25 +1,13 @@
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
-  '/api/patients(.*)',
-  '/api/test(.*)'
-])
-
-const isPublicApiRoute = createRouteMatcher([
-  '/api/cron(.*)',
-  '/api/webhooks/debug-webhook(.*)'
-])
-
-export default clerkMiddleware(async (auth, req) => {
-  if (isPublicApiRoute(req)) {
-    return
-  }
+// Temporary: Simple middleware without Stack Auth
+export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
   
-  if (isProtectedRoute(req)) {
-    await auth.protect()
-  }
-})
+  // For now, just pass everything through
+  // We'll add Stack Auth middleware back in Phase 3
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [

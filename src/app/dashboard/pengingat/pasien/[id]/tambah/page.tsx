@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Clock, Calendar, ChevronDown } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from '@/components/ui/user-menu'
 import { getCurrentDateWIB, getCurrentTimeWIB } from '@/lib/datetime'
 import { toast } from '@/components/ui/toast'
 
@@ -128,7 +128,7 @@ export default function AddReminderPage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

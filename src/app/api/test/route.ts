@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { sendUniversalWhatsApp, sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
 import { getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
@@ -24,8 +24,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Test endpoint disabled in production' }, { status: 403 })
   }
 
-  const { userId } = await auth()
-  if (!userId) {
+  const user = await getCurrentUser()
+  if (!user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   }
 

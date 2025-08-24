@@ -1,29 +1,26 @@
 'use client'
 
-import { UserButton } from '@clerk/nextjs'
-import { useUser } from '@clerk/nextjs'
+import { useUser } from '@stackframe/stack'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { Bell, BarChart3, HelpCircle, Plus } from 'lucide-react'
 import DashboardClient from './dashboard-client'
+import { UserMenu } from '@/components/ui/user-menu'
 
 export default function DashboardPage() {
-  const { user, isLoaded } = useUser()
+  const user = useUser()
   const router = useRouter()
   const [approvalStatus, setApprovalStatus] = useState<'loading' | 'approved' | 'pending' | 'error'>('loading')
 
   useEffect(() => {
-    // Only redirect if Clerk has fully loaded AND user is null
-    if (isLoaded && !user) {
-      router.push('/sign-in')
+    // Redirect to sign-in if not authenticated
+    if (!user) {
+      router.push('/handler/signin')
       return
     }
-    
+
     // Check approval status when user is loaded
-    if (isLoaded && user) {
-      checkApprovalStatus()
-    }
-  }, [isLoaded, user, router])
+    checkApprovalStatus()
+  }, [user, router])
 
   const checkApprovalStatus = async () => {
     try {
@@ -38,11 +35,11 @@ export default function DashboardPage() {
         return
       }
 
-      // Then check user profile
-      const response = await fetch('/api/user/profile')
+      // Then check user status (doesn't require approval)
+      const response = await fetch('/api/user/status')
       if (response.ok) {
         const userData = await response.json()
-        if (userData.isApproved) {
+        if (userData.canAccessDashboard) {
           setApprovalStatus('approved')
         } else {
           setApprovalStatus('pending')
@@ -58,7 +55,7 @@ export default function DashboardPage() {
   }
 
 
-  if (!isLoaded || approvalStatus === 'loading') {
+  if (approvalStatus === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -69,11 +66,11 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user || approvalStatus === 'pending') {
+  if (approvalStatus === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Redirecting...</p>
+          <p className="text-gray-600">Redirecting to approval page...</p>
         </div>
       </div>
     )
@@ -101,7 +98,7 @@ export default function DashboardPage() {
       <header className="bg-white shadow-sm">
         <div className="flex justify-between items-center px-4 py-4">
           <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu />
         </div>
       </header>
 

@@ -119,23 +119,23 @@ export default function UserManagement() {
   const getStatusBadge = (user: User) => {
     if (!user.isApproved) {
       return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs whitespace-nowrap">
-        <span className="hidden sm:inline">Pending</span><span className="sm:hidden">⏳</span>
+        <span className="sm:hidden">⏳</span> <span>Menunggu Persetujuan</span>
       </Badge>
     }
     if (!user.isActive) {
       return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs whitespace-nowrap">
-        <span className="hidden sm:inline">Inactive</span><span className="sm:hidden">❌</span>
+        <span className="sm:hidden">❌</span> <span>Tidak Aktif</span>
       </Badge>
     }
     return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
-      <span className="hidden sm:inline">Active</span><span className="sm:hidden">✅</span>
+      <span className="sm:hidden">✅</span> <span>Aktif</span>
     </Badge>
   }
 
   const getRoleBadge = (role: string) => {
     return (
       <Badge variant={role === 'ADMIN' ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
-        {role === 'ADMIN' ? '👑' : '👤'} <span className="hidden sm:inline">{role === 'ADMIN' ? 'Admin' : 'Member'}</span>
+        <span className="sm:hidden">{role === 'ADMIN' ? '👑' : '👤'}</span> <span>{role === 'ADMIN' ? 'Administrator' : 'Member'}</span>
       </Badge>
     )
   }
@@ -201,7 +201,7 @@ export default function UserManagement() {
                           <>
                             <CheckCircle className="w-4 h-4 mr-1" />
                             <span className="hidden sm:inline">Approve</span>
-                            <span className="sm:hidden">✓</span>
+                            <span className="sm:hidden">Setuju</span>
                           </>
                         )}
                       </Button>
@@ -218,7 +218,7 @@ export default function UserManagement() {
                           <>
                             <XCircle className="w-4 h-4 mr-1" />
                             <span className="hidden sm:inline">Reject</span>
-                            <span className="sm:hidden">✗</span>
+                            <span className="sm:hidden">Tolak</span>
                           </>
                         )}
                       </Button>
@@ -267,7 +267,7 @@ export default function UserManagement() {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                  <div className="flex justify-center sm:justify-start space-x-1 sm:space-x-2 flex-wrap">
+                  <div className="flex flex-col justify-center sm:justify-start space-y-1 items-center sm:items-start">
                     {getRoleBadge(user.role)}
                     {getStatusBadge(user)}
                   </div>
@@ -284,7 +284,7 @@ export default function UserManagement() {
                       ) : (
                         <>
                           <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
-                          <span className="sm:hidden">{user.isActive ? '❌' : '✅'}</span>
+                          <span className="sm:hidden">{user.isActive ? 'Nonaktifkan' : 'Aktifkan'}</span>
                         </>
                       )}
                     </Button>

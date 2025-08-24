@@ -1,17 +1,48 @@
-import { getCurrentUser } from '@/lib/auth-utils'
-import { redirect } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+'use client'
 
-export default async function PendingApprovalPage() {
-  const user = await getCurrentUser()
-  
-  if (!user) {
-    redirect('/sign-in')
+import { useUser } from '@stackframe/stack'
+import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { UserMenu } from '@/components/ui/user-menu'
+
+export default function PendingApprovalPage() {
+  const user = useUser()
+  const router = useRouter()
+  const [userData, setUserData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/handler/signin')
+      return
+    }
+
+    // Fetch user status from database
+    fetch('/api/user/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.canAccessDashboard) {
+          router.push('/dashboard')
+        } else {
+          setUserData(data)
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching user data:', err)
+        setLoading(false)
+      })
+  }, [user, router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
-  if (user.canAccessDashboard) {
-    redirect('/dashboard')
-  }
+  if (!userData) return null
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -29,7 +60,7 @@ export default async function PendingApprovalPage() {
           
           <div className="text-gray-600 space-y-4">
             <p>
-              Halo <strong>{user.firstName} {user.lastName}</strong>,
+              Halo <strong>{userData.firstName} {userData.lastName}</strong>,
             </p>
             <p>
               Akun Anda telah berhasil dibuat namun masih menunggu persetujuan dari administrator.
@@ -42,21 +73,21 @@ export default async function PendingApprovalPage() {
           <div className="mt-8 p-4 bg-blue-50 rounded-lg">
             <h3 className="font-medium text-blue-800 mb-2">📧 Informasi Kontak</h3>
             <p className="text-sm text-blue-700">
-              Email: <strong>{user.email}</strong>
+              Email: <strong>{userData.email}</strong>
             </p>
             <p className="text-sm text-blue-700 mt-1">
               Role: <span className="px-2 py-1 bg-blue-100 rounded-full text-xs">
-                {user.role === 'ADMIN' ? 'Administrator' : 'Member'}
+                {userData.role === 'ADMIN' ? 'Administrator' : 'Member'}
               </span>
             </p>
           </div>
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="flex items-center justify-center space-x-4">
-              <UserButton afterSignOutUrl="/" />
               <span className="text-sm text-gray-500">
                 atau keluar untuk ganti akun
               </span>
+              <UserMenu forceLeftTop={true} />
             </div>
           </div>
         </div>

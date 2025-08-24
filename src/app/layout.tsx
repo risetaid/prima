@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { ClerkProvider } from '@clerk/nextjs'
+import { StackProvider, StackTheme } from '@stackframe/stack'
+import { stackServerApp } from "../stack"
 import { Toaster } from 'sonner'
 import "./globals.css";
 
@@ -44,17 +45,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="id">
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-          <meta name="mobile-web-app-capable" content="yes" />
-          <meta name="apple-mobile-web-app-capable" content="yes" />
-          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        </head>
-        <body
-          className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
-        >
+    <html lang="id">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      </head>
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+      >
+        <StackProvider app={stackServerApp}>
+          <StackTheme />
           {children}
           <Toaster 
             position="top-center"
@@ -79,8 +81,8 @@ export default function RootLayout({
               `,
             }}
           />
-        </body>
-      </html>
-    </ClerkProvider>
+        </StackProvider>
+      </body>
+    </html>
   );
 }

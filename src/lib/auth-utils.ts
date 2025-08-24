@@ -1,4 +1,4 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
+import { stackServerApp } from '../stack'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import type { User } from '../generated/prisma'
@@ -15,16 +15,15 @@ export interface AdminUser extends AuthUser {
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
-    const { userId } = await auth()
-    const clerkUser = await currentUser()
+    const user = await stackServerApp.getUser()
 
-    if (!userId || !clerkUser) {
+    if (!user) {
       return null
     }
 
-    // Get user from database
+    // Get user from database using Stack Auth ID
     const dbUser = await prisma.user.findUnique({
-      where: { clerkId: userId },
+      where: { stackId: user.id },
       include: {
         approver: {
           select: {
@@ -57,7 +56,7 @@ export async function requireAuth(): Promise<AuthUser> {
   const user = await getCurrentUser()
   
   if (!user) {
-    redirect('/sign-in')
+    redirect('/handler/signin')
   }
 
   return user
