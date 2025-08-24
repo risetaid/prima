@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
+import { stackServerApp } from '@/stack'
 import { prisma } from '@/lib/prisma'
 
 export async function POST() {
   try {
-    const user = await currentUser()
+    const user = await stackServerApp.getUser()
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -12,7 +12,7 @@ export async function POST() {
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { clerkId: user.id }
+      where: { stackId: user.id }
     })
 
     if (existingUser) {
@@ -30,11 +30,11 @@ export async function POST() {
     // Create user in database
     const newUser = await prisma.user.create({
       data: {
-        clerkId: user.id,
-        email: user.emailAddresses[0]?.emailAddress || '',
-        firstName: user.firstName || '',
-        lastName: user.lastName || '',
-        phoneNumber: user.phoneNumbers[0]?.phoneNumber || null,
+        stackId: user.id,
+        email: user.primaryEmail || '',
+        firstName: user.displayName?.split(' ')[0] || '',
+        lastName: user.displayName?.split(' ')[1] || '',
+        phoneNumber: null, // Stack Auth doesn't provide phone by default
         role: isFirstUser ? 'ADMIN' : 'MEMBER',
         isApproved: isFirstUser, // First user auto-approved
         approvedAt: isFirstUser ? new Date() : null,

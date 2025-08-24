@@ -120,7 +120,6 @@ export default function PatientDetailPage() {
 
         if (photoResponse.ok) {
           const photoData = await photoResponse.json()
-          console.log('Photo upload response:', photoData)
           photoUrl = photoData.url
         } else {
           console.error('Photo upload failed:', photoResponse.status)
@@ -129,8 +128,6 @@ export default function PatientDetailPage() {
           })
         }
       }
-
-      console.log('Updating patient with photoUrl:', photoUrl)
 
       const response = await fetch(`/api/patients/${params.id}`, {
         method: 'PUT',
@@ -146,7 +143,6 @@ export default function PatientDetailPage() {
 
       if (response.ok) {
         const updatedPatient = await response.json()
-        console.log('Updated patient response:', updatedPatient)
         setPatient(updatedPatient)
         setIsEditMode(false)
         setSelectedPhoto(null)
@@ -293,7 +289,6 @@ export default function PatientDetailPage() {
 
         {/* Profile Picture */}
         <div className="flex justify-center mb-8 relative">
-          {console.log('Current patient.photoUrl:', patient.photoUrl, 'photoPreview:', photoPreview)}
           {(photoPreview || patient.photoUrl) ? (
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200 relative">
               <Image

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser, auth } from '@clerk/nextjs/server'
+import { stackServerApp } from '@/stack'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -23,16 +23,16 @@ export async function GET(request: NextRequest) {
 
 async function debugEmail() {
   try {
-    const user = await currentUser()
+    const user = await stackServerApp.getUser()
     
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const email = user.emailAddresses[0]?.emailAddress || ''
+    const email = user.primaryEmail || ''
 
-    const userByClerkId = await prisma.user.findUnique({
-      where: { clerkId: user.id }
+    const userByStackId = await prisma.user.findUnique({
+      where: { stackId: user.id }
     })
 
     const userByEmail = await prisma.user.findUnique({
@@ -41,16 +41,16 @@ async function debugEmail() {
 
     const allUsersWithEmail = await prisma.user.findMany({
       where: { email: email },
-      select: { id: true, clerkId: true, email: true, firstName: true, lastName: true, createdAt: true }
+      select: { id: true, stackId: true, email: true, firstName: true, lastName: true, createdAt: true }
     })
 
     return NextResponse.json({
-      currentClerkId: user.id,
+      currentStackId: user.id,
       currentEmail: email,
-      userByClerkId,
+      userByStackId,
       userByEmail,
       allUsersWithEmail,
-      conflict: userByEmail && userByEmail.clerkId !== user.id
+      conflict: userByEmail && userByEmail.stackId !== user.id
     })
   } catch (error) {
     console.error('Debug email error:', error)
@@ -63,22 +63,22 @@ async function debugEmail() {
 
 async function debugUser() {
   try {
-    const { userId } = await auth()
+    const user = await stackServerApp.getUser()
     
-    if (!userId) {
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { clerkId: userId }
+    const dbUser = await prisma.user.findUnique({
+      where: { stackId: user.id }
     })
 
     const totalUsers = await prisma.user.count()
 
     return NextResponse.json({
-      clerkUserId: userId,
-      userFoundInDb: !!user,
-      userDetails: user,
+      stackUserId: user.id,
+      userFoundInDb: !!dbUser,
+      userDetails: dbUser,
       totalUsersInDb: totalUsers
     })
   } catch (error) {
