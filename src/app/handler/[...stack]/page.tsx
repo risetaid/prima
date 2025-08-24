@@ -7,10 +7,6 @@ export default function Handler(props: any) {
       fullPage 
       app={stackServerApp} 
       routeProps={props}
-      urls={{
-        afterSignIn: '/dashboard',
-        afterSignUp: '/dashboard'
-      }}
     />
   );
 }
