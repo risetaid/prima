@@ -6,6 +6,7 @@ import { ArrowLeft, Edit, Trash2, User, ChevronRight } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 interface Patient {
   id: string
@@ -102,11 +103,15 @@ export default function PatientDetailPage() {
         setPatient(updatedPatient)
         setIsEditMode(false)
       } else {
-        alert('Gagal menyimpan perubahan')
+        toast.error('Gagal Menyimpan', {
+          description: 'Tidak dapat menyimpan perubahan data pasien. Coba lagi.'
+        })
       }
     } catch (error) {
       console.error('Error updating patient:', error)
-      alert('Gagal menyimpan perubahan')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.'
+      })
     }
   }
 
@@ -117,7 +122,22 @@ export default function PatientDetailPage() {
   const handleDelete = async () => {
     if (!patient) return
     
-    const confirmed = window.confirm(`Apakah Anda yakin ingin menghapus pasien ${patient.name}?`)
+    // Show confirmation toast instead of native confirm
+    const confirmed = await new Promise<boolean>((resolve) => {
+      toast.warning(`Hapus ${patient.name}?`, {
+        description: 'Tindakan ini tidak dapat dibatalkan. Semua data terkait akan dihapus.',
+        action: {
+          label: 'Hapus',
+          onClick: () => resolve(true)
+        },
+        cancel: {
+          label: 'Batal',
+          onClick: () => resolve(false)
+        },
+        duration: 10000
+      })
+    })
+    
     if (!confirmed) return
 
     try {
@@ -129,11 +149,15 @@ export default function PatientDetailPage() {
         router.push('/dashboard/pasien')
       } else {
         const error = await response.json()
-        alert(`Error: ${error.error}`)
+        toast.error('Gagal Menghapus', {
+          description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
+        })
       }
     } catch (error) {
       console.error('Error deleting patient:', error)
-      alert('Gagal menghapus pasien')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat menghapus pasien. Periksa koneksi internet Anda.'
+      })
     }
   }
 

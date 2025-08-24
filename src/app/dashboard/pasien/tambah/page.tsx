@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
 export default function AddPatientPage() {
   const router = useRouter()
@@ -45,11 +46,15 @@ export default function AddPatientPage() {
         router.push('/dashboard/pasien')
       } else {
         const error = await response.json()
-        alert(`Error: ${error.error}`)
+        toast.error('Gagal Menambahkan Pasien', {
+          description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
+        })
       }
     } catch (error) {
       console.error('Error creating patient:', error)
-      alert('Gagal menambahkan pasien')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat menambahkan pasien. Periksa koneksi internet Anda.'
+      })
     } finally {
       setLoading(false)
     }

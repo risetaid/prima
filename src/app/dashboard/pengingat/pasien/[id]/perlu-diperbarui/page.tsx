@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Download, Clock } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
+import { toast } from 'sonner'
 
 interface PendingReminder {
   id: string
@@ -60,20 +61,32 @@ export default function PendingUpdatePage() {
         // Remove from pending list since it's now confirmed
         setReminders(prev => prev.filter(r => r.id !== reminderId))
         
-        // Show success message
-        const message = taken 
-          ? 'Berhasil dikonfirmasi: Pasien sudah minum obat'
-          : 'Berhasil dikonfirmasi: Pasien belum minum obat'
-        
-        console.log(message)
+        // Show success toast message
+        if (taken) {
+          toast.success('✅ Konfirmasi Berhasil', {
+            description: 'Pasien sudah minum obat sesuai jadwal',
+            duration: 4000,
+          })
+        } else {
+          toast.warning('⚠️ Konfirmasi Berhasil', {
+            description: 'Pasien belum minum obat - akan dipantau lebih lanjut',
+            duration: 4000,
+          })
+        }
       } else {
         console.error('Failed to confirm reminder')
-        alert('Gagal mengupdate status pengingat')
+        toast.error('❌ Gagal Mengupdate', {
+          description: 'Tidak dapat menyimpan status pengingat. Coba lagi.',
+          duration: 5000,
+        })
       }
       
     } catch (error) {
       console.error('Error confirming reminder:', error)
-      alert('Gagal mengupdate status pengingat')
+      toast.error('❌ Kesalahan Jaringan', {
+        description: 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.',
+        duration: 5000,
+      })
     }
   }
 

@@ -1,189 +1,202 @@
-'use client'
+"use client";
 
-import { useRouter } from 'next/navigation'
-import { Plus, Settings } from 'lucide-react'
-import { useCallback, memo, useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
-import AddPatientDialog from '@/components/AddPatientDialog'
-import Image from 'next/image'
-import { useUser } from '@clerk/nextjs'
+import { useRouter } from "next/navigation";
+import { Plus, Settings, Shield } from "lucide-react";
+import { useCallback, memo, useState, useEffect } from "react";
+import { Search } from "lucide-react";
+import AddPatientDialog from "@/components/AddPatientDialog";
+import Image from "next/image";
+import { useUser } from "@clerk/nextjs";
 
 interface Patient {
-  id: string
-  name: string
-  complianceRate: number
-  isActive: boolean
-  photoUrl?: string
+  id: string;
+  name: string;
+  complianceRate: number;
+  isActive: boolean;
+  photoUrl?: string;
 }
 
 function DashboardClient() {
-  const router = useRouter()
-  const { user } = useUser()
-  const [patients, setPatients] = useState<Patient[]>([])
-  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false)
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const router = useRouter();
+  const { user } = useUser();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPatients()
-    fetchUserRole()
-  }, [])
+    fetchPatients();
+    fetchUserRole();
+  }, []);
 
   useEffect(() => {
-    filterPatients()
-  }, [patients, searchQuery, activeFilters])
+    filterPatients();
+  }, [patients, searchQuery, activeFilters]);
 
   const fetchUserRole = async () => {
     try {
-      const response = await fetch('/api/user/profile')
+      const response = await fetch("/api/user/profile");
       if (response.ok) {
-        const data = await response.json()
-        setUserRole(data.role)
+        const data = await response.json();
+        setUserRole(data.role);
       }
     } catch (error) {
-      console.error('Error fetching user role:', error)
+      console.error("Error fetching user role:", error);
     }
-  }
+  };
 
   const fetchPatients = async () => {
     try {
-      const response = await fetch('/api/patients')
+      const response = await fetch("/api/patients");
       if (response.ok) {
-        const data = await response.json()
-        
+        const data = await response.json();
+
         // Calculate real-time compliance rate for each patient
         const patientsWithRealTimeCompliance = await Promise.all(
           data.map(async (patient: Patient) => {
             try {
-              const completedResponse = await fetch(`/api/patients/${patient.id}/reminders/completed`)
+              const completedResponse = await fetch(
+                `/api/patients/${patient.id}/reminders/completed`
+              );
               if (completedResponse.ok) {
-                const completedReminders = await completedResponse.json()
-                const totalReminders = completedReminders.length
-                const completedCount = completedReminders.filter((r: any) => r.medicationTaken).length
-                const realTimeComplianceRate = totalReminders > 0 
-                  ? Math.round((completedCount / totalReminders) * 100)
-                  : 0
-                
+                const completedReminders = await completedResponse.json();
+                const totalReminders = completedReminders.length;
+                const completedCount = completedReminders.filter(
+                  (r: any) => r.medicationTaken
+                ).length;
+                const realTimeComplianceRate =
+                  totalReminders > 0
+                    ? Math.round((completedCount / totalReminders) * 100)
+                    : 0;
+
                 return {
                   ...patient,
-                  complianceRate: realTimeComplianceRate
-                }
+                  complianceRate: realTimeComplianceRate,
+                };
               }
-              return patient // Fallback to original data if API fails
+              return patient; // Fallback to original data if API fails
             } catch (error) {
-              console.error(`Error fetching compliance for patient ${patient.id}:`, error)
-              return patient // Fallback to original data if API fails
+              console.error(
+                `Error fetching compliance for patient ${patient.id}:`,
+                error
+              );
+              return patient; // Fallback to original data if API fails
             }
           })
-        )
-        
-        setPatients(patientsWithRealTimeCompliance)
+        );
+
+        setPatients(patientsWithRealTimeCompliance);
       }
     } catch (error) {
-      console.error('Error fetching patients:', error)
+      console.error("Error fetching patients:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const filterPatients = () => {
-    let filtered = patients
+    let filtered = patients;
 
     if (searchQuery.trim()) {
-      filtered = filtered.filter(patient => 
+      filtered = filtered.filter((patient) =>
         patient.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      );
     }
 
     // Apply multiple status filters
     if (activeFilters.length > 0) {
-      filtered = filtered.filter(patient => {
-        const isActive = patient.isActive
+      filtered = filtered.filter((patient) => {
+        const isActive = patient.isActive;
         return (
-          (activeFilters.includes('active') && isActive) ||
-          (activeFilters.includes('inactive') && !isActive)
-        )
-      })
+          (activeFilters.includes("active") && isActive) ||
+          (activeFilters.includes("inactive") && !isActive)
+        );
+      });
     }
 
-    setFilteredPatients(filtered)
-  }
+    setFilteredPatients(filtered);
+  };
 
   const handlePengingatClick = useCallback(() => {
-    router.push('/dashboard/pengingat')
-  }, [router])
+    router.push("/dashboard/pengingat");
+  }, [router]);
 
   const handleBeritaClick = useCallback(() => {
-    router.push('/dashboard/berita')
-  }, [router])
+    router.push("/dashboard/berita");
+  }, [router]);
 
   const handleVideoClick = useCallback(() => {
-    router.push('/dashboard/video')
-  }, [router])
+    router.push("/dashboard/video");
+  }, [router]);
 
   const handleAddPatientClick = useCallback(() => {
-    setShowAddPatientModal(true)
-  }, [])
+    setShowAddPatientModal(true);
+  }, []);
 
   const handleAddPatientSuccess = useCallback(() => {
-    fetchPatients()
-  }, [])
+    fetchPatients();
+  }, []);
 
   const toggleFilter = useCallback((filterType: string) => {
-    setActiveFilters(prev => {
+    setActiveFilters((prev) => {
       if (prev.includes(filterType)) {
         // Remove filter if already active
-        return prev.filter(f => f !== filterType)
+        return prev.filter((f) => f !== filterType);
       } else {
         // Add filter if not active
-        return [...prev, filterType]
+        return [...prev, filterType];
       }
-    })
-  }, [])
+    });
+  }, []);
 
-  const handlePatientClick = useCallback((patientId: string) => {
-    router.push(`/dashboard/pasien/${patientId}`)
-  }, [router])
+  const handlePatientClick = useCallback(
+    (patientId: string) => {
+      router.push(`/dashboard/pasien/${patientId}`);
+    },
+    [router]
+  );
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
       .toUpperCase()
-      .slice(0, 2)
-  }
+      .slice(0, 2);
+  };
 
   const getComplianceColor = (rate: number) => {
-    if (rate >= 80) return 'bg-green-500'
-    if (rate >= 50) return 'bg-yellow-500'
-    return 'bg-red-500'
-  }
+    if (rate >= 80) return "bg-green-500";
+    if (rate >= 50) return "bg-yellow-500";
+    return "bg-red-500";
+  };
 
   const getComplianceLabel = (rate: number) => {
-    if (rate >= 80) return { text: 'Tinggi', bg: 'bg-green-100', color: 'text-green-800' }
-    if (rate >= 50) return { text: 'Sedang', bg: 'bg-yellow-100', color: 'text-yellow-800' }
-    return { text: 'Rendah', bg: 'bg-red-100', color: 'text-red-800' }
-  }
+    if (rate >= 80)
+      return { text: "Tinggi", bg: "bg-green-100", color: "text-green-800" };
+    if (rate >= 50)
+      return { text: "Sedang", bg: "bg-yellow-100", color: "text-yellow-800" };
+    return { text: "Rendah", bg: "bg-red-100", color: "text-red-800" };
+  };
 
   return (
     <>
       {/* Blue Background Section */}
-      <div className="bg-blue-500 p-6 mb-6" style={{ marginLeft: '-1.5rem', marginRight: '-1.5rem' }}>
-        <div className="grid grid-cols-3 gap-4">
+      <div className="bg-blue-500 p-6">
+        <div className="flex space-x-4 overflow-x-auto pb-2">
           {/* Pengingat */}
-          <div className="text-center">
-            <div 
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
               onClick={handlePengingatClick}
               className="cursor-pointer hover:scale-105 transition-transform mb-3"
             >
-              <Image 
-                src="/btn_pengingat.png" 
-                alt="Pengingat" 
-                width={80} 
+              <Image
+                src="/btn_pengingat.png"
+                alt="Pengingat"
+                width={80}
                 height={80}
                 className="mx-auto"
               />
@@ -192,15 +205,15 @@ function DashboardClient() {
           </div>
 
           {/* Berita */}
-          <div className="text-center">
-            <div 
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
               onClick={handleBeritaClick}
               className="cursor-pointer hover:scale-105 transition-transform mb-3"
             >
-              <Image 
-                src="/btn_berita.png" 
-                alt="Berita" 
-                width={80} 
+              <Image
+                src="/btn_berita.png"
+                alt="Berita"
+                width={80}
                 height={80}
                 className="mx-auto"
               />
@@ -208,47 +221,51 @@ function DashboardClient() {
             <h3 className="font-semibold text-sm text-white">Berita</h3>
           </div>
 
-          {/* Video Edukasi / Admin (conditionally rendered) */}
-          <div className="text-center">
-            {userRole === 'ADMIN' ? (
-              <div 
-                onClick={() => router.push('/dashboard/admin/users')}
+          {/* Video Edukasi */}
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
+              onClick={handleVideoClick}
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+            >
+              <Image
+                src="/btn_videoEdukasi.png"
+                alt="Video Edukasi"
+                width={80}
+                height={80}
+                className="mx-auto"
+              />
+            </div>
+            <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
+          </div>
+
+          {/* Admin Panel - only for admins */}
+          {userRole === "ADMIN" && (
+            <div className="text-center flex-shrink-0 min-w-[80px]">
+              <div
+                onClick={() => router.push("/dashboard/admin/users")}
                 className="cursor-pointer hover:scale-105 transition-transform mb-3"
               >
-                <div className="w-20 h-20 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto">
-                  <Settings className="w-10 h-10 text-white" />
+                <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                  <Shield className="w-12 h-12 text-blue-500" />
                 </div>
               </div>
-            ) : (
-              <div 
-                onClick={handleVideoClick}
-                className="cursor-pointer hover:scale-105 transition-transform mb-3"
-              >
-                <Image 
-                  src="/btn_videoEdukasi.png" 
-                  alt="Video Edukasi" 
-                  width={80} 
-                  height={80}
-                  className="mx-auto"
-                />
-              </div>
-            )}
-            <h3 className="font-semibold text-sm text-white">
-              {userRole === 'ADMIN' ? 'Admin Panel' : 'Video Edukasi'}
-            </h3>
-          </div>
+              <h3 className="font-semibold text-sm text-white">Admin Panel</h3>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Status Badge */}
-      <div className="bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-6">
+      <div className="mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4">
         <span className="font-medium">
-          {loading ? 'Loading...' : `${filteredPatients.length} pasien dalam pengawasan`}
+          {loading
+            ? "Loading..."
+            : `${filteredPatients.length} pasien dalam pengawasan`}
         </span>
       </div>
 
       {/* Daftar Pasien Section */}
-      <div className="mb-6">
+      <div className="mx-4 mb-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
           <div className="flex items-center space-x-3">
@@ -264,7 +281,7 @@ function DashboardClient() {
               />
             </div>
             {/* Add Patient Button */}
-            <div 
+            <div
               onClick={handleAddPatientClick}
               className="bg-blue-500 rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors"
             >
@@ -276,21 +293,21 @@ function DashboardClient() {
         {/* Filter Buttons */}
         <div className="flex space-x-2 mb-4">
           <button
-            onClick={() => toggleFilter('active')}
+            onClick={() => toggleFilter("active")}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeFilters.includes('active')
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              activeFilters.includes("active")
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
             Aktif
           </button>
           <button
-            onClick={() => toggleFilter('inactive')}
+            onClick={() => toggleFilter("inactive")}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-              activeFilters.includes('inactive')
-                ? 'bg-blue-500 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              activeFilters.includes("inactive")
+                ? "bg-blue-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
           >
             Nonaktif
@@ -305,13 +322,15 @@ function DashboardClient() {
         ) : (
           <div className="space-y-3">
             {filteredPatients.slice(0, 8).map((patient) => {
-              const complianceLabel = getComplianceLabel(patient.complianceRate)
-              const statusLabel = patient.isActive 
-                ? { text: 'Aktif', bg: 'bg-blue-500', color: 'text-white' }
-                : { text: 'Nonaktif', bg: 'bg-gray-500', color: 'text-white' }
-              
+              const complianceLabel = getComplianceLabel(
+                patient.complianceRate
+              );
+              const statusLabel = patient.isActive
+                ? { text: "Aktif", bg: "bg-blue-500", color: "text-white" }
+                : { text: "Nonaktif", bg: "bg-gray-500", color: "text-white" };
+
               return (
-                <div 
+                <div
                   key={patient.id}
                   onClick={() => handlePatientClick(patient.id)}
                   className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -328,33 +347,47 @@ function DashboardClient() {
                         />
                       </div>
                     ) : (
-                      <div className={`w-12 h-12 ${getComplianceColor(patient.complianceRate)} rounded-full flex items-center justify-center`}>
+                      <div
+                        className={`w-12 h-12 ${getComplianceColor(
+                          patient.complianceRate
+                        )} rounded-full flex items-center justify-center`}
+                      >
                         <span className="text-white font-bold text-sm">
                           {getInitials(patient.name)}
                         </span>
                       </div>
                     )}
                     <div>
-                      <h3 className="font-semibold text-gray-900 text-base">{patient.name}</h3>
-                      <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
+                      <h3 className="font-semibold text-gray-900 text-base">
+                        {patient.name}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Kepatuhan: {patient.complianceRate}%
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium`}>
+                    <span
+                      className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium`}
+                    >
                       {statusLabel.text}
                     </span>
-                    <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium`}>
+                    <span
+                      className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium`}
+                    >
                       {complianceLabel.text}
                     </span>
                   </div>
                 </div>
-              )
+              );
             })}
 
             {filteredPatients.length === 0 && !loading && (
               <div className="text-center py-8">
                 <p className="text-gray-500 mb-4">
-                  {patients.length === 0 ? 'Belum ada pasien' : 'Tidak ada pasien yang cocok dengan pencarian'}
+                  {patients.length === 0
+                    ? "Belum ada pasien"
+                    : "Tidak ada pasien yang cocok dengan pencarian"}
                 </p>
                 {patients.length === 0 && (
                   <button
@@ -370,7 +403,7 @@ function DashboardClient() {
             {filteredPatients.length > 8 && (
               <div className="text-center pt-4">
                 <button
-                  onClick={() => router.push('/dashboard/pasien')}
+                  onClick={() => router.push("/dashboard/pasien")}
                   className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                 >
                   Lihat Semua Pasien ({filteredPatients.length})
@@ -379,10 +412,10 @@ function DashboardClient() {
             )}
 
             {/* Quick Test Access - Development only */}
-            {process.env.NODE_ENV === 'development' && (
+            {process.env.NODE_ENV === "development" && (
               <div className="text-center pt-4 border-t border-gray-200 mt-4">
                 <button
-                  onClick={() => router.push('/dashboard/test-whatsapp')}
+                  onClick={() => router.push("/dashboard/test-whatsapp")}
                   className="text-green-600 hover:text-green-800 font-medium cursor-pointer text-sm"
                 >
                   🧪 Test WhatsApp API
@@ -400,7 +433,7 @@ function DashboardClient() {
         onSuccess={handleAddPatientSuccess}
       />
     </>
-  )
+  );
 }
 
-export default memo(DashboardClient)
+export default memo(DashboardClient);

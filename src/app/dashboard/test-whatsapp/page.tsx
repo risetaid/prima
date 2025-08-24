@@ -68,7 +68,7 @@ Semangat sembuh! 💪
 Tim PRIMA - Berbagi Kasih`
 
       // Use backup system test endpoint
-      const response = await fetch('/api/test/backup-system', {
+      const response = await fetch('/api/test?type=whatsapp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

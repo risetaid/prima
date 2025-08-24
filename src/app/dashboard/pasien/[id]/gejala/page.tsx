@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
+import { toast } from 'sonner'
 
 interface Patient {
   id: string
@@ -70,7 +71,22 @@ export default function PatientSymptomsPage() {
   const handleDeleteSymptoms = async () => {
     if (selectedSymptoms.length === 0) return
 
-    const confirmed = window.confirm(`Apakah Anda yakin ingin menghapus ${selectedSymptoms.length} gejala?`)
+    // Show confirmation toast instead of native confirm
+    const confirmed = await new Promise<boolean>((resolve) => {
+      toast.warning(`Hapus ${selectedSymptoms.length} Gejala?`, {
+        description: 'Tindakan ini tidak dapat dibatalkan. Data gejala akan dihapus permanen.',
+        action: {
+          label: 'Hapus',
+          onClick: () => resolve(true)
+        },
+        cancel: {
+          label: 'Batal',
+          onClick: () => resolve(false)
+        },
+        duration: 10000
+      })
+    })
+    
     if (!confirmed) return
 
     try {
@@ -87,11 +103,15 @@ export default function PatientSymptomsPage() {
         setSelectedSymptoms([])
         setIsDeleteMode(false)
       } else {
-        alert('Gagal menghapus gejala')
+        toast.error('Gagal Menghapus', {
+          description: 'Tidak dapat menghapus gejala. Coba lagi.'
+        })
       }
     } catch (error) {
       console.error('Error deleting symptoms:', error)
-      alert('Gagal menghapus gejala')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat terhubung ke server.'
+      })
     }
   }
 
@@ -300,11 +320,15 @@ function AddSymptomDialog({ isOpen, patientId, onClose, onSuccess }: AddSymptomD
       if (response.ok) {
         onSuccess()
       } else {
-        alert('Gagal menambah gejala')
+        toast.error('Gagal Menambah Gejala', {
+          description: 'Tidak dapat menambahkan gejala baru. Coba lagi.'
+        })
       }
     } catch (error) {
       console.error('Error adding symptom:', error)
-      alert('Gagal menambah gejala')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat terhubung ke server.'
+      })
     } finally {
       setLoading(false)
     }
@@ -413,11 +437,15 @@ function EditSymptomDialog({ isOpen, symptom, patientId, onClose, onSuccess }: E
       if (response.ok) {
         onSuccess()
       } else {
-        alert('Gagal mengupdate gejala')
+        toast.error('Gagal Update Gejala', {
+          description: 'Tidak dapat memperbarui data gejala. Coba lagi.'
+        })
       }
     } catch (error) {
       console.error('Error updating symptom:', error)
-      alert('Gagal mengupdate gejala')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat terhubung ke server.'
+      })
     } finally {
       setLoading(false)
     }

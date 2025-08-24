@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { webhookStore } from '@/lib/webhook-store'
 
 export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const testMode = searchParams.get('test') === 'true'
+  
+  if (testMode) {
+    return await handleTestWebhook(request)
+  }
   try {
     // Get raw body
     const body = await request.text()
@@ -109,6 +115,13 @@ export async function POST(request: NextRequest) {
 // Handle GET requests for webhook verification (common for some providers)
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
+  const action = searchParams.get('action')
+  
+  if (action === 'logs') {
+    return await handleWebhookLogs()
+  } else if (action === 'clear') {
+    return await clearWebhookLogs()
+  }
   
   console.log('🔍 GET webhook verification request:', {
     url: request.url,
@@ -132,4 +145,87 @@ export async function GET(request: NextRequest) {
     methods: ['GET', 'POST'],
     timestamp: new Date().toISOString()
   })
+}
+
+async function handleTestWebhook(request: NextRequest) {
+  try {
+    const mockFonnteData = {
+      device: '628594257362',
+      sender: '6281333852187',
+      message: 'TEST dari webhook',
+      member: null,
+      name: 'Test User',
+      location: null
+    }
+
+    console.log('🧪 TEST WEBHOOK TRIGGERED:', JSON.stringify(mockFonnteData, null, 2))
+
+    const fonnteData = {
+      device: mockFonnteData.device || 'Unknown',
+      sender: mockFonnteData.sender || 'Unknown',
+      message: mockFonnteData.message || '',
+      member: mockFonnteData.member || null,
+      name: mockFonnteData.name || 'Unknown',
+      location: mockFonnteData.location || null,
+      messageType: 'text',
+      provider: 'fonnte'
+    }
+
+    const storedLog = webhookStore.addLog(fonnteData)
+    console.log(`📝 Test webhook stored with ID: ${storedLog.id}`)
+
+    return NextResponse.json({
+      success: true,
+      message: 'Test webhook processed successfully',
+      mockData: mockFonnteData,
+      storedLogId: storedLog.id,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('❌ Test webhook error:', error)
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
+async function handleWebhookLogs() {
+  try {
+    const logs = webhookStore.getLogs()
+    
+    return NextResponse.json({
+      success: true,
+      logs,
+      count: logs.length,
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('❌ Error fetching webhook logs:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch logs',
+      logs: [],
+      count: 0
+    }, { status: 500 })
+  }
+}
+
+async function clearWebhookLogs() {
+  try {
+    webhookStore.clearLogs()
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Logs cleared',
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('❌ Error clearing webhook logs:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to clear logs'
+    }, { status: 500 })
+  }
 }

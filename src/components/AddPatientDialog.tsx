@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { User, X, Camera, Upload } from 'lucide-react'
 import Image from 'next/image'
+import { toast } from 'sonner'
 
 interface AddPatientDialogProps {
   isOpen: boolean
@@ -84,12 +85,16 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
     const file = e.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        alert('Ukuran file terlalu besar. Maksimal 5MB.')
+        toast.error('File Terlalu Besar', {
+          description: 'Ukuran file maksimal 5MB. Silakan pilih file yang lebih kecil.'
+        })
         return
       }
 
       if (!file.type.startsWith('image/')) {
-        alert('File harus berupa gambar.')
+        toast.error('Format File Tidak Valid', {
+          description: 'File harus berupa gambar (JPG, PNG, GIF, dll).'
+        })
         return
       }
 

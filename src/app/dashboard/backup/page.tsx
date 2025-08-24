@@ -83,7 +83,7 @@ export default function BackupSystemPage() {
     try {
       const testPhone = "081234567890"; // Default test number
 
-      const response = await fetch("/api/test/backup-system", {
+      const response = await fetch("/api/test?type=whatsapp", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

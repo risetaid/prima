@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Calendar, Clock, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, Trash2, X, Edit } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB } from '@/lib/datetime'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -23,6 +23,12 @@ export default function ScheduledRemindersPage() {
   const [loading, setLoading] = useState(true)
   const [isDeleteMode, setIsDeleteMode] = useState(false)
   const [selectedReminders, setSelectedReminders] = useState<string[]>([])
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedReminder, setSelectedReminder] = useState<ScheduledReminder | null>(null)
+  const [editTime, setEditTime] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editMessage, setEditMessage] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
   const { confirm, ConfirmComponent } = useConfirm()
 
   useEffect(() => {
@@ -100,6 +106,84 @@ export default function ScheduledRemindersPage() {
     })
   }
 
+  const openEditModal = (reminder: ScheduledReminder) => {
+    if (isDeleteMode) return // Don't open modal in delete mode
+    setSelectedReminder(reminder)
+    setEditTime(reminder.scheduledTime)
+    // Convert date to YYYY-MM-DD format for input
+    const date = new Date(reminder.nextReminderDate)
+    const formattedDate = date.toISOString().split('T')[0]
+    setEditDate(formattedDate)
+    setEditMessage(reminder.customMessage || `Minum obat ${reminder.medicationName}`)
+    setIsEditModalOpen(true)
+  }
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false)
+    setSelectedReminder(null)
+    setEditTime('')
+    setEditDate('')
+    setEditMessage('')
+    setIsUpdating(false)
+  }
+
+  const handleEditReminder = async () => {
+    if (!editTime) {
+      toast.error('Waktu pengingat tidak boleh kosong')
+      return
+    }
+    if (!editDate) {
+      toast.error('Tanggal pengingat tidak boleh kosong')
+      return
+    }
+    if (!editMessage.trim()) {
+      toast.error('Pesan pengingat tidak boleh kosong')
+      return
+    }
+
+    if (!selectedReminder) return
+
+    setIsUpdating(true)
+    try {
+      const response = await fetch(`/api/reminders/scheduled/${selectedReminder.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reminderTime: editTime,
+          reminderDate: editDate,
+          customMessage: editMessage
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('Pengingat berhasil diperbarui')
+        setIsEditModalOpen(false)
+        setSelectedReminder(null)
+        setEditTime('')
+        setEditDate('')
+        setEditMessage('')
+        // Refresh the reminders
+        if (params.id) {
+          fetchScheduledReminders(params.id as string)
+        }
+      } else {
+        const error = await response.json()
+        toast.error('Gagal memperbarui pengingat', {
+          description: error.error || 'Terjadi kesalahan pada server'
+        })
+      }
+    } catch (error) {
+      console.error('Error updating reminder:', error)
+      toast.error('Gagal memperbarui pengingat', {
+        description: 'Terjadi kesalahan jaringan'
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
@@ -161,7 +245,12 @@ export default function ScheduledRemindersPage() {
                   className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-2 border-blue-300"
                 />
               )}
-              <div className="flex-1 bg-blue-500 text-white rounded-2xl p-4">
+              <div 
+                className={`flex-1 bg-blue-500 text-white rounded-2xl p-4 transition-all duration-200 ${
+                  isDeleteMode ? '' : 'cursor-pointer hover:bg-blue-600 active:bg-blue-700 hover:shadow-lg'
+                }`}
+                onClick={() => openEditModal(reminder)}
+              >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <h3 className="font-semibold text-white mb-1">
@@ -170,6 +259,12 @@ export default function ScheduledRemindersPage() {
                     <p className="text-blue-100 text-sm">
                       {formatDate(reminder.nextReminderDate)}
                     </p>
+                    {!isDeleteMode && (
+                      <p className="text-blue-200 text-xs mt-2 flex items-center space-x-1">
+                        <Edit className="w-3 h-3" />
+                        <span>Tap untuk edit waktu</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center space-x-1 text-white">
                     <Clock className="w-4 h-4" />
@@ -227,6 +322,98 @@ export default function ScheduledRemindersPage() {
           </button>
         )}
       </div>
+      
+      {/* Edit Modal */}
+      {isEditModalOpen && selectedReminder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-md mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Waktu Pengingat</h3>
+              <button
+                onClick={closeEditModal}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                disabled={isUpdating}
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-4 space-y-4">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-1">Pengingat Saat Ini:</h4>
+                <p className="font-medium text-gray-900">
+                  {selectedReminder.customMessage || `Minum obat ${selectedReminder.medicationName}`}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {formatDate(selectedReminder.nextReminderDate)} - {selectedReminder.scheduledTime}
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Pesan Pengingat
+                  </label>
+                  <textarea
+                    value={editMessage}
+                    onChange={(e) => setEditMessage(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={3}
+                    disabled={isUpdating}
+                    placeholder="Contoh: Jangan lupa minum obat candesartan pada waktu yang tepat"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tanggal Pengingat
+                  </label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isUpdating}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Waktu Pengingat
+                  </label>
+                  <input
+                    type="time"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isUpdating}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="flex space-x-3 p-4 border-t">
+              <button
+                onClick={closeEditModal}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                disabled={isUpdating}
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleEditReminder}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isUpdating || !editTime || !editDate || !editMessage.trim()}
+              >
+                {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

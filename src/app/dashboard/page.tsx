@@ -106,10 +106,8 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="py-6">
-        <div className="px-4">
-          <DashboardClient />
-        </div>
+      <main>
+        <DashboardClient />
       </main>
     </div>
   )

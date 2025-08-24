@@ -24,7 +24,7 @@ export default function DebugWebhookPage() {
   const fetchLogs = async () => {
     try {
       setIsLoading(true)
-      const response = await fetch('/api/webhooks/logs')
+      const response = await fetch('/api/webhooks/debug-webhook?action=logs')
       const result = await response.json()
       
       if (result.success) {
@@ -41,7 +41,7 @@ export default function DebugWebhookPage() {
   // Clear logs via API
   const clearLogsAPI = async () => {
     try {
-      const response = await fetch('/api/webhooks/logs', { method: 'DELETE' })
+      const response = await fetch('/api/webhooks/debug-webhook?action=clear')
       const result = await response.json()
       
       if (result.success) {
@@ -190,7 +190,7 @@ export default function DebugWebhookPage() {
               <Button 
                 onClick={async () => {
                   try {
-                    const response = await fetch('/api/webhooks/test-webhook', { method: 'POST' })
+                    const response = await fetch('/api/webhooks/debug-webhook?test=true', { method: 'POST' })
                     const result = await response.json()
                     console.log('Test webhook result:', result)
                     if (result.success) {

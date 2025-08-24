@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateInputWIB } from '@/lib/datetime'
+import { toast } from 'sonner'
 
 interface Patient {
   id: string
@@ -102,11 +103,15 @@ export default function EditPatientPage() {
         router.push(`/dashboard/pasien/${params.id}`)
       } else {
         const error = await response.json()
-        alert(`Error: ${error.error}`)
+        toast.error('Gagal Update Pasien', {
+          description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
+        })
       }
     } catch (error) {
       console.error('Error updating patient:', error)
-      alert('Gagal mengupdate pasien')
+      toast.error('Kesalahan Jaringan', {
+        description: 'Tidak dapat memperbarui data pasien. Periksa koneksi internet Anda.'
+      })
     } finally {
       setSaving(false)
     }

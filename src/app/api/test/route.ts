@@ -1,0 +1,222 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/prisma'
+import { sendUniversalWhatsApp, sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
+import { getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
+
+export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Test endpoint disabled in production' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const testType = searchParams.get('type') || 'timing'
+
+  if (testType === 'timing') {
+    return await timingTest()
+  }
+
+  return NextResponse.json({ error: 'Invalid test type. Use ?type=timing' }, { status: 400 })
+}
+
+export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Test endpoint disabled in production' }, { status: 403 })
+  }
+
+  const { userId } = await auth()
+  if (!userId) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const testType = searchParams.get('type')
+
+  if (testType === 'whatsapp') {
+    return await whatsappTest(request)
+  } else if (testType === 'log') {
+    return await logTest()
+  }
+
+  return NextResponse.json({ 
+    error: 'Invalid test type. Use ?type=whatsapp or ?type=log' 
+  }, { status: 400 })
+}
+
+async function timingTest() {
+  const currentWIBTime = getWIBTimeString()
+  const currentWIBDate = getWIBDateString()
+  
+  const testScenarios = [
+    { scheduledTime: '14:00', description: 'Exactly on time' },
+    { scheduledTime: '14:01', description: '1 minute late' },
+    { scheduledTime: '14:05', description: '5 minutes late' },
+    { scheduledTime: '14:10', description: '10 minutes late' },
+    { scheduledTime: '14:11', description: '11 minutes late (should not send)' },
+    { scheduledTime: '13:59', description: '1 minute early (should not send)' },
+  ]
+
+  const simulatedCurrentTime = '14:10'
+  
+  const results = testScenarios.map(scenario => {
+    const [currentHour, currentMinute] = simulatedCurrentTime.split(':').map(Number)
+    const [scheduledHour, scheduledMinute] = scenario.scheduledTime.split(':').map(Number)
+    
+    const currentTotalMinutes = currentHour * 60 + currentMinute
+    const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
+    const timeDifference = currentTotalMinutes - scheduledTotalMinutes
+    
+    const shouldSend = timeDifference >= 0 && timeDifference <= 10
+    
+    return {
+      ...scenario,
+      timeDifference,
+      shouldSend,
+      status: shouldSend ? '✅ SEND' : '❌ SKIP'
+    }
+  })
+
+  return NextResponse.json({
+    success: true,
+    currentWIBTime,
+    currentWIBDate,
+    simulatedTime: simulatedCurrentTime,
+    configuration: {
+      windowMinutes: 10,
+      cronInterval: 'Every 2 minutes (cron-job.org)',
+      provider: 'Universal (Twilio primary, Fonnte fallback)',
+    },
+    testResults: results,
+    summary: {
+      totalTests: results.length,
+      shouldSend: results.filter(r => r.shouldSend).length,
+      shouldSkip: results.filter(r => !r.shouldSend).length
+    }
+  })
+}
+
+async function whatsappTest(request: NextRequest) {
+  try {
+    const { phoneNumber, testProvider, patientName, medicationName, dosage } = await request.json()
+
+    if (!phoneNumber) {
+      return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
+    }
+
+    const name = patientName || 'Testing User'
+    const medication = medicationName || 'Tamoxifen'
+    const medicationDose = dosage || '20mg - 1 tablet'
+
+    const currentHour = new Date().toLocaleTimeString('id-ID', { 
+      timeZone: 'Asia/Jakarta', 
+      hour: '2-digit', 
+      minute: '2-digit'
+    })
+
+    const greeting = (() => {
+      const hour = new Date().getHours()
+      if (hour < 12) return 'Selamat Pagi'
+      if (hour < 15) return 'Selamat Siang' 
+      if (hour < 18) return 'Selamat Sore'
+      return 'Selamat Malam'
+    })()
+
+    const testMessage = `🏥 *PRIMA Reminder*
+
+${greeting}, ${name}! 👋
+
+⏰ Waktunya minum obat:
+💊 ${medication}
+📝 Dosis: ${medicationDose}
+🕐 Jam: ${currentHour} WIB
+
+📌 Catatan Penting:
+Minum setelah makan dengan air putih
+
+✅ Balas "MINUM" jika sudah minum obat
+❓ Balas "BANTUAN" untuk bantuan
+📞 Darurat: 0341-550171
+
+Semangat sembuh! 💪
+Tim PRIMA - Berbagi Kasih`
+
+    let result
+    const provider = process.env.WHATSAPP_PROVIDER || 'twilio'
+
+    if (testProvider === 'fonnte') {
+      console.log('🧪 Testing FONNTE provider specifically')
+      result = await sendWhatsAppMessageFonnte({
+        to: formatFonnteNumber(phoneNumber),
+        body: testMessage
+      })
+    } else {
+      console.log('🧪 Testing universal sender')
+      result = await sendUniversalWhatsApp(phoneNumber, testMessage)
+    }
+
+    return NextResponse.json({
+      success: true,
+      provider: testProvider || provider,
+      result,
+      message: 'Test message sent successfully',
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error) {
+    console.error('WhatsApp test failed:', error)
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
+  }
+}
+
+async function logTest() {
+  try {
+    const schedule = await prisma.reminderSchedule.findFirst({
+      where: { isActive: true },
+      include: {
+        patient: {
+          select: { id: true, name: true, phoneNumber: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (!schedule) {
+      return NextResponse.json({ error: 'No reminder schedule found' }, { status: 404 })
+    }
+
+    const testLogData = {
+      reminderScheduleId: schedule.id,
+      patientId: schedule.patient.id,
+      sentAt: getWIBTime(),
+      status: 'DELIVERED' as const,
+      fonnteMessageId: 'test-' + Date.now(),
+      message: 'Test message',
+      phoneNumber: schedule.patient.phoneNumber
+    }
+
+    const createdLog = await prisma.reminderLog.create({ data: testLogData })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Test log created successfully',
+      createdLog: {
+        id: createdLog.id,
+        status: createdLog.status,
+        sentAt: createdLog.sentAt.toISOString(),
+        fonnteMessageId: createdLog.fonnteMessageId
+      }
+    })
+
+  } catch (error) {
+    console.error('❌ Test log creation failed:', error)
+    
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      message: 'Failed to create test log'
+    }, { status: 500 })
+  }
+}

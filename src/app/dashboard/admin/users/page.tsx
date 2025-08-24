@@ -29,7 +29,7 @@ export default async function AdminUsersPage() {
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-8">
+      <main className="p-4">
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Manajemen Pengguna</h1>
           <p className="text-gray-600">Kelola registrasi dan persetujuan pengguna</p>
