@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
 // POST endpoint for manual trigger during development/testing
 export async function POST(request: NextRequest) {
-  // For development/testing - no auth required in dev mode
+  // Always require auth in production
   if (process.env.NODE_ENV === 'production') {
     const authHeader = request.headers.get('Authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
