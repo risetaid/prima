@@ -101,7 +101,7 @@ async function processReminders() {
             reminderScheduleId: schedule.id,
             patientId: schedule.patient.id,
             sentAt: getWIBTime(),
-            status: result.success ? 'DELIVERED' : 'FAILED',
+            status: result.success ? 'DELIVERED' : 'FAILED' as const,
             message: messageBody,
             phoneNumber: schedule.patient.phoneNumber,
             fonnteMessageId: result.messageId

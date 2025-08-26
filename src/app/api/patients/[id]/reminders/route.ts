@@ -145,7 +145,7 @@ export async function POST(
           reminderScheduleId: schedule.id,
           patientId: id,
           sentAt: getWIBTime(),
-          status: result.success ? 'DELIVERED' : 'FAILED',
+          status: result.success ? 'DELIVERED' : 'FAILED' as const,
           message: message,
           phoneNumber: patient.phoneNumber,
           fonnteMessageId: result.messageId
