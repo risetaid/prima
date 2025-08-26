@@ -332,6 +332,7 @@ enum Frequency {
   DAILY
   WEEKLY
   CUSTOM
+  CUSTOM_RECURRENCE
 }
 
 enum ReminderStatus {
