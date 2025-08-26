@@ -1,30 +1,35 @@
-// Fonnte WhatsApp API integration for PRIMA (Backup System)
-// Hidden backup untuk medical-grade reliability
+// Fonnte WhatsApp API integration for PRIMA
+// Primary WhatsApp provider for Indonesian healthcare system
 
-export interface FonnteMessage {
+const FONNTE_BASE_URL = process.env.FONNTE_BASE_URL || 'https://api.fonnte.com'
+const FONNTE_TOKEN = process.env.FONNTE_TOKEN
+
+export interface WhatsAppMessage {
   to: string           // Format: 6281234567890 (no + prefix)
   body: string
   mediaUrl?: string    // Optional image/document URL
 }
 
-export interface FonnteMessageResult {
+export interface WhatsAppMessageResult {
   success: boolean
   messageId?: string
   error?: string
 }
 
+if (!FONNTE_TOKEN) {
+  console.warn('Fonnte credentials not configured. WhatsApp messaging will be disabled.')
+}
+
 /**
  * Send WhatsApp message via Fonnte API
  */
-export const sendWhatsAppMessageFonnte = async (
-  message: FonnteMessage
-): Promise<FonnteMessageResult> => {
-  const fonnte_token = process.env.FONNTE_TOKEN
-  
-  if (!fonnte_token) {
+export const sendWhatsAppMessage = async (
+  message: WhatsAppMessage
+): Promise<WhatsAppMessageResult> => {
+  if (!FONNTE_TOKEN) {
     return {
       success: false,
-      error: 'Fonnte token not configured'
+      error: 'Fonnte not configured'
     }
   }
 
@@ -39,10 +44,10 @@ export const sendWhatsAppMessageFonnte = async (
       payload.url = message.mediaUrl
     }
 
-    const response = await fetch('https://api.fonnte.com/send', {
+    const response = await fetch(`${FONNTE_BASE_URL}/send`, {
       method: 'POST',
       headers: {
-        'Authorization': fonnte_token,
+        'Authorization': FONNTE_TOKEN,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
@@ -51,7 +56,7 @@ export const sendWhatsAppMessageFonnte = async (
     const result = await response.json()
 
     if (result.status) {
-      // FONNTE API returns messageId as array, convert to string
+      // Fonnte API returns messageId as array, convert to string
       const messageId = Array.isArray(result.id) ? result.id[0] : result.id
       return {
         success: true,
@@ -73,9 +78,9 @@ export const sendWhatsAppMessageFonnte = async (
 }
 
 /**
- * Format phone number for Fonnte (remove prefixes, Indonesia format)
+ * Format phone number for WhatsApp (Indonesia format, no prefixes)
  */
-export const formatFonnteNumber = (phoneNumber: string): string => {
+export const formatWhatsAppNumber = (phoneNumber: string): string => {
   // Remove all non-numeric characters
   let cleaned = phoneNumber.replace(/\D/g, '')
   
@@ -88,32 +93,88 @@ export const formatFonnteNumber = (phoneNumber: string): string => {
     cleaned = '62' + cleaned // Add Indonesia code if missing
   }
   
-  return cleaned // No whatsapp: prefix for Fonnte
+  return cleaned // Clean number format for Fonnte
 }
 
 /**
- * Universal WhatsApp sender - automatically chooses provider
+ * Create medication reminder message template
  */
-export const sendUniversalWhatsApp = async (
-  to: string,
-  body: string,
-  mediaUrl?: string
-): Promise<FonnteMessageResult> => {
-  const provider = process.env.WHATSAPP_PROVIDER || 'fonnte'
+export const createMedicationReminder = (
+  patientName: string,
+  medicationName: string,
+  dosage: string,
+  time: string,
+  educationLink?: string
+): string => {
+  let message = `🏥 *Pengingat Minum Obat - PRIMA*
+
+Halo ${patientName},
+
+⏰ Saatnya minum obat:
+💊 *${medicationName}* 
+📏 Dosis: ${dosage}
+🕐 Waktu: ${time}
+
+Jangan lupa minum obat sesuai jadwal ya! 
+
+✅ Balas "SUDAH" jika sudah minum obat
+❌ Balas "BELUM" jika belum sempat
+
+Semoga lekas sembuh! 🙏`
+
+  if (educationLink) {
+    message += `\n\n📖 Info lebih lanjut: ${educationLink}`
+  }
+
+  message += '\n\n_Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_'
+
+  return message
+}
+
+/**
+ * Create appointment reminder message
+ */
+export const createAppointmentReminder = (
+  patientName: string,
+  appointmentType: string,
+  date: string,
+  time: string,
+  location: string
+): string => {
+  return `🏥 *Pengingat Jadwal Dokter - PRIMA*
+
+Halo ${patientName},
+
+📅 Anda memiliki jadwal:
+🩺 *${appointmentType}*
+📅 Tanggal: ${date}
+🕐 Waktu: ${time}
+📍 Lokasi: ${location}
+
+Pastikan datang tepat waktu ya!
+
+Jika ada kendala, segera hubungi relawan atau rumah sakit.
+
+Semoga sehat selalu! 🙏
+
+_Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_`
+}
+
+/**
+ * Validate Fonnte webhook signature for security
+ */
+export const validateFonnteWebhook = (
+  signature: string,
+  body: any
+): boolean => {
+  if (!FONNTE_TOKEN) return false
   
-  if (provider === 'fonnte') {
-    return await sendWhatsAppMessageFonnte({
-      to: formatFonnteNumber(to),
-      body,
-      mediaUrl
-    })
-  } else {
-    // Default to Twilio - import dynamically to avoid circular deps
-    const { sendWhatsAppMessage, formatWhatsAppNumber } = await import('./twilio')
-    return await sendWhatsAppMessage({
-      to: formatWhatsAppNumber(to),
-      body,
-      mediaUrl
-    })
+  try {
+    // Implement Fonnte webhook validation if available
+    // For now, basic token validation
+    return signature === FONNTE_TOKEN
+  } catch (error) {
+    console.error('Fonnte webhook validation error:', error)
+    return false
   }
 }

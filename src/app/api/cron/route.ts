@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendUniversalWhatsApp } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 
 // GET endpoint for Vercel Cron Functions
@@ -83,41 +83,33 @@ async function processReminders() {
         console.log(`⏰ Schedule ${schedule.id}: ${schedule.scheduledTime} - Should send: ${shouldSend}`)
 
         if (shouldSend) {
-          const provider = process.env.WHATSAPP_PROVIDER || 'twilio'
-          console.log(`📱 Sending reminder to ${schedule.patient.name} via ${provider.toUpperCase()}`)
+          console.log(`📱 Sending reminder to ${schedule.patient.name} via FONNTE`)
           
-          // Send WhatsApp message via universal sender
+          // Send WhatsApp message via Fonnte
           const messageBody = schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
-          const result = await sendUniversalWhatsApp(
-            schedule.patient.phoneNumber,
-            messageBody
-          )
+          const result = await sendWhatsAppMessage({
+            to: formatWhatsAppNumber(schedule.patient.phoneNumber),
+            body: messageBody
+          })
 
-          const providerLogMessage = `🔍 ${provider.toUpperCase()} result for ${schedule.patient.name}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
+          const providerLogMessage = `🔍 FONNTE result for ${schedule.patient.name}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
           console.log(providerLogMessage)
           debugLogs.push(providerLogMessage)
 
-          // Create reminder log with appropriate field
-          const logData: any = {
+          // Create reminder log
+          const logData = {
             reminderScheduleId: schedule.id,
             patientId: schedule.patient.id,
             sentAt: getWIBTime(),
             status: result.success ? 'DELIVERED' : 'FAILED',
             message: messageBody,
-            phoneNumber: schedule.patient.phoneNumber
-          }
-
-          // Store message ID in appropriate field based on provider
-          if (provider === 'fonnte') {
-            logData.fonnteMessageId = result.messageId
-          } else {
-            logData.twilioMessageId = result.messageId
+            phoneNumber: schedule.patient.phoneNumber,
+            fonnteMessageId: result.messageId
           }
 
           console.log(`🔍 Attempting to create log with data:`, JSON.stringify({
             ...logData,
-            sentAt: logData.sentAt.toISOString(),
-            provider: provider
+            sentAt: logData.sentAt.toISOString()
           }, null, 2))
 
           // Create reminder log with error handling
@@ -148,16 +140,23 @@ async function processReminders() {
     const duration = Date.now() - startTime
     const summary = {
       success: true,
-      timestamp: new Date().toISOString(),
-      wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
-      duration: `${duration}ms`,
-      stats: {
-        processed: processedCount,
-        sent: sentCount,
-        errors: errorCount,
-        total_schedules: reminderSchedules.length
+      message: sentCount > 0 
+        ? `✅ Cron completed: ${sentCount} reminders sent successfully` 
+        : `📋 Cron completed: No reminders needed at this time`,
+      execution: {
+        timestamp: new Date().toISOString(),
+        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+        duration: `${duration}ms`,
+        provider: 'FONNTE'
       },
-      debugLogs: debugLogs
+      results: {
+        schedulesFound: reminderSchedules.length,
+        schedulesProcessed: processedCount,
+        messagesSent: sentCount,
+        errors: errorCount,
+        successRate: processedCount > 0 ? `${Math.round((sentCount / processedCount) * 100)}%` : '0%'
+      },
+      details: debugLogs.length > 0 ? debugLogs : ['No detailed logs available']
     }
 
     console.log('✅ Cron job completed:', summary)

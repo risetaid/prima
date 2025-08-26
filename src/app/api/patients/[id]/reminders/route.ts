@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
-import { sendUniversalWhatsApp } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
 
 export async function GET(
@@ -134,25 +134,21 @@ export async function POST(
       if (shouldSendReminderNow(scheduleDate, time)) {
         console.log('Sending immediate reminder for date:', scheduleDate)
         
-        // Send via universal sender (respects WHATSAPP_PROVIDER)
-        const result = await sendUniversalWhatsApp(patient.phoneNumber, message)
-        const provider = process.env.WHATSAPP_PROVIDER || 'fonnte'
+        // Send via Fonnte
+        const result = await sendWhatsAppMessage({
+          to: formatWhatsAppNumber(patient.phoneNumber),
+          body: message
+        })
 
-        // Log the reminder with appropriate provider field
-        const logData: any = {
+        // Log the reminder
+        const logData = {
           reminderScheduleId: schedule.id,
           patientId: id,
           sentAt: getWIBTime(),
           status: result.success ? 'DELIVERED' : 'FAILED',
           message: message,
-          phoneNumber: patient.phoneNumber
-        }
-
-        // Store message ID based on provider
-        if (provider === 'fonnte') {
-          logData.fonnteMessageId = result.messageId
-        } else {
-          logData.twilioMessageId = result.messageId
+          phoneNumber: patient.phoneNumber,
+          fonnteMessageId: result.messageId
         }
 
         await prisma.reminderLog.create({ data: logData })

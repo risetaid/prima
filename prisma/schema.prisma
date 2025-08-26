@@ -10,8 +10,7 @@ datasource db {
 
 model User {
   id                        String               @id @default(uuid())
-  stackId                   String               @unique @map("stack_id") // Changed from clerkId to stackId
-  clerkId                   String?              @map("clerk_id") // Keep for migration, make optional
+  stackId                   String               @unique @map("stack_id") // Stack Auth ID
   email                     String               @unique
   firstName                 String?              @map("first_name")
   lastName                  String?              @map("last_name")
@@ -149,7 +148,6 @@ model ReminderLog {
   message             String
   phoneNumber         String               @map("phone_number")
   sentAt              DateTime             @map("sent_at")
-  twilioMessageId     String?              @map("twilio_message_id")
   fonnteMessageId     String?              @map("fonnte_message_id")
   status              ReminderStatus       @default(PENDING)
   errorMessage        String?              @map("error_message")

@@ -6,13 +6,10 @@ import { ArrowLeft, Send, Settings } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
 import { Button } from '@/components/ui/button'
 
-type TestProvider = 'auto' | 'fonnte' | 'twilio'
-
 export default function TestWhatsAppPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
-  const [testProvider, setTestProvider] = useState<TestProvider>('auto')
   const [formData, setFormData] = useState({
     phoneNumber: '081234567890', // Default test number
     patientName: 'Testing User',
@@ -67,7 +64,7 @@ Minum setelah makan dengan air putih
 Semangat sembuh! 💪
 Tim PRIMA - Berbagi Kasih`
 
-      // Use backup system test endpoint
+      // Use test endpoint
       const response = await fetch('/api/test?type=whatsapp', {
         method: 'POST',
         headers: {
@@ -75,7 +72,6 @@ Tim PRIMA - Berbagi Kasih`
         },
         body: JSON.stringify({
           phoneNumber: formData.phoneNumber,
-          testProvider: testProvider === 'auto' ? undefined : testProvider,
           patientName: formData.patientName,
           medicationName: formData.medicationName,
           dosage: formData.dosage
@@ -118,52 +114,13 @@ Tim PRIMA - Berbagi Kasih`
       <main className="px-4 py-6">
         <div className="bg-white rounded-lg p-6 shadow-sm mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Test PRIMA Backup System</h2>
+            <h2 className="text-lg font-semibold">Test PRIMA WhatsApp System</h2>
             <div className="flex items-center space-x-2">
               <Settings className="w-4 h-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Current: {process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'}
+              <span className="text-sm text-green-600 font-medium">
+                Fonnte (Primary)
               </span>
             </div>
-          </div>
-
-          {/* Provider Selection */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              🔧 Test Provider
-            </label>
-            <div className="flex space-x-4">
-              <Button
-                type="button"
-                variant={testProvider === 'auto' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTestProvider('auto')}
-                className="cursor-pointer"
-              >
-                AUTO (Environment)
-              </Button>
-              <Button
-                type="button"
-                variant={testProvider === 'fonnte' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTestProvider('fonnte')}
-                className="cursor-pointer"
-              >
-                🟢 FONNTE
-              </Button>
-              <Button
-                type="button"
-                variant={testProvider === 'twilio' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTestProvider('twilio')}
-                className="cursor-pointer"
-              >
-                🔵 TWILIO
-              </Button>
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              AUTO menggunakan WHATSAPP_PROVIDER dari environment ({process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'})
-            </p>
           </div>
           
           <form onSubmit={handleTestSend} className="space-y-4">
@@ -267,36 +224,26 @@ Tim PRIMA - Berbagi Kasih`
         )}
 
         {/* System Status */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-6">
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
             <h3 className="font-medium text-green-800 mb-2">🟢 FONNTE Status</h3>
             <ul className="text-sm text-green-700 space-y-1">
-              <li>{process.env.NEXT_PUBLIC_FONNTE_CONFIGURED === 'true' ? '✅' : '❌'} Token: {process.env.NEXT_PUBLIC_FONNTE_CONFIGURED === 'true' ? 'Configured' : 'Missing'}</li>
-              <li>✅ Primary provider (default)</li>
+              <li>✅ Primary WhatsApp provider</li>
               <li>✅ Ready for production use</li>
               <li>✅ No sandbox limitations</li>
-            </ul>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-medium text-blue-800 mb-2">🔵 TWILIO Status</h3>
-            <ul className="text-sm text-blue-700 space-y-1">
-              <li>{process.env.NEXT_PUBLIC_TWILIO_CONFIGURED === 'true' ? '✅' : '❌'} Credentials: {process.env.NEXT_PUBLIC_TWILIO_CONFIGURED === 'true' ? 'Configured' : 'Missing'}</li>
-              <li>✅ Backup provider (fallback)</li>
-              <li>⚠️ Sandbox mode active</li>
-              <li>⚠️ Requires number whitelisting</li>
+              <li>✅ Indonesian healthcare optimized</li>
             </ul>
           </div>
         </div>
 
         {/* Instructions */}
-        <div className="mt-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h3 className="font-medium text-amber-800 mb-2">📋 System Information</h3>
-          <div className="text-sm text-amber-700 space-y-2">
-            <p><strong>Current Provider:</strong> {process.env.NEXT_PUBLIC_WHATSAPP_PROVIDER || 'fonnte'}</p>
-            <p><strong>Backup System:</strong> Fonnte (Primary) + Twilio (Fallback)</p>
-            <p><strong>Cron Provider:</strong> FastCron (3-minute intervals)</p>
-            <p><strong>Reliability:</strong> Dual-provider medical-grade system</p>
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-medium text-blue-800 mb-2">📋 System Information</h3>
+          <div className="text-sm text-blue-700 space-y-2">
+            <p><strong>Provider:</strong> Fonnte WhatsApp API</p>
+            <p><strong>Cron Service:</strong> app.fastcron.com (2-minute intervals)</p>
+            <p><strong>Authentication:</strong> Stack Auth with Gmail OAuth</p>
+            <p><strong>Target:</strong> Indonesian healthcare volunteers</p>
           </div>
         </div>
       </main>

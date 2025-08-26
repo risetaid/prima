@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
-import { sendUniversalWhatsApp, sendWhatsAppMessageFonnte, formatFonnteNumber } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
@@ -83,8 +83,8 @@ async function timingTest() {
     simulatedTime: simulatedCurrentTime,
     configuration: {
       windowMinutes: 10,
-      cronInterval: 'Every 2 minutes (cron-job.org)',
-      provider: 'Universal (Twilio primary, Fonnte fallback)',
+      cronInterval: 'Every 2 minutes (app.fastcron.com)',
+      provider: 'Fonnte (Primary)',
     },
     testResults: results,
     summary: {
@@ -97,7 +97,7 @@ async function timingTest() {
 
 async function whatsappTest(request: NextRequest) {
   try {
-    const { phoneNumber, testProvider, patientName, medicationName, dosage } = await request.json()
+    const { phoneNumber, patientName, medicationName, dosage } = await request.json()
 
     if (!phoneNumber) {
       return NextResponse.json({ error: 'Phone number required' }, { status: 400 })
@@ -140,23 +140,15 @@ Minum setelah makan dengan air putih
 Semangat sembuh! 💪
 Tim PRIMA - Berbagi Kasih`
 
-    let result
-    const provider = process.env.WHATSAPP_PROVIDER || 'twilio'
-
-    if (testProvider === 'fonnte') {
-      console.log('🧪 Testing FONNTE provider specifically')
-      result = await sendWhatsAppMessageFonnte({
-        to: formatFonnteNumber(phoneNumber),
-        body: testMessage
-      })
-    } else {
-      console.log('🧪 Testing universal sender')
-      result = await sendUniversalWhatsApp(phoneNumber, testMessage)
-    }
+    console.log('🧪 Testing FONNTE provider')
+    const result = await sendWhatsAppMessage({
+      to: formatWhatsAppNumber(phoneNumber),
+      body: testMessage
+    })
 
     return NextResponse.json({
       success: true,
-      provider: testProvider || provider,
+      provider: 'fonnte',
       result,
       message: 'Test message sent successfully',
       timestamp: new Date().toISOString()
