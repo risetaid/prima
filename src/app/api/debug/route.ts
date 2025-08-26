@@ -162,7 +162,7 @@ async function debugReminderLogs() {
             status: log.status,
             sentAt: log.sentAt.toISOString(),
             fonnteMessageId: log.fonnteMessageId,
-            twilioMessageId: log.twilioMessageId
+            provider: 'FONNTE'
           }))
         })),
         schedulesWithLogs: todaySchedules.map(schedule => ({
