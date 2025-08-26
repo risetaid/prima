@@ -141,11 +141,12 @@ export async function POST(
         })
 
         // Log the reminder
+        const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
         const logData = {
           reminderScheduleId: schedule.id,
           patientId: id,
           sentAt: getWIBTime(),
-          status: result.success ? 'DELIVERED' : 'FAILED' as const,
+          status: status,
           message: message,
           phoneNumber: patient.phoneNumber,
           fonnteMessageId: result.messageId

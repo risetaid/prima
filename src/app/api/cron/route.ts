@@ -97,11 +97,12 @@ async function processReminders() {
           debugLogs.push(providerLogMessage)
 
           // Create reminder log
+          const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
           const logData = {
             reminderScheduleId: schedule.id,
             patientId: schedule.patient.id,
             sentAt: getWIBTime(),
-            status: result.success ? 'DELIVERED' : 'FAILED' as const,
+            status: status,
             message: messageBody,
             phoneNumber: schedule.patient.phoneNumber,
             fonnteMessageId: result.messageId
