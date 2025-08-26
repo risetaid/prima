@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
+import Image from 'next/image'
 
 interface Patient {
   id: string
   name: string
   complianceRate: number
   isActive: boolean
+  photoUrl?: string
 }
 
 export default function ReminderPage() {
@@ -145,11 +147,23 @@ export default function ReminderPage() {
                 className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center space-x-3">
-                  <div className={`w-12 h-12 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center`}>
-                    <span className="text-white font-bold text-sm">
-                      {getInitials(patient.name)}
-                    </span>
-                  </div>
+                  {patient.photoUrl ? (
+                    <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                      <Image
+                        src={patient.photoUrl}
+                        alt={patient.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className={`w-12 h-12 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center`}>
+                      <span className="text-white font-bold text-sm">
+                        {getInitials(patient.name)}
+                      </span>
+                    </div>
+                  )}
                   <div>
                     <h3 className="font-semibold text-gray-900 text-base">{patient.name}</h3>
                     <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>

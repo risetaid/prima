@@ -26,7 +26,7 @@ export default function ScheduledRemindersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedReminder, setSelectedReminder] = useState<ScheduledReminder | null>(null)
   const [editTime, setEditTime] = useState('')
-  const [editDate, setEditDate] = useState('')
+
   const [editMessage, setEditMessage] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
   const { confirm, ConfirmComponent } = useConfirm()
@@ -110,10 +110,6 @@ export default function ScheduledRemindersPage() {
     if (isDeleteMode) return // Don't open modal in delete mode
     setSelectedReminder(reminder)
     setEditTime(reminder.scheduledTime)
-    // Convert date to YYYY-MM-DD format for input
-    const date = new Date(reminder.nextReminderDate)
-    const formattedDate = date.toISOString().split('T')[0]
-    setEditDate(formattedDate)
     setEditMessage(reminder.customMessage || `Minum obat ${reminder.medicationName}`)
     setIsEditModalOpen(true)
   }
@@ -122,7 +118,6 @@ export default function ScheduledRemindersPage() {
     setIsEditModalOpen(false)
     setSelectedReminder(null)
     setEditTime('')
-    setEditDate('')
     setEditMessage('')
     setIsUpdating(false)
   }
@@ -130,10 +125,6 @@ export default function ScheduledRemindersPage() {
   const handleEditReminder = async () => {
     if (!editTime) {
       toast.error('Waktu pengingat tidak boleh kosong')
-      return
-    }
-    if (!editDate) {
-      toast.error('Tanggal pengingat tidak boleh kosong')
       return
     }
     if (!editMessage.trim()) {
@@ -145,6 +136,7 @@ export default function ScheduledRemindersPage() {
 
     setIsUpdating(true)
     try {
+      // Update existing reminder with new time and message only
       const response = await fetch(`/api/reminders/scheduled/${selectedReminder.id}`, {
         method: 'PUT',
         headers: {
@@ -152,22 +144,17 @@ export default function ScheduledRemindersPage() {
         },
         body: JSON.stringify({
           reminderTime: editTime,
-          reminderDate: editDate,
           customMessage: editMessage
         }),
       })
 
       if (response.ok) {
         toast.success('Pengingat berhasil diperbarui')
-        setIsEditModalOpen(false)
-        setSelectedReminder(null)
-        setEditTime('')
-        setEditDate('')
-        setEditMessage('')
         // Refresh the reminders
         if (params.id) {
           fetchScheduledReminders(params.id as string)
         }
+        closeEditModal()
       } else {
         const error = await response.json()
         toast.error('Gagal memperbarui pengingat', {
@@ -326,9 +313,9 @@ export default function ScheduledRemindersPage() {
       {/* Edit Modal */}
       {isEditModalOpen && selectedReminder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg w-full max-w-md mx-4">
+          <div className="bg-white rounded-lg w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-900">Edit Waktu Pengingat</h3>
               <button
                 onClick={closeEditModal}
@@ -339,8 +326,8 @@ export default function ScheduledRemindersPage() {
               </button>
             </div>
             
-            {/* Modal Content */}
-            <div className="p-4 space-y-4">
+            {/* Modal Content - Scrollable */}
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
               <div className="bg-gray-50 p-3 rounded-lg">
                 <h4 className="text-sm font-medium text-gray-700 mb-1">Pengingat Saat Ini:</h4>
                 <p className="font-medium text-gray-900">
@@ -366,18 +353,7 @@ export default function ScheduledRemindersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tanggal Pengingat
-                  </label>
-                  <input
-                    type="date"
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={isUpdating}
-                  />
-                </div>
+
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -395,7 +371,7 @@ export default function ScheduledRemindersPage() {
             </div>
             
             {/* Modal Footer */}
-            <div className="flex space-x-3 p-4 border-t">
+            <div className="flex space-x-3 p-4 border-t flex-shrink-0">
               <button
                 onClick={closeEditModal}
                 className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
@@ -406,7 +382,7 @@ export default function ScheduledRemindersPage() {
               <button
                 onClick={handleEditReminder}
                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isUpdating || !editTime || !editDate || !editMessage.trim()}
+                disabled={isUpdating || !editTime || !editMessage.trim()}
               >
                 {isUpdating ? 'Menyimpan...' : 'Simpan Perubahan'}
               </button>

@@ -331,6 +331,7 @@ enum MedicalRecordType {
 enum Frequency {
   DAILY
   WEEKLY
+  CUSTOM
 }
 
 enum ReminderStatus {
