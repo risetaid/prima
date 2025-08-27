@@ -78,3 +78,14 @@ export const shouldSendReminderNow = (startDate: string, scheduledTime: string):
   // Using 3-minute FastCron interval with generous window to avoid timing conflicts
   return timeDifferenceMinutes >= 0 && timeDifferenceMinutes <= 10
 }
+
+/**
+ * Convert UTC Date to WIB datetime string for display
+ * @param utcDate UTC Date object from database
+ * @returns WIB datetime in ISO format
+ */
+export const convertUTCToWIBString = (utcDate: Date): string => {
+  // Add 7 hours to UTC to get WIB
+  const wibDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000)
+  return wibDate.toISOString()
+}

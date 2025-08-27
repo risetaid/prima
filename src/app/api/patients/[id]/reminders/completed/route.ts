@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
+import { convertUTCToWIBString } from '@/lib/timezone'
 
 export async function GET(
   request: NextRequest,
@@ -13,55 +14,79 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get completed reminders (those with manual confirmations)
-    const completedReminders = await prisma.manualConfirmation.findMany({
+    
+    // Get reminder schedules with their latest confirmations (same logic as /all endpoint)
+    const reminderSchedules = await prisma.reminderSchedule.findMany({
       where: {
-        patientId: id
+        patientId: id,
+        isActive: true
       },
       include: {
-        patient: {
-          select: {
-            name: true,
-            phoneNumber: true
-          }
-        },
-        volunteer: {
-          select: {
-            firstName: true,
-            lastName: true
-          }
-        },
-        reminderLog: {
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 1, // Latest log only
           include: {
-            reminderSchedule: {
-              select: {
-                customMessage: true,
-                medicationName: true
-              }
+            manualConfirmations: {
+              orderBy: { confirmedAt: 'desc' },
+              take: 1 // Latest confirmation for this log
             }
           }
+        },
+        manualConfirmations: {
+          orderBy: { confirmedAt: 'desc' },
+          take: 1 // Latest confirmation for this schedule
         }
       },
-      orderBy: {
-        visitDate: 'desc'
-      }
+      orderBy: { startDate: 'desc' }
     })
 
+    // Filter only schedules that have confirmations and extract completed ones
+    const completedReminders = reminderSchedules
+      .map(schedule => {
+        const latestLog = schedule.reminderLogs[0]
+        const scheduleConfirmation = schedule.manualConfirmations[0]
+        
+        // Check if we have a confirmation (either via log or direct schedule confirmation)
+        let confirmation = null
+        if (latestLog && latestLog.manualConfirmations[0]) {
+          confirmation = latestLog.manualConfirmations[0]
+        } else if (scheduleConfirmation) {
+          confirmation = scheduleConfirmation
+        }
+        
+        // Return only if we have a confirmation (completed reminder)
+        if (confirmation) {
+          return {
+            confirmation,
+            schedule,
+            latestLog
+          }
+        }
+        return null
+      })
+      .filter(item => item !== null) // Remove null entries
+      .sort((a, b) => new Date(b.confirmation.confirmedAt).getTime() - new Date(a.confirmation.confirmedAt).getTime()) // Sort by confirmation time desc
+
     // Transform to match frontend interface
-    const formattedReminders = completedReminders.map(confirmation => {
-      // Get original custom message from reminder schedule if available
-      const originalMessage = confirmation.reminderLog?.reminderSchedule?.customMessage
-      const medicationName = confirmation.reminderLog?.reminderSchedule?.medicationName || 
+    const formattedReminders = completedReminders.map(item => {
+      const { confirmation, schedule, latestLog } = item
+      
+      // Get original custom message from reminder schedule
+      const originalMessage = schedule.customMessage
+      const medicationName = schedule.medicationName || 
                             (confirmation.medicationsMissed.length > 0 ? confirmation.medicationsMissed[0] : 'candesartan')
       
       return {
         id: confirmation.id,
         medicationName,
-        scheduledTime: confirmation.visitTime,
+        scheduledTime: confirmation.visitTime, // This is already in HH:MM format from manual confirmation
         completedDate: confirmation.visitDate.toISOString().split('T')[0],
         customMessage: originalMessage || `Minum obat ${medicationName}`,
         medicationTaken: confirmation.medicationsTaken,
-        confirmedAt: confirmation.confirmedAt.toISOString()
+        confirmedAt: convertUTCToWIBString(confirmation.confirmedAt),
+        sentAt: latestLog?.sentAt 
+          ? latestLog.sentAt.toISOString()
+          : null
       }
     })
 

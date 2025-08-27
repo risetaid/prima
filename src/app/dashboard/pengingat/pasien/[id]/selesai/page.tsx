@@ -13,6 +13,7 @@ interface CompletedReminder {
   customMessage?: string
   medicationTaken: boolean
   confirmedAt: string
+  sentAt?: string
 }
 
 export default function CompletedRemindersPage() {
@@ -57,6 +58,25 @@ export default function CompletedRemindersPage() {
     const year = date.getFullYear()
     
     return `${dayName}, ${day} ${month} ${year}`
+  }
+
+  const formatConfirmationTime = (isoString: string) => {
+    // isoString already converted to WIB in API
+    const date = new Date(isoString)
+    const hours = String(date.getUTCHours()).padStart(2, '0')
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const year = date.getUTCFullYear()
+    return `${day}/${month}/${year} ${hours}:${minutes} WIB`
+  }
+
+  const formatSentTime = (isoString: string) => {
+    // isoString already converted to WIB in API
+    const date = new Date(isoString)
+    const hours = String(date.getUTCHours()).padStart(2, '0')
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
+    return `${hours}:${minutes}`
   }
 
   if (loading) {
@@ -107,10 +127,15 @@ export default function CompletedRemindersPage() {
                     <p className="text-gray-500 text-sm">
                       {formatDate(reminder.completedDate)}
                     </p>
+                    <p className="text-gray-400 text-xs mt-1">
+                      Dikonfirmasi: {formatConfirmationTime(reminder.confirmedAt)}
+                    </p>
                   </div>
                   <div className="flex items-center space-x-1 text-gray-600">
                     <Clock className="w-4 h-4" />
-                    <span className="font-semibold">{reminder.scheduledTime}</span>
+                    <span className="font-semibold">
+                      {reminder.sentAt ? formatSentTime(reminder.sentAt) : reminder.scheduledTime}
+                    </span>
                   </div>
                 </div>
               </div>

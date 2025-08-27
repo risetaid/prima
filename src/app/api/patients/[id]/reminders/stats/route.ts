@@ -14,45 +14,71 @@ export async function GET(
 
     const { id } = await params
     
-    // Count each type directly with same logic as individual endpoints
-    const [scheduledCount, pendingCount, completedCount] = await Promise.all([
-      // Scheduled: No DELIVERED logs yet
-      prisma.reminderSchedule.count({
-        where: {
-          patientId: id,
-          isActive: true,
-          reminderLogs: {
-            none: {
-              status: 'DELIVERED'
-            }
+    // Use same logic as /all endpoint to get reminder schedules with latest status
+    const reminderSchedules = await prisma.reminderSchedule.findMany({
+      where: {
+        patientId: id,
+        isActive: true
+      },
+      include: {
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 1, // Latest log only
+          include: {
+            manualConfirmations: true // Include confirmations for this specific log
           }
+        },
+        manualConfirmations: {
+          orderBy: { visitDate: 'desc' },
+          take: 1 // Latest confirmation only
         }
-      }),
+      }
+    })
 
-      // Pending: DELIVERED logs without manual confirmations
-      prisma.reminderLog.count({
-        where: {
-          patientId: id,
-          status: 'DELIVERED',
-          manualConfirmations: {
-            none: {}
-          }
-        }
-      }),
+    // Count by status using same logic as /all endpoint
+    const statusCounts = {
+      terjadwal: 0,
+      perluDiperbarui: 0,
+      selesai: 0
+    }
 
-      // Completed: All manual confirmations
-      prisma.manualConfirmation.count({
-        where: {
-          patientId: id
+    reminderSchedules.forEach(schedule => {
+      const latestLog = schedule.reminderLogs[0]
+      const scheduleConfirmation = schedule.manualConfirmations[0]
+      
+      // Determine status based on proper relations (same logic as /all)
+      let status = 'scheduled'
+
+      if (latestLog) {
+        const logConfirmation = latestLog.manualConfirmations[0]
+        
+        if (logConfirmation) {
+          // This specific log has been confirmed
+          status = 'completed'
+        } else if (latestLog.status === 'DELIVERED') {
+          // Log sent but not yet confirmed
+          status = 'pending'
         }
-      })
-    ])
+      } else if (scheduleConfirmation) {
+        // Manual confirmation without specific log
+        status = 'completed'
+      }
+
+      // Map to our counter keys
+      if (status === 'scheduled') {
+        statusCounts.terjadwal++
+      } else if (status === 'pending') {
+        statusCounts.perluDiperbarui++
+      } else if (status === 'completed') {
+        statusCounts.selesai++
+      }
+    })
 
     const stats = {
-      terjadwal: scheduledCount,
-      perluDiperbarui: pendingCount,
-      selesai: completedCount,
-      semua: scheduledCount + pendingCount + completedCount
+      terjadwal: statusCounts.terjadwal,
+      perluDiperbarui: statusCounts.perluDiperbarui,
+      selesai: statusCounts.selesai,
+      semua: statusCounts.terjadwal + statusCounts.perluDiperbarui + statusCounts.selesai
     }
 
     return NextResponse.json(stats)
