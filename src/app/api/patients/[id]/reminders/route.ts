@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
+import { whatsappRateLimiter } from '@/lib/rate-limiter'
 
 export async function GET(
   request: NextRequest,
@@ -63,6 +64,16 @@ export async function POST(
       if (!customRecurrence.frequency || !customRecurrence.interval) {
         return NextResponse.json({ error: 'Invalid custom recurrence configuration' }, { status: 400 })
       }
+      
+      // Prevent infinite loop - interval must be positive
+      if (customRecurrence.interval <= 0) {
+        return NextResponse.json({ error: 'Recurrence interval must be greater than 0' }, { status: 400 })
+      }
+      
+      // Prevent excessive occurrences
+      if (customRecurrence.occurrences && customRecurrence.occurrences > 1000) {
+        return NextResponse.json({ error: 'Maximum 1000 occurrences allowed' }, { status: 400 })
+      }
     } else {
       if (!selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0) {
         return NextResponse.json({ error: 'Missing required field: selectedDates' }, { status: 400 })
@@ -100,6 +111,12 @@ export async function POST(
     for (const dateString of datesToSchedule) {
       const reminderDate = new Date(dateString)
       
+      // Validate date is not invalid
+      if (isNaN(reminderDate.getTime())) {
+        console.error('Invalid date in datesToSchedule:', dateString)
+        continue // Skip invalid dates
+      }
+      
       const reminderSchedule = await prisma.reminderSchedule.create({
         data: {
           patientId: id,
@@ -134,25 +151,32 @@ export async function POST(
       if (shouldSendReminderNow(scheduleDate, time)) {
         console.log('Sending immediate reminder for date:', scheduleDate)
         
-        // Send via Fonnte
-        const result = await sendWhatsAppMessage({
-          to: formatWhatsAppNumber(patient.phoneNumber),
-          body: message
-        })
+        // Check rate limit before sending immediate reminder
+        const rateLimitKey = `user_${user.id}` // Per-user rate limiting
+        if (!whatsappRateLimiter.isAllowed(rateLimitKey)) {
+          console.warn(`🚫 Rate limit exceeded for user ${user.id}. Skipping immediate send.`)
+          // Don't break, just skip immediate send but still create the schedule
+        } else {
+          // Send via Fonnte
+          const result = await sendWhatsAppMessage({
+            to: formatWhatsAppNumber(patient.phoneNumber),
+            body: message
+          })
 
-        // Log the reminder
-        const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
-        const logData = {
-          reminderScheduleId: schedule.id,
-          patientId: id,
-          sentAt: getWIBTime(),
-          status: status,
-          message: message,
-          phoneNumber: patient.phoneNumber,
-          fonnteMessageId: result.messageId
+          // Log the reminder
+          const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
+          const logData = {
+            reminderScheduleId: schedule.id,
+            patientId: id,
+            sentAt: getWIBTime(),
+            status: status,
+            message: message,
+            phoneNumber: patient.phoneNumber,
+            fonnteMessageId: result.messageId
+          }
+
+          await prisma.reminderLog.create({ data: logData })
         }
-
-        await prisma.reminderLog.create({ data: logData })
         
         break // Only send one immediate reminder
       }
@@ -175,17 +199,47 @@ export async function POST(
 }
 
 function extractMedicationName(message: string): string {
-  // Simple extraction - look for common medication keywords
-  const words = message.toLowerCase().split(' ')
-  const medicationKeywords = ['obat', 'candesartan', 'paracetamol', 'amoxicillin', 'metformin']
+  if (!message || typeof message !== 'string') {
+    return 'Obat' // Safe default
+  }
+
+  // Clean and normalize the message
+  const cleanMessage = message.trim().toLowerCase()
+  if (cleanMessage.length === 0) {
+    return 'Obat'
+  }
   
+  // Enhanced extraction - look for common medication patterns
+  const words = cleanMessage.split(/\s+/)
+  const medicationKeywords = [
+    'obat', 'tablet', 'kapsul', 'sirup',
+    // Common Indonesian medications
+    'candesartan', 'paracetamol', 'amoxicillin', 'metformin', 
+    'amlodipine', 'aspirin', 'atorvastatin', 'captopril',
+    'dexamethasone', 'furosemide', 'insulin', 'omeprazole'
+  ]
+  
+  // Look for medication keywords
   for (const word of words) {
-    if (medicationKeywords.some(keyword => word.includes(keyword))) {
-      return word
+    // Clean word (remove punctuation)
+    const cleanWord = word.replace(/[^\w]/g, '')
+    if (cleanWord.length < 3) continue // Skip very short words
+    
+    if (medicationKeywords.some(keyword => cleanWord.includes(keyword))) {
+      return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1) // Capitalize
     }
   }
   
-  return 'Obat'
+  // Fallback: look for words after "obat" or "minum"
+  const obatIndex = words.findIndex(word => word.includes('obat') || word.includes('minum'))
+  if (obatIndex !== -1 && obatIndex + 1 < words.length) {
+    const nextWord = words[obatIndex + 1].replace(/[^\w]/g, '')
+    if (nextWord.length >= 3) {
+      return nextWord.charAt(0).toUpperCase() + nextWord.slice(1)
+    }
+  }
+  
+  return 'Obat' // Safe default
 }
 
 function calculateEndDate(startDate: string, interval: string, totalReminders: number): Date {
@@ -225,9 +279,17 @@ function generateRecurrenceDates(customRecurrence: any): string[] {
   
   let currentDate = new Date(startDate)
   let occurrenceCount = 0
-  const maxOccurrences = customRecurrence.endType === 'after' ? customRecurrence.occurrences : 1000
+  // Safe type coercion to prevent string/invalid numbers
+  const maxOccurrences = customRecurrence.endType === 'after' 
+    ? Math.max(1, parseInt(customRecurrence.occurrences) || 1)  // Ensure positive integer
+    : 1000
   
-  while (currentDate <= endDate && occurrenceCount < maxOccurrences) {
+  // Add safety counter to prevent infinite loops and memory issues
+  let loopCounter = 0
+  const maxLoops = 10000 // Safety limit
+  
+  while (currentDate <= endDate && occurrenceCount < maxOccurrences && loopCounter < maxLoops) {
+    loopCounter++
     let shouldInclude = false
     
     if (customRecurrence.frequency === 'day') {
@@ -236,7 +298,14 @@ function generateRecurrenceDates(customRecurrence: any): string[] {
       const dayOfWeek = currentDate.getDay() // 0 = Sunday, 1 = Monday, etc.
       const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
       const currentDayName = dayNames[dayOfWeek]
-      shouldInclude = customRecurrence.daysOfWeek.includes(currentDayName)
+      
+      // Safe array access with bounds check
+      if (customRecurrence.daysOfWeek && Array.isArray(customRecurrence.daysOfWeek)) {
+        shouldInclude = customRecurrence.daysOfWeek.includes(currentDayName)
+      } else {
+        // Default to current day if daysOfWeek is invalid
+        shouldInclude = true
+      }
     } else if (customRecurrence.frequency === 'month') {
       // For monthly, include if it's the same day of month as start date
       shouldInclude = currentDate.getDate() === startDate.getDate()

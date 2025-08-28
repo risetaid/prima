@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { getWIBTodayStart } from '@/lib/timezone'
+import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
 export async function GET(
   request: NextRequest,
@@ -15,21 +16,36 @@ export async function GET(
 
     const { id } = await params
     
-    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs today
-    const scheduledReminders = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id,
-        isActive: true,
-        // Only include schedules that don't have DELIVERED logs yet today (WIB timezone)
-        reminderLogs: {
-          none: {
-            status: 'DELIVERED',
-            sentAt: {
-              gte: getWIBTodayStart()
-            }
+    // Extract pagination and date filter parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '30')
+    const dateFilter = searchParams.get('date')
+    const pagination = createEfficientPagination(page, limit)
+
+    // Build optimized where clause
+    const whereClause: any = {
+      patientId: id,
+      isActive: true,
+      // Only include schedules that don't have DELIVERED logs yet today (WIB timezone)
+      reminderLogs: {
+        none: {
+          status: 'DELIVERED',
+          sentAt: {
+            gte: getWIBTodayStart()
           }
         }
-      },
+      }
+    }
+
+    // Add date range filter if provided for startDate
+    if (dateFilter) {
+      whereClause.startDate = createDateRangeQuery(dateFilter, '+07:00')
+    }
+
+    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs today (optimized)
+    const scheduledReminders = await prisma.reminderSchedule.findMany({
+      where: whereClause,
       include: {
         patient: {
           select: {
@@ -40,7 +56,8 @@ export async function GET(
       },
       orderBy: {
         startDate: 'asc'
-      }
+      },
+      ...pagination
     })
 
     // Transform to match frontend interface

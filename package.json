@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "cross-env NEXT_TURBO=1 next dev --turbo",
     "dev:next": "next dev",
     "build": "prisma generate && next build",
     "build:analyze": "ANALYZE=true next build",
@@ -47,6 +47,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.15.5",
+    "cross-env": "^10.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "tailwindcss": "^4",

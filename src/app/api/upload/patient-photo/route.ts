@@ -12,9 +12,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Validate file type
+    // Validate file type (check both MIME and file signature)
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
+    }
+
+    // Validate file signature (magic bytes) to prevent MIME spoofing
+    const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
+    const signature = buffer.subarray(0, 4).toString('hex')
+    
+    const validSignatures = [
+      'ffd8ff', // JPEG
+      '89504e47', // PNG
+      '47494638', // GIF87a/GIF89a
+      '52494646', // WebP (RIFF)
+    ]
+    
+    const isValidImage = validSignatures.some(sig => signature.startsWith(sig))
+    if (!isValidImage) {
+      return NextResponse.json({ error: 'Invalid image file. File signature does not match image format.' }, { status: 400 })
     }
 
     // Validate file size (5MB limit)
@@ -22,25 +39,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 })
     }
 
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    // Create unique filename
+    // Create unique filename with security sanitization
     const timestamp = Date.now()
-    const originalName = file.name.replace(/\s+/g, '-').toLowerCase()
-    const filename = `${timestamp}-${originalName}`
+    // Sanitize filename: remove path traversal, keep only alphanumeric and safe chars
+    const sanitizedName = file.name
+      .replace(/[^a-zA-Z0-9.-]/g, '_') // Replace unsafe chars with underscore
+      .replace(/\.+/g, '.') // Replace multiple dots with single dot
+      .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
+      .toLowerCase()
+    
+    // Extract and validate file extension
+    const ext = sanitizedName.split('.').pop() || ''
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
+    if (!allowedExtensions.includes(ext)) {
+      return NextResponse.json({ error: 'Invalid file extension. Only jpg, jpeg, png, gif, webp allowed' }, { status: 400 })
+    }
+    
+    const filename = `${timestamp}-${sanitizedName}`
     
     // Define upload directory
     const uploadDir = join(process.cwd(), 'public', 'uploads', 'patients')
     
-    // Create upload directory if it doesn't exist
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true })
-    }
-
-    // Save file
+    // Atomic directory creation and file write to prevent race conditions
     const filePath = join(uploadDir, filename)
-    await writeFile(filePath, buffer)
+    
+    try {
+      // mkdir with recursive: true is atomic and won't fail if directory exists
+      await mkdir(uploadDir, { recursive: true })
+      
+      // Atomic file write with unique filename prevents collisions
+      await writeFile(filePath, buffer, { flag: 'wx' }) // 'wx' fails if file exists
+    } catch (error: any) {
+      if (error.code === 'EEXIST') {
+        // File already exists, generate new unique filename
+        const newTimestamp = Date.now()
+        const newFilename = `${newTimestamp}-${sanitizedName}`
+        const newFilePath = join(uploadDir, newFilename)
+        await writeFile(newFilePath, buffer, { flag: 'wx' })
+        
+        return NextResponse.json({ 
+          success: true, 
+          url: `/uploads/patients/${newFilename}`,
+          filename: newFilename
+        })
+      }
+      throw error // Re-throw other errors
+    }
 
     // Return public URL
     const publicUrl = `/uploads/patients/${filename}`

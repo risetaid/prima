@@ -34,6 +34,10 @@ model User {
   loginLogs                 UserLoginLog[]
   volunteerMetrics          VolunteerMetric[]
 
+  @@index([role])
+  @@index([isActive])
+  @@index([isApproved])
+  @@index([role, isActive, isApproved])
   @@map("users")
 }
 
@@ -65,6 +69,11 @@ model Patient {
   reminderLogs          ReminderLog[]
   reminderSchedules     ReminderSchedule[]
 
+  @@index([isActive])
+  @@index([assignedVolunteerId])
+  @@index([assignedVolunteerId, isActive])
+  @@index([phoneNumber])
+  @@index([createdAt])
   @@map("patients")
 }
 
@@ -138,6 +147,11 @@ model ReminderSchedule {
   PatientMedication   PatientMedication?   @relation(fields: [patientMedicationId], references: [id])
   patient             Patient              @relation(fields: [patientId], references: [id])
 
+  @@index([patientId])
+  @@index([isActive])
+  @@index([patientId, isActive])
+  @@index([startDate])
+  @@index([endDate])
   @@map("reminder_schedules")
 }
 
@@ -158,6 +172,11 @@ model ReminderLog {
   patient             Patient              @relation(fields: [patientId], references: [id])
   reminderSchedule    ReminderSchedule?    @relation(fields: [reminderScheduleId], references: [id])
 
+  @@index([patientId])
+  @@index([reminderScheduleId])
+  @@index([status])
+  @@index([sentAt])
+  @@index([patientId, status])
   @@map("reminder_logs")
 }
 
@@ -193,6 +212,12 @@ model ManualConfirmation {
   reminderSchedule   ReminderSchedule? @relation(fields: [reminderScheduleId], references: [id])
   volunteer          User              @relation(fields: [volunteerId], references: [id])
 
+  @@index([patientId])
+  @@index([volunteerId])
+  @@index([reminderScheduleId])
+  @@index([reminderLogId])
+  @@index([visitDate])
+  @@index([patientId, visitDate])
   @@map("manual_confirmations")
 }
 

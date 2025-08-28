@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { StackProvider, StackTheme } from '@stackframe/stack'
-import { stackServerApp } from "../stack"
-import { Toaster } from 'sonner'
+import { StackProvider, StackTheme } from "@stackframe/stack";
+import { stackServerApp } from "../stack";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,7 +17,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "PRIMA - Palliative Remote Integrated Monitoring",
-  description: "Sistem monitoring dan pengingat obat untuk pasien kanker paliatif",
+  description:
+    "Sistem monitoring dan pengingat obat untuk pasien kanker paliatif",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -28,15 +29,15 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
     icon: [
       { url: "/icon-192x192.png", sizes: "192x192" },
-      { url: "/icon-512x512.png", sizes: "512x512" }
-    ]
-  }
+      { url: "/icon-512x512.png", sizes: "512x512" },
+    ],
+  },
 };
 
 export function generateViewport() {
   return {
-    themeColor: "#3b82f6"
-  }
+    themeColor: "#3b82f6",
+  };
 }
 
 export default function RootLayout({
@@ -47,7 +48,10 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=5"
+        />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -58,10 +62,14 @@ export default function RootLayout({
         <StackProvider app={stackServerApp}>
           <StackTheme />
           {children}
-          <Toaster 
+          <Toaster
             position="top-center"
             toastOptions={{
-              style: { background: 'white', color: 'black', border: '1px solid #e5e7eb' },
+              style: {
+                background: "white",
+                color: "black",
+                border: "1px solid #e5e7eb",
+              },
             }}
           />
           <script

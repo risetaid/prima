@@ -319,7 +319,7 @@ export default function ScheduledRemindersPage() {
               <h3 className="text-lg font-semibold text-gray-900">Edit Waktu Pengingat</h3>
               <button
                 onClick={closeEditModal}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
                 disabled={isUpdating}
               >
                 <X className="w-5 h-5 text-gray-500" />

@@ -99,7 +99,7 @@ export default function PatientListPage() {
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-full"
+              className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-blue-600" />
             </button>

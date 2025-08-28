@@ -221,14 +221,14 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
             <button
               type="button"
               onClick={handleCancel}
-              className="flex-1 bg-gray-200 text-gray-700 py-2.5 sm:py-3 rounded-xl font-medium hover:bg-gray-300 transition-colors text-sm sm:text-base"
+              className="flex-1 bg-gray-200 text-gray-700 py-2.5 sm:py-3 rounded-xl font-medium hover:bg-gray-300 transition-colors text-sm sm:text-base cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-blue-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm sm:text-base"
+              className="flex-1 bg-blue-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm sm:text-base cursor-pointer"
             >
               {loading ? 'Loading...' : 'Tambah'}
             </button>

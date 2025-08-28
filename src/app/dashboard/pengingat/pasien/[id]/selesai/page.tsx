@@ -181,7 +181,10 @@ export default function CompletedRemindersPage() {
             <div className="mt-3 pt-3 border-t border-blue-200">
               <div className="text-center">
                 <div className="text-lg font-bold text-blue-600">
-                  {Math.round((reminders.filter(r => r.medicationTaken).length / reminders.length) * 100)}%
+                  {reminders.length > 0 
+                    ? Math.round((reminders.filter(r => r.medicationTaken).length / reminders.length) * 100)
+                    : 0
+                  }%
                 </div>
                 <div className="text-sm text-gray-600">Tingkat Kepatuhan</div>
               </div>

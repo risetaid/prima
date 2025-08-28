@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
 import { convertUTCToWIBString } from '@/lib/timezone'
+import { createEfficientPagination } from '@/lib/query-optimizer'
 
 export async function GET(
   request: NextRequest,
@@ -15,29 +16,42 @@ export async function GET(
 
     const { id } = await params
     
-    // Get reminder schedules with their latest confirmations (same logic as /all endpoint)
+    // Extract pagination parameters from request
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const pagination = createEfficientPagination(page, limit)
+
+    // Get reminder schedules with their latest confirmations (optimized with pagination)
     const reminderSchedules = await prisma.reminderSchedule.findMany({
       where: {
         patientId: id,
-        isActive: true
+        isActive: true,
+        // Optimize by only getting schedules that have confirmations
+        OR: [
+          { reminderLogs: { some: { manualConfirmations: { some: {} } } } },
+          { manualConfirmations: { some: {} } }
+        ]
       },
       include: {
         reminderLogs: {
+          where: { manualConfirmations: { some: {} } }, // Only logs with confirmations
           orderBy: { sentAt: 'desc' },
-          take: 1, // Latest log only
+          take: 1,
           include: {
             manualConfirmations: {
               orderBy: { confirmedAt: 'desc' },
-              take: 1 // Latest confirmation for this log
+              take: 1
             }
           }
         },
         manualConfirmations: {
           orderBy: { confirmedAt: 'desc' },
-          take: 1 // Latest confirmation for this schedule
+          take: 1
         }
       },
-      orderBy: { startDate: 'desc' }
+      orderBy: { startDate: 'desc' },
+      ...pagination
     })
 
     // Filter only schedules that have confirmations and extract completed ones

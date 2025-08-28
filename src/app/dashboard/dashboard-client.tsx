@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import AddPatientDialog from "@/components/AddPatientDialog";
 import Image from "next/image";
 import { useUser } from "@stackframe/stack";
+import { PatientDesktopTable } from "@/components/ui/patient-desktop-table";
 
 interface Patient {
   id: string;
@@ -14,6 +15,7 @@ interface Patient {
   complianceRate: number;
   isActive: boolean;
   photoUrl?: string;
+  phoneNumber?: string;
 }
 
 function DashboardClient() {
@@ -26,17 +28,50 @@ function DashboardClient() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [dashboardStats, setDashboardStats] = useState({
+    totalPatients: 0,
+    activePatients: 0,
+    inactivePatients: 0
+  });
 
   useEffect(() => {
-    fetchPatients();
-    fetchUserRole();
+    fetchDashboardData();
   }, []);
 
   useEffect(() => {
     filterPatients();
   }, [patients, searchQuery, activeFilters]);
 
-  const fetchUserRole = async () => {
+  const fetchDashboardData = async () => {
+    try {
+      // Single optimized API call for all dashboard data
+      const response = await fetch("/api/dashboard/overview");
+      if (response.ok) {
+        const data = await response.json();
+        setPatients(data.patients);
+        setUserRole(data.user.role);
+        setDashboardStats(data.stats);
+      } else {
+        // Fallback to separate calls if needed
+        console.warn("Failed to fetch dashboard overview, falling back to separate endpoints");
+        await Promise.all([
+          fetchPatientsLegacy(),
+          fetchUserRoleLegacy()
+        ]);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+      // Try legacy methods as fallback
+      await Promise.all([
+        fetchPatientsLegacy(),
+        fetchUserRoleLegacy()
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUserRoleLegacy = async () => {
     try {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
@@ -48,52 +83,15 @@ function DashboardClient() {
     }
   };
 
-  const fetchPatients = async () => {
+  const fetchPatientsLegacy = async () => {
     try {
       const response = await fetch("/api/patients");
       if (response.ok) {
         const data = await response.json();
-
-        // Calculate real-time compliance rate for each patient
-        const patientsWithRealTimeCompliance = await Promise.all(
-          data.map(async (patient: Patient) => {
-            try {
-              const completedResponse = await fetch(
-                `/api/patients/${patient.id}/reminders/completed`
-              );
-              if (completedResponse.ok) {
-                const completedReminders = await completedResponse.json();
-                const totalReminders = completedReminders.length;
-                const completedCount = completedReminders.filter(
-                  (r: any) => r.medicationTaken
-                ).length;
-                const realTimeComplianceRate =
-                  totalReminders > 0
-                    ? Math.round((completedCount / totalReminders) * 100)
-                    : 0;
-
-                return {
-                  ...patient,
-                  complianceRate: realTimeComplianceRate,
-                };
-              }
-              return patient; // Fallback to original data if API fails
-            } catch (error) {
-              console.error(
-                `Error fetching compliance for patient ${patient.id}:`,
-                error
-              );
-              return patient; // Fallback to original data if API fails
-            }
-          })
-        );
-
-        setPatients(patientsWithRealTimeCompliance);
+        setPatients(data);
       }
     } catch (error) {
       console.error("Error fetching patients:", error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -137,8 +135,8 @@ function DashboardClient() {
   }, []);
 
   const handleAddPatientSuccess = useCallback(() => {
-    fetchPatients();
-  }, []);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const toggleFilter = useCallback((filterType: string) => {
     setActiveFilters((prev) => {
@@ -176,13 +174,22 @@ function DashboardClient() {
 
   const getRandomAvatarColor = (name: string) => {
     const colors = [
-      "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
-      "bg-cyan-500", "bg-teal-500", "bg-emerald-500", "bg-lime-500",
-      "bg-orange-500", "bg-rose-500", "bg-violet-500", "bg-sky-500"
+      "bg-blue-500",
+      "bg-purple-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-cyan-500",
+      "bg-teal-500",
+      "bg-emerald-500",
+      "bg-lime-500",
+      "bg-orange-500",
+      "bg-rose-500",
+      "bg-violet-500",
+      "bg-sky-500",
     ];
     // Use name hash to ensure consistent color per person
-    const hash = name.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
+    const hash = name.split("").reduce((a, b) => {
+      a = (a << 5) - a + b.charCodeAt(0);
       return a & a;
     }, 0);
     return colors[Math.abs(hash) % colors.length];
@@ -198,9 +205,13 @@ function DashboardClient() {
 
   return (
     <>
-      {/* Blue Background Section */}
-      <div className="bg-blue-500 p-6">
-        <div className={`flex space-x-4 overflow-x-auto pb-2 ${userRole !== "ADMIN" ? "justify-center" : ""}`}>
+      {/* Blue Background Section - Mobile Only */}
+      <div className="lg:hidden bg-blue-500 p-6">
+        <div
+          className={`flex space-x-4 overflow-x-auto pb-2 ${
+            userRole !== "ADMIN" ? "justify-center" : ""
+          }`}
+        >
           {/* Pengingat */}
           <div className="text-center flex-shrink-0 min-w-[80px]">
             <div
@@ -264,9 +275,11 @@ function DashboardClient() {
                     <Shield className="w-12 h-12 text-blue-500" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-sm text-white">Admin Panel</h3>
+                <h3 className="font-semibold text-sm text-white">
+                  Admin Panel
+                </h3>
               </div>
-              
+
               <div className="text-center flex-shrink-0 min-w-[80px]">
                 <div
                   onClick={() => router.push("/debug-webhook")}
@@ -276,15 +289,30 @@ function DashboardClient() {
                     <Bug className="w-12 h-12 text-orange-500" />
                   </div>
                 </div>
-                <h3 className="font-semibold text-sm text-white">Debug Webhook</h3>
+                <h3 className="font-semibold text-sm text-white">
+                  Debug Webhook
+                </h3>
               </div>
             </>
           )}
         </div>
       </div>
 
-      {/* Status Badge */}
-      <div className="mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4">
+      {/* Desktop: Header Section */}
+      <div className="hidden lg:block">
+        <div className="bg-blue-600 text-white py-6">
+          <div className="max-w-7xl mx-auto px-8 text-center">
+            <h1 className="text-3xl font-bold">
+              {loading
+                ? "Loading..."
+                : `${filteredPatients.length} Pasien Dalam Pengawasan`}
+            </h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile: Status Badge */}
+      <div className="lg:hidden mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4">
         <span className="font-medium">
           {loading
             ? "Loading..."
@@ -292,9 +320,10 @@ function DashboardClient() {
         </span>
       </div>
 
-      {/* Daftar Pasien Section */}
-      <div className="mx-4 mb-6">
-        <div className="flex justify-between items-center mb-4">
+      {/* Patient List Section */}
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-6">
+        {/* Mobile: Title and Controls */}
+        <div className="lg:hidden flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
           <div className="flex items-center space-x-3">
             {/* Search Bar */}
@@ -318,11 +347,61 @@ function DashboardClient() {
           </div>
         </div>
 
-        {/* Filter Buttons */}
-        <div className="flex space-x-2 mb-4">
+        {/* Desktop: Controls */}
+        <div className="hidden lg:flex justify-between items-center my-6">
+          <div className="flex items-center space-x-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Cari pasien..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+              />
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => toggleFilter("active")}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                  activeFilters.includes("active")
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                Aktif
+              </button>
+              <button
+                onClick={() => toggleFilter("inactive")}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                  activeFilters.includes("inactive")
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                Nonaktif
+              </button>
+            </div>
+          </div>
+
+          {/* Add Patient Button */}
+          <button
+            onClick={handleAddPatientClick}
+            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center space-x-2 cursor-pointer"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Tambah Pasien Baru</span>
+          </button>
+        </div>
+
+        {/* Mobile: Filter Buttons */}
+        <div className="lg:hidden flex space-x-2 mb-4">
           <button
             onClick={() => toggleFilter("active")}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
               activeFilters.includes("active")
                 ? "bg-blue-500 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -332,7 +411,7 @@ function DashboardClient() {
           </button>
           <button
             onClick={() => toggleFilter("inactive")}
-            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
               activeFilters.includes("inactive")
                 ? "bg-blue-500 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -342,116 +421,127 @@ function DashboardClient() {
           </button>
         </div>
 
-        {/* Patient List */}
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredPatients.slice(0, 8).map((patient) => {
-              const complianceLabel = getComplianceLabel(
-                patient.complianceRate
-              );
-              const statusLabel = patient.isActive
-                ? { text: "Aktif", bg: "bg-blue-500", color: "text-white" }
-                : { text: "Nonaktif", bg: "bg-gray-500", color: "text-white" };
+        {/* Desktop: Table View */}
+        <div className="hidden lg:block">
+          <PatientDesktopTable patients={filteredPatients} loading={loading} />
+        </div>
 
-              return (
-                <div
-                  key={patient.id}
-                  onClick={() => handlePatientClick(patient.id)}
-                  className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center space-x-3">
-                    {patient.photoUrl ? (
-                      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
-                        <Image
-                          src={patient.photoUrl}
-                          alt={patient.name}
-                          width={48}
-                          height={48}
-                          className="w-full h-full object-cover"
-                        />
+        {/* Mobile: Card View */}
+        <div className="lg:hidden">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredPatients.slice(0, 8).map((patient) => {
+                const complianceLabel = getComplianceLabel(
+                  patient.complianceRate
+                );
+                const statusLabel = patient.isActive
+                  ? { text: "Aktif", bg: "bg-blue-500", color: "text-white" }
+                  : {
+                      text: "Nonaktif",
+                      bg: "bg-gray-500",
+                      color: "text-white",
+                    };
+
+                return (
+                  <div
+                    key={patient.id}
+                    onClick={() => handlePatientClick(patient.id)}
+                    className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center space-x-3">
+                      {patient.photoUrl ? (
+                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                          <Image
+                            src={patient.photoUrl}
+                            alt={patient.name}
+                            width={48}
+                            height={48}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className={`w-12 h-12 ${getRandomAvatarColor(
+                            patient.name
+                          )} rounded-full flex items-center justify-center`}
+                        >
+                          <span className="text-white font-bold text-sm">
+                            {getInitials(patient.name)}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-base">
+                          {patient.name}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                          Kepatuhan: {patient.complianceRate}%
+                        </p>
                       </div>
-                    ) : (
-                      <div
-                        className={`w-12 h-12 ${getRandomAvatarColor(
-                          patient.name
-                        )} rounded-full flex items-center justify-center`}
+                    </div>
+                    <div className="flex flex-col items-end space-y-1">
+                      <span
+                        className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
                       >
-                        <span className="text-white font-bold text-sm">
-                          {getInitials(patient.name)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-base">
-                        {patient.name}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        Kepatuhan: {patient.complianceRate}%
-                      </p>
+                        {statusLabel.text}
+                      </span>
+                      <span
+                        className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
+                      >
+                        {complianceLabel.text}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end space-y-1">
-                    <span
-                      className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
+                );
+              })}
+
+              {filteredPatients.length === 0 && !loading && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">
+                    {patients.length === 0
+                      ? "Belum ada pasien"
+                      : "Tidak ada pasien yang cocok dengan pencarian"}
+                  </p>
+                  {patients.length === 0 && (
+                    <button
+                      onClick={handleAddPatientClick}
+                      className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors cursor-pointer"
                     >
-                      {statusLabel.text}
-                    </span>
-                    <span
-                      className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center`}
-                    >
-                      {complianceLabel.text}
-                    </span>
-                  </div>
+                      Tambah Pasien Pertama
+                    </button>
+                  )}
                 </div>
-              );
-            })}
+              )}
 
-            {filteredPatients.length === 0 && !loading && (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">
-                  {patients.length === 0
-                    ? "Belum ada pasien"
-                    : "Tidak ada pasien yang cocok dengan pencarian"}
-                </p>
-                {patients.length === 0 && (
+              {filteredPatients.length > 8 && (
+                <div className="text-center pt-4">
                   <button
-                    onClick={handleAddPatientClick}
-                    className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors cursor-pointer"
+                    onClick={() => router.push("/dashboard/pasien")}
+                    className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                   >
-                    Tambah Pasien Pertama
+                    Lihat Semua Pasien ({filteredPatients.length})
                   </button>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {filteredPatients.length > 8 && (
-              <div className="text-center pt-4">
-                <button
-                  onClick={() => router.push("/dashboard/pasien")}
-                  className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                >
-                  Lihat Semua Pasien ({filteredPatients.length})
-                </button>
-              </div>
-            )}
-
-            {/* Quick Test Access - Development only */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="text-center pt-4 border-t border-gray-200 mt-4">
-                <button
-                  onClick={() => router.push("/dashboard/test-whatsapp")}
-                  className="text-green-600 hover:text-green-800 font-medium cursor-pointer text-sm"
-                >
-                  🧪 Test WhatsApp API
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+              {/* Quick Test Access - Development only */}
+              {process.env.NODE_ENV === "development" && (
+                <div className="text-center pt-4 border-t border-gray-200 mt-4">
+                  <button
+                    onClick={() => router.push("/dashboard/test-whatsapp")}
+                    className="text-green-600 hover:text-green-800 font-medium cursor-pointer text-sm"
+                  >
+                    🧪 Test WhatsApp API
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Add Patient Dialog */}

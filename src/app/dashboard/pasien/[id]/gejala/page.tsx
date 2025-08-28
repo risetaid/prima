@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Plus, Trash2, Calendar } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Calendar, Activity } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
+import { DesktopHeader } from '@/components/ui/desktop-header'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 
@@ -136,9 +137,9 @@ export default function PatientSymptomsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white">
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Header */}
+      <header className="lg:hidden bg-white">
         <div className="flex justify-between items-center px-4 py-4">
           <button 
             onClick={() => router.back()}
@@ -151,12 +152,31 @@ export default function PatientSymptomsPage() {
         </div>
       </header>
 
+      {/* Desktop Header */}
+      <div className="hidden lg:block">
+        <DesktopHeader showNavigation={true} />
+      </div>
+
       {/* Main Content */}
-      <main className="px-4 py-6">
-        <div className="flex items-center space-x-2 mb-6">
-          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-            <div className="w-3 h-3 bg-white rounded-full"></div>
+      <main className="px-4 lg:px-8 py-6 max-w-4xl mx-auto">
+        {/* Desktop Back Button & Title */}
+        <div className="hidden lg:flex items-center space-x-3 mb-6">
+          <button 
+            onClick={() => router.back()}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-600" />
+          </button>
+          <div className="flex items-center space-x-2">
+            <Activity className="w-6 h-6 text-blue-600" />
+            <h2 className="text-2xl font-semibold text-gray-900">Gejala Pasien</h2>
+            {patient && <span className="text-lg text-gray-600">- {patient.name}</span>}
           </div>
+        </div>
+
+        {/* Mobile Title */}
+        <div className="lg:hidden flex items-center space-x-2 mb-6">
+          <Activity className="w-6 h-6 text-blue-600" />
           <h2 className="text-lg font-semibold text-gray-900">Gejala Pasien</h2>
         </div>
 
@@ -198,8 +218,8 @@ export default function PatientSymptomsPage() {
           )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-4 fixed bottom-6 left-4 right-4">
+        {/* Action Buttons - Responsive positioning */}
+        <div className="flex gap-4 lg:static lg:mt-8 fixed lg:relative bottom-6 left-4 right-4 lg:bottom-auto lg:left-auto lg:right-auto lg:flex-row flex-col lg:flex-row lg:max-w-none max-w-none">
           {isDeleteMode ? (
             <>
               <button
@@ -235,7 +255,8 @@ export default function PatientSymptomsPage() {
                 className="flex-1 bg-red-500 text-white py-4 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Trash2 className="w-5 h-5" />
-                <span>Hapus Gejala</span>
+                <span className="hidden lg:inline">Hapus Gejala</span>
+                <span className="lg:hidden">Hapus</span>
               </button>
             </>
           )}

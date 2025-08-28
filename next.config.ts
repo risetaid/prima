@@ -4,8 +4,24 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
-    // Minimal experimental features for Next.js 15
+    // Basic experimental config - Turbopack doesn't need explicit configuration
+    // for most use cases as it handles common patterns automatically
   },
+  // Only include webpack config when NOT using Turbopack
+  ...(process.env.NEXT_TURBO !== '1' && {
+    webpack: (config, { dev, isServer }) => {
+      if (dev) {
+        // Suppress critical dependency warnings in development
+        config.ignoreWarnings = [
+          ...(config.ignoreWarnings || []),
+          /Critical dependency: the request of a dependency is an expression/,
+          /Module not found: Can't resolve 'fs'/,
+          /Module not found: Can't resolve 'path'/,
+        ];
+      }
+      return config;
+    },
+  }),
   // Performance optimizations  
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
@@ -18,6 +34,9 @@ const nextConfig: NextConfig = {
     // Fix import-in-the-middle warnings
     'import-in-the-middle',
     'require-in-the-middle',
+    // Suppress Prisma instrumentation warnings
+    '@prisma/instrumentation',
+    '@opentelemetry/instrumentation',
   ],
   // Disable ESLint during build to avoid configuration issues
   eslint: {

@@ -120,3 +120,119 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Stack Auth Custom Styling */
+.stack-auth-container {
+  /* Override Stack Auth default widths and spacing */
+  & * {
+    max-width: none !important;
+  }
+  
+  /* Account Settings Page Fixes */
+  & div[data-stack-auth-page="account-settings"] {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Form containers */
+  & form {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Input fields - prevent overflow */
+  & input[type="text"],
+  & input[type="email"],
+  & input[type="password"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 0.75rem !important;
+    border-radius: 0.5rem !important;
+    border: 1px solid #e5e7eb !important;
+  }
+  
+  /* Buttons */
+  & button {
+    width: auto !important;
+    padding: 0.75rem 1.5rem !important;
+    border-radius: 0.5rem !important;
+    font-weight: 500 !important;
+    white-space: nowrap !important;
+  }
+  
+  /* Labels */
+  & label {
+    display: block !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 500 !important;
+    color: #374151 !important;
+  }
+  
+  /* Sections/Cards */
+  & > div {
+    margin-bottom: 1.5rem !important;
+    padding: 1.5rem !important;
+    background: white !important;
+    border-radius: 0.75rem !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  /* Grid layout improvements for larger screens */
+  @media (min-width: 1024px) {
+    & {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 2rem !important;
+      align-items: start !important;
+    }
+    
+    /* Make single-column items span full width */
+    & > div:first-child {
+      grid-column: span 2 !important;
+    }
+  }
+  
+  /* Text and headers */
+  & h1, & h2, & h3 {
+    color: #1f2937 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  & h1 {
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+  }
+  
+  & h2 {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+  }
+  
+  & p {
+    color: #6b7280 !important;
+    line-height: 1.5 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Error messages */
+  & .error {
+    color: #dc2626 !important;
+    background-color: #fee2e2 !important;
+    padding: 0.75rem !important;
+    border-radius: 0.5rem !important;
+    border: 1px solid #fecaca !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Success messages */
+  & .success {
+    color: #059669 !important;
+    background-color: #d1fae5 !important;
+    padding: 0.75rem !important;
+    border-radius: 0.5rem !important;
+    border: 1px solid #a7f3d0 !important;
+    margin-bottom: 1rem !important;
+  }
+}

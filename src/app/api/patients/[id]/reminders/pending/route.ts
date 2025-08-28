@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
+import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
 export async function GET(
   request: NextRequest,
@@ -14,16 +15,30 @@ export async function GET(
 
     const { id } = await params
     
-    // Get reminder logs that are DELIVERED but don't have manual confirmation yet
+    // Extract pagination and date filter parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const dateFilter = searchParams.get('date')
+    const pagination = createEfficientPagination(page, limit)
+
+    // Build optimized where clause
+    const whereClause: any = {
+      patientId: id,
+      status: 'DELIVERED',
+      manualConfirmations: {
+        none: {} // No manual confirmations exist for this log
+      }
+    }
+
+    // Add date range filter if provided
+    if (dateFilter) {
+      whereClause.sentAt = createDateRangeQuery(dateFilter, '+07:00')
+    }
+
+    // Get reminder logs that are DELIVERED but don't have manual confirmation yet (optimized)
     const pendingReminders = await prisma.reminderLog.findMany({
-      where: {
-        patientId: id,
-        status: 'DELIVERED',
-        // Use the new relation to exclude confirmed logs
-        manualConfirmations: {
-          none: {} // No manual confirmations exist for this log
-        }
-      },
+      where: whereClause,
       include: {
         reminderSchedule: {
           select: {
@@ -35,7 +50,8 @@ export async function GET(
       },
       orderBy: {
         sentAt: 'desc'
-      }
+      },
+      ...pagination
     })
 
     // Transform to match frontend interface

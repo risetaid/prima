@@ -78,19 +78,47 @@ export const sendWhatsAppMessage = async (
 }
 
 /**
- * Format phone number for WhatsApp (Indonesia format, no prefixes)
+ * Format phone number for WhatsApp (Indonesia format, no prefixes) with validation
  */
 export const formatWhatsAppNumber = (phoneNumber: string): string => {
+  if (!phoneNumber || typeof phoneNumber !== 'string') {
+    throw new Error('Invalid phone number: must be a non-empty string')
+  }
+
   // Remove all non-numeric characters
   let cleaned = phoneNumber.replace(/\D/g, '')
   
-  // Convert Indonesian numbers
+  if (!cleaned || cleaned.length < 8) {
+    throw new Error('Invalid phone number: too short after cleaning')
+  }
+
+  // Convert Indonesian numbers with validation
   if (cleaned.startsWith('08')) {
+    if (cleaned.length < 10 || cleaned.length > 13) {
+      throw new Error('Invalid Indonesian phone number length (08 format)')
+    }
     cleaned = '628' + cleaned.slice(2) // 08xxxxxxxx -> 628xxxxxxxx
   } else if (cleaned.startsWith('8') && cleaned.length >= 9) {
+    if (cleaned.length < 9 || cleaned.length > 12) {
+      throw new Error('Invalid Indonesian phone number length (8 format)')
+    }
     cleaned = '62' + cleaned // 8xxxxxxxx -> 628xxxxxxxx
-  } else if (!cleaned.startsWith('62')) {
-    cleaned = '62' + cleaned // Add Indonesia code if missing
+  } else if (cleaned.startsWith('62')) {
+    if (cleaned.length < 11 || cleaned.length > 14) {
+      throw new Error('Invalid Indonesian phone number length (62 format)')
+    }
+    // Already has country code
+  } else {
+    // Assume local Indonesian number
+    if (cleaned.length < 8 || cleaned.length > 11) {
+      throw new Error('Invalid phone number length')
+    }
+    cleaned = '62' + cleaned // Add Indonesia code
+  }
+
+  // Final validation - Indonesian mobile numbers after 62 should start with 8
+  if (!cleaned.startsWith('628')) {
+    throw new Error('Invalid Indonesian mobile number format')
   }
   
   return cleaned // Clean number format for Fonnte

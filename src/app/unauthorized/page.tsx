@@ -1,7 +1,10 @@
+'use client'
+
 import { UserMenu } from '@/components/ui/user-menu'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function UnauthorizedPage() {
+  const router = useRouter()
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-md p-4 sm:p-8">
@@ -26,12 +29,12 @@ export default function UnauthorizedPage() {
           </div>
 
           <div className="mt-6 sm:mt-8 space-y-3 sm:space-y-4">
-            <Link 
-              href="/dashboard"
-              className="block w-full bg-blue-600 text-white py-2.5 sm:py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base font-medium"
+            <button 
+              onClick={() => router.back()}
+              className="block w-full bg-blue-600 text-white py-2.5 sm:py-2 px-4 rounded-md hover:bg-blue-700 transition-colors text-sm sm:text-base font-medium cursor-pointer"
             >
-              Kembali ke Dashboard
-            </Link>
+              Kembali
+            </button>
             
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4 pt-3 sm:pt-4 border-t border-gray-200">
               <UserMenu />

@@ -305,7 +305,7 @@ export default function AddReminderPage() {
               <h3 className="text-lg font-semibold text-gray-900">Pengulangan Kustom</h3>
               <button
                 onClick={() => setIsCustomRecurrenceOpen(false)}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
               </button>

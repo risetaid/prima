@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
+import { createEfficientPagination } from '@/lib/query-optimizer'
 
 export async function GET(
   request: NextRequest,
@@ -14,7 +15,13 @@ export async function GET(
 
     const { id } = await params
     
-    // Get all reminder schedules with their logs and confirmations
+    // Extract pagination parameters from request
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const pagination = createEfficientPagination(page, limit)
+
+    // Revert to Prisma ORM query with optimizations - keeping original UI logic intact
     const reminderSchedules = await prisma.reminderSchedule.findMany({
       where: {
         patientId: id,
@@ -25,7 +32,10 @@ export async function GET(
           orderBy: { sentAt: 'desc' },
           take: 1, // Latest log only
           include: {
-            manualConfirmations: true // Include confirmations for this specific log
+            manualConfirmations: {
+              orderBy: { confirmedAt: 'desc' },
+              take: 1 // Only latest confirmation per log
+            }
           }
         },
         manualConfirmations: {
@@ -33,10 +43,12 @@ export async function GET(
           take: 1 // Latest confirmation only
         }
       },
-      orderBy: { startDate: 'desc' }
+      orderBy: { startDate: 'desc' },
+      take: limit,
+      skip: (page - 1) * limit
     })
 
-    // Transform to unified format with proper status determination
+    // Transform Prisma results to unified format (keeping original logic)
     const allReminders = reminderSchedules.map(schedule => {
       const latestLog = schedule.reminderLogs[0]
       const scheduleConfirmation = schedule.manualConfirmations[0]
