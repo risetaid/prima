@@ -40,10 +40,7 @@ export async function GET(
         patientMedications: {
           where: { isActive: true },
           include: {
-            medication: true,
-            reminderSchedules: {
-              where: { isActive: true }
-            }
+            medication: true
           }
         }
       }

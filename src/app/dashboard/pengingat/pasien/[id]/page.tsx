@@ -93,14 +93,24 @@ export default function PatientReminderDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
+
       {/* Desktop: Header */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block relative z-10">
         <DesktopHeader showNavigation={true} />
       </div>
 
       {/* Mobile: Header */}
-      <div className="lg:hidden">
+      <div className="lg:hidden relative z-10">
         <header className="bg-white">
           <div className="flex justify-between items-center px-4 py-4">
             <button 
@@ -116,12 +126,12 @@ export default function PatientReminderDashboard() {
       </div>
 
       {/* Desktop: 3-Column Layout */}
-      <div className="hidden lg:block py-8">
+      <div className="hidden lg:block py-8 relative z-10">
         <PatientReminderDesktop patientName={patientName} />
       </div>
 
       {/* Mobile: Card Layout */}
-      <div className="lg:hidden">
+      <div className="lg:hidden relative z-10">
         <main className="px-4 py-6">
           {/* Patient Name */}
           {patientName && (

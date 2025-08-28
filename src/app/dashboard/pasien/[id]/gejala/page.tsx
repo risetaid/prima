@@ -358,7 +358,7 @@ function AddSymptomDialog({ isOpen, patientId, onClose, onSuccess }: AddSymptomD
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Tambah Gejala</h2>
 
@@ -475,7 +475,7 @@ function EditSymptomDialog({ isOpen, symptom, patientId, onClose, onSuccess }: E
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-auto">
         <div className="flex items-center space-x-2 mb-4">
           <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">

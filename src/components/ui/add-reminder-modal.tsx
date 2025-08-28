@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Clock, Repeat, X, ChevronDown } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { useParams } from 'next/navigation'
+import { X, Clock, Repeat, ChevronDown } from 'lucide-react'
 import { getCurrentTimeWIB } from '@/lib/datetime'
-import { toast } from '@/components/ui/toast'
+import { toast } from 'sonner'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 
 interface Patient {
@@ -22,8 +21,14 @@ interface WhatsAppTemplate {
   category: 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'
 }
 
-export default function AddReminderPage() {
-  const router = useRouter()
+interface AddReminderModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+  patientName: string
+}
+
+export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: AddReminderModalProps) {
   const params = useParams()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [loading, setLoading] = useState(true)
@@ -49,11 +54,27 @@ export default function AddReminderPage() {
   })
 
   useEffect(() => {
-    if (params.id) {
+    if (isOpen && params.id) {
       fetchPatient(params.id as string)
+      fetchTemplates()
+      // Reset form when opened
+      setFormData({
+        message: '',
+        time: getCurrentTimeWIB()
+      })
+      setSelectedDates([])
+      setCustomRecurrence({
+        enabled: false,
+        frequency: 'week',
+        interval: 1,
+        daysOfWeek: [],
+        endType: 'never',
+        endDate: '',
+        occurrences: 1
+      })
+      setSelectedTemplate('')
     }
-    fetchTemplates()
-  }, [params.id])
+  }, [isOpen, params.id])
 
   // Close template dropdown when clicking outside
   useEffect(() => {
@@ -77,7 +98,6 @@ export default function AddReminderPage() {
           name: data.name,
           phoneNumber: data.phoneNumber
         })
-        // Message field will remain empty for template system
       }
     } catch (error) {
       console.error('Error fetching patient:', error)
@@ -134,34 +154,22 @@ export default function AddReminderPage() {
     if (!customRecurrence.enabled) {
       // Regular date selection validation
       if (selectedDates.length === 0) {
-        toast.error('Pilih minimal satu tanggal', {
-          description: 'Anda harus memilih setidaknya satu tanggal untuk pengingat'
-        })
+        toast.error('Pilih minimal satu tanggal')
         return
       }
     } else {
       // Custom recurrence validation
       if (customRecurrence.frequency === 'week' && customRecurrence.daysOfWeek.length === 0) {
-        toast.error('Pilih minimal satu hari', {
-          description: 'Untuk pengulangan mingguan, pilih setidaknya satu hari'
-        })
+        toast.error('Pilih minimal satu hari')
         return
       }
       if (customRecurrence.endType === 'on' && !customRecurrence.endDate) {
-        toast.error('Pilih tanggal berakhir', {
-          description: 'Tentukan tanggal berakhir untuk pengulangan'
-        })
+        toast.error('Pilih tanggal berakhir')
         return
       }
     }
     
     setSubmitting(true)
-
-    console.log('=== FRONTEND SUBMIT ===')
-    console.log('params.id:', params.id)
-    console.log('formData:', formData)
-    console.log('selectedDates:', selectedDates)
-    console.log('customRecurrence:', customRecurrence)
 
     try {
       const requestBody = {
@@ -191,250 +199,239 @@ export default function AddReminderPage() {
 
       if (response.ok) {
         const result = await response.json()
-        toast.success('Pengingat berhasil dibuat', {
-          description: `${result.count || 1} pengingat telah dijadwalkan`
-        })
-        router.back()
+        toast.success(`Pengingat berhasil dibuat - ${result.count || 1} pengingat dijadwalkan`)
+        onSuccess()
+        onClose()
       } else {
         const error = await response.json()
-        toast.error('Gagal membuat pengingat', {
-          description: error.error || 'Terjadi kesalahan pada server'
-        })
+        toast.error(error.error || 'Gagal membuat pengingat')
       }
     } catch (error) {
       console.error('Error creating reminder:', error)
-      toast.error('Gagal membuat pengingat', {
-        description: 'Terjadi kesalahan jaringan'
-      })
+      toast.error('Gagal membuat pengingat')
     } finally {
       setSubmitting(false)
     }
   }
 
-
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  if (!isOpen) return null
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white">
-        <div className="flex justify-between items-center px-4 py-4">
-          <button 
-            onClick={() => router.back()}
-            className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
+          <h2 className="text-xl font-bold text-gray-900">Tambah Pengingat Baru</h2>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-6 h-6 text-blue-600" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
-          <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserMenu />
         </div>
-      </header>
+        
+        {/* Modal Content */}
+        <div className="p-6 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading...</p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Patient Info */}
+              {patient && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-gray-700">
+                    <strong>Pasien:</strong> {patient.name}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <strong>WhatsApp:</strong> {patient.phoneNumber}
+                  </p>
+                </div>
+              )}
 
-      {/* Main Content */}
-      <main className="px-4 py-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Message Field */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-gray-500 text-sm">
-                Isi Pesan
-              </label>
-              
-              {/* Template Dropdown */}
-              {templates.length > 0 && (
-                <div className="relative template-dropdown">
-                  <button
-                    type="button"
-                    onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
-                    className="flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer text-sm"
-                  >
-                    <span>📝 Template</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${isTemplateDropdownOpen ? 'rotate-180' : ''}`} />
-                  </button>
+              {/* Message Field */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-700 text-sm font-medium">
+                    Isi Pesan
+                  </label>
                   
-                  {isTemplateDropdownOpen && (
-                    <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                      <div className="max-h-48 overflow-y-auto">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTemplate('')
-                            setFormData(prev => ({ ...prev, message: '' }))
-                            setIsTemplateDropdownOpen(false)
-                          }}
-                          className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 border-b border-gray-100 cursor-pointer"
-                        >
-                          ✨ Tulis sendiri
-                        </button>
-                        {templates.map((template) => (
-                          <button
-                            key={template.id}
-                            type="button"
-                            onClick={() => handleTemplateSelect(template.id)}
-                            className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors cursor-pointer ${
-                              selectedTemplate === template.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                            }`}
-                          >
-                            <div className="font-medium">{template.templateName}</div>
-                            <div className="text-xs text-gray-500 truncate">
-                              {template.templateText.substring(0, 50)}...
-                            </div>
-                          </button>
-                        ))}
-                      </div>
+                  {/* Template Dropdown */}
+                  {templates.length > 0 && (
+                    <div className="relative template-dropdown">
+                      <button
+                        type="button"
+                        onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
+                        className="flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer text-sm"
+                      >
+                        <span>📝 Template</span>
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isTemplateDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {isTemplateDropdownOpen && (
+                        <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <div className="max-h-48 overflow-y-auto">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedTemplate('')
+                                setFormData(prev => ({ ...prev, message: '' }))
+                                setIsTemplateDropdownOpen(false)
+                              }}
+                              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 border-b border-gray-100 cursor-pointer"
+                            >
+                              ✨ Tulis sendiri
+                            </button>
+                            {templates.map((template) => (
+                              <button
+                                key={template.id}
+                                type="button"
+                                onClick={() => handleTemplateSelect(template.id)}
+                                className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors cursor-pointer ${
+                                  selectedTemplate === template.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                }`}
+                              >
+                                <div className="font-medium">{template.templateName}</div>
+                                <div className="text-xs text-gray-500 truncate">
+                                  {template.templateText.substring(0, 50)}...
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
-            
-            <textarea
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              placeholder={templates.length > 0 ? "Pilih template atau tulis pesan sendiri..." : "Tulis pesan pengingat..."}
-              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
-              rows={4}
-              required
-            />
-            
-            {/* Selected Template Info */}
-            {selectedTemplate && (
-              <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-blue-700 font-medium">
-                    📝 Template: {templates.find(t => t.id === selectedTemplate)?.templateName}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedTemplate('')
-                      setFormData(prev => ({ ...prev, message: '' }))
-                    }}
-                    className="text-xs text-red-600 hover:text-red-800 cursor-pointer"
-                  >
-                    ✕ Hapus template
-                  </button>
+                
+                <textarea
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  placeholder={templates.length > 0 ? "Pilih template atau tulis pesan sendiri..." : "Tulis pesan pengingat..."}
+                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
+                  rows={4}
+                  required
+                />
+                
+                {/* Selected Template Info */}
+                {selectedTemplate && (
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-blue-700 font-medium">
+                        📝 Template: {templates.find(t => t.id === selectedTemplate)?.templateName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplate('')
+                          setFormData(prev => ({ ...prev, message: '' }))
+                        }}
+                        className="text-xs text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        ✕ Hapus template
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Time Field */}
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Jam Pengingat
+                </label>
+                <div className="relative">
+                  <input
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                    required
+                  />
+                  <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500 pointer-events-none" />
                 </div>
               </div>
-            )}
-          </div>
 
-
-
-          {/* Time Field */}
-          <div>
-            <label className="block text-gray-500 text-sm mb-2">
-              Jam Pengingat
-            </label>
-            <div className="relative">
-              <input
-                type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
-                required
-              />
-              <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Date Selection Field */}
-          <div>
-            <label className="block text-gray-500 text-sm mb-2">
-              Pilih Tanggal Pengingat
-            </label>
-            <DatePickerCalendar
-              selectedDates={selectedDates}
-              onDateChange={setSelectedDates}
-            />
-            
-            {/* Custom Recurrence Option */}
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => setIsCustomRecurrenceOpen(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
-              >
-                <Repeat className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  {customRecurrence.enabled ? 'Pengulangan kustom aktif' : 'Pengulangan kustom'}
-                </span>
-              </button>
-              
-              {customRecurrence.enabled && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-700">
-                    Ulangi setiap {customRecurrence.interval} {customRecurrence.frequency === 'day' ? 'hari' : customRecurrence.frequency === 'week' ? 'minggu' : 'bulan'}
-                    {customRecurrence.daysOfWeek.length > 0 && customRecurrence.frequency === 'week' && (
-                       <span> pada {customRecurrence.daysOfWeek.map(day => {
-                         const dayMap: {[key: string]: string} = {
-                           'sun': 'Minggu', 'mon': 'Senin', 'tue': 'Selasa', 'wed': 'Rabu',
-                           'thu': 'Kamis', 'fri': 'Jumat', 'sat': 'Sabtu'
-                         }
-                         return dayMap[day]
-                       }).join(', ')}</span>
-                     )}
-                    {customRecurrence.endType === 'on' && ` sampai ${customRecurrence.endDate}`}
-                    {customRecurrence.endType === 'after' && ` selama ${customRecurrence.occurrences} kejadian`}
-                  </p>
+              {/* Date Selection Field */}
+              <div>
+                <label className="block text-gray-700 text-sm font-medium mb-2">
+                  Pilih Tanggal Pengingat
+                </label>
+                <DatePickerCalendar
+                  selectedDates={selectedDates}
+                  onDateChange={setSelectedDates}
+                />
+                
+                {/* Custom Recurrence Option */}
+                <div className="mt-4">
                   <button
                     type="button"
-                    onClick={() => setCustomRecurrence(prev => ({ ...prev, enabled: false }))}
-                    className="mt-2 text-xs text-red-600 hover:text-red-800 cursor-pointer"
+                    onClick={() => setIsCustomRecurrenceOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
                   >
-                    Hapus pengulangan kustom
+                    <Repeat className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {customRecurrence.enabled ? 'Pengulangan kustom aktif' : 'Pengulangan kustom'}
+                    </span>
                   </button>
+                  
+                  {customRecurrence.enabled && (
+                    <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-700">
+                        Ulangi setiap {customRecurrence.interval} {customRecurrence.frequency === 'day' ? 'hari' : customRecurrence.frequency === 'week' ? 'minggu' : 'bulan'}
+                        {customRecurrence.daysOfWeek.length > 0 && customRecurrence.frequency === 'week' && (
+                           <span> pada {customRecurrence.daysOfWeek.map(day => {
+                             const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
+                             return dayNames[day]
+                           }).join(', ')}</span>
+                         )}
+                        {customRecurrence.endType === 'on' && ` sampai ${customRecurrence.endDate}`}
+                        {customRecurrence.endType === 'after' && ` selama ${customRecurrence.occurrences} kejadian`}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setCustomRecurrence(prev => ({ ...prev, enabled: false }))}
+                        className="mt-2 text-xs text-red-600 hover:text-red-800 cursor-pointer"
+                      >
+                        Hapus pengulangan kustom
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex space-x-4 pt-4">
+              </div>
+            </form>
+          )}
+        </div>
+        
+        {/* Modal Footer */}
+        {!loading && (
+          <div className="flex space-x-4 p-6 border-t flex-shrink-0">
             <button
               type="button"
-              onClick={() => router.back()}
-              className="flex-1 bg-gray-200 text-gray-700 py-4 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
             >
               ✕ Batal
             </button>
             <button
-              type="submit"
+              onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 bg-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="flex-1 bg-red-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-2"
             >
               <span>▶</span>
               <span>{submitting ? 'Loading...' : 'Submit'}</span>
             </button>
           </div>
-        </form>
-
-        {/* Patient Info */}
-        {patient && (
-          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <p className="text-sm text-gray-600">
-              <strong>Pasien:</strong> {patient.name}
-            </p>
-            <p className="text-sm text-gray-600">
-              <strong>WhatsApp:</strong> {patient.phoneNumber}
-            </p>
-          </div>
         )}
-      </main>
+      </div>
       
       {/* Custom Recurrence Modal */}
       {isCustomRecurrenceOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-lg w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b flex-shrink-0">

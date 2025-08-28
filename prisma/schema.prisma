@@ -28,6 +28,7 @@ model User {
   patientMedicationsCreated PatientMedication[]
   patientsManaged           Patient[]            @relation("VolunteerPatients")
   reminderSchedulesCreated  ReminderSchedule[]
+  whatsappTemplatesCreated  WhatsAppTemplate[]   @relation("TemplateCreator")
 
   @@index([role])
   @@index([isActive])
@@ -94,21 +95,20 @@ model Medication {
 }
 
 model PatientMedication {
-  id                String             @id @default(uuid())
-  patientId         String             @map("patient_id")
-  medicationId      String             @map("medication_id")
-  dosage            String
-  frequency         String
-  instructions      String?
-  startDate         DateTime           @map("start_date")
-  endDate           DateTime?          @map("end_date")
-  isActive          Boolean            @default(true) @map("is_active")
-  createdBy         String             @map("created_by")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  createdByUser     User               @relation(fields: [createdBy], references: [id])
-  medication        Medication         @relation(fields: [medicationId], references: [id])
-  patient           Patient            @relation(fields: [patientId], references: [id])
-  reminderSchedules ReminderSchedule[]
+  id            String     @id @default(uuid())
+  patientId     String     @map("patient_id")
+  medicationId  String     @map("medication_id")
+  dosage        String
+  frequency     String
+  instructions  String?
+  startDate     DateTime   @map("start_date")
+  endDate       DateTime?  @map("end_date")
+  isActive      Boolean    @default(true) @map("is_active")
+  createdBy     String     @map("created_by")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  createdByUser User       @relation(fields: [createdBy], references: [id])
+  medication    Medication @relation(fields: [medicationId], references: [id])
+  patient       Patient    @relation(fields: [patientId], references: [id])
 
   @@map("patient_medications")
 }
@@ -205,11 +205,17 @@ model WhatsAppTemplate {
   templateName String           @unique @map("template_name")
   templateText String           @map("template_text")
   variables    String[]
-  category     TemplateCategory
+  category     TemplateCategory @default(REMINDER)
   isActive     Boolean          @default(true) @map("is_active")
   createdBy    String           @map("created_by")
   createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  createdByUser User            @relation("TemplateCreator", fields: [createdBy], references: [id])
 
+  @@index([category])
+  @@index([isActive])
+  @@index([category, isActive])
+  @@index([createdBy])
   @@map("whatsapp_templates")
 }
 

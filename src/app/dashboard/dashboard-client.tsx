@@ -31,7 +31,7 @@ function DashboardClient() {
   const [dashboardStats, setDashboardStats] = useState({
     totalPatients: 0,
     activePatients: 0,
-    inactivePatients: 0
+    inactivePatients: 0,
   });
 
   useEffect(() => {
@@ -53,19 +53,15 @@ function DashboardClient() {
         setDashboardStats(data.stats);
       } else {
         // Fallback to separate calls if needed
-        console.warn("Failed to fetch dashboard overview, falling back to separate endpoints");
-        await Promise.all([
-          fetchPatientsLegacy(),
-          fetchUserRoleLegacy()
-        ]);
+        console.warn(
+          "Failed to fetch dashboard overview, falling back to separate endpoints"
+        );
+        await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       // Try legacy methods as fallback
-      await Promise.all([
-        fetchPatientsLegacy(),
-        fetchUserRoleLegacy()
-      ]);
+      await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
     } finally {
       setLoading(false);
     }
@@ -299,14 +295,61 @@ function DashboardClient() {
       </div>
 
       {/* Desktop: Header Section */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block ">
         <div className="bg-blue-600 text-white py-6">
-          <div className="max-w-7xl mx-auto px-8 text-center">
-            <h1 className="text-3xl font-bold">
-              {loading
-                ? "Loading..."
-                : `${filteredPatients.length} Pasien Dalam Pengawasan`}
-            </h1>
+          <div className="max-w-7xl mx-auto px-8">
+            <div className="flex items-center justify-between">
+              {/* Left: Search Bar */}
+              <div className="relative bg-white rounded-lg">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Cari Pasien"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-3 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent w-80 text-gray-900"
+                />
+              </div>
+
+              {/* Center: Patient Count with Plus Button */}
+              <div className="flex items-center space-x-4">
+                <h1 className="text-white text-3xl font-bold">
+                  {loading
+                    ? "Loading..."
+                    : `${filteredPatients.length} Pasien Dalam Pengawasan`}
+                </h1>
+                <button
+                  onClick={handleAddPatientClick}
+                  className="bg-white text-blue-500 rounded-full p-2 cursor-pointer hover:bg-blue-50 transition-colors shadow-md"
+                >
+                  <Plus className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Right: Filter Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => toggleFilter("active")}
+                  className={`px-6 py-3 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                    activeFilters.includes("active")
+                      ? "bg-white text-blue-500 shadow-md"
+                      : "bg-blue-400 text-white hover:bg-blue-300"
+                  }`}
+                >
+                  Aktif
+                </button>
+                <button
+                  onClick={() => toggleFilter("inactive")}
+                  className={`px-6 py-3 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                    activeFilters.includes("inactive")
+                      ? "bg-white text-blue-500 shadow-md"
+                      : "bg-blue-400 text-white hover:bg-blue-300"
+                  }`}
+                >
+                  Nonaktif
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -321,7 +364,7 @@ function DashboardClient() {
       </div>
 
       {/* Patient List Section */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-6">
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 my-6">
         {/* Mobile: Title and Controls */}
         <div className="lg:hidden flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
@@ -345,56 +388,6 @@ function DashboardClient() {
               <Plus className="w-6 h-6 text-white" />
             </div>
           </div>
-        </div>
-
-        {/* Desktop: Controls */}
-        <div className="hidden lg:flex justify-between items-center my-6">
-          <div className="flex items-center space-x-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Cari pasien..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
-              />
-            </div>
-
-            {/* Filter Buttons */}
-            <div className="flex space-x-2">
-              <button
-                onClick={() => toggleFilter("active")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  activeFilters.includes("active")
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                Aktif
-              </button>
-              <button
-                onClick={() => toggleFilter("inactive")}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
-                  activeFilters.includes("inactive")
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                Nonaktif
-              </button>
-            </div>
-          </div>
-
-          {/* Add Patient Button */}
-          <button
-            onClick={handleAddPatientClick}
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center space-x-2 cursor-pointer"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Tambah Pasien Baru</span>
-          </button>
         </div>
 
         {/* Mobile: Filter Buttons */}

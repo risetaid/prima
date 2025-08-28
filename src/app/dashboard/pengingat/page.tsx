@@ -142,14 +142,24 @@ export default function ReminderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
+
       {/* Desktop: Header */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block relative z-10">
         <DesktopHeader showNavigation={true} />
       </div>
 
       {/* Mobile: Header */}
-      <div className="lg:hidden">
+      <div className="lg:hidden relative z-10">
         <header className="bg-white">
           <div className="flex justify-between items-center px-4 py-4">
             <button 
@@ -164,53 +174,48 @@ export default function ReminderPage() {
         </header>
       </div>
 
-      {/* Desktop: Main Content */}
-      <div className="hidden lg:block py-8">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8">
-          <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">
-                  Manajemen Pengingat Pasien
-                </h1>
-                <p className="text-gray-600">
-                  {loading ? "Loading..." : `${filteredPatients.length} pasien tersedia untuk dikelola pengingat obatnya`}
-                </p>
-              </div>
-            </div>
-
-            {/* Search and Filter Controls */}
-            <div className="flex items-center space-x-4 mb-6">
-              {/* Search Bar */}
-              <div className="relative">
+      {/* Desktop: Header Section with Dashboard Style */}
+      <div className="hidden lg:block relative z-10">
+        <div className="bg-blue-600 text-white py-6">
+          <div className="max-w-7xl mx-auto px-8">
+            <div className="flex items-center justify-between">
+              {/* Left: Search Bar */}
+              <div className="relative bg-white rounded-lg">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Cari pasien..."
+                  placeholder="Cari Pasien"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+                  className="pl-10 pr-4 py-3 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-transparent w-80 text-gray-900"
                 />
               </div>
 
-              {/* Filter Buttons */}
-              <div className="flex space-x-2">
+              {/* Center: Patient Count */}
+              <div className="flex items-center space-x-4">
+                <h1 className="text-white text-3xl font-bold">
+                  {loading ? "Loading..." : `${filteredPatients.length} Pasien Dalam Pengawasan`}
+                </h1>
+              </div>
+
+              {/* Right: Filter Buttons */}
+              <div className="flex space-x-3">
                 <button
                   onClick={() => toggleFilter('active')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                  className={`px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer ${
                     activeFilters.includes('active')
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      ? 'bg-white text-blue-600'
+                      : 'bg-blue-700 text-white hover:bg-blue-800'
                   }`}
                 >
                   Aktif
                 </button>
                 <button
                   onClick={() => toggleFilter('inactive')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                  className={`px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer ${
                     activeFilters.includes('inactive')
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                      ? 'bg-white text-blue-600'
+                      : 'bg-blue-700 text-white hover:bg-blue-800'
                   }`}
                 >
                   Nonaktif
@@ -218,13 +223,16 @@ export default function ReminderPage() {
               </div>
             </div>
           </div>
-          
+        </div>
+        
+        {/* Desktop: Patient Table */}
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
           <PatientReminderTable patients={filteredPatients} loading={loading} />
         </div>
       </div>
 
       {/* Mobile: Card Layout */}
-      <div className="lg:hidden">
+      <div className="lg:hidden relative z-10">
         <main className="px-4 py-6">
           {/* Mobile: Title and Controls */}
           <div className="flex justify-between items-center mb-4">

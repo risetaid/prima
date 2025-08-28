@@ -97,14 +97,24 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
+
       {/* Desktop: Header with Navigation */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block relative z-10">
         <DesktopHeader showNavigation={true} />
       </div>
 
       {/* Mobile: Simple Header */}
-      <div className="lg:hidden">
+      <div className="lg:hidden relative z-10">
         <header className="bg-white shadow-sm">
           <div className="flex justify-between items-center px-4 py-4">
             <div 
@@ -122,7 +132,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Main Content */}
-      <main>
+      <main className="relative z-10">
         <DashboardClient />
       </main>
     </div>

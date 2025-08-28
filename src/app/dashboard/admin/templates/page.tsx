@@ -1,9 +1,9 @@
 import { requireAdmin } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
-import UserManagement from "@/components/admin/user-management";
+import TemplateManagement from "@/components/admin/template-management";
 import { DesktopHeader } from "@/components/ui/desktop-header";
 
-export default async function AdminUsersPage() {
+export default async function AdminTemplatesPage() {
   const user = await requireAdmin();
 
   if (!user) {
@@ -31,14 +31,14 @@ export default async function AdminUsersPage() {
       <main className="max-w-7xl mx-auto relative z-10">
         <div className="my-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Manajemen Pengguna
+            Manajemen Template WhatsApp
           </h1>
           <p className="text-gray-600">
-            Kelola registrasi dan persetujuan pengguna
+            Kelola template pesan WhatsApp untuk pengingat, janji, dan edukasi
           </p>
         </div>
 
-        <UserManagement />
+        <TemplateManagement />
       </main>
     </div>
   );

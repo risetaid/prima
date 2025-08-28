@@ -31,11 +31,9 @@ export async function POST(request: NextRequest) {
             email: user.primaryEmail || '',
             firstName: user.displayName?.split(' ')[0] || '',
             lastName: user.displayName?.split(' ').slice(1).join(' ') || '',
-            phoneNumber: null, // Stack Auth doesn't provide phone by default
             role: isFirstUser ? 'ADMIN' : 'MEMBER',
             isApproved: isFirstUser, // First user auto-approved
-            approvedAt: isFirstUser ? new Date() : null,
-            lastLoginAt: nowWIB()
+            approvedAt: isFirstUser ? new Date() : null
           }
         })
         
@@ -51,13 +49,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update last login timestamp
-    await prisma.user.update({
-      where: { stackId: user.id },
-      data: {
-        lastLoginAt: nowWIB()
-      }
-    })
+    // User login tracking removed as lastLoginAt field not needed for this system
+    console.log(`✅ User logged in: ${existingUser.email}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {
