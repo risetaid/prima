@@ -31,19 +31,26 @@ const PatientRow = memo(({ patient, onClick }: { patient: Patient; onClick: (id:
 
   const getRandomAvatarColor = (name: string) => {
     const colors = [
-      "bg-green-500",
-      "bg-yellow-500", 
-      "bg-red-500",
       "bg-blue-500",
       "bg-purple-500",
       "bg-pink-500",
       "bg-indigo-500",
+      "bg-cyan-500",
+      "bg-teal-500",
+      "bg-emerald-500",
+      "bg-lime-500",
+      "bg-orange-500",
+      "bg-rose-500",
+      "bg-violet-500",
+      "bg-sky-500",
     ];
+    // Use name hash to ensure consistent color per person
     const hash = name.split("").reduce((a, b) => {
       a = (a << 5) - a + b.charCodeAt(0);
       return a & a;
     }, 0);
-    return colors[Math.abs(hash) % colors.length];
+    const selectedColor = colors[Math.abs(hash) % colors.length];
+    return selectedColor;
   };
 
   const handleClick = useCallback(() => {
@@ -119,6 +126,39 @@ export const PatientReminderTable = memo(({
   const handlePatientClick = useCallback((patientId: string) => {
     router.push(`/dashboard/pengingat/pasien/${patientId}`);
   }, [router]);
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getRandomAvatarColor = (name: string) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-purple-500",
+      "bg-pink-500",
+      "bg-indigo-500",
+      "bg-cyan-500",
+      "bg-teal-500",
+      "bg-emerald-500",
+      "bg-lime-500",
+      "bg-orange-500",
+      "bg-rose-500",
+      "bg-violet-500",
+      "bg-sky-500",
+    ];
+    // Use name hash to ensure consistent color per person
+    const hash = name.split("").reduce((a, b) => {
+      a = (a << 5) - a + b.charCodeAt(0);
+      return a & a;
+    }, 0);
+    const selectedColor = colors[Math.abs(hash) % colors.length];
+    return selectedColor;
+  };
 
   const getComplianceLabel = (rate: number) => {
     if (rate >= 80)
@@ -209,9 +249,9 @@ export const PatientReminderTable = memo(({
                       />
                     </div>
                   ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${getRandomAvatarColor(patient.name)}`}>
                       <span className="text-white font-semibold text-lg">
-                        {patient.name.charAt(0).toUpperCase()}
+                        {getInitials(patient.name)}
                       </span>
                     </div>
                   )}

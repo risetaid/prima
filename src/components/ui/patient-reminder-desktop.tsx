@@ -193,17 +193,25 @@ export function PatientReminderDesktop({ patientName }: PatientReminderDesktopPr
 
   const handlePendingAction = async (reminderId: string, action: 'ya' | 'tidak') => {
     try {
-      const response = await fetch(`/api/patients/${params.id}/reminders/manual-confirmation`, {
-        method: 'POST',
+      // Extract actual ReminderLog ID from prefixed format
+      // Desktop /all endpoint returns IDs like "pending-732829dc-1b65-4c5b-91c9-0749cd287e95"
+      // But API expects just the UUID: "732829dc-1b65-4c5b-91c9-0749cd287e95"
+      const actualReminderId = reminderId.startsWith('pending-') 
+        ? reminderId.replace('pending-', '') 
+        : reminderId
+
+      console.log('🔍 Desktop handlePendingAction:', { 
+        originalId: reminderId, 
+        actualId: actualReminderId,
+        action 
+      })
+
+      const response = await fetch(`/api/patients/${params.id}/reminders/${actualReminderId}/confirm`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reminderLogId: reminderId,
-          medicationsTaken: action === 'ya',
-          visitDate: new Date().toISOString().split('T')[0],
-          visitTime: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-          patientCondition: 'STABLE',
-          symptomsReported: [],
-          notes: `Konfirmasi ${action === 'ya' ? 'Ya' : 'Tidak'} via dashboard desktop`
+          medicationTaken: action === 'ya',
+          reminderLogId: actualReminderId
         })
       })
 
@@ -211,7 +219,9 @@ export function PatientReminderDesktop({ patientName }: PatientReminderDesktopPr
         toast.success(`Konfirmasi "${action === 'ya' ? 'Ya' : 'Tidak'}" berhasil disimpan`)
         await fetchAllReminders()
       } else {
-        throw new Error('Failed to save confirmation')
+        const errorData = await response.json()
+        console.error('❌ Desktop API Error:', errorData)
+        throw new Error(errorData.error || 'Failed to save confirmation')
       }
     } catch (error) {
       console.error('Error saving confirmation:', error)

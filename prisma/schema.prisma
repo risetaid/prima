@@ -14,30 +14,26 @@ model User {
   email                     String               @unique
   firstName                 String?              @map("first_name")
   lastName                  String?              @map("last_name")
-  phoneNumber               String?              @map("phone_number")
   role                      UserRole             @default(MEMBER)
   isActive                  Boolean              @default(true) @map("is_active")
   isApproved                Boolean              @default(false) @map("is_approved")
   approvedAt                DateTime?            @map("approved_at")
   approvedBy                String?              @map("approved_by")
-  lastLoginAt               DateTime?            @map("last_login_at")
   createdAt                 DateTime             @default(now()) @map("created_at")
   updatedAt                 DateTime             @updatedAt @map("updated_at")
   approver                  User?                @relation("UserApprovals", fields: [approvedBy], references: [id])
   approvedUsers             User[]               @relation("UserApprovals")
-  educationalArticles       EducationalArticle[]
   manualConfirmations       ManualConfirmation[]
   medicalRecords            MedicalRecord[]
   patientMedicationsCreated PatientMedication[]
   patientsManaged           Patient[]            @relation("VolunteerPatients")
   reminderSchedulesCreated  ReminderSchedule[]
-  loginLogs                 UserLoginLog[]
-  volunteerMetrics          VolunteerMetric[]
 
   @@index([role])
   @@index([isActive])
   @@index([isApproved])
   @@index([role, isActive, isApproved])
+  @@index([stackId, isApproved, isActive]) // Performance for auth queries
   @@map("users")
 }
 
@@ -58,13 +54,9 @@ model Patient {
   deletedAt             DateTime?            @map("deleted_at")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
-  appointments          Appointment[]
-  contentAccessLogs     ContentAccessLog[]
   manualConfirmations   ManualConfirmation[]
   medicalRecords        MedicalRecord[]
   patientMedications    PatientMedication[]
-  patientMetrics        PatientMetric[]
-  patientSymptoms       PatientSymptom[]
   assignedVolunteer     User?                @relation("VolunteerPatients", fields: [assignedVolunteerId], references: [id])
   reminderLogs          ReminderLog[]
   reminderSchedules     ReminderSchedule[]
@@ -95,11 +87,6 @@ model MedicalRecord {
 model Medication {
   id                 String              @id @default(uuid())
   name               String
-  genericName        String?             @map("generic_name")
-  description        String?
-  commonDosages      String[]            @map("common_dosages")
-  sideEffects        String?             @map("side_effects")
-  instructions       String?
   createdAt          DateTime            @default(now()) @map("created_at")
   patientMedications PatientMedication[]
 
@@ -116,7 +103,6 @@ model PatientMedication {
   startDate         DateTime           @map("start_date")
   endDate           DateTime?          @map("end_date")
   isActive          Boolean            @default(true) @map("is_active")
-  prescribedBy      String?            @map("prescribed_by")
   createdBy         String             @map("created_by")
   createdAt         DateTime           @default(now()) @map("created_at")
   createdByUser     User               @relation(fields: [createdBy], references: [id])
@@ -132,7 +118,7 @@ model ReminderSchedule {
   patientId           String               @map("patient_id")
   medicationName      String               @map("medication_name")
   scheduledTime       String               @map("scheduled_time")
-  frequency           Frequency            @default(DAILY)
+  frequency           Frequency            @default(CUSTOM)
   startDate           DateTime             @map("start_date")
   endDate             DateTime?            @map("end_date")
   customMessage       String?              @map("custom_message")
@@ -140,11 +126,9 @@ model ReminderSchedule {
   createdById         String               @map("created_by_id")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
-  patientMedicationId String?
   manualConfirmations ManualConfirmation[]
   reminderLogs        ReminderLog[]
   createdByUser       User                 @relation(fields: [createdById], references: [id])
-  PatientMedication   PatientMedication?   @relation(fields: [patientMedicationId], references: [id])
   patient             Patient              @relation(fields: [patientId], references: [id])
 
   @@index([patientId])
@@ -152,6 +136,7 @@ model ReminderSchedule {
   @@index([patientId, isActive])
   @@index([startDate])
   @@index([endDate])
+  @@index([createdAt, isActive]) // Performance for recent active reminders
   @@map("reminder_schedules")
 }
 
@@ -164,9 +149,6 @@ model ReminderLog {
   sentAt              DateTime             @map("sent_at")
   fonnteMessageId     String?              @map("fonnte_message_id")
   status              ReminderStatus       @default(PENDING)
-  errorMessage        String?              @map("error_message")
-  patientResponse     String?              @map("patient_response")
-  responseReceivedAt  DateTime?            @map("response_received_at")
   createdAt           DateTime             @default(now()) @map("created_at")
   manualConfirmations ManualConfirmation[]
   patient             Patient              @relation(fields: [patientId], references: [id])
@@ -177,19 +159,10 @@ model ReminderLog {
   @@index([status])
   @@index([sentAt])
   @@index([patientId, status])
+  @@index([sentAt, status]) // Performance for cron job queries
   @@map("reminder_logs")
 }
 
-model PatientSymptom {
-  id          String   @id @default(uuid())
-  patientId   String   @map("patient_id")
-  symptomText String   @map("symptom_text")
-  recordedAt  DateTime @map("recorded_at")
-  createdAt   DateTime @default(now()) @map("created_at")
-  patient     Patient  @relation(fields: [patientId], references: [id])
-
-  @@map("patient_symptoms")
-}
 
 model ManualConfirmation {
   id                 String            @id @default(uuid())
@@ -218,78 +191,14 @@ model ManualConfirmation {
   @@index([reminderLogId])
   @@index([visitDate])
   @@index([patientId, visitDate])
+  @@index([confirmedAt, patientId]) // Performance for completion tracking
   @@map("manual_confirmations")
 }
 
-model Appointment {
-  id              String            @id @default(uuid())
-  patientId       String            @map("patient_id")
-  appointmentType AppointmentType   @map("appointment_type")
-  scheduledDate   DateTime          @map("scheduled_date")
-  scheduledTime   String            @map("scheduled_time")
-  location        String?
-  doctorName      String?           @map("doctor_name")
-  status          AppointmentStatus @default(SCHEDULED)
-  reminderSent    Boolean           @default(false) @map("reminder_sent")
-  notes           String?
-  createdBy       String            @map("created_by")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  patient         Patient           @relation(fields: [patientId], references: [id])
 
-  @@map("appointments")
-}
 
-model PatientMetric {
-  id                    String   @id @default(uuid())
-  patientId             String   @map("patient_id")
-  metricDate            DateTime @map("metric_date")
-  remindersSent         Int      @default(0) @map("reminders_sent")
-  remindersAcknowledged Int      @default(0) @map("reminders_acknowledged")
-  medicationsTaken      Int      @default(0) @map("medications_taken")
-  medicationsMissed     Int      @default(0) @map("medications_missed")
-  complianceRate        Float    @default(0) @map("compliance_rate")
-  calculatedAt          DateTime @default(now()) @map("calculated_at")
-  patient               Patient  @relation(fields: [patientId], references: [id])
 
-  @@map("patient_metrics")
-}
 
-model VolunteerMetric {
-  id                       String   @id @default(uuid())
-  volunteerId              String   @map("volunteer_id")
-  periodStart              DateTime @map("period_start")
-  periodEnd                DateTime @map("period_end")
-  patientsManaged          Int      @default(0) @map("patients_managed")
-  visitsConducted          Int      @default(0) @map("visits_conducted")
-  averagePatientCompliance Float    @default(0) @map("average_patient_compliance")
-  postsCreated             Int      @default(0) @map("posts_created")
-  calculatedAt             DateTime @default(now()) @map("calculated_at")
-  volunteer                User     @relation(fields: [volunteerId], references: [id])
-
-  @@map("volunteer_metrics")
-}
-
-model ContentAccessLog {
-  id          String       @id @default(uuid())
-  postSlug    String       @map("post_slug")
-  patientId   String?      @map("patient_id")
-  accessedVia AccessSource @map("accessed_via")
-  accessedAt  DateTime     @default(now()) @map("accessed_at")
-  timeSpent   Int?         @map("time_spent")
-  patient     Patient?     @relation(fields: [patientId], references: [id])
-
-  @@map("content_access_logs")
-}
-
-model SystemSetting {
-  key         String   @id
-  value       String
-  description String?
-  updatedBy   String   @map("updated_by")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@map("system_settings")
-}
 
 model WhatsAppTemplate {
   id           String           @id @default(uuid())
@@ -304,34 +213,7 @@ model WhatsAppTemplate {
   @@map("whatsapp_templates")
 }
 
-model UserLoginLog {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  loginTime DateTime @default(now()) @map("login_time")
-  ipAddress String?  @map("ip_address")
-  userAgent String?  @map("user_agent")
-  location  String?
-  device    String?
-  user      User     @relation(fields: [userId], references: [id])
 
-  @@map("user_login_logs")
-}
-
-model EducationalArticle {
-  id            String          @id @default(uuid())
-  title         String
-  description   String?
-  url           String
-  category      ArticleCategory
-  tags          String[]
-  isActive      Boolean         @default(true) @map("is_active")
-  createdBy     String          @map("created_by")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  createdByUser User            @relation(fields: [createdBy], references: [id])
-
-  @@map("educational_articles")
-}
 
 enum UserRole {
   ADMIN
@@ -352,8 +234,6 @@ enum MedicalRecordType {
 }
 
 enum Frequency {
-  DAILY
-  WEEKLY
   CUSTOM
   CUSTOM_RECURRENCE
 }
@@ -371,36 +251,8 @@ enum PatientCondition {
   POOR
 }
 
-enum AppointmentType {
-  CHECKUP
-  CHEMOTHERAPY
-  CONSULTATION
-}
-
-enum AppointmentStatus {
-  SCHEDULED
-  COMPLETED
-  CANCELLED
-}
-
-enum AccessSource {
-  REMINDER
-  DIRECT
-  SEARCH
-}
-
 enum TemplateCategory {
   REMINDER
   APPOINTMENT
   EDUCATIONAL
-}
-
-enum ArticleCategory {
-  MEDICATION
-  NUTRITION
-  EXERCISE
-  MENTAL_HEALTH
-  SYMPTOMS
-  TREATMENT
-  LIFESTYLE
 }
