@@ -2,18 +2,75 @@
 
 import { useUser } from "@stackframe/stack";
 import { LogOut, User, ChevronDown } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 
 export function UserMenu({ forceLeftTop = false }: { forceLeftTop?: boolean }) {
   const user = useUser();
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: forceLeftTop ? rect.top - 8 : rect.bottom + 8,
+        left: rect.right - 192, // 192px = w-48
+        width: 192
+      });
+    }
+  }, [isOpen, forceLeftTop]);
 
   if (!user) return null;
+
+  const dropdownContent = isOpen && (
+    <>
+      {/* Click outside to close */}
+      <div className="fixed inset-0 z-[9998]" onClick={() => setIsOpen(false)} />
+      
+      {/* Dropdown */}
+      <div 
+        className="fixed bg-white rounded-md shadow-lg border border-gray-200 z-[9999]"
+        style={{
+          top: dropdownPosition.top,
+          left: dropdownPosition.left,
+          width: dropdownPosition.width,
+          transform: forceLeftTop ? 'translateY(-100%)' : 'none'
+        }}
+      >
+        <div className="py-1">
+          <div className="px-4 py-2 text-sm text-gray-500 border-b">
+            {user.displayName || user.primaryEmail}
+          </div>
+          <Link
+            href="/handler/account-settings"
+            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+            onClick={() => setIsOpen(false)}
+          >
+            <User className="w-4 h-4 mr-2" />
+            Profil
+          </Link>
+          <button
+            onClick={() => {
+              setIsOpen(false);
+              user.signOut();
+            }}
+            className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Keluar
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="relative">
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 hover:bg-gray-100 rounded-lg cursor-pointer flex items-center space-x-2"
       >
@@ -26,40 +83,7 @@ export function UserMenu({ forceLeftTop = false }: { forceLeftTop?: boolean }) {
         </div>
       </button>
 
-      {isOpen && (
-        <div className={`absolute w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50 ${
-          forceLeftTop ? 'bottom-full mb-2 right-0' : 'top-full mt-2 right-0'
-        }`}>
-          <div className="py-1">
-            <div className="px-4 py-2 text-sm text-gray-500 border-b">
-              {user.displayName || user.primaryEmail}
-            </div>
-            <Link
-              href="/handler/account-settings"
-              className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-              onClick={() => setIsOpen(false)}
-            >
-              <User className="w-4 h-4 mr-2" />
-              Profil
-            </Link>
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                user.signOut();
-              }}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Keluar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Click outside to close */}
-      {isOpen && (
-        <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-      )}
+      {typeof window !== 'undefined' && dropdownContent && createPortal(dropdownContent, document.body)}
     </div>
   );
 }

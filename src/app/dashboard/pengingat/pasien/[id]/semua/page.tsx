@@ -122,44 +122,131 @@ export default function AllRemindersPage() {
           <h2 className="text-lg font-semibold text-gray-900">Semua</h2>
         </div>
 
-        {/* Reminders List */}
-        <div className="space-y-3">
-          {reminders.map((reminder) => {
-            const cardStyle = getCardStyle(reminder.status)
-            const statusBadge = getStatusBadge(reminder.status)
-            
-            return (
-              <div key={reminder.id} className="space-y-2">
-                {/* Status Badge */}
-                {reminder.status !== 'scheduled' && (
-                  <div className="flex justify-start">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
-                      {statusBadge.text}
-                    </span>
-                  </div>
-                )}
-                
-                {/* Reminder Card */}
-                <div className={`${cardStyle} rounded-2xl p-4`}>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-semibold mb-1">
-                        {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
-                      </h3>
-                      <p className="text-sm opacity-90">
-                        {formatDate(reminder.reminderDate)}
-                      </p>
+        {/* Grouped Reminders List */}
+        <div className="space-y-8">
+          {/* 1. Terjadwal Section */}
+          {(() => {
+            const scheduledReminders = reminders.filter(r => r.status === 'scheduled')
+            return scheduledReminders.length > 0 && (
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Terjadwal ({scheduledReminders.length})
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {scheduledReminders.map((reminder) => (
+                    <div key={reminder.id} className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="font-semibold mb-1">
+                            {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                          </h3>
+                          <p className="text-sm opacity-90">
+                            {formatDate(reminder.reminderDate)}
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Clock className="w-4 h-4" />
+                          <span className="font-semibold">{reminder.scheduledTime}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="w-4 h-4" />
-                      <span className="font-semibold">{reminder.scheduledTime}</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             )
-          })}
+          })()}
 
+          {/* 2. Perlu Diperbarui Section */}
+          {(() => {
+            const pendingReminders = reminders.filter(r => r.status === 'pending')
+            return pendingReminders.length > 0 && (
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Perlu Diperbarui ({pendingReminders.length})
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {pendingReminders.map((reminder) => (
+                    <div key={reminder.id} className="space-y-2">
+                      <div className="flex justify-start">
+                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          Perlu Update
+                        </span>
+                      </div>
+                      <div className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-semibold mb-1">
+                              {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                            </h3>
+                            <p className="text-sm opacity-90">
+                              {formatDate(reminder.reminderDate)}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <Clock className="w-4 h-4" />
+                            <span className="font-semibold">{reminder.scheduledTime}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* 3. Selesai Section */}
+          {(() => {
+            const completedReminders = reminders.filter(r => r.status === 'completed_taken' || r.status === 'completed_not_taken')
+            return completedReminders.length > 0 && (
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Selesai ({completedReminders.length})
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {completedReminders.map((reminder) => {
+                    const statusBadge = getStatusBadge(reminder.status)
+                    return (
+                      <div key={reminder.id} className="space-y-2">
+                        <div className="flex justify-start">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
+                            {statusBadge.text}
+                          </span>
+                        </div>
+                        <div className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="font-semibold mb-1">
+                                {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                              </h3>
+                              <p className="text-sm opacity-90">
+                                {formatDate(reminder.reminderDate)}
+                              </p>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Clock className="w-4 h-4" />
+                              <span className="font-semibold">{reminder.scheduledTime}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Empty State */}
           {reminders.length === 0 && (
             <div className="text-center py-8">
               <p className="text-gray-500">Belum ada pengingat</p>

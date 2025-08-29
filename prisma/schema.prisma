@@ -29,6 +29,7 @@ model User {
   patientsManaged           Patient[]            @relation("VolunteerPatients")
   reminderSchedulesCreated  ReminderSchedule[]
   whatsappTemplatesCreated  WhatsAppTemplate[]   @relation("TemplateCreator")
+  healthNotesRecorded       HealthNote[]         @relation("HealthNoteRecorder")
 
   @@index([role])
   @@index([isActive])
@@ -61,6 +62,7 @@ model Patient {
   assignedVolunteer     User?                @relation("VolunteerPatients", fields: [assignedVolunteerId], references: [id])
   reminderLogs          ReminderLog[]
   reminderSchedules     ReminderSchedule[]
+  healthNotes           HealthNote[]
 
   @@index([isActive])
   @@index([assignedVolunteerId])
@@ -237,6 +239,7 @@ enum MedicalRecordType {
   DIAGNOSIS
   TREATMENT
   PROGRESS
+  HEALTH_NOTE
 }
 
 enum Frequency {
@@ -261,4 +264,22 @@ enum TemplateCategory {
   REMINDER
   APPOINTMENT
   EDUCATIONAL
+}
+
+model HealthNote {
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  note        String
+  noteDate    DateTime @map("note_date") // Date when the health event occurred
+  recordedBy  String   @map("recorded_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedByUser User    @relation("HealthNoteRecorder", fields: [recordedBy], references: [id])
+  
+  @@index([patientId])
+  @@index([patientId, noteDate])
+  @@index([recordedBy])
+  @@map("health_notes")
 }

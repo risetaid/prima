@@ -61,14 +61,29 @@ export function PatientReminderDesktop({
 
   useEffect(() => {
     if (params.id) {
+      fetchStats();
       fetchAllReminders();
-      // Stats are now calculated from actual data, no separate API call needed
     }
   }, [params.id]);
 
+  const fetchStats = async () => {
+    try {
+      // Use the corrected /stats endpoint for badge counts
+      const response = await fetch(`/api/patients/${params.id}/reminders/stats`);
+      if (response.ok) {
+        const statsData = await response.json();
+        setStats(statsData);
+      } else {
+        console.error("❌ Stats API failed:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    }
+  };
+
   const fetchAllReminders = async () => {
     try {
-      // Use the same API endpoint as mobile - /all gives us everything in correct format
+      // Fetch data for display purposes only, stats come from separate endpoint
       const response = await fetch(`/api/patients/${params.id}/reminders/all`);
 
       if (response.ok) {
@@ -120,7 +135,7 @@ export function PatientReminderDesktop({
         }));
 
         console.log(
-          "🔍 Categorized - Terjadwal:",
+          "🔍 Display Data - Terjadwal:",
           mappedTerjadwal.length,
           "Perlu:",
           mappedPerlu.length,
@@ -132,12 +147,6 @@ export function PatientReminderDesktop({
         setPerluDiperbaruiReminders(mappedPerlu);
         setSelesaiReminders(mappedSelesai);
 
-        // Update stats based on actual data
-        setStats({
-          terjadwal: mappedTerjadwal.length,
-          perluDiperbarui: mappedPerlu.length,
-          selesai: mappedSelesai.length,
-        });
       } else {
         console.error("❌ All Reminders API failed:", response.status);
         toast.error("Gagal memuat data pengingat");
@@ -150,57 +159,13 @@ export function PatientReminderDesktop({
     }
   };
 
-  const fetchStats = async () => {
-    try {
-      const response = await fetch(
-        `/api/patients/${params.id}/reminders/stats`
-      );
-      if (response.ok) {
-        const statsData = await response.json();
-        setStats({
-          terjadwal: Number(statsData.terjadwal) || 0,
-          perluDiperbarui: Number(statsData.perluDiperbarui) || 0,
-          selesai: Number(statsData.selesai) || 0,
-        });
-      } else {
-        // Fallback to calculated stats from actual data
-        const calcStats = {
-          terjadwal: Array.isArray(terjadwalReminders)
-            ? terjadwalReminders.length
-            : 0,
-          perluDiperbarui: Array.isArray(perluDiperbaruiReminders)
-            ? perluDiperbaruiReminders.length
-            : 0,
-          selesai: Array.isArray(selesaiReminders)
-            ? selesaiReminders.length
-            : 0,
-        };
-        console.log("📊 Calculated fallback stats:", calcStats);
-        setStats(calcStats);
-      }
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-      // Fallback to calculated stats from actual data
-      const calcStats = {
-        terjadwal: Array.isArray(terjadwalReminders)
-          ? terjadwalReminders.length
-          : 0,
-        perluDiperbarui: Array.isArray(perluDiperbaruiReminders)
-          ? perluDiperbaruiReminders.length
-          : 0,
-        selesai: Array.isArray(selesaiReminders) ? selesaiReminders.length : 0,
-      };
-      console.log("📊 Error fallback stats:", calcStats);
-      setStats(calcStats);
-    }
-  };
-
   const handleAddReminder = () => {
     setIsAddModalOpen(true);
   };
 
   const handleModalSuccess = async () => {
-    // Refresh data after successful reminder creation
+    // Refresh both stats and data after successful reminder creation
+    await fetchStats();
     await fetchAllReminders();
   };
 
@@ -231,7 +196,9 @@ export function PatientReminderDesktop({
 
       if (response.ok) {
         toast.success("Pengingat berhasil diperbarui");
-        await fetchAllReminders();
+        await fetchStats();
+        await fetchStats();
+      await fetchAllReminders();
         setIsEditModalOpen(false);
         setEditingReminder(null);
       } else {
@@ -272,6 +239,7 @@ export function PatientReminderDesktop({
       toast.success(`${selectedReminders.length} pengingat berhasil dihapus`);
 
       // Refresh data (stats are calculated automatically)
+      await fetchStats();
       await fetchAllReminders();
 
       // Reset delete mode
@@ -317,7 +285,9 @@ export function PatientReminderDesktop({
         toast.success(
           `Konfirmasi "${action === "ya" ? "Ya" : "Tidak"}" berhasil disimpan`
         );
-        await fetchAllReminders();
+        await fetchStats();
+        await fetchStats();
+      await fetchAllReminders();
       } else {
         const errorData = await response.json();
         console.error("❌ Desktop API Error:", errorData);
@@ -381,72 +351,73 @@ export function PatientReminderDesktop({
     showActions = false,
     allowEdit = false
   ) => (
-    <div
-      key={reminder.id}
-      className={`bg-blue-600 text-white rounded-lg p-4 relative ${
-        allowEdit && !showCheckbox && !showActions
-          ? "cursor-pointer hover:bg-blue-700 transition-colors"
-          : ""
-      }`}
-      onClick={() => {
-        if (allowEdit && !showCheckbox && !showActions) {
-          handleEditReminder(reminder);
-        }
-      }}
-    >
+    <div key={reminder.id} className="flex items-start space-x-3">
       {showCheckbox && (
-        <div className="absolute top-3 left-3">
+        <div className="flex items-center pt-4">
           <input
             type="checkbox"
             checked={selectedReminders.includes(reminder.id)}
             onChange={() => toggleReminderSelection(reminder.id)}
-            className="w-4 h-4 rounded border-white/30"
+            className="w-4 h-4 text-blue-600 rounded"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
+      
+      <div
+        className={`flex-1 bg-blue-600 text-white rounded-lg p-4 relative ${
+          allowEdit && !showCheckbox && !showActions
+            ? "cursor-pointer hover:bg-blue-700 transition-colors"
+            : ""
+        }`}
+        onClick={() => {
+          if (allowEdit && !showCheckbox && !showActions) {
+            handleEditReminder(reminder);
+          }
+        }}
+      >
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <h3 className="font-semibold text-lg">
+              {reminder.customMessage ||
+                reminder.medicationName ||
+                "Pesan pengingat"}
+            </h3>
+            <p className="text-sm opacity-90">
+              {formatDate(reminder.reminderDate)}
+            </p>
+          </div>
+          <div className="flex items-center text-white/90">
+            <Clock className="w-4 h-4 mr-1" />
+            <span className="font-semibold">
+              {formatTime(reminder.scheduledTime)}
+            </span>
+          </div>
+        </div>
 
-      <div className="flex justify-between items-start mb-2">
-        <div className={showCheckbox ? "ml-6" : ""}>
-          <h3 className="font-semibold text-lg">
-            {reminder.customMessage ||
-              reminder.medicationName ||
-              "Pesan pengingat"}
-          </h3>
-          <p className="text-sm opacity-90">
-            {formatDate(reminder.reminderDate)}
-          </p>
-        </div>
-        <div className="flex items-center text-white/90">
-          <Clock className="w-4 h-4 mr-1" />
-          <span className="font-semibold">
-            {formatTime(reminder.scheduledTime)}
-          </span>
-        </div>
+        {showActions && (
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePendingAction(reminder.id, "ya");
+              }}
+              className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+            >
+              Ya
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePendingAction(reminder.id, "tidak");
+              }}
+              className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+            >
+              Tidak
+            </button>
+          </div>
+        )}
       </div>
-
-      {showActions && (
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePendingAction(reminder.id, "ya");
-            }}
-            className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
-          >
-            Ya
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePendingAction(reminder.id, "tidak");
-            }}
-            className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
-          >
-            Tidak
-          </button>
-        </div>
-      )}
     </div>
   );
 

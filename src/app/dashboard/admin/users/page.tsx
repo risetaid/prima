@@ -1,15 +1,9 @@
-import { requireAdmin } from "@/lib/auth-utils";
-import { redirect } from "next/navigation";
+"use client";
+
 import UserManagement from "@/components/admin/user-management";
 import { DesktopHeader } from "@/components/ui/desktop-header";
 
-export default async function AdminUsersPage() {
-  const user = await requireAdmin();
-
-  if (!user) {
-    redirect("/unauthorized");
-  }
-
+export default function AdminUsersPage() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
       {/* Background Pattern */}
@@ -28,16 +22,7 @@ export default async function AdminUsersPage() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto relative z-10">
-        <div className="my-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Manajemen Pengguna
-          </h1>
-          <p className="text-gray-600">
-            Kelola registrasi dan persetujuan pengguna
-          </p>
-        </div>
-
+      <main className="max-w-7xl my-8 mx-auto relative z-10 px-4 sm:px-6 lg:px-8">
         <UserManagement />
       </main>
     </div>

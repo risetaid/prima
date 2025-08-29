@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireApprovedUser } from '@/lib/auth-utils'
+import { getCurrentUser } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireApprovedUser()
+    const user = await getCurrentUser()
+    
+    // Handle unauthenticated users properly
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
+    }
+
+    // Handle unapproved users
+    if (!user.canAccessDashboard) {
+      return NextResponse.json(
+        { error: 'Not approved', needsApproval: true },
+        { status: 403 }
+      )
+    }
     
     return NextResponse.json({
       id: user.id,

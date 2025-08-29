@@ -85,28 +85,26 @@ export default function PatientDetailPage() {
   }
 
   const fetchHealthNotes = async (patientId: string) => {
-    // For now, use sample data. Later you can create an API endpoint
-    const sampleNotes: HealthNote[] = [
-      {
-        id: '1',
-        date: '2025-08-01',
-        note: 'Gatal-gatal, benjolan',
-        createdAt: '2025-08-01T10:00:00Z'
-      },
-      {
-        id: '2', 
-        date: '2025-08-08',
-        note: 'Gatal-gatal, benjolan, perubahan bentuk',
-        createdAt: '2025-08-08T10:00:00Z'
-      },
-      {
-        id: '3',
-        date: '2025-08-15', 
-        note: 'Keluar cairan dari puting',
-        createdAt: '2025-08-15T10:00:00Z'
+    try {
+      const response = await fetch(`/api/patients/${patientId}/health-notes`)
+      if (response.ok) {
+        const data = await response.json()
+        // Convert API response to match frontend interface
+        const formattedNotes: HealthNote[] = data.healthNotes.map((note: any) => ({
+          id: note.id,
+          date: note.noteDate.split('T')[0], // Extract date part
+          note: note.note,
+          createdAt: note.createdAt
+        }))
+        setHealthNotes(formattedNotes)
+      } else {
+        console.error('Failed to fetch health notes:', response.status)
+        toast.error('Gagal memuat catatan kesehatan')
       }
-    ]
-    setHealthNotes(sampleNotes)
+    } catch (error) {
+      console.error('Error fetching health notes:', error)
+      toast.error('Gagal memuat catatan kesehatan')
+    }
   }
 
   const handleAddNote = async () => {
@@ -115,18 +113,41 @@ export default function PatientDetailPage() {
       return
     }
 
-    const newNote: HealthNote = {
-      id: Date.now().toString(),
-      date: selectedDate,
-      note: newNoteText.trim(),
-      createdAt: new Date().toISOString()
-    }
+    try {
+      const response = await fetch(`/api/patients/${params.id}/health-notes`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          note: newNoteText.trim(),
+          noteDate: selectedDate
+        })
+      })
 
-    setHealthNotes(prev => [newNote, ...prev])
-    setNewNoteText('')
-    setSelectedDate(new Date().toISOString().split('T')[0])
-    setIsAddNoteModalOpen(false)
-    toast.success('Catatan berhasil ditambahkan')
+      if (response.ok) {
+        const data = await response.json()
+        // Add new note to the beginning of the list
+        const formattedNote: HealthNote = {
+          id: data.healthNote.id,
+          date: data.healthNote.noteDate.split('T')[0],
+          note: data.healthNote.note,
+          createdAt: data.healthNote.createdAt
+        }
+        
+        setHealthNotes(prev => [formattedNote, ...prev])
+        setNewNoteText('')
+        setSelectedDate(new Date().toISOString().split('T')[0])
+        setIsAddNoteModalOpen(false)
+        toast.success('Catatan berhasil ditambahkan')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Gagal menambahkan catatan')
+      }
+    } catch (error) {
+      console.error('Error adding health note:', error)
+      toast.error('Gagal menambahkan catatan')
+    }
   }
 
   const handleEditNote = (note: HealthNote) => {
@@ -138,7 +159,7 @@ export default function PatientDetailPage() {
     setIsEditNoteModalOpen(true)
   }
 
-  const handleSaveEditNote = () => {
+  const handleSaveEditNote = async () => {
     if (!editNoteText.trim()) {
       toast.error('Catatan tidak boleh kosong')
       return
@@ -146,34 +167,80 @@ export default function PatientDetailPage() {
 
     if (!editingNote) return
 
-    const updatedNote = {
-      ...editingNote,
-      note: editNoteText.trim(),
-      date: editSelectedDate
-    }
+    try {
+      const response = await fetch(`/api/patients/${params.id}/health-notes/${editingNote.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          note: editNoteText.trim(),
+          noteDate: editSelectedDate
+        })
+      })
 
-    setHealthNotes(prev => prev.map(note => 
-      note.id === editingNote.id ? updatedNote : note
-    ))
-    
-    setIsEditNoteModalOpen(false)
-    setEditingNote(null)
-    setEditNoteText('')
-    setEditSelectedDate('')
-    setShowEditCalendar(false)
-    toast.success('Catatan berhasil diperbarui')
+      if (response.ok) {
+        const data = await response.json()
+        // Update the note in the list
+        const updatedNote: HealthNote = {
+          id: data.healthNote.id,
+          date: data.healthNote.noteDate.split('T')[0],
+          note: data.healthNote.note,
+          createdAt: data.healthNote.createdAt
+        }
+
+        setHealthNotes(prev => prev.map(note => 
+          note.id === editingNote.id ? updatedNote : note
+        ))
+        
+        setIsEditNoteModalOpen(false)
+        setEditingNote(null)
+        setEditNoteText('')
+        setEditSelectedDate('')
+        setShowEditCalendar(false)
+        toast.success('Catatan berhasil diperbarui')
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Gagal memperbarui catatan')
+      }
+    } catch (error) {
+      console.error('Error updating health note:', error)
+      toast.error('Gagal memperbarui catatan')
+    }
   }
 
-  const handleDeleteSelectedNotes = () => {
+  const handleDeleteSelectedNotes = async () => {
     if (selectedNotes.length === 0) {
       toast.error('Pilih catatan yang akan dihapus')
       return
     }
 
-    setHealthNotes(prev => prev.filter(note => !selectedNotes.includes(note.id)))
-    setSelectedNotes([])
-    setIsDeleteMode(false)
-    toast.success(`${selectedNotes.length} catatan berhasil dihapus`)
+    try {
+      const response = await fetch(`/api/patients/${params.id}/health-notes/bulk-delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          noteIds: selectedNotes
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Remove deleted notes from the list
+        setHealthNotes(prev => prev.filter(note => !selectedNotes.includes(note.id)))
+        setSelectedNotes([])
+        setIsDeleteMode(false)
+        toast.success(data.message || `${selectedNotes.length} catatan berhasil dihapus`)
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Gagal menghapus catatan')
+      }
+    } catch (error) {
+      console.error('Error deleting health notes:', error)
+      toast.error('Gagal menghapus catatan')
+    }
   }
 
   const toggleNoteSelection = (noteId: string) => {
@@ -713,56 +780,16 @@ export default function PatientDetailPage() {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               {/* Health Notes Header */}
-              <div className="bg-blue-500 text-white p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <User className="w-5 h-5" />
-                    <h3 className="text-xl font-bold">Catatan Kesehatan</h3>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button 
-                      onClick={() => {
-                        setIsAddNoteModalOpen(true)
-                        setNewNoteText('')
-                        setSelectedDate(new Date().toISOString().split('T')[0])
-                        setCurrentMonth(new Date())
-                        setShowCalendar(false)
-                      }}
-                      className="bg-white text-blue-500 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer flex items-center space-x-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>Tambah Catatan</span>
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (isDeleteMode && selectedNotes.length > 0) {
-                          handleDeleteSelectedNotes()
-                        } else {
-                          setIsDeleteMode(!isDeleteMode)
-                          setSelectedNotes([])
-                        }
-                      }}
-                      className={`px-4 py-2 rounded-lg transition-colors cursor-pointer flex items-center space-x-2 ${
-                        isDeleteMode && selectedNotes.length > 0
-                          ? 'bg-red-600 text-white hover:bg-red-700'
-                          : 'bg-red-500 text-white hover:bg-red-600'
-                      }`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>
-                        {isDeleteMode && selectedNotes.length > 0 
-                          ? `Hapus ${selectedNotes.length} Catatan`
-                          : isDeleteMode ? 'Batal' : 'Hapus Catatan'
-                        }
-                      </span>
-                    </button>
-                  </div>
+              <div className="bg-blue-500 text-white p-6 text-center">
+                <div className="flex items-center justify-center space-x-2">
+                  <User className="w-6 h-6" />
+                  <h3 className="text-xl font-bold">Catatan Kesehatan</h3>
                 </div>
               </div>
 
               {/* Health Notes Content */}
-              <div className="p-6">
-                <div className="space-y-4">
+              <div className="p-6 min-h-[400px]">
+                <div className="space-y-3">
                   {healthNotes.length === 0 ? (
                     <div className="text-center py-12 text-gray-500">
                       <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -783,13 +810,15 @@ export default function PatientDetailPage() {
                             />
                           </div>
                         )}
-                        <div className="w-32 bg-blue-500 text-white text-xs rounded-lg flex items-center justify-center flex-shrink-0 p-2">
-                          <span className="text-center leading-tight">
-                            {formatNoteDate(note.date)}
-                          </span>
-                        </div>
+                        
+                        {/* Date Button */}
+                        <button className="bg-blue-500 text-white text-sm px-4 py-2 rounded-full font-medium whitespace-nowrap">
+                          {formatNoteDate(note.date)}
+                        </button>
+                        
+                        {/* Note Content */}
                         <div 
-                          className={`flex-1 bg-blue-500 text-white p-3 rounded-lg relative group ${
+                          className={`flex-1 bg-blue-500 text-white px-4 py-2 rounded-full relative group ${
                             !isDeleteMode ? 'cursor-pointer hover:bg-blue-600 transition-colors' : ''
                           }`}
                           onClick={() => {
@@ -798,10 +827,10 @@ export default function PatientDetailPage() {
                             }
                           }}
                         >
-                          {note.note}
+                          <span className="font-medium">{note.note}</span>
                           {!isDeleteMode && (
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Edit className="w-4 h-4 text-white/80" />
+                            <div className="absolute top-2 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Edit className="w-3 h-3 text-white/80" />
                             </div>
                           )}
                         </div>
@@ -809,6 +838,46 @@ export default function PatientDetailPage() {
                     ))
                   )}
                 </div>
+              </div>
+
+              {/* Health Notes Footer */}
+              <div className="bg-blue-500 p-4 flex space-x-3">
+                <button 
+                  onClick={() => {
+                    setIsAddNoteModalOpen(true)
+                    setNewNoteText('')
+                    setSelectedDate(new Date().toISOString().split('T')[0])
+                    setCurrentMonth(new Date())
+                    setShowCalendar(false)
+                  }}
+                  className="flex-1 bg-white text-blue-500 px-4 py-3 rounded-full font-semibold hover:bg-blue-50 transition-colors cursor-pointer flex items-center justify-center space-x-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Catatan</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    if (isDeleteMode && selectedNotes.length > 0) {
+                      handleDeleteSelectedNotes()
+                    } else {
+                      setIsDeleteMode(!isDeleteMode)
+                      setSelectedNotes([])
+                    }
+                  }}
+                  className={`flex-1 px-4 py-3 rounded-full font-semibold transition-colors cursor-pointer flex items-center justify-center space-x-2 ${
+                    isDeleteMode && selectedNotes.length > 0
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-red-500 text-white hover:bg-red-600'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>
+                    {isDeleteMode && selectedNotes.length > 0 
+                      ? `Hapus ${selectedNotes.length} Catatan`
+                      : isDeleteMode ? 'Batal' : 'Hapus Catatan'
+                    }
+                  </span>
+                </button>
               </div>
             </div>
           </div>

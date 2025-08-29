@@ -16,13 +16,6 @@ export default function LandingPage() {
     }
   };
 
-  const handleViewPatients = () => {
-    if (user) {
-      router.push("/dashboard");
-    } else {
-      router.push("/handler/signin");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white relative">
@@ -41,12 +34,12 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main className="relative z-10">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8">
-          <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-center min-h-[70vh] sm:min-h-[80vh] text-center py-8">
             {/* Hero Content */}
-            <div className="max-w-4xl mx-auto space-y-8">
+            <div className="max-w-4xl mx-auto space-y-6 sm:space-y-8">
               {/* Main Title */}
-              <h1 className="text-4xl lg:text-6xl font-bold text-blue-600 leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-blue-600 leading-tight">
                 Palliative Remote
                 <br />
                 Integrated Monitoring
@@ -55,8 +48,8 @@ export default function LandingPage() {
               </h1>
 
               {/* Description */}
-              <div className="max-w-2xl mx-auto">
-                <p className="text-lg lg:text-xl text-gray-700 leading-relaxed">
+              <div className="max-w-2xl mx-auto px-4">
+                <p className="text-base sm:text-lg lg:text-xl text-gray-700 leading-relaxed">
                   PRIMA merupakan inovasi sistem monitoring terpadu berbasis
                   Android yang didesain khusus untuk meningkatkan efektivitas
                   pendampingan pasien kanker payudara oleh relawan paliatif.
@@ -69,53 +62,15 @@ export default function LandingPage() {
               </div>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-8">
-                {user ? (
+              <div className="flex justify-center items-center pt-6 sm:pt-8">
+                {!user && (
                   <button
-                    onClick={handleViewPatients}
-                    className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
+                    onClick={handleGetStarted}
+                    className="bg-blue-600 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:bg-blue-700 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
                   >
-                    <span>📋</span>
-                    <span>Lihat Daftar Pasien</span>
+                    <span>🚀</span>
+                    <span>Mulai Sekarang</span>
                   </button>
-                ) : (
-                  <>
-                    {/* Mobile: Stack vertically */}
-                    <div className="sm:hidden space-y-4">
-                      <button
-                        onClick={handleGetStarted}
-                        className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
-                      >
-                        <span>🚀</span>
-                        <span>Mulai Sekarang</span>
-                      </button>
-                      <button
-                        onClick={handleViewPatients}
-                        className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-50 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
-                      >
-                        <span>📋</span>
-                        <span>Lihat Daftar Pasien</span>
-                      </button>
-                    </div>
-
-                    {/* Desktop: Side by side */}
-                    <div className="hidden sm:flex space-x-4">
-                      <button
-                        onClick={handleGetStarted}
-                        className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
-                      >
-                        <span>🚀</span>
-                        <span>Mulai Sekarang</span>
-                      </button>
-                      <button
-                        onClick={handleViewPatients}
-                        className="bg-white text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-50 transition-colors duration-200 shadow-lg cursor-pointer flex items-center space-x-2"
-                      >
-                        <span>📋</span>
-                        <span>Lihat Daftar Pasien</span>
-                      </button>
-                    </div>
-                  </>
                 )}
               </div>
             </div>

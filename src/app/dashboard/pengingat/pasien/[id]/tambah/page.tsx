@@ -353,23 +353,52 @@ export default function AddReminderPage() {
             <label className="block text-gray-500 text-sm mb-2">
               Pilih Tanggal Pengingat
             </label>
-            <DatePickerCalendar
-              selectedDates={selectedDates}
-              onDateChange={setSelectedDates}
-            />
+            <div className={customRecurrence.enabled ? 'opacity-50 pointer-events-none' : ''}>
+              <DatePickerCalendar
+                selectedDates={selectedDates}
+                onDateChange={(dates) => {
+                  setSelectedDates(dates)
+                  // Clear custom recurrence if dates are selected
+                  if (dates.length > 0 && customRecurrence.enabled) {
+                    setCustomRecurrence(prev => ({ ...prev, enabled: false }))
+                  }
+                }}
+              />
+            </div>
+            {customRecurrence.enabled && (
+              <p className="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                📅 Kalender dinonaktifkan karena pengulangan kustom sedang aktif
+              </p>
+            )}
             
             {/* Custom Recurrence Option */}
             <div className="mt-4">
               <button
                 type="button"
-                onClick={() => setIsCustomRecurrenceOpen(true)}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (selectedDates.length > 0) {
+                    // Clear selected dates when enabling custom recurrence
+                    setSelectedDates([])
+                  }
+                  setIsCustomRecurrenceOpen(true)
+                }}
+                disabled={selectedDates.length > 0 && !customRecurrence.enabled}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                  selectedDates.length > 0 && !customRecurrence.enabled
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                }`}
               >
                 <Repeat className="w-4 h-4" />
                 <span className="text-sm font-medium">
                   {customRecurrence.enabled ? 'Pengulangan kustom aktif' : 'Pengulangan kustom'}
                 </span>
               </button>
+              {selectedDates.length > 0 && !customRecurrence.enabled && (
+                <p className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                  🔄 Pengulangan kustom dinonaktifkan karena sudah memilih tanggal dari kalender
+                </p>
+              )}
               
               {customRecurrence.enabled && (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
@@ -389,10 +418,22 @@ export default function AddReminderPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setCustomRecurrence(prev => ({ ...prev, enabled: false }))}
+                    onClick={() => {
+                      setCustomRecurrence(prev => ({ ...prev, enabled: false }))
+                      // Reset custom recurrence settings
+                      setCustomRecurrence({
+                        enabled: false,
+                        frequency: 'week',
+                        interval: 1,
+                        daysOfWeek: [],
+                        endType: 'never',
+                        endDate: '',
+                        occurrences: 1
+                      })
+                    }}
                     className="mt-2 text-xs text-red-600 hover:text-red-800 cursor-pointer"
                   >
-                    Hapus pengulangan kustom
+                    ✕ Hapus pengulangan kustom
                   </button>
                 </div>
               )}

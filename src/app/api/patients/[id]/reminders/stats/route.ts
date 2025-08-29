@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { prisma } from '@/lib/prisma'
+import { getWIBTodayStart } from '@/lib/timezone'
 
 export async function GET(
   request: NextRequest,
@@ -14,8 +15,37 @@ export async function GET(
 
     const { id } = await params
     
-    // Use same logic as /all endpoint to get reminder schedules with latest status
-    const reminderSchedules = await prisma.reminderSchedule.findMany({
+    // DEBUG: Log the filter criteria
+    const todayWIBStart = getWIBTodayStart()
+    console.log("🔍 STATS API DEBUG - WIB Today Start:", todayWIBStart)
+    
+    // SCHEDULED COUNT: Reminders that haven't been delivered yet (simple logic)
+    const scheduledReminders = await prisma.reminderSchedule.findMany({
+      where: {
+        patientId: id,
+        isActive: true,
+        // Haven't been delivered yet
+        reminderLogs: {
+          none: {
+            status: 'DELIVERED'
+          }
+        }
+      },
+      include: {
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 3
+        }
+      }
+    })
+
+    console.log("🔍 STATS API DEBUG - Scheduled count:", scheduledReminders.length)
+    scheduledReminders.forEach(reminder => {
+      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${reminder.reminderLogs.length} | Latest: ${reminder.reminderLogs[0]?.status} at ${reminder.reminderLogs[0]?.sentAt}`)
+    })
+
+    // ALL REMINDERS: Get all active reminders for other status calculations
+    const allReminderSchedules = await prisma.reminderSchedule.findMany({
       where: {
         patientId: id,
         isActive: true
@@ -37,12 +67,13 @@ export async function GET(
 
     // Count by status using same logic as /all endpoint
     const statusCounts = {
-      terjadwal: 0,
+      terjadwal: scheduledReminders.length, // Use the filtered count from scheduled query
       perluDiperbarui: 0,
       selesai: 0
     }
 
-    reminderSchedules.forEach(schedule => {
+    // Count pending and completed from all reminders
+    allReminderSchedules.forEach(schedule => {
       const latestLog = schedule.reminderLogs[0]
       const scheduleConfirmation = schedule.manualConfirmations[0]
       
@@ -64,10 +95,8 @@ export async function GET(
         status = 'completed'
       }
 
-      // Map to our counter keys
-      if (status === 'scheduled') {
-        statusCounts.terjadwal++
-      } else if (status === 'pending') {
+      // Only count pending and completed (scheduled already counted above)
+      if (status === 'pending') {
         statusCounts.perluDiperbarui++
       } else if (status === 'completed') {
         statusCounts.selesai++

@@ -14,6 +14,7 @@ interface DesktopHeaderProps {
 function AdminActions() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     fetchUserRole();
@@ -25,9 +26,16 @@ function AdminActions() {
       if (response.ok) {
         const data = await response.json();
         setUserRole(data.role);
+      } else if (response.status === 401 || response.status === 403) {
+        // User not authenticated or not approved - don't show admin buttons
+        setUserRole(null);
+      } else {
+        console.error("Error fetching user role:", response.status);
+        setUserRole(null);
       }
     } catch (error) {
       console.error("Error fetching user role:", error);
+      setUserRole(null);
     }
   };
 
@@ -36,29 +44,43 @@ function AdminActions() {
   }
 
   return (
-    <div className="flex items-center space-x-2">
+    <>
       {/* Admin Panel */}
       <button
         onClick={() => router.push("/dashboard/admin/users")}
-        className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+        className={`
+          px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
+          ${
+            pathname.startsWith("/dashboard/admin")
+              ? "bg-blue-100 text-blue-700"
+              : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+          }
+        `}
         title="Admin Panel"
       >
-        <Shield className="w-4 h-4 text-blue-600" />
-        <span className="text-sm font-medium text-gray-700">Admin</span>
+        <Shield className="w-4 h-4" />
+        <span>Admin</span>
       </button>
 
       {/* Debug Webhook */}
       {process.env.NODE_ENV === "development" && (
         <button
           onClick={() => router.push("/debug-webhook")}
-          className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+          className={`
+            px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
+            ${
+              pathname.startsWith("/debug-webhook")
+                ? "bg-orange-100 text-orange-700"
+                : "text-gray-600 hover:text-orange-600 hover:bg-gray-50"
+            }
+          `}
           title="Debug Webhook"
         >
-          <Bug className="w-4 h-4 text-orange-600" />
-          <span className="text-sm font-medium text-gray-700">Debug</span>
+          <Bug className="w-4 h-4" />
+          <span>Debug</span>
         </button>
       )}
-    </div>
+    </>
   );
 }
 
@@ -142,6 +164,9 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
                   {item.label}
                 </button>
               ))}
+
+              {/* Admin Actions - Only visible to admins */}
+              <AdminActions />
 
               {/* Special Pengingat Button */}
               <button

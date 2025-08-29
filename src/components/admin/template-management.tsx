@@ -566,7 +566,7 @@ function TemplateForm({
         <Label htmlFor="category">Kategori *</Label>
         <Select 
           value={formData.category} 
-          onValueChange={(value) => setFormData(prev => ({ ...prev, category: value as TemplateFormData['category'] }))}
+          onValueChange={(value: string) => setFormData(prev => ({ ...prev, category: value as TemplateFormData['category'] }))}
         >
           <SelectTrigger className="mt-1">
             <SelectValue />
@@ -585,7 +585,7 @@ function TemplateForm({
           id="templateText"
           name="templateText"
           value={formData.templateText}
-          onChange={(e) => onTextChange(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onTextChange(e.target.value)}
           placeholder="Halo {nama}, jangan lupa minum obat {obat} dengan dosis {dosis} pada pukul {waktu}. Terima kasih!"
           className="mt-1 min-h-[120px]"
         />

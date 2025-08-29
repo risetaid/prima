@@ -34,7 +34,6 @@ export async function POST() {
         email: user.primaryEmail || '',
         firstName: user.displayName?.split(' ')[0] || '',
         lastName: user.displayName?.split(' ')[1] || '',
-        phoneNumber: null, // Stack Auth doesn't provide phone by default
         role: isFirstUser ? 'ADMIN' : 'MEMBER',
         isApproved: isFirstUser, // First user auto-approved
         approvedAt: isFirstUser ? new Date() : null,

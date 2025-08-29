@@ -24,16 +24,14 @@ export async function GET(
     const pagination = createEfficientPagination(page, limit)
 
     // Build optimized where clause
+    const todayWIBStart = getWIBTodayStart()
     const whereClause: any = {
       patientId: id,
       isActive: true,
-      // Only include schedules that don't have DELIVERED logs yet today (WIB timezone)
+      // Haven't been delivered yet
       reminderLogs: {
         none: {
-          status: 'DELIVERED',
-          sentAt: {
-            gte: getWIBTodayStart()
-          }
+          status: 'DELIVERED'
         }
       }
     }
@@ -42,6 +40,11 @@ export async function GET(
     if (dateFilter) {
       whereClause.startDate = createDateRangeQuery(dateFilter, '+07:00')
     }
+
+    // DEBUG: Log the filter criteria first
+    console.log("🔍 SCHEDULED API DEBUG - Filter criteria:")
+    console.log("Today WIB start:", todayWIBStart)
+    console.log("whereClause:", JSON.stringify(whereClause, null, 2))
 
     // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs today (optimized)
     const scheduledReminders = await prisma.reminderSchedule.findMany({
@@ -52,12 +55,22 @@ export async function GET(
             name: true,
             phoneNumber: true
           }
+        },
+        reminderLogs: {
+          orderBy: { sentAt: 'desc' },
+          take: 5 // Get latest logs for debugging
         }
       },
       orderBy: {
         startDate: 'asc'
       },
       ...pagination
+    })
+
+    // DEBUG: Log what we found
+    console.log("🔍 SCHEDULED API DEBUG - Found reminders:", scheduledReminders.length)
+    scheduledReminders.forEach(reminder => {
+      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${reminder.reminderLogs.length} | Latest: ${reminder.reminderLogs[0]?.status} at ${reminder.reminderLogs[0]?.sentAt}`)
     })
 
     // Transform to match frontend interface
