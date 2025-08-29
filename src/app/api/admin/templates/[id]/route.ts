@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -16,8 +16,10 @@ export async function GET(
       )
     }
 
+    const { id } = await params
+
     const template = await prisma.whatsAppTemplate.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         createdByUser: {
           select: {
@@ -49,7 +51,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -61,12 +63,13 @@ export async function PUT(
       )
     }
 
+    const { id } = await params
     const body = await request.json()
     const { templateName, templateText, variables, category, isActive } = body
 
     // Check if template exists
     const existingTemplate = await prisma.whatsAppTemplate.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingTemplate) {
@@ -133,7 +136,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -145,9 +148,11 @@ export async function DELETE(
       )
     }
 
+    const { id } = await params
+
     // Check if template exists
     const existingTemplate = await prisma.whatsAppTemplate.findUnique({
-      where: { id: params.id }
+      where: { id }
     })
 
     if (!existingTemplate) {
@@ -159,7 +164,7 @@ export async function DELETE(
 
     // Soft delete by setting isActive = false
     const template = await prisma.whatsAppTemplate.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false }
     })
 
