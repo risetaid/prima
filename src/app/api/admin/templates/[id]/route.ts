@@ -110,7 +110,7 @@ export async function PUT(
     if (isActive !== undefined) updateData.isActive = isActive
 
     const template = await prisma.whatsAppTemplate.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         createdByUser: {
