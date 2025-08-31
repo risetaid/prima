@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AddReminderModal } from "@/components/ui/add-reminder-modal";
+import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 
 interface Reminder {
   id: string;
@@ -32,13 +32,13 @@ interface ReminderStats {
   selesai: number;
 }
 
-interface PatientReminderDesktopProps {
+interface PatientReminderDashboardProps {
   patientName: string;
 }
 
-export function PatientReminderDesktop({
+export function PatientReminderDashboard({
   patientName,
-}: PatientReminderDesktopProps) {
+}: PatientReminderDashboardProps) {
   const router = useRouter();
   const params = useParams();
   const [terjadwalReminders, setTerjadwalReminders] = useState<Reminder[]>([]);

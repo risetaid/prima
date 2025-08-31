@@ -10,10 +10,12 @@
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "seed:templates": "bun run scripts/seed-templates.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
+    "@opentelemetry/api": "^1.9.0",
     "@prisma/client": "^6.14.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -21,13 +23,16 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-toast": "^1.2.15",
     "@sentry/nextjs": "10",
+    "@sentry/node": "^10.8.0",
     "@stackframe/stack": "^2.8.32",
+    "@types/ioredis": "^5.0.0",
     "@types/react": "19.1.10",
     "@types/react-dom": "19.1.7",
     "@vercel/blob": "^1.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "import-in-the-middle": "^1.14.2",
+    "ioredis": "^5.7.0",
     "lucide-react": "^0.539.0",
     "next": "15.4.6",
     "prisma": "^6.14.0",
@@ -39,6 +44,7 @@
     "sonner": "^2.0.7",
     "svix": "^1.71.0",
     "tailwind-merge": "^3.3.1",
+    "web-vitals": "^5.1.0",
     "zod": "^4.0.17"
   },
   "devDependencies": {

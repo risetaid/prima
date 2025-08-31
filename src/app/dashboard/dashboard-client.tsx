@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, Settings, Shield, Bug } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { useCallback, memo, useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import AddPatientDialog from "@/components/AddPatientDialog";
+import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import Image from "next/image";
 import { useUser } from "@stackframe/stack";
-import { PatientDesktopTable } from "@/components/ui/patient-desktop-table";
+import { PatientListTable } from "@/components/dashboard/patient-list-table";
 
 interface Patient {
   id: string;
@@ -203,11 +203,7 @@ function DashboardClient() {
     <>
       {/* Blue Background Section - Mobile Only */}
       <div className="lg:hidden bg-blue-500 p-6">
-        <div
-          className={`flex space-x-4 overflow-x-auto pb-2 ${
-            userRole !== "ADMIN" ? "justify-center" : ""
-          }`}
-        >
+        <div className="flex space-x-4 justify-center pb-2">
           {/* Pengingat */}
           <div className="text-center flex-shrink-0 min-w-[80px]">
             <div
@@ -258,39 +254,6 @@ function DashboardClient() {
             </div>
             <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
           </div>
-
-          {/* Admin Panel - only for admins */}
-          {userRole === "ADMIN" && (
-            <>
-              <div className="text-center flex-shrink-0 min-w-[80px]">
-                <div
-                  onClick={() => router.push("/dashboard/admin/users")}
-                  className="cursor-pointer hover:scale-105 transition-transform mb-3"
-                >
-                  <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
-                    <Shield className="w-12 h-12 text-blue-500" />
-                  </div>
-                </div>
-                <h3 className="font-semibold text-sm text-white">
-                  Admin Panel
-                </h3>
-              </div>
-
-              <div className="text-center flex-shrink-0 min-w-[80px]">
-                <div
-                  onClick={() => router.push("/debug-webhook")}
-                  className="cursor-pointer hover:scale-105 transition-transform mb-3"
-                >
-                  <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto shadow-sm">
-                    <Bug className="w-12 h-12 text-orange-500" />
-                  </div>
-                </div>
-                <h3 className="font-semibold text-sm text-white">
-                  Debug Webhook
-                </h3>
-              </div>
-            </>
-          )}
         </div>
       </div>
 
@@ -416,7 +379,7 @@ function DashboardClient() {
 
         {/* Desktop: Table View */}
         <div className="hidden lg:block">
-          <PatientDesktopTable patients={filteredPatients} loading={loading} />
+          <PatientListTable patients={filteredPatients} loading={loading} />
         </div>
 
         {/* Mobile: Card View */}
@@ -521,17 +484,6 @@ function DashboardClient() {
                 </div>
               )}
 
-              {/* Quick Test Access - Development only */}
-              {process.env.NODE_ENV === "development" && (
-                <div className="text-center pt-4 border-t border-gray-200 mt-4">
-                  <button
-                    onClick={() => router.push("/dashboard/test-whatsapp")}
-                    className="text-green-600 hover:text-green-800 font-medium cursor-pointer text-sm"
-                  >
-                    🧪 Test WhatsApp API
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>

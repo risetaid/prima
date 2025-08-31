@@ -13,7 +13,7 @@ interface Patient {
   phoneNumber?: string;
 }
 
-interface PatientReminderTableProps {
+interface ReminderListTableProps {
   patients: Patient[];
   loading: boolean;
 }
@@ -116,10 +116,10 @@ const PatientRow = memo(({ patient, onClick }: { patient: Patient; onClick: (id:
 
 PatientRow.displayName = "PatientRow";
 
-export const PatientReminderTable = memo(({
+export const ReminderListTable = memo(({
   patients,
   loading,
-}: PatientReminderTableProps) => {
+}: ReminderListTableProps) => {
   const router = useRouter();
 
   // Memoized click handler to prevent unnecessary re-renders
@@ -307,7 +307,7 @@ export const PatientReminderTable = memo(({
   );
 });
 
-PatientReminderTable.displayName = "PatientReminderTable";
+ReminderListTable.displayName = "ReminderListTable";
 
 // Export default as the optimized version
-export default PatientReminderTable;  
+export default ReminderListTable;  

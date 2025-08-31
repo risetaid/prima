@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Edit, Trash2, User, ChevronRight, Camera, Upload, X, Plus, ChevronLeft } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, User, ChevronRight, Camera, Upload, X, Plus, ChevronLeft, Calendar, MessageSquare, Clock, Repeat, ChevronDown, Zap } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
 import { DesktopHeader } from '@/components/ui/desktop-header'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import Image from 'next/image'
 import { toast } from 'sonner'
+import { getCurrentTimeWIB } from '@/lib/datetime'
+import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 
 interface Patient {
   id: string
@@ -34,6 +36,33 @@ interface HealthNote {
   createdAt: string
 }
 
+interface WhatsAppTemplate {
+  id: string
+  templateName: string
+  templateText: string
+  variables: string[]
+  category: 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'
+}
+
+interface AutoFillData {
+  nama: string
+  nomor: string
+  obat?: string
+  dosis?: string
+  dokter?: string
+  rumahSakit?: string
+  volunteer: string
+  waktu?: string
+  tanggal?: string
+  dataContext?: {
+    hasActiveMedications: boolean
+    hasRecentReminders: boolean
+    hasMedicalRecords: boolean
+    assignedVolunteerName?: string
+    currentUserName?: string
+  }
+}
+
 export default function PatientDetailPage() {
   const router = useRouter()
   const params = useParams()
@@ -57,6 +86,29 @@ export default function PatientDetailPage() {
   const [editSelectedDate, setEditSelectedDate] = useState('')
   const [editCurrentMonth, setEditCurrentMonth] = useState(new Date())
   const [showEditCalendar, setShowEditCalendar] = useState(false)
+  
+  // Modal Reminder States
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false)
+  const [autoFillData, setAutoFillData] = useState<AutoFillData | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [selectedDates, setSelectedDates] = useState<string[]>([])
+  const [isCustomRecurrenceOpen, setIsCustomRecurrenceOpen] = useState(false)
+  const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('')
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false)
+  const [customRecurrence, setCustomRecurrence] = useState({
+    enabled: false,
+    frequency: 'week' as 'day' | 'week' | 'month',
+    interval: 1,
+    daysOfWeek: [] as number[], // 0=Sunday, 1=Monday, etc.
+    endType: 'never' as 'never' | 'on' | 'after',
+    endDate: '',
+    occurrences: 1
+  })
+  const [reminderFormData, setReminderFormData] = useState({
+    message: '',
+    time: getCurrentTimeWIB()
+  })
 
   useEffect(() => {
     if (params.id) {
@@ -524,6 +576,180 @@ export default function PatientDetailPage() {
     }
   }
 
+  // Enhanced Reminder Modal Functions
+  const handleAddReminder = async () => {
+    setIsReminderModalOpen(true)
+    await fetchAutoFillData()
+    await fetchTemplates()
+  }
+
+  const handleViewReminders = () => {
+    router.push(`/dashboard/pengingat/pasien/${params.id}`)
+  }
+
+  const fetchAutoFillData = async () => {
+    try {
+      const response = await fetch(`/api/patients/${params.id}/autofill`)
+      if (response.ok) {
+        const data = await response.json()
+        setAutoFillData(data.autoFillData)
+      }
+    } catch (error) {
+      console.error('Error fetching auto-fill data:', error)
+    }
+  }
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates') // Remove category filter to get all templates
+      if (response.ok) {
+        const data = await response.json()
+        console.log('📋 Templates fetched:', data.templates?.length || 0)
+        console.log('🎯 Template data:', data.templates)
+        setTemplates(data.templates || [])
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error)
+    }
+  }
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId)
+    if (template && autoFillData) {
+      setSelectedTemplate(templateId)
+      // Apply template with auto-filled data
+      const messageWithData = applyTemplateVariables(template.templateText, {
+        nama: autoFillData.nama,
+        obat: autoFillData.obat || '',
+        dosis: autoFillData.dosis || '',
+        waktu: reminderFormData.time,
+        tanggal: selectedDates.length > 0 ? selectedDates[0] : '{tanggal}',
+        dokter: autoFillData.dokter || '',
+        rumahSakit: autoFillData.rumahSakit || '',
+        volunteer: autoFillData.volunteer
+      })
+      setReminderFormData(prev => ({ ...prev, message: messageWithData }))
+    }
+    setIsTemplateDropdownOpen(false)
+  }
+
+  const handleAutoFillMessage = () => {
+    if (!autoFillData || !reminderFormData.message) return
+
+    let updatedMessage = reminderFormData.message
+
+    // Auto-fill common variables if they exist in the message
+    const autoFillMap = {
+      '{obat}': autoFillData.obat || '',
+      '{dosis}': autoFillData.dosis || '',
+      '{dokter}': autoFillData.dokter || '',
+      '{rumahSakit}': autoFillData.rumahSakit || '',
+      '{nama}': autoFillData.nama,
+      '{volunteer}': autoFillData.volunteer,
+      '{waktu}': reminderFormData.time,
+      '{tanggal}': selectedDates.length > 0 ? selectedDates[0] : '{tanggal}'
+    }
+
+    Object.entries(autoFillMap).forEach(([placeholder, value]) => {
+      if (value) {
+        updatedMessage = updatedMessage.replace(
+          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          value
+        )
+      }
+    })
+
+    setReminderFormData(prev => ({ ...prev, message: updatedMessage }))
+    
+    toast.success('Data berhasil diisi otomatis!', {
+      description: 'Variabel dalam pesan telah diisi dengan data pasien'
+    })
+  }
+
+  const applyTemplateVariables = (text: string, variables: Record<string, string>) => {
+    let result = text
+    Object.entries(variables).forEach(([key, value]) => {
+      const placeholder = `{${key}}`
+      result = result.replace(new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), value)
+    })
+    return result
+  }
+
+  const handleReminderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate input based on recurrence type
+    if (!customRecurrence.enabled) {
+      // Regular date selection validation
+      if (selectedDates.length === 0) {
+        toast.error('Pilih tanggal pengingat')
+        return
+      }
+    } else {
+      // Custom recurrence validation
+      if (customRecurrence.frequency === 'week' && customRecurrence.daysOfWeek.length === 0) {
+        toast.error('Pilih hari dalam seminggu untuk pengulangan')
+        return
+      }
+    }
+
+    setSubmitting(true)
+    
+    try {
+      const requestBody = {
+        message: reminderFormData.message,
+        time: reminderFormData.time,
+        ...(customRecurrence.enabled ? {
+          customRecurrence: {
+            frequency: customRecurrence.frequency,
+            interval: customRecurrence.interval,
+            daysOfWeek: customRecurrence.daysOfWeek,
+            endType: customRecurrence.endType,
+            endDate: customRecurrence.endDate || null,
+            occurrences: customRecurrence.occurrences
+          }
+        } : {
+          dates: selectedDates
+        })
+      }
+
+      const response = await fetch(`/api/patients/${params.id}/reminders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      if (response.ok) {
+        toast.success('Pengingat berhasil dibuat!')
+        
+        // Reset form
+        setReminderFormData({ message: '', time: getCurrentTimeWIB() })
+        setSelectedDates([])
+        setSelectedTemplate('')
+        setCustomRecurrence({
+          enabled: false,
+          frequency: 'week',
+          interval: 1,
+          daysOfWeek: [],
+          endType: 'never',
+          endDate: '',
+          occurrences: 1
+        })
+        setIsReminderModalOpen(false)
+      } else {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Gagal membuat pengingat')
+      }
+    } catch (error) {
+      console.error('Error creating reminder:', error)
+      toast.error('Terjadi kesalahan saat membuat pengingat')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -721,6 +947,38 @@ export default function PatientDetailPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Quick Action Buttons - Enhanced Navigation with Responsive Design */}
+                {!isEditMode && (
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 md:p-6 rounded-xl mb-6 border border-blue-100">
+                    <h4 className="text-sm md:text-base font-semibold text-gray-700 mb-3 md:mb-4 flex items-center space-x-2">
+                      <span>🚀</span>
+                      <span>Aksi Cepat</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                      <button
+                        onClick={handleAddReminder}
+                        className="bg-blue-500 text-white py-3 md:py-4 px-4 md:px-6 rounded-lg font-medium flex items-center justify-center space-x-2 hover:bg-blue-600 transition-colors cursor-pointer text-sm md:text-base shadow-md hover:shadow-lg transform hover:scale-105"
+                      >
+                        <MessageSquare className="w-4 h-4 md:w-5 md:h-5" />
+                        <span>Buat Pengingat</span>
+                      </button>
+                      <button
+                        onClick={handleViewReminders}
+                        className="bg-indigo-500 text-white py-3 md:py-4 px-4 md:px-6 rounded-lg font-medium flex items-center justify-center space-x-2 hover:bg-indigo-600 transition-colors cursor-pointer text-sm md:text-base shadow-md hover:shadow-lg transform hover:scale-105"
+                      >
+                        <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+                        <span>Lihat Jadwal</span>
+                      </button>
+                    </div>
+                    {/* Usage Tip - Hidden on mobile to save space */}
+                    <div className="hidden md:block mt-4 pt-4 border-t border-blue-200">
+                      <p className="text-xs text-gray-600">
+                        💡 <strong>Tips:</strong> Gunakan "Buat Pengingat" untuk mengakses sistem auto-fill yang canggih dengan template WhatsApp
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-3">
@@ -1129,6 +1387,278 @@ export default function PatientDetailPage() {
                 <Edit className="w-4 h-4" />
                 <span>Simpan</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Reminder Modal */}
+      {isReminderModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Buat Pengingat</h3>
+                {patient && (
+                  <p className="text-sm text-gray-600">untuk {patient.name}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setIsReminderModalOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* Modal Content - Scrollable */}
+            <div className="p-6 overflow-y-auto flex-1">
+              <form onSubmit={handleReminderSubmit} className="space-y-6">
+                {/* Message Field */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-gray-500 text-sm">
+                      Isi Pesan
+                    </label>
+                    
+                    <div className="flex items-center space-x-2">
+                      {/* Auto-fill Button */}
+                      {autoFillData && reminderFormData.message && (
+                        <button
+                          type="button"
+                          onClick={handleAutoFillMessage}
+                          className="flex items-center space-x-1 px-2 py-1 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors cursor-pointer text-xs"
+                        >
+                          <Zap className="w-3 h-3" />
+                          <span>Auto-isi</span>
+                        </button>
+                      )}
+
+                      {/* Template Dropdown */}
+                      {templates.length > 0 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsTemplateDropdownOpen(!isTemplateDropdownOpen)}
+                            className="flex items-center space-x-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer text-sm"
+                          >
+                            <span>📝 Template</span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isTemplateDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {isTemplateDropdownOpen && (
+                            <div className="absolute right-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                              <div className="max-h-48 overflow-y-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTemplate('')
+                                    setReminderFormData(prev => ({ ...prev, message: '' }))
+                                    setIsTemplateDropdownOpen(false)
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 border-b border-gray-100"
+                                >
+                                  <span className="font-medium">Kosongkan</span>
+                                  <p className="text-xs text-gray-500">Tulis pesan sendiri</p>
+                                </button>
+                                {/* Group templates by category */}
+                                {['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'].map((category) => {
+                                  const categoryTemplates = templates.filter(t => t.category === category)
+                                  if (categoryTemplates.length === 0) return null
+                                  
+                                  const categoryLabels = {
+                                    REMINDER: '💊 Pengingat',
+                                    APPOINTMENT: '📅 Janji Temu', 
+                                    EDUCATIONAL: '📚 Edukasi'
+                                  }
+                                  
+                                  return (
+                                    <div key={category}>
+                                      <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 border-b">
+                                        {categoryLabels[category as keyof typeof categoryLabels]}
+                                      </div>
+                                      {categoryTemplates.map((template) => (
+                                        <button
+                                          key={template.id}
+                                          type="button"
+                                          onClick={() => handleTemplateSelect(template.id)}
+                                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 border-b border-gray-100 last:border-b-0 ${
+                                            selectedTemplate === template.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                          }`}
+                                        >
+                                          <span className="font-medium">{template.templateName}</span>
+                                          <p className="text-xs text-gray-500 mt-1 truncate">{template.templateText}</p>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <textarea
+                    value={reminderFormData.message}
+                    onChange={(e) => setReminderFormData({ ...reminderFormData, message: e.target.value })}
+                    placeholder={templates.length > 0 ? "Pilih template atau tulis pesan sendiri..." : "Tulis pesan pengingat..."}
+                    className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
+                    rows={4}
+                    required
+                  />
+                  
+                  {/* Enhanced Auto-fill Data Preview */}
+                  {autoFillData && (
+                    <div className="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
+                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                          <span>Data Tersedia untuk Auto-isi</span>
+                        </h4>
+                        {!reminderFormData.message && (
+                          <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
+                            Tulis pesan dulu
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* Patient Basic Info */}
+                        {autoFillData.nama && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Nama Pasien</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.nama}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{nama}'}</div>
+                          </div>
+                        )}
+                        
+                        {autoFillData.nomor && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">No. WhatsApp</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.nomor}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{nomor}'}</div>
+                          </div>
+                        )}
+                        
+                        {/* Medical Info */}
+                        {autoFillData.obat && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Nama Obat</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.obat}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{obat}'}</div>
+                          </div>
+                        )}
+                        
+                        {autoFillData.dosis && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Dosis</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.dosis}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{dosis}'}</div>
+                          </div>
+                        )}
+                        
+                        {autoFillData.dokter && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Nama Dokter</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.dokter}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{dokter}'}</div>
+                          </div>
+                        )}
+                        
+                        {autoFillData.rumahSakit && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Rumah Sakit</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.rumahSakit}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{rumahSakit}'}</div>
+                          </div>
+                        )}
+                        
+                        {autoFillData.volunteer && (
+                          <div className="bg-white p-2 rounded-lg">
+                            <div className="text-xs text-gray-500">Volunteer</div>
+                            <div className="text-sm font-medium text-gray-800">{autoFillData.volunteer}</div>
+                            <div className="text-xs text-blue-600 mt-1">{'{volunteer}'}</div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Quick Usage Guide */}
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-600">
+                            💡 <strong>Tips:</strong> Ketik variabel seperti <span className="bg-blue-100 text-blue-800 px-1 rounded">{'{nama}'}</span> di pesan, lalu klik 
+                            <span className="ml-1 inline-flex items-center bg-green-100 text-green-700 px-1 rounded text-xs">
+                              <Zap className="w-3 h-3 mr-1" />Auto-isi
+                            </span>
+                          </div>
+                          {reminderFormData.message && (
+                            <button
+                              type="button"
+                              onClick={handleAutoFillMessage}
+                              className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-xs font-medium"
+                            >
+                              <Zap className="w-3 h-3" />
+                              <span>Auto-isi Sekarang</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Time Field */}
+                <div>
+                  <label className="block text-gray-500 text-sm mb-2">
+                    Waktu Pengingat (WIB)
+                  </label>
+                  <input
+                    type="time"
+                    value={reminderFormData.time}
+                    onChange={(e) => setReminderFormData({ ...reminderFormData, time: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                    required
+                  />
+                </div>
+
+                {/* Date Selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-gray-500 text-sm">
+                      Pilih Tanggal
+                    </label>
+                  </div>
+                  
+                  <DatePickerCalendar
+                    selectedDates={selectedDates}
+                    onDateSelect={setSelectedDates}
+                    multiple={true}
+                  />
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex space-x-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsReminderModalOpen(false)}
+                    className="flex-1 bg-gray-200 text-gray-700 py-4 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
+                  >
+                    ✕ Batal
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 bg-red-500 text-white py-4 px-6 rounded-xl font-semibold hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-2"
+                  >
+                    <span>▶</span>
+                    <span>{submitting ? 'Loading...' : 'Submit'}</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>

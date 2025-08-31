@@ -13,15 +13,15 @@ interface Patient {
   phoneNumber?: string;
 }
 
-interface PatientDesktopTableProps {
+interface PatientListTableProps {
   patients: Patient[];
   loading: boolean;
 }
 
-export function PatientDesktopTable({
+export function PatientListTable({
   patients,
   loading,
-}: PatientDesktopTableProps) {
+}: PatientListTableProps) {
   const router = useRouter();
 
   const getInitials = (name: string) => {

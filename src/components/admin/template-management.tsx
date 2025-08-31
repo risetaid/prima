@@ -287,9 +287,9 @@ export default function TemplateManagement() {
     <div className="space-y-6">
       {/* Header Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Filter kategori" />
             </SelectTrigger>
             <SelectContent>
@@ -307,7 +307,7 @@ export default function TemplateManagement() {
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="cursor-pointer">
+            <Button className="cursor-pointer w-full sm:w-auto">
               <Plus className="w-4 h-4 mr-2" />
               Buat Template
             </Button>
@@ -347,33 +347,37 @@ export default function TemplateManagement() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-6">
+        <div className="grid gap-4 sm:gap-6">
           {templates.map((template) => {
             const CategoryIcon = categoryIcons[template.category]
             return (
               <Card key={template.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <CategoryIcon className="w-5 h-5 text-gray-600" />
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {template.templateName}
-                        </h3>
-                        <Badge className={`${categoryColors[template.category]} border`}>
-                          {categoryLabels[template.category]}
-                        </Badge>
-                        {!template.isActive && (
-                          <Badge variant="secondary" className="bg-gray-100 text-gray-600">
-                            Nonaktif
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                            {template.templateName}
+                          </h3>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={`${categoryColors[template.category]} border text-xs`}>
+                            {categoryLabels[template.category]}
                           </Badge>
-                        )}
+                          {!template.isActive && (
+                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-xs">
+                              Nonaktif
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       
-                      <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                          {template.templateText.length > 200 
-                            ? template.templateText.substring(0, 200) + '...' 
+                      <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-4">
+                        <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">
+                          {template.templateText.length > (window.innerWidth < 640 ? 150 : 200)
+                            ? template.templateText.substring(0, window.innerWidth < 640 ? 150 : 200) + '...' 
                             : template.templateText
                           }
                         </p>
@@ -394,29 +398,30 @@ export default function TemplateManagement() {
                         </div>
                       )}
 
-                      <div className="flex items-center text-xs text-gray-500">
+                      <div className="flex flex-col sm:flex-row sm:items-center text-xs text-gray-500 gap-1 sm:gap-0">
                         <span>
                           Dibuat oleh {template.createdByUser.firstName} {template.createdByUser.lastName}
                         </span>
-                        <span className="mx-2">•</span>
+                        <span className="hidden sm:inline mx-2">•</span>
                         <span>
                           {new Date(template.createdAt).toLocaleDateString('id-ID', {
                             day: 'numeric',
-                            month: 'long',
+                            month: window.innerWidth < 640 ? 'short' : 'long',
                             year: 'numeric'
                           })}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 ml-4">
+                    <div className="flex items-center justify-center lg:justify-start gap-2 lg:ml-4">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openPreviewDialog(template)}
-                        className="cursor-pointer"
+                        className="cursor-pointer flex-1 lg:flex-none"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="ml-1 sm:hidden">Lihat</span>
                       </Button>
                       
                       <Button
@@ -424,9 +429,10 @@ export default function TemplateManagement() {
                         size="sm"
                         onClick={() => openEditDialog(template)}
                         disabled={actionLoading === template.id}
-                        className="cursor-pointer"
+                        className="cursor-pointer flex-1 lg:flex-none"
                       >
-                        <Edit className="w-4 h-4" />
+                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="ml-1 sm:hidden">Edit</span>
                       </Button>
                       
                       {template.isActive && (
@@ -435,12 +441,15 @@ export default function TemplateManagement() {
                           size="sm"
                           onClick={() => handleDeactivateTemplate(template.id)}
                           disabled={actionLoading === template.id}
-                          className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 lg:flex-none"
                         >
                           {actionLoading === template.id ? (
-                            <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                            <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                            <>
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="ml-1 sm:hidden">Hapus</span>
+                            </>
                           )}
                         </Button>
                       )}

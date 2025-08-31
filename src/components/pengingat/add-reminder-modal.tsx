@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { X, Clock, Repeat, ChevronDown } from 'lucide-react'
+import { X, Clock, Repeat, ChevronDown, Zap } from 'lucide-react'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
@@ -19,6 +19,25 @@ interface WhatsAppTemplate {
   templateText: string
   variables: string[]
   category: 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'
+}
+
+interface AutoFillData {
+  nama: string
+  nomor: string
+  obat?: string
+  dosis?: string
+  dokter?: string
+  rumahSakit?: string
+  volunteer: string
+  waktu?: string
+  tanggal?: string
+  dataContext?: {
+    hasActiveMedications: boolean
+    hasRecentReminders: boolean
+    hasMedicalRecords: boolean
+    assignedVolunteerName?: string
+    currentUserName?: string
+  }
 }
 
 interface AddReminderModalProps {
@@ -38,6 +57,7 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('')
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false)
+  const [autoFillData, setAutoFillData] = useState<AutoFillData | null>(null)
   const [customRecurrence, setCustomRecurrence] = useState({
     enabled: false,
     frequency: 'week' as 'day' | 'week' | 'month',
@@ -57,6 +77,7 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
     if (isOpen && params.id) {
       fetchPatient(params.id as string)
       fetchTemplates()
+      fetchAutoFillData(params.id as string)
       // Reset form when opened
       setFormData({
         message: '',
@@ -108,9 +129,11 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/templates?category=REMINDER')
+      const response = await fetch('/api/templates') // Remove category filter to get all templates
       if (response.ok) {
         const data = await response.json()
+        console.log('📋 Modal Templates fetched:', data.templates?.length || 0)
+        console.log('🎯 Modal Template data:', data.templates)
         setTemplates(data.templates || [])
       }
     } catch (error) {
@@ -118,24 +141,80 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
     }
   }
 
+  const fetchAutoFillData = async (patientId: string) => {
+    try {
+      const response = await fetch(`/api/patients/${patientId}/autofill`)
+      if (response.ok) {
+        const data = await response.json()
+        setAutoFillData(data.autoFillData)
+      }
+    } catch (error) {
+      console.error('Error fetching auto-fill data:', error)
+    }
+  }
+
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId)
-    if (template) {
+    if (template && autoFillData) {
       setSelectedTemplate(templateId)
-      // Apply template with patient data
+      // Apply template with auto-filled data
       const messageWithData = applyTemplateVariables(template.templateText, {
-        nama: patient?.name || '{nama}',
-        obat: '{obat}', // Will be filled by user
-        dosis: '{dosis}', // Will be filled by user
+        nama: autoFillData.nama,
+        obat: autoFillData.obat || '{obat}',
+        dosis: autoFillData.dosis || '{dosis}',
         waktu: formData.time,
         tanggal: selectedDates.length > 0 ? selectedDates[0] : '{tanggal}',
-        dokter: '{dokter}', // Will be filled by user
-        rumahSakit: '{rumahSakit}', // Will be filled by user
-        volunteer: '{volunteer}' // Will be filled by user
+        dokter: autoFillData.dokter || '{dokter}',
+        rumahSakit: autoFillData.rumahSakit || '{rumahSakit}',
+        volunteer: autoFillData.volunteer
+      })
+      setFormData(prev => ({ ...prev, message: messageWithData }))
+    } else if (template) {
+      setSelectedTemplate(templateId)
+      // Fallback to basic template if no autoFillData
+      const messageWithData = applyTemplateVariables(template.templateText, {
+        nama: patient?.name || '{nama}',
+        obat: '{obat}',
+        dosis: '{dosis}',
+        waktu: formData.time,
+        tanggal: selectedDates.length > 0 ? selectedDates[0] : '{tanggal}',
+        dokter: '{dokter}',
+        rumahSakit: '{rumahSakit}',
+        volunteer: '{volunteer}'
       })
       setFormData(prev => ({ ...prev, message: messageWithData }))
     }
     setIsTemplateDropdownOpen(false)
+  }
+
+  const handleAutoFillMessage = () => {
+    if (!autoFillData || !formData.message) return
+
+    let updatedMessage = formData.message
+
+    // Auto-fill common variables if they exist in the message
+    const autoFillMap = {
+      '{obat}': autoFillData.obat,
+      '{dosis}': autoFillData.dosis,
+      '{dokter}': autoFillData.dokter,
+      '{rumahSakit}': autoFillData.rumahSakit,
+      '{nama}': autoFillData.nama,
+      '{volunteer}': autoFillData.volunteer,
+      '{waktu}': formData.time,
+      '{tanggal}': selectedDates.length > 0 ? selectedDates[0] : '{tanggal}'
+    }
+
+    Object.entries(autoFillMap).forEach(([placeholder, value]) => {
+      if (value) {
+        updatedMessage = updatedMessage.replace(
+          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          value
+        )
+      }
+    })
+
+    setFormData(prev => ({ ...prev, message: updatedMessage }))
+    toast.success('Pesan berhasil diisi otomatis!')
   }
 
   const applyTemplateVariables = (text: string, variables: Record<string, string>) => {
@@ -260,8 +339,21 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                     Isi Pesan
                   </label>
                   
-                  {/* Template Dropdown */}
-                  {templates.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    {/* Auto-fill Button */}
+                    {autoFillData && formData.message && (
+                      <button
+                        type="button"
+                        onClick={handleAutoFillMessage}
+                        className="flex items-center space-x-1 px-2 py-1 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors cursor-pointer text-xs"
+                      >
+                        <Zap className="w-3 h-3" />
+                        <span>Auto-isi</span>
+                      </button>
+                    )}
+
+                    {/* Template Dropdown */}
+                    {templates.length > 0 && (
                     <div className="relative template-dropdown">
                       <button
                         type="button"
@@ -286,26 +378,46 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                             >
                               ✨ Tulis sendiri
                             </button>
-                            {templates.map((template) => (
-                              <button
-                                key={template.id}
-                                type="button"
-                                onClick={() => handleTemplateSelect(template.id)}
-                                className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors cursor-pointer ${
-                                  selectedTemplate === template.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                                }`}
-                              >
-                                <div className="font-medium">{template.templateName}</div>
-                                <div className="text-xs text-gray-500 truncate">
-                                  {template.templateText.substring(0, 50)}...
+                            {/* Group templates by category */}
+                            {['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'].map((category) => {
+                              const categoryTemplates = templates.filter(t => t.category === category)
+                              if (categoryTemplates.length === 0) return null
+                              
+                              const categoryLabels = {
+                                REMINDER: '💊 Pengingat',
+                                APPOINTMENT: '📅 Janji Temu', 
+                                EDUCATIONAL: '📚 Edukasi'
+                              }
+                              
+                              return (
+                                <div key={category}>
+                                  <div className="px-4 py-2 bg-gray-50 text-xs font-semibold text-gray-600 border-b">
+                                    {categoryLabels[category as keyof typeof categoryLabels]}
+                                  </div>
+                                  {categoryTemplates.map((template) => (
+                                    <button
+                                      key={template.id}
+                                      type="button"
+                                      onClick={() => handleTemplateSelect(template.id)}
+                                      className={`w-full px-4 py-2 text-left hover:bg-blue-50 transition-colors cursor-pointer ${
+                                        selectedTemplate === template.id ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                      }`}
+                                    >
+                                      <div className="font-medium">{template.templateName}</div>
+                                      <div className="text-xs text-gray-500 truncate">
+                                        {template.templateText.substring(0, 50)}...
+                                      </div>
+                                    </button>
+                                  ))}
                                 </div>
-                              </button>
-                            ))}
+                              )
+                            })}
                           </div>
                         </div>
                       )}
                     </div>
                   )}
+                  </div>
                 </div>
                 
                 <textarea
@@ -317,6 +429,90 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                   required
                 />
                 
+                {/* Enhanced Auto-fill Data Preview */}
+                {autoFillData && (
+                  <div className="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Data Tersedia untuk Auto-isi</span>
+                      </h4>
+                      {!formData.message && (
+                        <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
+                          Tulis pesan dulu
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Patient Basic Info */}
+                      {autoFillData.nama && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Nama Pasien</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.nama}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{nama}'}</div>
+                        </div>
+                      )}
+                      
+                      {autoFillData.nomor && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">No. WhatsApp</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.nomor}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{nomor}'}</div>
+                        </div>
+                      )}
+                      
+                      {/* Medical Info */}
+                      {autoFillData.obat && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Nama Obat</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.obat}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{obat}'}</div>
+                        </div>
+                      )}
+                      
+                      {autoFillData.dosis && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Dosis</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.dosis}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{dosis}'}</div>
+                        </div>
+                      )}
+                      
+                      {autoFillData.dokter && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Nama Dokter</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.dokter}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{dokter}'}</div>
+                        </div>
+                      )}
+                      
+                      {autoFillData.rumahSakit && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Rumah Sakit</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.rumahSakit}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{rumahSakit}'}</div>
+                        </div>
+                      )}
+                      
+                      {/* Time & Volunteer Info */}
+                      <div className="bg-white p-2 rounded-lg">
+                        <div className="text-xs text-gray-500">Waktu</div>
+                        <div className="text-sm font-medium text-gray-800">{formData.time}</div>
+                        <div className="text-xs text-blue-600 mt-1">{'{waktu}'}</div>
+                      </div>
+                      
+                      {autoFillData.volunteer && (
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Volunteer</div>
+                          <div className="text-sm font-medium text-gray-800">{autoFillData.volunteer}</div>
+                          <div className="text-xs text-blue-600 mt-1">{'{volunteer}'}</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* Selected Template Info */}
                 {selectedTemplate && (
                   <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">

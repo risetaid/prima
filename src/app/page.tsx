@@ -3,6 +3,7 @@
 import { useUser } from "@stackframe/stack";
 import { useRouter } from "next/navigation";
 import { DesktopHeader } from "@/components/ui/desktop-header";
+import { UserMenu } from "@/components/ui/user-menu";
 
 export default function LandingPage() {
   const user = useUser();
@@ -29,8 +30,49 @@ export default function LandingPage() {
         />
       </div>
 
-      {/* Header */}
-      <DesktopHeader showNavigation={true} />
+      {/* Desktop Header */}
+      <div className="hidden lg:block">
+        <DesktopHeader showNavigation={true} />
+      </div>
+
+      {/* Mobile Header */}
+      <div className="lg:hidden relative z-10">
+        <header className="bg-white shadow-sm">
+          <div className="flex justify-between items-center px-4 py-4">
+            <div 
+              className="flex items-center space-x-2 cursor-pointer"
+              onClick={() => router.push("/")}
+            >
+              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">P</span>
+              </div>
+              <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
+            </div>
+            
+            {/* Mobile Navigation Actions */}
+            <div className="flex items-center space-x-3">
+              {user ? (
+                <>
+                  <button
+                    onClick={() => router.push("/dashboard")}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                  >
+                    Dashboard
+                  </button>
+                  <UserMenu />
+                </>
+              ) : (
+                <button
+                  onClick={() => router.push("/handler/signin")}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  Masuk
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+      </div>
 
       {/* Hero Section */}
       <main className="relative z-10">

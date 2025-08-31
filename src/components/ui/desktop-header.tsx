@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { UserMenu } from "@/components/ui/user-menu";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { Shield, Bug } from "lucide-react";
+import { Shield, Bug, Settings } from "lucide-react";
 
 interface DesktopHeaderProps {
   showNavigation?: boolean;
@@ -45,9 +45,9 @@ function AdminActions() {
 
   return (
     <>
-      {/* Admin Panel */}
+      {/* Admin Panel - Main Entry Point */}
       <button
-        onClick={() => router.push("/dashboard/admin/users")}
+        onClick={() => router.push("/dashboard/admin")}
         className={`
           px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
           ${
@@ -59,27 +59,10 @@ function AdminActions() {
         title="Admin Panel"
       >
         <Shield className="w-4 h-4" />
-        <span>Admin</span>
+        <span>Admin Panel</span>
       </button>
 
-      {/* Debug Webhook */}
-      {process.env.NODE_ENV === "development" && (
-        <button
-          onClick={() => router.push("/debug-webhook")}
-          className={`
-            px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
-            ${
-              pathname.startsWith("/debug-webhook")
-                ? "bg-orange-100 text-orange-700"
-                : "text-gray-600 hover:text-orange-600 hover:bg-gray-50"
-            }
-          `}
-          title="Debug Webhook"
-        >
-          <Bug className="w-4 h-4" />
-          <span>Debug</span>
-        </button>
-      )}
+
     </>
   );
 }

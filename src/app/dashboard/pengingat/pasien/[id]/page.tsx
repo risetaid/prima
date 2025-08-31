@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
 import { DesktopHeader } from '@/components/ui/desktop-header'
-import { PatientReminderDesktop } from '@/components/ui/patient-reminder-desktop'
+import { PatientReminderDashboard } from '@/components/pengingat/patient-reminder-dashboard'
 
 interface ReminderStats {
   terjadwal: number
@@ -14,7 +14,7 @@ interface ReminderStats {
   semua: number
 }
 
-export default function PatientReminderDashboard() {
+export default function PatientReminderPage() {
   const router = useRouter()
   const params = useParams()
   const [stats, setStats] = useState<ReminderStats>({
@@ -127,7 +127,7 @@ export default function PatientReminderDashboard() {
 
       {/* Desktop: 3-Column Layout */}
       <div className="hidden lg:block py-8 relative z-10">
-        <PatientReminderDesktop patientName={patientName} />
+        <PatientReminderDashboard patientName={patientName} />
       </div>
 
       {/* Mobile: Card Layout */}

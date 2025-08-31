@@ -6,6 +6,42 @@ import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
 import { DesktopHeader } from "@/components/ui/desktop-header";
 import { UserMenu } from "@/components/ui/user-menu";
+import { Shield } from "lucide-react";
+
+function MobileAdminActions() {
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetchUserRole();
+  }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await fetch("/api/user/profile");
+      if (response.ok) {
+        const data = await response.json();
+        setUserRole(data.role);
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    }
+  };
+
+  if (userRole !== "ADMIN") {
+    return null;
+  }
+
+  return (
+    <button
+      onClick={() => router.push("/dashboard/admin")}
+      className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors"
+      title="Admin Panel"
+    >
+      <Shield className="w-5 h-5 text-blue-600" />
+    </button>
+  );
+}
 
 export default function DashboardPage() {
   const user = useUser();
@@ -113,7 +149,7 @@ export default function DashboardPage() {
         <DesktopHeader showNavigation={true} />
       </div>
 
-      {/* Mobile: Simple Header */}
+      {/* Mobile: Enhanced Header */}
       <div className="lg:hidden relative z-10">
         <header className="bg-white shadow-sm">
           <div className="flex justify-between items-center px-4 py-4">
@@ -126,7 +162,12 @@ export default function DashboardPage() {
               </div>
               <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
             </div>
-            <UserMenu />
+            
+            {/* Mobile Admin & User Actions */}
+            <div className="flex items-center space-x-3">
+              <MobileAdminActions />
+              <UserMenu />
+            </div>
           </div>
         </header>
       </div>

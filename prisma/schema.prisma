@@ -10,32 +10,33 @@ datasource db {
 
 model User {
   id                        String               @id @default(uuid())
-  stackId                   String               @unique @map("stack_id") // Stack Auth ID
   email                     String               @unique
   firstName                 String?              @map("first_name")
   lastName                  String?              @map("last_name")
+  hospitalName              String?              @map("hospital_name")
   role                      UserRole             @default(MEMBER)
   isActive                  Boolean              @default(true) @map("is_active")
-  isApproved                Boolean              @default(false) @map("is_approved")
-  approvedAt                DateTime?            @map("approved_at")
-  approvedBy                String?              @map("approved_by")
   createdAt                 DateTime             @default(now()) @map("created_at")
   updatedAt                 DateTime             @updatedAt @map("updated_at")
-  approver                  User?                @relation("UserApprovals", fields: [approvedBy], references: [id])
-  approvedUsers             User[]               @relation("UserApprovals")
+  approvedAt                DateTime?            @map("approved_at")
+  approvedBy                String?              @map("approved_by")
+  isApproved                Boolean              @default(false) @map("is_approved")
+  stackId                   String               @unique @map("stack_id")
+  healthNotesRecorded       HealthNote[]         @relation("HealthNoteRecorder")
   manualConfirmations       ManualConfirmation[]
   medicalRecords            MedicalRecord[]
   patientMedicationsCreated PatientMedication[]
   patientsManaged           Patient[]            @relation("VolunteerPatients")
   reminderSchedulesCreated  ReminderSchedule[]
+  approver                  User?                @relation("UserApprovals", fields: [approvedBy], references: [id])
+  approvedUsers             User[]               @relation("UserApprovals")
   whatsappTemplatesCreated  WhatsAppTemplate[]   @relation("TemplateCreator")
-  healthNotesRecorded       HealthNote[]         @relation("HealthNoteRecorder")
 
   @@index([role])
   @@index([isActive])
   @@index([isApproved])
   @@index([role, isActive, isApproved])
-  @@index([stackId, isApproved, isActive]) // Performance for auth queries
+  @@index([stackId, isApproved, isActive])
   @@map("users")
 }
 
@@ -51,18 +52,18 @@ model Patient {
   emergencyContactName  String?              @map("emergency_contact_name")
   emergencyContactPhone String?              @map("emergency_contact_phone")
   notes                 String?
-  photoUrl              String?              @map("photo_url")
   isActive              Boolean              @default(true) @map("is_active")
   deletedAt             DateTime?            @map("deleted_at")
   createdAt             DateTime             @default(now()) @map("created_at")
   updatedAt             DateTime             @updatedAt @map("updated_at")
+  photoUrl              String?              @map("photo_url")
+  healthNotes           HealthNote[]
   manualConfirmations   ManualConfirmation[]
   medicalRecords        MedicalRecord[]
   patientMedications    PatientMedication[]
   assignedVolunteer     User?                @relation("VolunteerPatients", fields: [assignedVolunteerId], references: [id])
   reminderLogs          ReminderLog[]
   reminderSchedules     ReminderSchedule[]
-  healthNotes           HealthNote[]
 
   @@index([isActive])
   @@index([assignedVolunteerId])
@@ -119,6 +120,8 @@ model ReminderSchedule {
   id                  String               @id @default(uuid())
   patientId           String               @map("patient_id")
   medicationName      String               @map("medication_name")
+  dosage              String?              @map("dosage")
+  doctorName          String?              @map("doctor_name")
   scheduledTime       String               @map("scheduled_time")
   frequency           Frequency            @default(CUSTOM)
   startDate           DateTime             @map("start_date")
@@ -138,7 +141,7 @@ model ReminderSchedule {
   @@index([patientId, isActive])
   @@index([startDate])
   @@index([endDate])
-  @@index([createdAt, isActive]) // Performance for recent active reminders
+  @@index([createdAt, isActive])
   @@map("reminder_schedules")
 }
 
@@ -149,9 +152,9 @@ model ReminderLog {
   message             String
   phoneNumber         String               @map("phone_number")
   sentAt              DateTime             @map("sent_at")
-  fonnteMessageId     String?              @map("fonnte_message_id")
   status              ReminderStatus       @default(PENDING)
   createdAt           DateTime             @default(now()) @map("created_at")
+  fonnteMessageId     String?              @map("fonnte_message_id")
   manualConfirmations ManualConfirmation[]
   patient             Patient              @relation(fields: [patientId], references: [id])
   reminderSchedule    ReminderSchedule?    @relation(fields: [reminderScheduleId], references: [id])
@@ -161,10 +164,9 @@ model ReminderLog {
   @@index([status])
   @@index([sentAt])
   @@index([patientId, status])
-  @@index([sentAt, status]) // Performance for cron job queries
+  @@index([sentAt, status])
   @@map("reminder_logs")
 }
-
 
 model ManualConfirmation {
   id                 String            @id @default(uuid())
@@ -193,26 +195,21 @@ model ManualConfirmation {
   @@index([reminderLogId])
   @@index([visitDate])
   @@index([patientId, visitDate])
-  @@index([confirmedAt, patientId]) // Performance for completion tracking
+  @@index([confirmedAt, patientId])
   @@map("manual_confirmations")
 }
 
-
-
-
-
-
 model WhatsAppTemplate {
-  id           String           @id @default(uuid())
-  templateName String           @unique @map("template_name")
-  templateText String           @map("template_text")
-  variables    String[]
-  category     TemplateCategory @default(REMINDER)
-  isActive     Boolean          @default(true) @map("is_active")
-  createdBy    String           @map("created_by")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-  createdByUser User            @relation("TemplateCreator", fields: [createdBy], references: [id])
+  id            String           @id @default(uuid())
+  templateName  String           @unique @map("template_name")
+  templateText  String           @map("template_text")
+  variables     String[]
+  category      TemplateCategory @default(REMINDER)
+  isActive      Boolean          @default(true) @map("is_active")
+  createdBy     String           @map("created_by")
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+  createdByUser User             @relation("TemplateCreator", fields: [createdBy], references: [id])
 
   @@index([category])
   @@index([isActive])
@@ -221,7 +218,22 @@ model WhatsAppTemplate {
   @@map("whatsapp_templates")
 }
 
+model HealthNote {
+  id             String   @id @default(uuid())
+  patientId      String   @map("patient_id")
+  note           String
+  noteDate       DateTime @map("note_date")
+  recordedBy     String   @map("recorded_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  patient        Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedByUser User     @relation("HealthNoteRecorder", fields: [recordedBy], references: [id])
 
+  @@index([patientId])
+  @@index([patientId, noteDate])
+  @@index([recordedBy])
+  @@map("health_notes")
+}
 
 enum UserRole {
   ADMIN
@@ -264,22 +276,4 @@ enum TemplateCategory {
   REMINDER
   APPOINTMENT
   EDUCATIONAL
-}
-
-model HealthNote {
-  id          String   @id @default(uuid())
-  patientId   String   @map("patient_id")
-  note        String
-  noteDate    DateTime @map("note_date") // Date when the health event occurred
-  recordedBy  String   @map("recorded_by")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
-  patient        Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  recordedByUser User    @relation("HealthNoteRecorder", fields: [recordedBy], references: [id])
-  
-  @@index([patientId])
-  @@index([patientId, noteDate])
-  @@index([recordedBy])
-  @@map("health_notes")
 }

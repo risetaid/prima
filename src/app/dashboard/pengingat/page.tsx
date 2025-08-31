@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search } from 'lucide-react'
 import { UserMenu } from '@/components/ui/user-menu'
 import { DesktopHeader } from '@/components/ui/desktop-header'
-import { PatientReminderTable } from '@/components/ui/patient-reminder-table'
+import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
 import Image from 'next/image'
 
 interface Patient {
@@ -227,7 +227,7 @@ export default function ReminderPage() {
         
         {/* Desktop: Patient Table */}
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
-          <PatientReminderTable patients={filteredPatients} loading={loading} />
+          <ReminderListTable patients={filteredPatients} loading={loading} />
         </div>
       </div>
 
