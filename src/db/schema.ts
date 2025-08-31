@@ -1,0 +1,338 @@
+import { 
+  pgTable, 
+  text, 
+  timestamp, 
+  boolean, 
+  uuid, 
+  pgEnum,
+  index
+} from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
+
+// ===== ENUMS =====
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MEMBER'])
+export const cancerStageEnum = pgEnum('cancer_stage', ['I', 'II', 'III', 'IV'])
+export const medicalRecordTypeEnum = pgEnum('medical_record_type', ['DIAGNOSIS', 'TREATMENT', 'PROGRESS', 'HEALTH_NOTE'])
+export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE'])
+export const reminderStatusEnum = pgEnum('reminder_status', ['PENDING', 'SENT', 'DELIVERED', 'FAILED'])
+export const patientConditionEnum = pgEnum('patient_condition', ['GOOD', 'FAIR', 'POOR'])
+export const templateCategoryEnum = pgEnum('template_category', ['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
+
+// ===== TABLES =====
+
+export const users = pgTable('users', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  hospitalName: text('hospital_name'),
+  role: userRoleEnum('role').notNull().default('MEMBER'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  approvedBy: uuid('approved_by'),
+  isApproved: boolean('is_approved').notNull().default(false),
+  stackId: text('stack_id').notNull().unique(),
+}, (table) => ({
+  roleIdx: index('users_role_idx').on(table.role),
+  isActiveIdx: index('users_is_active_idx').on(table.isActive),
+  isApprovedIdx: index('users_is_approved_idx').on(table.isApproved),
+  roleActiveApprovedIdx: index('users_role_active_approved_idx').on(table.role, table.isActive, table.isApproved),
+  stackIdApprovedActiveIdx: index('users_stack_approved_active_idx').on(table.stackId, table.isApproved, table.isActive),
+}))
+
+export const patients = pgTable('patients', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  phoneNumber: text('phone_number').notNull(),
+  address: text('address'),
+  birthDate: timestamp('birth_date', { withTimezone: true }),
+  diagnosisDate: timestamp('diagnosis_date', { withTimezone: true }),
+  cancerStage: cancerStageEnum('cancer_stage'),
+  assignedVolunteerId: uuid('assigned_volunteer_id'),
+  emergencyContactName: text('emergency_contact_name'),
+  emergencyContactPhone: text('emergency_contact_phone'),
+  notes: text('notes'),
+  isActive: boolean('is_active').notNull().default(true),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  photoUrl: text('photo_url'),
+}, (table) => ({
+  isActiveIdx: index('patients_is_active_idx').on(table.isActive),
+  assignedVolunteerIdx: index('patients_assigned_volunteer_idx').on(table.assignedVolunteerId),
+  assignedVolunteerActiveIdx: index('patients_assigned_volunteer_active_idx').on(table.assignedVolunteerId, table.isActive),
+  phoneNumberIdx: index('patients_phone_number_idx').on(table.phoneNumber),
+  createdAtIdx: index('patients_created_at_idx').on(table.createdAt),
+}))
+
+export const medicalRecords = pgTable('medical_records', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  recordType: medicalRecordTypeEnum('record_type').notNull(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  recordedDate: timestamp('recorded_date', { withTimezone: true }).notNull(),
+  recordedBy: uuid('recorded_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const medications = pgTable('medications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const patientMedications = pgTable('patient_medications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  medicationId: uuid('medication_id').notNull(),
+  dosage: text('dosage').notNull(),
+  frequency: text('frequency').notNull(),
+  instructions: text('instructions'),
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }),
+  isActive: boolean('is_active').notNull().default(true),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const reminderSchedules = pgTable('reminder_schedules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  medicationName: text('medication_name').notNull(),
+  dosage: text('dosage'),
+  doctorName: text('doctor_name'),
+  scheduledTime: text('scheduled_time').notNull(),
+  frequency: frequencyEnum('frequency').notNull().default('CUSTOM'),
+  startDate: timestamp('start_date', { withTimezone: true }).notNull(),
+  endDate: timestamp('end_date', { withTimezone: true }),
+  customMessage: text('custom_message'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdById: uuid('created_by_id').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  patientIdIdx: index('reminder_schedules_patient_id_idx').on(table.patientId),
+  isActiveIdx: index('reminder_schedules_is_active_idx').on(table.isActive),
+  patientIdActiveIdx: index('reminder_schedules_patient_active_idx').on(table.patientId, table.isActive),
+  startDateIdx: index('reminder_schedules_start_date_idx').on(table.startDate),
+  endDateIdx: index('reminder_schedules_end_date_idx').on(table.endDate),
+  createdAtActiveIdx: index('reminder_schedules_created_active_idx').on(table.createdAt, table.isActive),
+}))
+
+export const reminderLogs = pgTable('reminder_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reminderScheduleId: uuid('reminder_schedule_id'),
+  patientId: uuid('patient_id').notNull(),
+  message: text('message').notNull(),
+  phoneNumber: text('phone_number').notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
+  status: reminderStatusEnum('status').notNull().default('PENDING'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  fonnteMessageId: text('fonnte_message_id'),
+}, (table) => ({
+  patientIdIdx: index('reminder_logs_patient_id_idx').on(table.patientId),
+  reminderScheduleIdIdx: index('reminder_logs_reminder_schedule_id_idx').on(table.reminderScheduleId),
+  statusIdx: index('reminder_logs_status_idx').on(table.status),
+  sentAtIdx: index('reminder_logs_sent_at_idx').on(table.sentAt),
+  patientIdStatusIdx: index('reminder_logs_patient_status_idx').on(table.patientId, table.status),
+  sentAtStatusIdx: index('reminder_logs_sent_status_idx').on(table.sentAt, table.status),
+}))
+
+export const manualConfirmations = pgTable('manual_confirmations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  volunteerId: uuid('volunteer_id').notNull(),
+  reminderScheduleId: uuid('reminder_schedule_id'),
+  reminderLogId: uuid('reminder_log_id'),
+  visitDate: timestamp('visit_date', { withTimezone: true }).notNull(),
+  visitTime: text('visit_time').notNull(),
+  medicationsTaken: boolean('medications_taken').notNull(),
+  medicationsMissed: text('medications_missed').array().notNull().default([]),
+  patientCondition: patientConditionEnum('patient_condition').notNull(),
+  symptomsReported: text('symptoms_reported').array().notNull().default([]),
+  notes: text('notes'),
+  followUpNeeded: boolean('follow_up_needed').notNull().default(false),
+  followUpNotes: text('follow_up_notes'),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  patientIdIdx: index('manual_confirmations_patient_id_idx').on(table.patientId),
+  volunteerIdIdx: index('manual_confirmations_volunteer_id_idx').on(table.volunteerId),
+  reminderScheduleIdIdx: index('manual_confirmations_reminder_schedule_id_idx').on(table.reminderScheduleId),
+  reminderLogIdIdx: index('manual_confirmations_reminder_log_id_idx').on(table.reminderLogId),
+  visitDateIdx: index('manual_confirmations_visit_date_idx').on(table.visitDate),
+  patientIdVisitDateIdx: index('manual_confirmations_patient_visit_date_idx').on(table.patientId, table.visitDate),
+  confirmedAtPatientIdIdx: index('manual_confirmations_confirmed_patient_idx').on(table.confirmedAt, table.patientId),
+}))
+
+export const whatsappTemplates = pgTable('whatsapp_templates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  templateName: text('template_name').notNull().unique(),
+  templateText: text('template_text').notNull(),
+  variables: text('variables').array().notNull().default([]),
+  category: templateCategoryEnum('category').notNull().default('REMINDER'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdBy: uuid('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  categoryIdx: index('whatsapp_templates_category_idx').on(table.category),
+  isActiveIdx: index('whatsapp_templates_is_active_idx').on(table.isActive),
+  categoryActiveIdx: index('whatsapp_templates_category_active_idx').on(table.category, table.isActive),
+  createdByIdx: index('whatsapp_templates_created_by_idx').on(table.createdBy),
+}))
+
+export const healthNotes = pgTable('health_notes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  note: text('note').notNull(),
+  noteDate: timestamp('note_date', { withTimezone: true }).notNull(),
+  recordedBy: uuid('recorded_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  patientIdIdx: index('health_notes_patient_id_idx').on(table.patientId),
+  patientIdNoteDateIdx: index('health_notes_patient_note_date_idx').on(table.patientId, table.noteDate),
+  recordedByIdx: index('health_notes_recorded_by_idx').on(table.recordedBy),
+}))
+
+// ===== RELATIONS =====
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  approver: one(users, {
+    fields: [users.approvedBy],
+    references: [users.id],
+    relationName: 'UserApprovals'
+  }),
+  approvedUsers: many(users, {
+    relationName: 'UserApprovals'
+  }),
+  patientsManaged: many(patients),
+  reminderSchedulesCreated: many(reminderSchedules),
+  whatsappTemplatesCreated: many(whatsappTemplates),
+  manualConfirmations: many(manualConfirmations),
+  medicalRecords: many(medicalRecords),
+  patientMedicationsCreated: many(patientMedications),
+  healthNotesRecorded: many(healthNotes),
+}))
+
+export const patientsRelations = relations(patients, ({ one, many }) => ({
+  assignedVolunteer: one(users, {
+    fields: [patients.assignedVolunteerId],
+    references: [users.id]
+  }),
+  reminderSchedules: many(reminderSchedules),
+  reminderLogs: many(reminderLogs),
+  manualConfirmations: many(manualConfirmations),
+  medicalRecords: many(medicalRecords),
+  patientMedications: many(patientMedications),
+  healthNotes: many(healthNotes),
+}))
+
+export const reminderSchedulesRelations = relations(reminderSchedules, ({ one, many }) => ({
+  patient: one(patients, {
+    fields: [reminderSchedules.patientId],
+    references: [patients.id]
+  }),
+  createdByUser: one(users, {
+    fields: [reminderSchedules.createdById],
+    references: [users.id]
+  }),
+  reminderLogs: many(reminderLogs),
+  manualConfirmations: many(manualConfirmations),
+}))
+
+export const reminderLogsRelations = relations(reminderLogs, ({ one, many }) => ({
+  patient: one(patients, {
+    fields: [reminderLogs.patientId],
+    references: [patients.id]
+  }),
+  reminderSchedule: one(reminderSchedules, {
+    fields: [reminderLogs.reminderScheduleId],
+    references: [reminderSchedules.id]
+  }),
+  manualConfirmations: many(manualConfirmations),
+}))
+
+export const manualConfirmationsRelations = relations(manualConfirmations, ({ one }) => ({
+  patient: one(patients, {
+    fields: [manualConfirmations.patientId],
+    references: [patients.id]
+  }),
+  volunteer: one(users, {
+    fields: [manualConfirmations.volunteerId],
+    references: [users.id]
+  }),
+  reminderSchedule: one(reminderSchedules, {
+    fields: [manualConfirmations.reminderScheduleId],
+    references: [reminderSchedules.id]
+  }),
+  reminderLog: one(reminderLogs, {
+    fields: [manualConfirmations.reminderLogId],
+    references: [reminderLogs.id]
+  }),
+}))
+
+export const whatsappTemplatesRelations = relations(whatsappTemplates, ({ one }) => ({
+  createdByUser: one(users, {
+    fields: [whatsappTemplates.createdBy],
+    references: [users.id]
+  }),
+}))
+
+export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
+  patient: one(patients, {
+    fields: [medicalRecords.patientId],
+    references: [patients.id]
+  }),
+  recordedByUser: one(users, {
+    fields: [medicalRecords.recordedBy],
+    references: [users.id]
+  }),
+}))
+
+export const medicationsRelations = relations(medications, ({ many }) => ({
+  patientMedications: many(patientMedications),
+}))
+
+export const patientMedicationsRelations = relations(patientMedications, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientMedications.patientId],
+    references: [patients.id]
+  }),
+  medication: one(medications, {
+    fields: [patientMedications.medicationId],
+    references: [medications.id]
+  }),
+  createdByUser: one(users, {
+    fields: [patientMedications.createdBy],
+    references: [users.id]
+  }),
+}))
+
+export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
+  patient: one(patients, {
+    fields: [healthNotes.patientId],
+    references: [patients.id]
+  }),
+  recordedByUser: one(users, {
+    fields: [healthNotes.recordedBy],
+    references: [users.id]
+  }),
+}))
+
+// ===== TYPE EXPORTS =====
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
+export type Patient = typeof patients.$inferSelect
+export type NewPatient = typeof patients.$inferInsert
+export type ReminderSchedule = typeof reminderSchedules.$inferSelect
+export type NewReminderSchedule = typeof reminderSchedules.$inferInsert
+export type ReminderLog = typeof reminderLogs.$inferSelect
+export type NewReminderLog = typeof reminderLogs.$inferInsert
+export type WhatsAppTemplate = typeof whatsappTemplates.$inferSelect
+export type NewWhatsAppTemplate = typeof whatsappTemplates.$inferInsert
+export type ManualConfirmation = typeof manualConfirmations.$inferSelect
+export type NewManualConfirmation = typeof manualConfirmations.$inferInsert

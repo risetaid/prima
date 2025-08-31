@@ -6,11 +6,15 @@
   "scripts": {
     "dev": "cross-env NEXT_TURBO=1 next dev --turbo",
     "dev:next": "next dev",
-    "build": "prisma generate && next build",
+    "build": "drizzle-kit generate && next build",
     "build:analyze": "ANALYZE=true next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate",
+    "postinstall": "drizzle-kit generate",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "seed:templates": "bun run scripts/seed-templates.ts"
   },
   "dependencies": {
