@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin } from '@/lib/auth-utils'
+import { getCurrentUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq, desc, asc } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdmin()
-    if (!admin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Only superadmins can access user management
+    if (currentUser.role !== 'SUPERADMIN') {
+      return NextResponse.json({ error: 'Superadmin access required' }, { status: 403 })
     }
 
     // Create alias for approver table to avoid naming conflicts

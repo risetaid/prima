@@ -27,13 +27,17 @@ export async function POST() {
       })
     }
 
-    // Check if this is the first user (should be admin)
+    // Check if this is the first user (should be superadmin)
     const userCountResult = await db
       .select({ count: count(users.id) })
       .from(users)
     
     const userCount = userCountResult[0]?.count || 0
     const isFirstUser = userCount === 0
+    
+    console.log(`🔍 Sync User - Current user count in DB: ${userCount}`)
+    console.log(`🔍 Sync User - Is first user? ${isFirstUser}`)
+    console.log(`🔍 Sync User - Will set role to: ${isFirstUser ? 'SUPERADMIN' : 'MEMBER'}`)
 
     // Create user in database
     const newUser = await db
@@ -43,7 +47,7 @@ export async function POST() {
         email: user.primaryEmailAddress?.emailAddress || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        role: isFirstUser ? 'ADMIN' : 'MEMBER',
+        role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
         isApproved: isFirstUser, // First user auto-approved
         approvedAt: isFirstUser ? new Date() : null,
       })

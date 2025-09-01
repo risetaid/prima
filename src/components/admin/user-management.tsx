@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle, XCircle, Clock, User, Mail, Calendar } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, User, Mail, Calendar, Crown, UserCheck, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface User {
@@ -12,7 +12,7 @@ interface User {
   email: string
   firstName: string | null
   lastName: string | null
-  role: 'ADMIN' | 'MEMBER'
+  role: 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
   isActive: boolean
   isApproved: boolean
   createdAt: string
@@ -28,9 +28,16 @@ export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
     fetchUsers()
+    // Auto-sync when Superadmin Panel opens
+    const autoSync = setTimeout(() => {
+      handleClerkSync()
+    }, 1000) // Delay 1 second after initial load
+
+    return () => clearTimeout(autoSync)
   }, [])
 
   const fetchUsers = async () => {
@@ -106,6 +113,90 @@ export default function UserManagement() {
     }
   }
 
+  const toggleUserRole = async (userId: string, currentRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER') => {
+    try {
+      setActionLoading(userId)
+      
+      // Cycle through roles: MEMBER -> ADMIN -> SUPERADMIN -> MEMBER
+      let newRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
+      if (currentRole === 'MEMBER') {
+        newRole = 'ADMIN'
+      } else if (currentRole === 'ADMIN') {
+        newRole = 'SUPERADMIN'  
+      } else {
+        newRole = 'MEMBER'
+      }
+      const response = await fetch(`/api/admin/users/${userId}/toggle-role`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: newRole })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        toast.success(`User role updated to ${newRole} successfully`)
+        fetchUsers()
+      } else {
+        toast.error(data.error || 'Failed to update user role')
+      }
+    } catch (error) {
+      console.error('Error toggling user role:', error)
+      toast.error('Failed to update user role')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleClerkSync = async () => {
+    if (syncing) return // Prevent multiple simultaneous syncs
+    
+    try {
+      setSyncing(true)
+      
+      const response = await fetch('/api/admin/sync-clerk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        const { results } = data
+        const messages = []
+        
+        if (results.created > 0) messages.push(`${results.created} user baru`)
+        if (results.updated > 0) messages.push(`${results.updated} user diperbarui`)
+        if (results.reactivated > 0) messages.push(`${results.reactivated} user diaktifkan kembali`)
+        if (results.deactivated > 0) messages.push(`${results.deactivated} user dinonaktifkan`)
+        
+        const summary = messages.length > 0 ? messages.join(', ') : 'Tidak ada perubahan'
+        
+        toast.success('Sync Clerk berhasil', {
+          description: `Sinkronisasi selesai: ${summary}`
+        })
+        
+        // Refresh user list
+        fetchUsers()
+      } else {
+        toast.error('Sync Clerk gagal', {
+          description: data.error || 'Terjadi kesalahan pada server'
+        })
+      }
+    } catch (error) {
+      console.error('Error syncing with Clerk:', error)
+      toast.error('Sync Clerk gagal', {
+        description: 'Terjadi kesalahan jaringan'
+      })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
       day: '2-digit',
@@ -133,11 +224,25 @@ export default function UserManagement() {
   }
 
   const getRoleBadge = (role: string) => {
-    return (
-      <Badge variant={role === 'ADMIN' ? 'default' : 'outline'} className="text-xs whitespace-nowrap">
-        <span className="sm:hidden">{role === 'ADMIN' ? '👑' : '👤'}</span> <span>{role === 'ADMIN' ? 'Administrator' : 'Member'}</span>
-      </Badge>
-    )
+    if (role === 'SUPERADMIN') {
+      return (
+        <Badge variant="default" className="text-xs whitespace-nowrap bg-purple-600 hover:bg-purple-700">
+          <span className="sm:hidden">⭐</span> <span>Superadmin</span>
+        </Badge>
+      )
+    } else if (role === 'ADMIN') {
+      return (
+        <Badge variant="default" className="text-xs whitespace-nowrap bg-blue-600 hover:bg-blue-700">
+          <span className="sm:hidden">👑</span> <span>Admin</span>
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="outline" className="text-xs whitespace-nowrap">
+          <span className="sm:hidden">👤</span> <span>Member</span>
+        </Badge>
+      )
+    }
   }
 
   if (loading) {
@@ -153,6 +258,41 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-8">
+      {/* Sync Controls */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+              <span>Sinkronisasi Clerk</span>
+            </CardTitle>
+            <Button
+              onClick={handleClerkSync}
+              disabled={syncing}
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700 cursor-pointer text-xs sm:text-sm px-3 py-2"
+            >
+              {syncing ? (
+                <>
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  <span>Syncing...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                  <span>Sync Manual</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600">
+            Sinkronisasi otomatis dijalankan saat panel dibuka. Gunakan tombol sync manual jika diperlukan untuk memastikan konsistensi data antara Clerk dan database PRIMA.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Pending Approvals */}
       {pendingUsers.length > 0 && (
         <Card>
@@ -273,24 +413,68 @@ export default function UserManagement() {
                     {getRoleBadge(user.role)}
                     {getStatusBadge(user)}
                   </div>
-                  {user.role !== 'ADMIN' && (
+                  <div className="flex flex-col space-y-1.5 sm:flex-row sm:space-y-0 sm:space-x-2">
+                    {/* Role Toggle Button */}
                     <Button
-                      onClick={() => toggleUserStatus(user.id, user.isActive)}
+                      onClick={() => toggleUserRole(user.id, user.role)}
                       disabled={actionLoading === user.id}
                       size="sm"
-                      variant="outline"
-                      className="cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+                      variant={user.role === 'MEMBER' ? 'outline' : 'default'}
+                      className={`cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap ${
+                        user.role === 'SUPERADMIN' 
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                          : user.role === 'ADMIN'
+                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                      }`}
                     >
                       {actionLoading === user.id ? (
-                        <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <>
-                          <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
-                          <span className="sm:hidden">{user.isActive ? 'Nonaktifkan' : 'Aktifkan'}</span>
+                          {user.role === 'SUPERADMIN' ? (
+                            <>
+                              <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              <span className="hidden sm:inline">→ Member</span>
+                              <span className="sm:hidden">→ Member</span>
+                            </>
+                          ) : user.role === 'ADMIN' ? (
+                            <>
+                              <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              <span className="hidden sm:inline">→ Superadmin</span>
+                              <span className="sm:hidden">→ Super</span>
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              <span className="hidden sm:inline">→ Admin</span>
+                              <span className="sm:hidden">→ Admin</span>
+                            </>
+                          )}
                         </>
                       )}
                     </Button>
-                  )}
+                    
+                    {/* Status Toggle Button - Only for regular members */}
+                    {user.role === 'MEMBER' && (
+                      <Button
+                        onClick={() => toggleUserStatus(user.id, user.isActive)}
+                        disabled={actionLoading === user.id}
+                        size="sm"
+                        variant="outline"
+                        className="cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap"
+                      >
+                        {actionLoading === user.id ? (
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
+                            <span className="sm:hidden">{user.isActive ? 'Nonaktifkan' : 'Aktifkan'}</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

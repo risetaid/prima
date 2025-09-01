@@ -10,6 +10,7 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
+import { PatientVariablesManager } from '@/components/patient/patient-variables-manager'
 
 interface Patient {
   id: string
@@ -977,6 +978,16 @@ export default function PatientDetailPage() {
                         💡 <strong>Tips:</strong> Gunakan "Buat Pengingat" untuk mengakses sistem auto-fill yang canggih dengan template WhatsApp
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Patient Variables Manager */}
+                {!isEditMode && (
+                  <div className="mb-6">
+                    <PatientVariablesManager 
+                      patientId={Array.isArray(params.id) ? params.id[0] : params.id!}
+                      patientName={patient?.name || 'Pasien'}
+                    />
                   </div>
                 )}
 

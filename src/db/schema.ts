@@ -10,7 +10,7 @@ import {
 import { relations } from 'drizzle-orm'
 
 // ===== ENUMS =====
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MEMBER'])
+export const userRoleEnum = pgEnum('user_role', ['SUPERADMIN', 'ADMIN', 'MEMBER'])
 export const cancerStageEnum = pgEnum('cancer_stage', ['I', 'II', 'III', 'IV'])
 export const medicalRecordTypeEnum = pgEnum('medical_record_type', ['DIAGNOSIS', 'TREATMENT', 'PROGRESS', 'HEALTH_NOTE'])
 export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE'])
@@ -198,6 +198,21 @@ export const healthNotes = pgTable('health_notes', {
   recordedByIdx: index('health_notes_recorded_by_idx').on(table.recordedBy),
 }))
 
+export const patientVariables = pgTable('patient_variables', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  variableName: text('variable_name').notNull(), // nama, obat, dosis, dokter, etc
+  variableValue: text('variable_value').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  createdById: uuid('created_by_id').notNull(),
+}, (table) => ({
+  patientVarIdx: index('patient_variables_patient_idx').on(table.patientId),
+  patientVarNameIdx: index('patient_variables_name_idx').on(table.patientId, table.variableName),
+  patientActiveVarIdx: index('patient_variables_patient_active_idx').on(table.patientId, table.isActive),
+}))
+
 // ===== RELATIONS =====
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -229,6 +244,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   medicalRecords: many(medicalRecords),
   patientMedications: many(patientMedications),
   healthNotes: many(healthNotes),
+  patientVariables: many(patientVariables),
 }))
 
 export const reminderSchedulesRelations = relations(reminderSchedules, ({ one, many }) => ({
@@ -323,6 +339,17 @@ export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
   }),
 }))
 
+export const patientVariablesRelations = relations(patientVariables, ({ one }) => ({
+  patient: one(patients, {
+    fields: [patientVariables.patientId],
+    references: [patients.id]
+  }),
+  createdByUser: one(users, {
+    fields: [patientVariables.createdById],
+    references: [users.id]
+  }),
+}))
+
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -336,3 +363,5 @@ export type WhatsAppTemplate = typeof whatsappTemplates.$inferSelect
 export type NewWhatsAppTemplate = typeof whatsappTemplates.$inferInsert
 export type ManualConfirmation = typeof manualConfirmations.$inferSelect
 export type NewManualConfirmation = typeof manualConfirmations.$inferInsert
+export type PatientVariable = typeof patientVariables.$inferSelect
+export type NewPatientVariable = typeof patientVariables.$inferInsert

@@ -11,28 +11,49 @@ export interface AuthUser extends User {
 
 export interface AdminUser extends AuthUser {
   id: string
-  role: 'ADMIN'
+  role: 'ADMIN' | 'SUPERADMIN'
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     const { userId } = await auth()
-    const user = await currentUser()
-
-    if (!userId || !user) {
+    
+    if (!userId) {
       return null
     }
 
-    // Get user from database using Clerk ID
-    const dbUserResult = await db
-      .select()
-      .from(users)
-      .where(eq(users.clerkId, userId))
-      .limit(1)
+    const user = await currentUser()
+    if (!user) {
+      return null
+    }
 
-    const dbUser = dbUserResult[0]
+    // Get user from database using Clerk ID with retry on connection timeout
+    let dbUserResult
+    let retries = 3
+    
+    while (retries > 0) {
+      try {
+        dbUserResult = await db
+          .select()
+          .from(users)
+          .where(eq(users.clerkId, userId))
+          .limit(1)
+        break
+      } catch (dbError: any) {
+        retries--
+        if (dbError.code === 'CONNECT_TIMEOUT' && retries > 0) {
+          console.log(`🔍 Auth: DB connection timeout, retrying... (${retries} attempts left)`)
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+          continue
+        }
+        throw dbError
+      }
+    }
+
+    const dbUser = dbUserResult?.[0]
 
     if (!dbUser) {
+      console.log('🔍 Auth: User not found in database for Clerk ID:', userId)
       return null
     }
 
@@ -44,7 +65,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     return authUser
   } catch (error) {
-    console.error('Error getting current user:', error)
+    console.error('🔍 Auth: Error getting current user:', error)
     return null
   }
 }
@@ -72,11 +93,21 @@ export async function requireApprovedUser(): Promise<AuthUser> {
 export async function requireAdmin(): Promise<AdminUser> {
   const user = await requireApprovedUser()
   
-  if (user.role !== 'ADMIN') {
+  if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
     redirect('/unauthorized')
   }
 
   return user as AdminUser
+}
+
+export async function requireSuperAdmin(): Promise<AuthUser> {
+  const user = await requireApprovedUser()
+  
+  if (user.role !== 'SUPERADMIN') {
+    redirect('/unauthorized')
+  }
+
+  return user
 }
 
 export async function getUserPatients(userId: string) {

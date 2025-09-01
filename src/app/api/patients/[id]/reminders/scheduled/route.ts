@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs } from '@/db'
 import { eq, and, desc, asc, gte, lte, sql, inArray } from 'drizzle-orm'
-import { getWIBTodayStart } from '@/lib/timezone'
+import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
 import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
 export async function GET(
@@ -162,17 +162,30 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid reminderIds' }, { status: 400 })
     }
 
-    // Delete multiple scheduled reminders
-    await db
-      .delete(reminderSchedules)
+    // Soft delete multiple scheduled reminders by setting isActive to false
+    const deleteResult = await db
+      .update(reminderSchedules)
+      .set({
+        isActive: false,
+        updatedAt: getWIBTime()
+      })
       .where(
         and(
           inArray(reminderSchedules.id, reminderIds),
-          eq(reminderSchedules.patientId, id)
+          eq(reminderSchedules.patientId, id),
+          eq(reminderSchedules.isActive, true)
         )
       )
+      .returning({
+        id: reminderSchedules.id,
+        medicationName: reminderSchedules.medicationName
+      })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ 
+      success: true,
+      message: 'Reminders berhasil dihapus',
+      deletedCount: deleteResult.length
+    })
   } catch (error) {
     console.error('Error deleting scheduled reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -29,9 +29,10 @@ export default function AdminPanelPage() {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
         const data = await response.json();
-        if (data.role !== "ADMIN") {
+        
+        if (data.role !== "SUPERADMIN") {
           toast.error("Akses Ditolak", {
-            description: "Anda tidak memiliki akses ke halaman admin."
+            description: "Anda tidak memiliki akses ke Superadmin Panel."
           });
           router.push("/dashboard");
           return;
@@ -171,13 +172,13 @@ export default function AdminPanelPage() {
     );
   }
 
-  if (userRole !== "ADMIN") {
+  if (userRole !== "SUPERADMIN") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Akses Ditolak</h1>
-          <p className="text-gray-600">Anda tidak memiliki akses ke halaman admin.</p>
+          <p className="text-gray-600">Anda tidak memiliki akses ke Superadmin Panel.</p>
         </div>
       </div>
     );
@@ -201,15 +202,15 @@ export default function AdminPanelPage() {
       </div>
 
       {/* Header Section */}
-      <div className="bg-blue-600 text-white py-8 relative z-10">
+      <div className="bg-purple-600 text-white py-8 relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex items-center justify-center space-x-3 mb-4">
               <Shield className="w-12 h-12 text-white" />
-              <h1 className="text-4xl font-bold">Admin Panel</h1>
+              <h1 className="text-4xl font-bold">Superadmin Panel</h1>
             </div>
-            <p className="text-xl text-blue-100">
-              Panel kontrol untuk manajemen sistem PRIMA
+            <p className="text-xl text-purple-100">
+              Panel kontrol khusus Superadmin untuk manajemen sistem PRIMA
             </p>
           </div>
         </div>

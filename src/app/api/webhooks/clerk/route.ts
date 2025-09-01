@@ -66,6 +66,10 @@ export async function POST(request: NextRequest) {
       
       const userCount = userCountResult[0]?.count || 0
       const isFirstUser = userCount === 0
+      
+      console.log(`🔍 Webhook - Current user count in DB: ${userCount}`)
+      console.log(`🔍 Webhook - Is first user? ${isFirstUser}`)
+      console.log(`🔍 Webhook - Will set role to: ${isFirstUser ? 'SUPERADMIN' : 'MEMBER'}`)
 
       // Create user in database
       await db
@@ -75,7 +79,7 @@ export async function POST(request: NextRequest) {
           email: email_addresses[0]?.email_address || '',
           firstName: first_name || '',
           lastName: last_name || '',
-          role: isFirstUser ? 'ADMIN' : 'MEMBER',
+          role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
           isApproved: isFirstUser, // First user auto-approved
           approvedAt: isFirstUser ? new Date() : null
         })
@@ -83,7 +87,7 @@ export async function POST(request: NextRequest) {
       console.log(`✅ User created from Clerk webhook: ${email_addresses[0]?.email_address}`)
       
       if (isFirstUser) {
-        console.log(`🎉 First user created as ADMIN: ${email_addresses[0]?.email_address}`)
+        console.log(`🎉 First user created as SUPERADMIN: ${email_addresses[0]?.email_address}`)
       }
 
       return NextResponse.json({ success: true })

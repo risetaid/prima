@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 interface Reminder {
   id: string;
@@ -58,6 +59,7 @@ export function PatientReminderDashboard({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [editFormData, setEditFormData] = useState({ message: "", time: "" });
+  const { confirm, ConfirmComponent } = useConfirm();
 
   useEffect(() => {
     if (params.id) {
@@ -142,6 +144,12 @@ export function PatientReminderDashboard({
           "Selesai:",
           mappedSelesai.length
         );
+
+        console.log('🔍 Desktop: Setting reminder states:', {
+          terjadwal: mappedTerjadwal.length,
+          perlu: mappedPerlu.length,
+          selesai: mappedSelesai.length
+        });
 
         setTerjadwalReminders(mappedTerjadwal);
         setPerluDiperbaruiReminders(mappedPerlu);
@@ -230,21 +238,70 @@ export function PatientReminderDashboard({
       return;
     }
 
-    try {
-      const deletePromises = selectedReminders.map((reminderId) =>
-        fetch(`/api/reminders/scheduled/${reminderId}`, { method: "DELETE" })
-      );
+    // Show confirmation dialog (like mobile)
+    confirm({
+      title: 'Hapus Pengingat',
+      description: `Apakah Anda yakin ingin menghapus ${selectedReminders.length} pengingat? Tindakan ini tidak dapat dibatalkan.`,
+      confirmText: 'Hapus',
+      cancelText: 'Batal',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await performDelete();
+      }
+    });
+  };
 
-      await Promise.all(deletePromises);
+  const performDelete = async () => {
+    try {
+      console.log('🔍 Desktop: Deleting reminders:', selectedReminders);
+      
+      const deletePromises = selectedReminders.map(async (reminderId) => {
+        // Extract real UUID from formatted ID (remove status prefix)
+        const realId = reminderId.includes('-') ? 
+          reminderId.split('-').slice(1).join('-') : 
+          reminderId;
+        
+        console.log('🔍 Desktop: Converting ID', reminderId, 'to', realId);
+        
+        const response = await fetch(`/api/reminders/scheduled/${realId}`, { 
+          method: "DELETE" 
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('🔍 Desktop: Delete failed for', realId, errorData);
+          throw new Error(`Delete failed for ${realId}`);
+        }
+        
+        const result = await response.json();
+        console.log('🔍 Desktop: Delete success for', realId, result);
+        return result;
+      });
+
+      const results = await Promise.all(deletePromises);
+      console.log('🔍 Desktop: All deletions completed:', results);
+      
+      // Update local state immediately (like mobile does)
+      setTerjadwalReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
+      setPerluDiperbaruiReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
+      setSelesaiReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
+      
+      // Update stats immediately
+      setStats(prev => ({
+        ...prev,
+        terjadwal: Math.max(0, prev.terjadwal - selectedReminders.length)
+      }));
+      
       toast.success(`${selectedReminders.length} pengingat berhasil dihapus`);
 
-      // Refresh data (stats are calculated automatically)
-      await fetchStats();
-      await fetchAllReminders();
-
-      // Reset delete mode
-      setDeleteMode(false);
+      // Clear selected reminders immediately
       setSelectedReminders([]);
+      setDeleteMode(false);
+
+      // Optional: Refresh data in background for accuracy (but UI already updated)
+      console.log('🔍 Desktop: Background refresh...');
+      fetchStats().catch(console.error);
+      fetchAllReminders().catch(console.error);
     } catch (error) {
       console.error("Error deleting reminders:", error);
       toast.error("Gagal menghapus pengingat");
@@ -680,6 +737,9 @@ export function PatientReminderDashboard({
           </div>
         </div>
       )}
+      
+      {/* Confirmation Dialog */}
+      <ConfirmComponent />
     </div>
   );
 }

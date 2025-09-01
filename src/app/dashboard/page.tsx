@@ -35,31 +35,36 @@ function MobileAdminActions() {
   return (
     <button
       onClick={() => router.push("/dashboard/admin")}
-      className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 transition-colors"
-      title="Admin Panel"
+      className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
+      title="Superadmin Panel"
     >
-      <Shield className="w-5 h-5 text-blue-600" />
+      <Shield className="w-5 h-5 text-purple-600" />
     </button>
   );
 }
 
 export default function DashboardPage() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const router = useRouter();
   const [approvalStatus, setApprovalStatus] = useState<
     "loading" | "approved" | "pending" | "error"
   >("loading");
 
   useEffect(() => {
-    // Redirect to sign-in if not authenticated
+    // Wait for Clerk to load before checking authentication
+    if (!isLoaded) return;
+
+    // Redirect to sign-in if not authenticated after loading
     if (!user) {
+      console.log('🔍 Dashboard: No user found after load, redirecting to sign-in');
       router.push("/sign-in");
       return;
     }
 
+    console.log('🔍 Dashboard: User found:', user.id, user.primaryEmailAddress?.emailAddress);
     // Check approval status when user is loaded
     checkApprovalStatus();
-  }, [user, router]);
+  }, [user, isLoaded, router]);
 
   const checkApprovalStatus = async () => {
     try {
@@ -93,12 +98,15 @@ export default function DashboardPage() {
     }
   };
 
-  if (approvalStatus === "loading") {
+  // Show loading while Clerk is loading or while checking approval status
+  if (!isLoaded || approvalStatus === "loading") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">
+            {!isLoaded ? 'Initializing...' : 'Loading dashboard...'}
+          </p>
         </div>
       </div>
     );

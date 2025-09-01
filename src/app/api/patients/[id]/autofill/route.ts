@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, users, patientMedications, medications, reminderSchedules, medicalRecords } from '@/db'
+import { db, patients, users, patientMedications, medications, reminderSchedules, medicalRecords, patientVariables } from '@/db'
 import { eq, and, desc } from 'drizzle-orm'
 
 export async function GET(
@@ -37,6 +37,23 @@ export async function GET(
     }
 
     const patient = patientResult[0]
+
+    // Get custom patient variables (highest priority)
+    const customVariables = await db
+      .select({
+        variableName: patientVariables.variableName,
+        variableValue: patientVariables.variableValue,
+      })
+      .from(patientVariables)
+      .where(and(
+        eq(patientVariables.patientId, patientId),
+        eq(patientVariables.isActive, true)
+      ))
+
+    const customVariablesMap = customVariables.reduce((acc, variable) => {
+      acc[variable.variableName] = variable.variableValue
+      return acc
+    }, {} as Record<string, string>)
 
     // Get latest active medication
     const latestMedication = await db
@@ -100,50 +117,58 @@ export async function GET(
     }
 
     // Build auto-fill data with smart priority system
+    // Priority: Custom Variables > Database > Default values
     const autoFillData = {
-      // Patient basic data (always available)
-      nama: patient.name || '',
-      nomor: patient.phoneNumber || '',
+      // Patient basic data (priority: custom > database)
+      nama: customVariablesMap.nama || patient.name || '',
+      nomor: customVariablesMap.nomor || patient.phoneNumber || '',
 
-      // Medication data (priority: latest active medication > reminder schedule)
-      obat: latestMedication[0]?.medicationName || 
+      // Medication data (priority: custom > latest active medication > reminder schedule)
+      obat: customVariablesMap.obat || 
+            latestMedication[0]?.medicationName || 
             recentReminders[0]?.medicationName || '',
       
-      // Dosage data (priority: patient medication > reminder schedule)
-      dosis: latestMedication[0]?.dosage || 
+      // Dosage data (priority: custom > patient medication > reminder schedule)
+      dosis: customVariablesMap.dosis ||
+             latestMedication[0]?.dosage || 
              recentReminders[0]?.dosage || '',
 
-      // Doctor data (priority: current user > assigned volunteer > medication prescriber > medical record recorder)
-      dokter: mockCurrentUser.firstName && mockCurrentUser.lastName 
-              ? `${mockCurrentUser.firstName} ${mockCurrentUser.lastName}`
-              : patient.volunteerFirstName && patient.volunteerLastName
-              ? `${patient.volunteerFirstName} ${patient.volunteerLastName}`
-              : latestMedication[0]?.prescriberFirstName && latestMedication[0]?.prescriberLastName
-              ? `${latestMedication[0].prescriberFirstName} ${latestMedication[0].prescriberLastName}`
-              : latestMedicalRecord[0]?.recordedByFirstName && latestMedicalRecord[0]?.recordedByLastName
-              ? `${latestMedicalRecord[0].recordedByFirstName} ${latestMedicalRecord[0].recordedByLastName}`
-              : recentReminders[0]?.doctorName || '',
+      // Doctor data (priority: custom > current user > assigned volunteer > medication prescriber > medical record recorder)
+      dokter: customVariablesMap.dokter ||
+              (mockCurrentUser.firstName && mockCurrentUser.lastName 
+                ? `${mockCurrentUser.firstName} ${mockCurrentUser.lastName}`
+                : patient.volunteerFirstName && patient.volunteerLastName
+                ? `${patient.volunteerFirstName} ${patient.volunteerLastName}`
+                : latestMedication[0]?.prescriberFirstName && latestMedication[0]?.prescriberLastName
+                ? `${latestMedication[0].prescriberFirstName} ${latestMedication[0].prescriberLastName}`
+                : latestMedicalRecord[0]?.recordedByFirstName && latestMedicalRecord[0]?.recordedByLastName
+                ? `${latestMedicalRecord[0].recordedByFirstName} ${latestMedicalRecord[0].recordedByLastName}`
+                : recentReminders[0]?.doctorName || ''),
 
-      // Hospital data (priority: current user > assigned volunteer > medication prescriber > medical record recorder)
-      rumahSakit: mockCurrentUser.hospitalName ||
+      // Hospital data (priority: custom > current user > assigned volunteer > medication prescriber > medical record recorder)
+      rumahSakit: customVariablesMap.rumahSakit ||
+                  mockCurrentUser.hospitalName ||
                   patient.volunteerHospitalName ||
                   latestMedication[0]?.prescriberHospitalName ||
                   latestMedicalRecord[0]?.recordedByHospitalName || '',
 
-      // Volunteer data (current user)
-      volunteer: mockCurrentUser.firstName && mockCurrentUser.lastName 
-                 ? `${mockCurrentUser.firstName} ${mockCurrentUser.lastName}`
-                 : 'PRIMA Volunteer',
+      // Volunteer data (priority: custom > current user)
+      volunteer: customVariablesMap.volunteer ||
+                 (mockCurrentUser.firstName && mockCurrentUser.lastName 
+                   ? `${mockCurrentUser.firstName} ${mockCurrentUser.lastName}`
+                   : 'PRIMA Volunteer'),
 
-      // Time and date (will be filled by form)
-      waktu: '',
-      tanggal: '',
+      // Time and date (will be filled by form, but can be customized)
+      waktu: customVariablesMap.waktu || '',
+      tanggal: customVariablesMap.tanggal || '',
 
       // Additional context for better UX
       dataContext: {
         hasActiveMedications: latestMedication.length > 0,
         hasRecentReminders: recentReminders.length > 0,
         hasMedicalRecords: latestMedicalRecord.length > 0,
+        hasCustomVariables: customVariables.length > 0,
+        customVariablesCount: customVariables.length,
         assignedVolunteerName: patient.volunteerFirstName && patient.volunteerLastName
           ? `${patient.volunteerFirstName} ${patient.volunteerLastName}`.trim()
           : null,

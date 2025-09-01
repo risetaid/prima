@@ -87,3 +87,58 @@ export async function PUT(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    // Check if reminder exists
+    const reminderScheduleResult = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime
+      })
+      .from(reminderSchedules)
+      .where(eq(reminderSchedules.id, id))
+      .limit(1)
+
+    if (reminderScheduleResult.length === 0) {
+      return NextResponse.json({ error: 'Reminder not found' }, { status: 404 })
+    }
+
+    const reminder = reminderScheduleResult[0]
+
+    // Soft delete by setting isActive to false
+    await db
+      .update(reminderSchedules)
+      .set({
+        isActive: false,
+        updatedAt: getWIBTime()
+      })
+      .where(eq(reminderSchedules.id, id))
+
+    return NextResponse.json({
+      success: true,
+      message: 'Reminder berhasil dihapus',
+      deletedReminder: {
+        id: reminder.id,
+        medicationName: reminder.medicationName,
+        scheduledTime: reminder.scheduledTime
+      }
+    })
+
+  } catch (error) {
+    console.error('Error deleting reminder:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

@@ -36,22 +36,22 @@ export default function AdminUsersPage() {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div className="flex items-center space-x-2">
-              <Users className="w-5 h-5 text-blue-600" />
-              <h1 className="text-lg font-semibold text-gray-900">Manajemen Pengguna</h1>
+              <Users className="w-5 h-5 text-purple-600" />
+              <h1 className="text-lg font-semibold text-gray-900">Superadmin Panel</h1>
             </div>
           </div>
         </header>
       </div>
 
       {/* Page Title - Desktop Only */}
-      <div className="hidden lg:block relative z-10 bg-blue-600 text-white py-6">
+      <div className="hidden lg:block relative z-10 bg-purple-600 text-white py-6">
         <div className="max-w-7xl mx-auto px-8">
           <div className="flex items-center space-x-3">
             <Users className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">Manajemen Pengguna</h1>
+            <h1 className="text-3xl font-bold">Superadmin Panel</h1>
           </div>
-          <p className="text-blue-100 mt-2">
-            Kelola persetujuan dan status pengguna sistem
+          <p className="text-purple-100 mt-2">
+            Kelola persetujuan, status, dan role pengguna sistem (hanya Superadmin)
           </p>
         </div>
       </div>

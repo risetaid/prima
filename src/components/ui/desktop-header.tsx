@@ -27,10 +27,8 @@ function AdminActions() {
         const data = await response.json();
         setUserRole(data.role);
       } else if (response.status === 401 || response.status === 403) {
-        // User not authenticated or not approved - don't show admin buttons
         setUserRole(null);
       } else {
-        console.error("Error fetching user role:", response.status);
         setUserRole(null);
       }
     } catch (error) {
@@ -39,27 +37,27 @@ function AdminActions() {
     }
   };
 
-  if (userRole !== "ADMIN") {
+  if (userRole !== "SUPERADMIN") {
     return null;
   }
 
   return (
     <>
-      {/* Admin Panel - Main Entry Point */}
+      {/* Superadmin Panel - Main Entry Point */}
       <button
         onClick={() => router.push("/dashboard/admin")}
         className={`
           px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
           ${
             pathname.startsWith("/dashboard/admin")
-              ? "bg-blue-100 text-blue-700"
-              : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+              ? "bg-purple-100 text-purple-700"
+              : "text-gray-600 hover:text-purple-600 hover:bg-gray-50"
           }
         `}
-        title="Admin Panel"
+        title="Superadmin Panel"
       >
         <Shield className="w-4 h-4" />
-        <span>Admin Panel</span>
+        <span>Superadmin Panel</span>
       </button>
 
 
