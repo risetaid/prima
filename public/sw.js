@@ -2,10 +2,7 @@ const CACHE_NAME = 'prima-v1'
 const urlsToCache = [
   '/',
   '/dashboard',
-  '/tutorial',
-  '/pengingat',
-  '/statistik',
-  '/globals.css'
+  '/pengingat'
 ]
 
 self.addEventListener('install', (event) => {

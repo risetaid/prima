@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, reminderSchedules, patients, reminderLogs } from '@/db'
+import { eq, and, desc, asc, gte, lte, sql, inArray } from 'drizzle-orm'
 import { getWIBTodayStart } from '@/lib/timezone'
 import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
@@ -21,65 +22,120 @@ export async function GET(
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '30')
     const dateFilter = searchParams.get('date')
-    const pagination = createEfficientPagination(page, limit)
+    const offset = (page - 1) * limit
 
-    // Build optimized where clause
-    const todayWIBStart = getWIBTodayStart()
-    const whereClause: any = {
-      patientId: id,
-      isActive: true,
-      // Haven't been delivered yet
-      reminderLogs: {
-        none: {
-          status: 'DELIVERED'
-        }
-      }
-    }
+    // Build conditions array
+    const conditions = [
+      eq(reminderSchedules.patientId, id),
+      eq(reminderSchedules.isActive, true)
+    ]
 
     // Add date range filter if provided for startDate
     if (dateFilter) {
-      whereClause.startDate = createDateRangeQuery(dateFilter, '+07:00')
+      const filterDate = new Date(dateFilter)
+      const startOfDay = new Date(filterDate)
+      startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
+      const endOfDay = new Date(filterDate)
+      endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB
+      endOfDay.setDate(endOfDay.getDate() + 1)
+      
+      conditions.push(
+        gte(reminderSchedules.startDate, startOfDay),
+        lte(reminderSchedules.startDate, endOfDay)
+      )
     }
 
-    // DEBUG: Log the filter criteria first
-    console.log("🔍 SCHEDULED API DEBUG - Filter criteria:")
-    console.log("Today WIB start:", todayWIBStart)
-    console.log("whereClause:", JSON.stringify(whereClause, null, 2))
+    // Build base query for scheduled reminders
+    const baseQuery = db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        startDate: reminderSchedules.startDate,
+        endDate: reminderSchedules.endDate,
+        customMessage: reminderSchedules.customMessage,
+        isActive: reminderSchedules.isActive,
+        createdAt: reminderSchedules.createdAt,
+        updatedAt: reminderSchedules.updatedAt
+      })
+      .from(reminderSchedules)
+      .where(and(...conditions))
 
-    // Get scheduled reminders - those that haven't been sent yet or don't have delivery logs today (optimized)
-    const scheduledReminders = await prisma.reminderSchedule.findMany({
-      where: whereClause,
-      include: {
-        patient: {
-          select: {
-            name: true,
-            phoneNumber: true
-          }
-        },
-        reminderLogs: {
-          orderBy: { sentAt: 'desc' },
-          take: 5 // Get latest logs for debugging
-        }
-      },
-      orderBy: {
-        startDate: 'asc'
-      },
-      ...pagination
+    // Execute query with pagination
+    const scheduledReminders = await baseQuery
+      .orderBy(asc(reminderSchedules.startDate))
+      .limit(limit)
+      .offset(offset)
+
+    // Get patient details for reminders
+    const patientIds = [...new Set(scheduledReminders.map(r => r.patientId))]
+    const patientDetails = patientIds.length > 0 ? await db
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber
+      })
+      .from(patients)
+      .where(inArray(patients.id, patientIds)) : []
+
+    // Get reminder logs for debugging (latest 5 per reminder)
+    const reminderIds = scheduledReminders.map(r => r.id)
+    const recentLogs = reminderIds.length > 0 ? await db
+      .select({
+        id: reminderLogs.id,
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+        status: reminderLogs.status,
+        sentAt: reminderLogs.sentAt,
+      })
+      .from(reminderLogs)
+      .where(inArray(reminderLogs.reminderScheduleId, reminderIds))
+      .orderBy(desc(reminderLogs.sentAt))
+      .limit(reminderIds.length * 5) : []
+
+    // Create lookup maps
+    const patientMap = new Map()
+    patientDetails.forEach(patient => {
+      patientMap.set(patient.id, patient)
     })
 
-    // DEBUG: Log what we found
-    console.log("🔍 SCHEDULED API DEBUG - Found reminders:", scheduledReminders.length)
-    scheduledReminders.forEach(reminder => {
-      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${reminder.reminderLogs.length} | Latest: ${reminder.reminderLogs[0]?.status} at ${reminder.reminderLogs[0]?.sentAt}`)
+    const logsMap = new Map()
+    recentLogs.forEach(log => {
+      if (!logsMap.has(log.reminderScheduleId)) {
+        logsMap.set(log.reminderScheduleId, [])
+      }
+      logsMap.get(log.reminderScheduleId).push(log)
+    })
+
+    // DEBUG: Log the filter criteria first
+    const todayWIBStart = getWIBTodayStart()
+    console.log("🔍 SCHEDULED API DEBUG - Filter criteria:")
+    console.log("Today WIB start:", todayWIBStart)
+    console.log("Found reminders:", scheduledReminders.length)
+
+    // Filter out reminders that have already been delivered
+    const filteredReminders = scheduledReminders.filter(reminder => {
+      const logs = logsMap.get(reminder.id) || []
+      const hasDeliveredLog = logs.some((log: any) => log.status === 'DELIVERED')
+      return !hasDeliveredLog
+    })
+
+    // DEBUG: Log what we found after filtering
+    console.log("🔍 SCHEDULED API DEBUG - Found reminders after filtering:", filteredReminders.length)
+    filteredReminders.forEach(reminder => {
+      const logs = logsMap.get(reminder.id) || []
+      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${logs.length} | Latest: ${logs[0]?.status} at ${logs[0]?.sentAt}`)
     })
 
     // Transform to match frontend interface
-    const formattedReminders = scheduledReminders.map(reminder => ({
+    const formattedReminders = filteredReminders.map(reminder => ({
       id: reminder.id,
       medicationName: reminder.medicationName,
       scheduledTime: reminder.scheduledTime,
       nextReminderDate: reminder.startDate.toISOString().split('T')[0],
-      customMessage: reminder.customMessage
+      customMessage: reminder.customMessage,
+      patient: patientMap.get(reminder.patientId) || null,
+      reminderLogs: logsMap.get(reminder.id) || []
     }))
 
     return NextResponse.json(formattedReminders)
@@ -107,12 +163,14 @@ export async function DELETE(
     }
 
     // Delete multiple scheduled reminders
-    await prisma.reminderSchedule.deleteMany({
-      where: {
-        id: { in: reminderIds },
-        patientId: id
-      }
-    })
+    await db
+      .delete(reminderSchedules)
+      .where(
+        and(
+          inArray(reminderSchedules.id, reminderIds),
+          eq(reminderSchedules.patientId, id)
+        )
+      )
 
     return NextResponse.json({ success: true })
   } catch (error) {

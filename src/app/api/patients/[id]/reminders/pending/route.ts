@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
-import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
+import { db, reminderLogs, reminderSchedules, manualConfirmations } from '@/db'
+import { eq, and, desc, gte, lte, notExists } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
@@ -20,47 +20,60 @@ export async function GET(
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const dateFilter = searchParams.get('date')
-    const pagination = createEfficientPagination(page, limit)
+    const offset = (page - 1) * limit
 
-    // Build optimized where clause
-    const whereClause: any = {
-      patientId: id,
-      status: 'DELIVERED',
-      manualConfirmations: {
-        none: {} // No manual confirmations exist for this log
-      }
-    }
+    // Build where conditions with Drizzle
+    const whereConditions = [
+      eq(reminderLogs.patientId, id),
+      eq(reminderLogs.status, 'DELIVERED'),
+      // No manual confirmations exist for this log
+      notExists(
+        db.select()
+          .from(manualConfirmations)
+          .where(eq(manualConfirmations.reminderLogId, reminderLogs.id))
+      )
+    ]
 
-    // Add date range filter if provided
+    // Add date range filter if provided (simplified)
     if (dateFilter) {
-      whereClause.sentAt = createDateRangeQuery(dateFilter, '+07:00')
+      const date = new Date(dateFilter)
+      const startOfDay = new Date(date)
+      startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
+      
+      const endOfDay = new Date(date)
+      endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB
+      endOfDay.setDate(endOfDay.getDate() + 1)
+
+      whereConditions.push(gte(reminderLogs.sentAt, startOfDay))
+      whereConditions.push(lte(reminderLogs.sentAt, endOfDay))
     }
 
-    // Get reminder logs that are DELIVERED but don't have manual confirmation yet (optimized)
-    const pendingReminders = await prisma.reminderLog.findMany({
-      where: whereClause,
-      include: {
-        reminderSchedule: {
-          select: {
-            medicationName: true,
-            scheduledTime: true,
-            customMessage: true
-          }
-        }
-      },
-      orderBy: {
-        sentAt: 'desc'
-      },
-      ...pagination
-    })
+    // Get reminder logs that are DELIVERED but don't have manual confirmation yet
+    const pendingReminders = await db
+      .select({
+        id: reminderLogs.id,
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+        sentAt: reminderLogs.sentAt,
+        message: reminderLogs.message,
+        // Schedule fields
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        customMessage: reminderSchedules.customMessage
+      })
+      .from(reminderLogs)
+      .leftJoin(reminderSchedules, eq(reminderLogs.reminderScheduleId, reminderSchedules.id))
+      .where(and(...whereConditions))
+      .orderBy(desc(reminderLogs.sentAt))
+      .offset(offset)
+      .limit(limit)
 
     // Transform to match frontend interface
     const formattedReminders = pendingReminders.map(reminder => ({
       id: reminder.id,
-      medicationName: reminder.reminderSchedule?.medicationName || 'Obat',
-      scheduledTime: reminder.reminderSchedule?.scheduledTime || '12:00',
+      medicationName: reminder.medicationName || 'Obat',
+      scheduledTime: reminder.scheduledTime || '12:00',
       sentDate: reminder.sentAt.toISOString().split('T')[0],
-      customMessage: reminder.reminderSchedule?.customMessage || reminder.message,
+      customMessage: reminder.customMessage || reminder.message,
       status: 'PENDING_UPDATE'
     }))
 

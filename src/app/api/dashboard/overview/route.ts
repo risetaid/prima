@@ -1,109 +1,145 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db, patients, users, reminderLogs, manualConfirmations } from '@/db'
+import { eq, and, isNull, count, sql, inArray } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
     if (!user || !user.canAccessDashboard) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Combine all dashboard data in single optimized queries
+    // Combine all dashboard data in optimized Drizzle queries
     let patientsData, userStats
     
     if (user.role === 'ADMIN') {
       // Admin dashboard - optimized for all patients
       [patientsData, userStats] = await Promise.all([
-        // Get patients with compliance in one raw query
-        prisma.$queryRaw`
-          SELECT 
-            p.id,
-            p.name,
-            p.phone_number as "phoneNumber",
-            p.is_active as "isActive",
-            p.photo_url as "photoUrl",
-            p.created_at as "createdAt",
-            COALESCE(
-              CASE 
-                WHEN COUNT(DISTINCT rl.id) > 0 
-                THEN ROUND((COUNT(DISTINCT mc.id)::numeric / COUNT(DISTINCT rl.id)) * 100)
-                ELSE 0 
-              END, 0
-            ) as "complianceRate"
-          FROM patients p
-          LEFT JOIN reminder_logs rl ON rl.patient_id = p.id AND rl.status = 'DELIVERED'
-          LEFT JOIN manual_confirmations mc ON mc.patient_id = p.id
-          WHERE p.deleted_at IS NULL
-          GROUP BY p.id, p.name, p.phone_number, p.is_active, p.photo_url, p.created_at
-          ORDER BY p.is_active DESC, p.name ASC
-          LIMIT 100
-        `,
+        // Get basic patients data first (separate from compliance calculation for better performance)
+        db.select({
+          id: patients.id,
+          name: patients.name,
+          phoneNumber: patients.phoneNumber,
+          isActive: patients.isActive,
+          photoUrl: patients.photoUrl,
+          createdAt: patients.createdAt
+        })
+        .from(patients)
+        .where(isNull(patients.deletedAt))
+        .orderBy(patients.isActive, patients.name)
+        .limit(100),
         
-        // Get user statistics
-        prisma.$queryRaw`
-          SELECT 
-            COUNT(*) as total_patients,
-            COUNT(*) FILTER (WHERE is_active = true) as active_patients,
-            COUNT(*) FILTER (WHERE is_active = false) as inactive_patients
-          FROM patients
-          WHERE deleted_at IS NULL
-        `
+        // Get user statistics with conditional counting using SQL
+        db.select({
+          totalPatients: count(),
+          activePatients: sql<number>`COUNT(*) FILTER (WHERE ${patients.isActive} = true)`,
+          inactivePatients: sql<number>`COUNT(*) FILTER (WHERE ${patients.isActive} = false)`
+        })
+        .from(patients)
+        .where(isNull(patients.deletedAt))
       ])
     } else {
       // Member dashboard - only their patients
       [patientsData, userStats] = await Promise.all([
-        prisma.$queryRaw`
-          SELECT 
-            p.id,
-            p.name,
-            p.phone_number as "phoneNumber",
-            p.is_active as "isActive", 
-            p.photo_url as "photoUrl",
-            p.created_at as "createdAt",
-            COALESCE(
-              CASE 
-                WHEN COUNT(DISTINCT rl.id) > 0 
-                THEN ROUND((COUNT(DISTINCT mc.id)::numeric / COUNT(DISTINCT rl.id)) * 100)
-                ELSE 0 
-              END, 0
-            ) as "complianceRate"
-          FROM patients p
-          LEFT JOIN reminder_logs rl ON rl.patient_id = p.id AND rl.status = 'DELIVERED'
-          LEFT JOIN manual_confirmations mc ON mc.patient_id = p.id
-          WHERE p.deleted_at IS NULL AND p.assigned_volunteer_id = ${user.id}::uuid
-          GROUP BY p.id, p.name, p.phone_number, p.is_active, p.photo_url, p.created_at
-          ORDER BY p.is_active DESC, p.name ASC
-          LIMIT 50
-        `,
+        db.select({
+          id: patients.id,
+          name: patients.name,
+          phoneNumber: patients.phoneNumber,
+          isActive: patients.isActive,
+          photoUrl: patients.photoUrl,
+          createdAt: patients.createdAt
+        })
+        .from(patients)
+        .where(
+          and(
+            isNull(patients.deletedAt),
+            eq(patients.assignedVolunteerId, user.id)
+          )
+        )
+        .orderBy(patients.isActive, patients.name)
+        .limit(50),
         
-        prisma.$queryRaw`
-          SELECT 
-            COUNT(*) as total_patients,
-            COUNT(*) FILTER (WHERE is_active = true) as active_patients,
-            COUNT(*) FILTER (WHERE is_active = false) as inactive_patients
-          FROM patients
-          WHERE deleted_at IS NULL AND assigned_volunteer_id = ${user.id}::uuid
-        `
+        db.select({
+          totalPatients: count(),
+          activePatients: sql<number>`COUNT(*) FILTER (WHERE ${patients.isActive} = true)`,
+          inactivePatients: sql<number>`COUNT(*) FILTER (WHERE ${patients.isActive} = false)`
+        })
+        .from(patients)
+        .where(
+          and(
+            isNull(patients.deletedAt),
+            eq(patients.assignedVolunteerId, user.id)
+          )
+        )
       ])
     }
 
-    // Format response
-    const patients = Array.isArray(patientsData) ? patientsData.map((patient: any) => ({
+    // Calculate compliance rates separately for better performance (reuse logic from main patients API)
+    const patientIds = patientsData.map(p => p.id)
+    
+    // Get delivered reminders count for each patient
+    const deliveredRemindersCounts = patientIds.length > 0 ? await db
+      .select({
+        patientId: reminderLogs.patientId,
+        count: count(reminderLogs.id).as('delivered_count')
+      })
+      .from(reminderLogs)
+      .where(
+        and(
+          inArray(reminderLogs.patientId, patientIds),
+          eq(reminderLogs.status, 'DELIVERED')
+        )
+      )
+      .groupBy(reminderLogs.patientId) : []
+
+    // Get confirmations count for each patient
+    const confirmationsCounts = patientIds.length > 0 ? await db
+      .select({
+        patientId: manualConfirmations.patientId,
+        count: count(manualConfirmations.id).as('confirmations_count')
+      })
+      .from(manualConfirmations)
+      .where(inArray(manualConfirmations.patientId, patientIds))
+      .groupBy(manualConfirmations.patientId) : []
+
+    // Create compliance rate maps
+    const deliveredMap = new Map()
+    deliveredRemindersCounts.forEach(row => {
+      deliveredMap.set(row.patientId, parseInt(row.count.toString()) || 0)
+    })
+
+    const confirmationsMap = new Map()
+    confirmationsCounts.forEach(row => {
+      confirmationsMap.set(row.patientId, parseInt(row.count.toString()) || 0)
+    })
+
+    // Calculate compliance rates
+    const complianceMap = new Map()
+    patientIds.forEach(patientId => {
+      const deliveredReminders = deliveredMap.get(patientId) || 0
+      const confirmations = confirmationsMap.get(patientId) || 0
+      const complianceRate = deliveredReminders > 0 
+        ? Math.round((confirmations / deliveredReminders) * 100)
+        : 0
+      complianceMap.set(patientId, complianceRate)
+    })
+
+    // Format response with calculated compliance rates
+    const patientsFormatted = patientsData.map(patient => ({
       id: patient.id,
       name: patient.name,
       phoneNumber: patient.phoneNumber,
       isActive: patient.isActive,
       photoUrl: patient.photoUrl,
-      complianceRate: parseInt(patient.complianceRate) || 0,
+      complianceRate: complianceMap.get(patient.id) || 0,
       createdAt: patient.createdAt
-    })) : []
+    }))
 
-    const stats = Array.isArray(userStats) && userStats.length > 0 ? {
-      totalPatients: parseInt(userStats[0].total_patients) || 0,
-      activePatients: parseInt(userStats[0].active_patients) || 0,
-      inactivePatients: parseInt(userStats[0].inactive_patients) || 0
+    const stats = userStats[0] ? {
+      totalPatients: parseInt(userStats[0].totalPatients.toString()) || 0,
+      activePatients: parseInt(userStats[0].activePatients.toString()) || 0,
+      inactivePatients: parseInt(userStats[0].inactivePatients.toString()) || 0
     } : {
       totalPatients: 0,
       activePatients: 0,
@@ -118,7 +154,7 @@ export async function GET(request: NextRequest) {
         firstName: user.firstName,
         lastName: user.lastName
       },
-      patients,
+      patients: patientsFormatted,
       stats
     })
   } catch (error) {

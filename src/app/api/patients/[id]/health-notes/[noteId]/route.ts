@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@/generated/prisma'
 import { requireAuth } from '@/lib/auth-utils'
-
-const prisma = new PrismaClient()
+import { db, healthNotes, users, patients } from '@/db'
+import { eq, and } from 'drizzle-orm'
 
 // GET /api/patients/[id]/health-notes/[noteId] - Get specific health note
 export async function GET(
@@ -18,35 +17,62 @@ export async function GET(
 
     const { id: patientId, noteId } = await params
 
-    // Get health note with user verification
-    const healthNote = await prisma.healthNote.findFirst({
-      where: {
-        id: noteId,
-        patientId: patientId,
-        patient: {
-          isActive: true
-        }
-      },
-      include: {
-        recordedByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        },
-        patient: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    })
+    // Get health note with separate queries for user and patient data
+    const healthNoteResult = await db
+      .select({
+        id: healthNotes.id,
+        patientId: healthNotes.patientId,
+        note: healthNotes.note,
+        noteDate: healthNotes.noteDate,
+        recordedBy: healthNotes.recordedBy,
+        createdAt: healthNotes.createdAt,
+        updatedAt: healthNotes.updatedAt
+      })
+      .from(healthNotes)
+      .innerJoin(patients, and(
+        eq(healthNotes.patientId, patients.id),
+        eq(patients.isActive, true)
+      ))
+      .where(
+        and(
+          eq(healthNotes.id, noteId),
+          eq(healthNotes.patientId, patientId)
+        )
+      )
+      .limit(1)
 
-    if (!healthNote) {
+    if (healthNoteResult.length === 0) {
       return NextResponse.json({ error: 'Health note not found' }, { status: 404 })
+    }
+
+    const healthNoteData = healthNoteResult[0]
+
+    // Get user details
+    const userResult = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email
+      })
+      .from(users)
+      .where(eq(users.id, healthNoteData.recordedBy))
+      .limit(1)
+
+    // Get patient details
+    const patientResult = await db
+      .select({
+        id: patients.id,
+        name: patients.name
+      })
+      .from(patients)
+      .where(eq(patients.id, patientId))
+      .limit(1)
+
+    const healthNote = {
+      ...healthNoteData,
+      recordedByUser: userResult.length > 0 ? userResult[0] : null,
+      patient: patientResult.length > 0 ? patientResult[0] : null
     }
 
     return NextResponse.json({ healthNote })
@@ -92,19 +118,29 @@ export async function PUT(
     }
 
     // Check if health note exists and user has permission to edit
-    const existingNote = await prisma.healthNote.findFirst({
-      where: {
-        id: noteId,
-        patientId: patientId,
-        patient: {
-          isActive: true
-        }
-      }
-    })
+    const existingNoteResult = await db
+      .select({
+        id: healthNotes.id,
+        recordedBy: healthNotes.recordedBy
+      })
+      .from(healthNotes)
+      .innerJoin(patients, and(
+        eq(healthNotes.patientId, patients.id),
+        eq(patients.isActive, true)
+      ))
+      .where(
+        and(
+          eq(healthNotes.id, noteId),
+          eq(healthNotes.patientId, patientId)
+        )
+      )
+      .limit(1)
 
-    if (!existingNote) {
+    if (existingNoteResult.length === 0) {
       return NextResponse.json({ error: 'Health note not found' }, { status: 404 })
     }
+
+    const existingNote = existingNoteResult[0]
 
     // Only allow the original recorder or admin to edit
     if (existingNote.recordedBy !== user.id && user.role !== 'ADMIN') {
@@ -115,25 +151,41 @@ export async function PUT(
     }
 
     // Update health note
-    const updatedHealthNote = await prisma.healthNote.update({
-      where: {
-        id: noteId
-      },
-      data: {
+    const updatedResult = await db
+      .update(healthNotes)
+      .set({
         note: note.trim(),
         noteDate: new Date(noteDate)
-      },
-      include: {
-        recordedByUser: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        }
-      }
-    })
+      })
+      .where(eq(healthNotes.id, noteId))
+      .returning({
+        id: healthNotes.id,
+        patientId: healthNotes.patientId,
+        note: healthNotes.note,
+        noteDate: healthNotes.noteDate,
+        recordedBy: healthNotes.recordedBy,
+        createdAt: healthNotes.createdAt,
+        updatedAt: healthNotes.updatedAt
+      })
+
+    const updatedData = updatedResult[0]
+
+    // Get user details for response
+    const userResult = await db
+      .select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email
+      })
+      .from(users)
+      .where(eq(users.id, updatedData.recordedBy))
+      .limit(1)
+
+    const updatedHealthNote = {
+      ...updatedData,
+      recordedByUser: userResult.length > 0 ? userResult[0] : null
+    }
 
     return NextResponse.json({ healthNote: updatedHealthNote })
     
@@ -161,19 +213,29 @@ export async function DELETE(
     const { id: patientId, noteId } = await params
 
     // Check if health note exists and user has permission to delete
-    const existingNote = await prisma.healthNote.findFirst({
-      where: {
-        id: noteId,
-        patientId: patientId,
-        patient: {
-          isActive: true
-        }
-      }
-    })
+    const existingNoteResult = await db
+      .select({
+        id: healthNotes.id,
+        recordedBy: healthNotes.recordedBy
+      })
+      .from(healthNotes)
+      .innerJoin(patients, and(
+        eq(healthNotes.patientId, patients.id),
+        eq(patients.isActive, true)
+      ))
+      .where(
+        and(
+          eq(healthNotes.id, noteId),
+          eq(healthNotes.patientId, patientId)
+        )
+      )
+      .limit(1)
 
-    if (!existingNote) {
+    if (existingNoteResult.length === 0) {
       return NextResponse.json({ error: 'Health note not found' }, { status: 404 })
     }
+
+    const existingNote = existingNoteResult[0]
 
     // Only allow the original recorder or admin to delete
     if (existingNote.recordedBy !== user.id && user.role !== 'ADMIN') {
@@ -184,11 +246,9 @@ export async function DELETE(
     }
 
     // Delete health note
-    await prisma.healthNote.delete({
-      where: {
-        id: noteId
-      }
-    })
+    await db
+      .delete(healthNotes)
+      .where(eq(healthNotes.id, noteId))
 
     return NextResponse.json({ message: 'Health note deleted successfully' })
     

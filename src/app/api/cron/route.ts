@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db, reminderSchedules, patients, reminderLogs } from '@/db'
+import { eq, and, gte, lte, notExists, count } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 import { whatsappRateLimiter } from '@/lib/rate-limiter'
-import { createDateRangeQuery } from '@/lib/query-optimizer'
+
+// Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
+function createWIBDateRange(dateString: string) {
+  const date = new Date(dateString)
+  // Start of day in WIB (00:00:00)
+  const startOfDay = new Date(date)
+  startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
+  
+  // End of day in WIB (23:59:59.999)
+  const endOfDay = new Date(date)
+  endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB (UTC+7)
+  endOfDay.setDate(endOfDay.getDate() + 1)
+  
+  return { startOfDay, endOfDay }
+}
 
 // GET endpoint for Vercel Cron Functions
 export async function GET(request: NextRequest) {
@@ -59,62 +74,94 @@ async function processReminders() {
     const batchSize = 50 // Process in batches to prevent memory issues
 
     // First, get count to determine if we need batch processing
-    const totalCount = await prisma.reminderSchedule.count({
-      where: {
-        isActive: true,
-        startDate: createDateRangeQuery(todayWIB, '+07:00'),
-        reminderLogs: {
-          none: {
-            AND: [
-              { status: 'DELIVERED' },
-              { 
-                sentAt: {
-                  gte: getWIBTodayStart()
-                }
-              }
-            ]
-          }
-        }
-      }
-    })
+    const { startOfDay, endOfDay } = createWIBDateRange(todayWIB)
+    const todayStart = getWIBTodayStart()
+    
+    // Count reminder schedules that haven't been delivered today yet
+    const totalCountResult = await db
+      .select({ count: count() })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.isActive, true),
+          gte(reminderSchedules.startDate, startOfDay),
+          lte(reminderSchedules.startDate, endOfDay),
+          // Haven't been delivered today yet (using notExists for efficiency)
+          notExists(
+            db.select()
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                  eq(reminderLogs.status, 'DELIVERED'),
+                  gte(reminderLogs.sentAt, todayStart)
+                )
+              )
+          )
+        )
+      )
+    
+    const totalCount = totalCountResult[0]?.count || 0
 
     console.log(`📊 Found ${totalCount} reminder schedules to potentially process`)
 
-    let reminderSchedules: any[] = []
+    let reminderSchedulesToProcess: any[] = []
     if (totalCount > batchSize) {
       // Process in batches to prevent memory overload
       for (let skip = 0; skip < totalCount; skip += batchSize) {
-        const batch = await prisma.reminderSchedule.findMany({
-          where: {
-            isActive: true,
-            startDate: createDateRangeQuery(todayWIB, '+07:00'),
-            reminderLogs: {
-              none: {
-                AND: [
-                  { status: 'DELIVERED' },
-                  { 
-                    sentAt: {
-                      gte: getWIBTodayStart()
-                    }
-                  }
-                ]
-              }
-            }
-          },
-          include: {
-            patient: {
-              select: {
-                id: true,
-                name: true,
-                phoneNumber: true
-              }
-            }
-          },
-          skip,
-          take: batchSize,
-          orderBy: { scheduledTime: 'asc' } // Process by time order
-        })
-        reminderSchedules.push(...batch)
+        const batch = await db
+          .select({
+            // Schedule fields
+            id: reminderSchedules.id,
+            patientId: reminderSchedules.patientId,
+            medicationName: reminderSchedules.medicationName,
+            scheduledTime: reminderSchedules.scheduledTime,
+            startDate: reminderSchedules.startDate,
+            customMessage: reminderSchedules.customMessage,
+            // Patient fields
+            patientName: patients.name,
+            patientPhoneNumber: patients.phoneNumber
+          })
+          .from(reminderSchedules)
+          .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+          .where(
+            and(
+              eq(reminderSchedules.isActive, true),
+              gte(reminderSchedules.startDate, startOfDay),
+              lte(reminderSchedules.startDate, endOfDay),
+              notExists(
+                db.select()
+                  .from(reminderLogs)
+                  .where(
+                    and(
+                      eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                      eq(reminderLogs.status, 'DELIVERED'),
+                      gte(reminderLogs.sentAt, todayStart)
+                    )
+                  )
+              )
+            )
+          )
+          .offset(skip)
+          .limit(batchSize)
+          .orderBy(reminderSchedules.scheduledTime) // Process by time order
+
+        // Transform to match Prisma structure
+        const formattedBatch = batch.map(item => ({
+          id: item.id,
+          patientId: item.patientId,
+          medicationName: item.medicationName,
+          scheduledTime: item.scheduledTime,
+          startDate: item.startDate,
+          customMessage: item.customMessage,
+          patient: {
+            id: item.patientId,
+            name: item.patientName,
+            phoneNumber: item.patientPhoneNumber
+          }
+        }))
+        
+        reminderSchedulesToProcess.push(...formattedBatch)
         
         // Small delay between batches to prevent database overload
         if (skip + batchSize < totalCount) {
@@ -123,39 +170,60 @@ async function processReminders() {
       }
     } else {
       // Small dataset, process all at once
-      reminderSchedules = await prisma.reminderSchedule.findMany({
-        where: {
-          isActive: true,
-          startDate: createDateRangeQuery(todayWIB, '+07:00'),
-          reminderLogs: {
-            none: {
-              AND: [
-                { status: 'DELIVERED' },
-                { 
-                  sentAt: {
-                    gte: getWIBTodayStart()
-                  }
-                }
-              ]
-            }
-          }
-        },
-        include: {
-          patient: {
-            select: {
-              id: true,
-              name: true,
-              phoneNumber: true
-            }
-          }
-        },
-        orderBy: { scheduledTime: 'asc' }
-      })
+      const allSchedules = await db
+        .select({
+          // Schedule fields
+          id: reminderSchedules.id,
+          patientId: reminderSchedules.patientId,
+          medicationName: reminderSchedules.medicationName,
+          scheduledTime: reminderSchedules.scheduledTime,
+          startDate: reminderSchedules.startDate,
+          customMessage: reminderSchedules.customMessage,
+          // Patient fields
+          patientName: patients.name,
+          patientPhoneNumber: patients.phoneNumber
+        })
+        .from(reminderSchedules)
+        .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+        .where(
+          and(
+            eq(reminderSchedules.isActive, true),
+            gte(reminderSchedules.startDate, startOfDay),
+            lte(reminderSchedules.startDate, endOfDay),
+            notExists(
+              db.select()
+                .from(reminderLogs)
+                .where(
+                  and(
+                    eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                    eq(reminderLogs.status, 'DELIVERED'),
+                    gte(reminderLogs.sentAt, todayStart)
+                  )
+                )
+            )
+          )
+        )
+        .orderBy(reminderSchedules.scheduledTime)
+
+      // Transform to match Prisma structure
+      reminderSchedulesToProcess = allSchedules.map(item => ({
+        id: item.id,
+        patientId: item.patientId,
+        medicationName: item.medicationName,
+        scheduledTime: item.scheduledTime,
+        startDate: item.startDate,
+        customMessage: item.customMessage,
+        patient: {
+          id: item.patientId,
+          name: item.patientName,
+          phoneNumber: item.patientPhoneNumber
+        }
+      }))
     }
 
-    console.log(`📋 Found ${reminderSchedules.length} reminder schedules for today`)
+    console.log(`📋 Found ${reminderSchedulesToProcess.length} reminder schedules for today`)
 
-    for (const schedule of reminderSchedules) {
+    for (const schedule of reminderSchedulesToProcess) {
       processedCount++
       
       try {
@@ -216,7 +284,8 @@ async function processReminders() {
 
             // Create reminder log with error handling
             try {
-              const createdLog = await prisma.reminderLog.create({ data: logData })
+              const createdLogResult = await db.insert(reminderLogs).values(logData).returning()
+              const createdLog = createdLogResult[0]
               console.log(`📝 Created log for ${schedule.patient.name}: ${createdLog.id}`)
             } catch (logError) {
               console.error(`❌ Failed to create reminder log for ${schedule.patient.name}:`, logError)
@@ -257,7 +326,7 @@ async function processReminders() {
         provider: 'FONNTE'
       },
       results: {
-        schedulesFound: reminderSchedules.length,
+        schedulesFound: reminderSchedulesToProcess.length,
         schedulesProcessed: processedCount,
         messagesSent: sentCount,
         errors: errorCount,

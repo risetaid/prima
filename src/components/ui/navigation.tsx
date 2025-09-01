@@ -2,18 +2,17 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@stackframe/stack'
+import { useUser } from '@clerk/nextjs'
 import { Menu, X, User } from 'lucide-react'
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const router = useRouter()
-  const user = useUser()
+  const { user } = useUser()
 
   const menuItems = [
     { name: 'Beranda', href: '/', active: false },
     { name: 'Berita', href: '/berita', active: false },
-    { name: 'Statistik', href: '/statistik', active: false },
     { name: 'Pengingat', href: '/pengingat', active: false },
   ]
 
@@ -53,7 +52,7 @@ export function Navigation() {
             {/* Desktop Auth Button */}
             {user ? (
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">Hi, {user.displayName || user.primaryEmail}</span>
+                <span className="text-sm text-gray-600">Hi, {user.fullName || user.primaryEmailAddress?.emailAddress}</span>
                 <button
                   onClick={() => handleNavigation('/dashboard')}
                   className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
@@ -63,7 +62,7 @@ export function Navigation() {
               </div>
             ) : (
               <button
-                onClick={() => handleNavigation('/handler/signin')}
+                onClick={() => handleNavigation('/sign-in')}
                 className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
               >
                 Masuk
@@ -107,7 +106,7 @@ export function Navigation() {
               {/* Mobile Auth Button */}
               {user ? (
                 <div className="mt-4 space-y-2">
-                  <p className="text-center text-sm text-gray-600">Hi, {user.displayName || user.primaryEmail}</p>
+                  <p className="text-center text-sm text-gray-600">Hi, {user.fullName || user.primaryEmailAddress?.emailAddress}</p>
                   <button
                     onClick={() => handleNavigation('/dashboard')}
                     className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
@@ -117,7 +116,7 @@ export function Navigation() {
                 </div>
               ) : (
                 <button
-                  onClick={() => handleNavigation('/handler/signin')}
+                  onClick={() => handleNavigation('/sign-in')}
                   className="w-full mt-4 bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                 >
                   Masuk

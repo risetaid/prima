@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, patients, reminderSchedules, reminderLogs } from '@/db'
+import { eq, desc } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
 import { whatsappRateLimiter } from '@/lib/rate-limiter'
@@ -16,25 +17,57 @@ export async function GET(
     }
 
     const { id } = await params
-    // Get reminders for patient
-    const reminders = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id
-      },
-      include: {
-        patient: {
-          select: {
-            name: true,
-            phoneNumber: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    })
+    
+    // Get reminders for patient with patient info
+    const reminders = await db
+      .select({
+        // Reminder fields
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        dosage: reminderSchedules.dosage,
+        doctorName: reminderSchedules.doctorName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        frequency: reminderSchedules.frequency,
+        startDate: reminderSchedules.startDate,
+        endDate: reminderSchedules.endDate,
+        customMessage: reminderSchedules.customMessage,
+        isActive: reminderSchedules.isActive,
+        createdById: reminderSchedules.createdById,
+        createdAt: reminderSchedules.createdAt,
+        updatedAt: reminderSchedules.updatedAt,
+        // Patient fields
+        patientName: patients.name,
+        patientPhoneNumber: patients.phoneNumber
+      })
+      .from(reminderSchedules)
+      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+      .where(eq(reminderSchedules.patientId, id))
+      .orderBy(desc(reminderSchedules.createdAt))
 
-    return NextResponse.json(reminders)
+    // Format response to match Prisma structure
+    const formattedReminders = reminders.map(reminder => ({
+      id: reminder.id,
+      patientId: reminder.patientId,
+      medicationName: reminder.medicationName,
+      dosage: reminder.dosage,
+      doctorName: reminder.doctorName,
+      scheduledTime: reminder.scheduledTime,
+      frequency: reminder.frequency,
+      startDate: reminder.startDate,
+      endDate: reminder.endDate,
+      customMessage: reminder.customMessage,
+      isActive: reminder.isActive,
+      createdById: reminder.createdById,
+      createdAt: reminder.createdAt,
+      updatedAt: reminder.updatedAt,
+      patient: {
+        name: reminder.patientName,
+        phoneNumber: reminder.patientPhoneNumber
+      }
+    }))
+
+    return NextResponse.json(formattedReminders)
   } catch (error) {
     console.error('Error fetching reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -81,18 +114,21 @@ export async function POST(
     }
 
     // Verify patient exists and get phone number
-    const patient = await prisma.patient.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        phoneNumber: true
-      }
-    })
+    const patientResult = await db
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber
+      })
+      .from(patients)
+      .where(eq(patients.id, id))
+      .limit(1)
 
-    if (!patient) {
+    if (patientResult.length === 0) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
+
+    const patient = patientResult[0]
 
     // User is already available from getCurrentUser()
 
@@ -106,7 +142,7 @@ export async function POST(
     }
 
     // Create reminder schedules for each date
-    const reminderSchedules = []
+    const createdSchedules = []
 
     for (const dateString of datesToSchedule) {
       const reminderDate = new Date(dateString)
@@ -117,8 +153,9 @@ export async function POST(
         continue // Skip invalid dates
       }
       
-      const reminderSchedule = await prisma.reminderSchedule.create({
-        data: {
+      const reminderScheduleResult = await db
+        .insert(reminderSchedules)
+        .values({
           patientId: id,
           medicationName: extractMedicationName(message),
           scheduledTime: time,
@@ -128,10 +165,12 @@ export async function POST(
           isActive: true,
           customMessage: message,
           createdById: user.id
-        }
-      })
+        })
+        .returning()
 
-      reminderSchedules.push(reminderSchedule)
+      const reminderSchedule = reminderScheduleResult[0]
+
+      createdSchedules.push(reminderSchedule)
     }
 
     // Debug logging
@@ -145,7 +184,7 @@ export async function POST(
     console.log('=== END DEBUG ===')
 
     // Check if any of today's reminders should be sent now
-    for (const schedule of reminderSchedules) {
+    for (const schedule of createdSchedules) {
       const scheduleDate = schedule.startDate.toISOString().split('T')[0]
       
       if (shouldSendReminderNow(scheduleDate, time)) {
@@ -175,7 +214,7 @@ export async function POST(
             fonnteMessageId: result.messageId
           }
 
-          await prisma.reminderLog.create({ data: logData })
+          await db.insert(reminderLogs).values(logData)
         }
         
         break // Only send one immediate reminder
@@ -184,8 +223,8 @@ export async function POST(
 
     return NextResponse.json({ 
       message: 'Reminders created successfully',
-      count: reminderSchedules.length,
-      schedules: reminderSchedules.map(s => ({
+      count: createdSchedules.length,
+      schedules: createdSchedules.map(s => ({
         id: s.id,
         startDate: s.startDate,
         scheduledTime: s.scheduledTime

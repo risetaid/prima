@@ -1,19 +1,19 @@
 'use client'
 
-import { useUser } from '@stackframe/stack'
+import { useUser } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 
 export default function PendingApprovalPage() {
-  const user = useUser()
+  const { user } = useUser()
   const router = useRouter()
   const [userData, setUserData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!user) {
-      router.push('/handler/signin')
+      router.push('/sign-in')
       return
     }
 
@@ -87,7 +87,7 @@ export default function PendingApprovalPage() {
               <span className="text-sm text-gray-500">
                 atau keluar untuk ganti akun
               </span>
-              <UserMenu forceLeftTop={true} />
+              <UserButton afterSignOutUrl="/sign-in" />
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, reminderLogs, reminderSchedules, manualConfirmations } from '@/db'
+import { eq, and } from 'drizzle-orm'
 
 export async function PUT(
   request: NextRequest,
@@ -23,52 +24,94 @@ export async function PUT(
     // Use reminderLogId from request body if provided, otherwise use reminderId from URL
     const logId = reminderLogId || reminderId
 
-    // Get the reminder log to find the related schedule
-    const reminderLog = await prisma.reminderLog.findUnique({
-      where: { 
-        id: logId,
-        patientId: id
-      },
-      include: {
-        reminderSchedule: true
-      }
-    })
+    // Get the reminder log using separate queries
+    const reminderLog = await db
+      .select({
+        id: reminderLogs.id,
+        patientId: reminderLogs.patientId,
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+        message: reminderLogs.message,
+        status: reminderLogs.status
+      })
+      .from(reminderLogs)
+      .where(
+        and(
+          eq(reminderLogs.id, logId),
+          eq(reminderLogs.patientId, id)
+        )
+      )
+      .limit(1)
 
-    if (!reminderLog) {
+    if (reminderLog.length === 0) {
       return NextResponse.json({ error: 'Reminder not found' }, { status: 404 })
     }
 
-    // Check if this ReminderLog is already confirmed
-    const existingConfirmation = await prisma.manualConfirmation.findFirst({
-      where: {
-        reminderLogId: logId
-      }
-    })
+    const logData = reminderLog[0]
 
-    if (existingConfirmation) {
+    // Get reminder schedule details (if reminderScheduleId exists)
+    let reminderSchedule: any[] = []
+    if (logData.reminderScheduleId) {
+      reminderSchedule = await db
+        .select({
+          id: reminderSchedules.id,
+          medicationName: reminderSchedules.medicationName,
+          dosage: reminderSchedules.dosage
+        })
+        .from(reminderSchedules)
+        .where(eq(reminderSchedules.id, logData.reminderScheduleId))
+        .limit(1)
+    }
+
+    // Check if this ReminderLog is already confirmed
+    const existingConfirmation = await db
+      .select({
+        id: manualConfirmations.id
+      })
+      .from(manualConfirmations)
+      .where(eq(manualConfirmations.reminderLogId, logId))
+      .limit(1)
+
+    if (existingConfirmation.length > 0) {
       return NextResponse.json({ error: 'Reminder already confirmed' }, { status: 400 })
     }
 
     // Create manual confirmation with proper relations
-    const manualConfirmation = await prisma.manualConfirmation.create({
-      data: {
+    const newManualConfirmation = await db
+      .insert(manualConfirmations)
+      .values({
         patientId: id,
         volunteerId: user.id,
-        reminderScheduleId: reminderLog.reminderScheduleId,
+        reminderScheduleId: logData.reminderScheduleId,
         reminderLogId: logId,  // Link to specific ReminderLog
         visitDate: new Date(),
         visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
         medicationsTaken: medicationTaken,
-        medicationsMissed: medicationTaken ? [] : [reminderLog.reminderSchedule?.medicationName || 'Obat'],
+        medicationsMissed: medicationTaken ? [] : [reminderSchedule.length > 0 ? reminderSchedule[0].medicationName : 'Obat'],
         patientCondition: 'FAIR', // Default, could be made dynamic
         symptomsReported: [],
-        notes: `Manual confirmation for reminder: ${reminderLog.message}`,
+        notes: `Manual confirmation for reminder: ${logData.message}`,
         followUpNeeded: !medicationTaken,
         followUpNotes: medicationTaken ? null : 'Patient did not take medication as scheduled'
-      }
-    })
+      })
+      .returning({
+        id: manualConfirmations.id,
+        patientId: manualConfirmations.patientId,
+        volunteerId: manualConfirmations.volunteerId,
+        reminderScheduleId: manualConfirmations.reminderScheduleId,
+        reminderLogId: manualConfirmations.reminderLogId,
+        visitDate: manualConfirmations.visitDate,
+        visitTime: manualConfirmations.visitTime,
+        medicationsTaken: manualConfirmations.medicationsTaken,
+        medicationsMissed: manualConfirmations.medicationsMissed,
+        patientCondition: manualConfirmations.patientCondition,
+        symptomsReported: manualConfirmations.symptomsReported,
+        notes: manualConfirmations.notes,
+        followUpNeeded: manualConfirmations.followUpNeeded,
+        followUpNotes: manualConfirmations.followUpNotes,
+        confirmedAt: manualConfirmations.confirmedAt
+      })
 
-    return NextResponse.json(manualConfirmation)
+    return NextResponse.json(newManualConfirmation[0])
   } catch (error) {
     console.error('Error confirming reminder:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

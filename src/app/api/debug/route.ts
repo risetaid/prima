@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { db, reminderSchedules, reminderLogs, patients } from '@/db'
+import { eq, and, gte, lt, isNull, desc, sql, inArray } from 'drizzle-orm'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
@@ -27,41 +28,76 @@ async function debugCron() {
     const todayWIB = getWIBDateString()
     const currentTimeWIB = getWIBTimeString()
 
-    const reminderSchedules = await prisma.reminderSchedule.findMany({
-      where: {
-        isActive: true,
-        startDate: {
-          gte: new Date(todayWIB + 'T00:00:00.000Z'),
-          lt: new Date(todayWIB + 'T23:59:59.999Z')
-        },
-        reminderLogs: {
-          none: {
-            status: 'DELIVERED'
-          }
-        }
-      },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            phoneNumber: true
-          }
-        }
-      }
+    // Get active reminder schedules for today
+    const schedules = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        startDate: reminderSchedules.startDate,
+        isActive: reminderSchedules.isActive
+      })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.isActive, true),
+          gte(reminderSchedules.startDate, new Date(todayWIB + 'T00:00:00.000Z')),
+          lt(reminderSchedules.startDate, new Date(todayWIB + 'T23:59:59.999Z'))
+        )
+      )
+
+    // Get patient details for schedules
+    const patientIds = [...new Set(schedules.map(s => s.patientId))]
+    const patientDetails = patientIds.length > 0 ? await db
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber
+      })
+      .from(patients)
+      .where(inArray(patients.id, patientIds)) : []
+
+    // Get delivered logs for today
+    const scheduleIds = schedules.map(s => s.id)
+    const deliveredLogs = scheduleIds.length > 0 ? await db
+      .select({
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+        status: reminderLogs.status
+      })
+      .from(reminderLogs)
+      .where(
+        and(
+          inArray(reminderLogs.reminderScheduleId, scheduleIds),
+          eq(reminderLogs.status, 'DELIVERED')
+        )
+      ) : []
+
+    // Create patient and delivered logs lookup maps
+    const patientMap = new Map()
+    patientDetails.forEach(patient => {
+      patientMap.set(patient.id, patient)
     })
+
+    const deliveredSet = new Set(deliveredLogs.map(log => log.reminderScheduleId))
+
+    // Filter schedules that haven't been delivered
+    const undeliveredSchedules = schedules.filter(schedule => 
+      !deliveredSet.has(schedule.id)
+    )
 
     const debugInfo = {
       currentWIBTime: `${todayWIB} ${currentTimeWIB}`,
       todayWIBDate: todayWIB,
-      totalSchedulesFound: reminderSchedules.length,
-      schedules: reminderSchedules.map(schedule => {
+      totalSchedulesFound: undeliveredSchedules.length,
+      schedules: undeliveredSchedules.map(schedule => {
         const scheduleDate = schedule.startDate.toISOString().split('T')[0]
         const shouldSend = shouldSendReminderNow(scheduleDate, schedule.scheduledTime)
+        const patient = patientMap.get(schedule.patientId)
         
         return {
           id: schedule.id,
-          patientName: schedule.patient.name,
+          patientName: patient?.name || 'Unknown',
           medicationName: schedule.medicationName,
           scheduledTime: schedule.scheduledTime,
           startDate: scheduleDate,
@@ -87,61 +123,101 @@ async function debugCron() {
 
 async function debugReminderLogs() {
   try {
-    const todayLogs = await prisma.reminderLog.findMany({
-      where: {
-        sentAt: {
-          gte: getWIBTodayStart()
-        }
-      },
-      include: {
-        reminderSchedule: {
-          select: {
-            id: true,
-            medicationName: true,
-            scheduledTime: true,
-            isActive: true
-          }
-        },
-        patient: {
-          select: {
-            name: true,
-            phoneNumber: true
-          }
-        }
-      },
-      orderBy: {
-        sentAt: 'desc'
-      }
+    const todayStart = getWIBTodayStart()
+    
+    // Get today's logs
+    const todayLogsData = await db
+      .select({
+        id: reminderLogs.id,
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+        patientId: reminderLogs.patientId,
+        status: reminderLogs.status,
+        sentAt: reminderLogs.sentAt,
+        fonnteMessageId: reminderLogs.fonnteMessageId
+      })
+      .from(reminderLogs)
+      .where(gte(reminderLogs.sentAt, todayStart))
+      .orderBy(desc(reminderLogs.sentAt))
+
+    // Get reminder schedule and patient details
+    const scheduleIds = [...new Set(todayLogsData.map(log => log.reminderScheduleId).filter((id): id is string => id !== null))]
+    const patientIds = [...new Set(todayLogsData.map(log => log.patientId))]
+
+    const scheduleDetails = scheduleIds.length > 0 ? await db
+      .select({
+        id: reminderSchedules.id,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        isActive: reminderSchedules.isActive
+      })
+      .from(reminderSchedules)
+      .where(inArray(reminderSchedules.id, scheduleIds)) : []
+
+    const patientDetails = patientIds.length > 0 ? await db
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber
+      })
+      .from(patients)
+      .where(inArray(patients.id, patientIds)) : []
+
+    // Create lookup maps
+    const scheduleMap = new Map()
+    scheduleDetails.forEach(schedule => {
+      scheduleMap.set(schedule.id, schedule)
     })
 
-    const logsBySchedule = todayLogs.reduce((acc, log) => {
+    const patientMap = new Map()
+    patientDetails.forEach(patient => {
+      patientMap.set(patient.id, patient)
+    })
+
+    // Group logs by schedule
+    const logsBySchedule = todayLogsData.reduce((acc, log) => {
       const scheduleId = log.reminderScheduleId || 'no-schedule'
       if (!acc[scheduleId]) {
         acc[scheduleId] = []
       }
-      acc[scheduleId].push(log)
+      acc[scheduleId].push({
+        ...log,
+        reminderSchedule: scheduleMap.get(log.reminderScheduleId),
+        patient: patientMap.get(log.patientId)
+      })
       return acc
-    }, {} as Record<string, typeof todayLogs>)
+    }, {} as Record<string, any[]>)
 
-    const todaySchedules = await prisma.reminderSchedule.findMany({
-      where: {
-        startDate: {
-          gte: getWIBTodayStart(),
-          lt: new Date(new Date(getWIBTodayStart()).getTime() + 24 * 60 * 60 * 1000)
-        }
-      },
-      include: {
-        reminderLogs: {
-          where: {
-            sentAt: {
-              gte: getWIBTodayStart()
-            }
-          }
-        },
-        patient: {
-          select: {
-            name: true
-          }
+    // Get today's schedules
+    const todayEndTime = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+    const todaySchedulesData = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        isActive: reminderSchedules.isActive,
+        startDate: reminderSchedules.startDate
+      })
+      .from(reminderSchedules)
+      .where(
+        and(
+          gte(reminderSchedules.startDate, todayStart),
+          lt(reminderSchedules.startDate, todayEndTime)
+        )
+      )
+
+    // Get logs count for each schedule
+    const scheduleLogCounts = new Map()
+    const scheduleDeliveredStatus = new Map()
+    
+    todayLogsData.forEach(log => {
+      const scheduleId = log.reminderScheduleId
+      if (scheduleId) {
+        const currentCount = scheduleLogCounts.get(scheduleId) || 0
+        scheduleLogCounts.set(scheduleId, currentCount + 1)
+        
+        if (log.status === 'DELIVERED') {
+          scheduleDeliveredStatus.set(scheduleId, true)
         }
       }
     })
@@ -149,12 +225,12 @@ async function debugReminderLogs() {
     return NextResponse.json({
       success: true,
       debug: {
-        totalLogsToday: todayLogs.length,
-        totalSchedulesToday: todaySchedules.length,
+        totalLogsToday: todayLogsData.length,
+        totalSchedulesToday: todaySchedulesData.length,
         logsBySchedule: Object.entries(logsBySchedule).map(([scheduleId, logs]) => ({
           scheduleId,
           logCount: logs.length,
-          patientName: logs[0]?.patient.name,
+          patientName: logs[0]?.patient?.name,
           medicationName: logs[0]?.reminderSchedule?.medicationName,
           duplicates: logs.length > 1,
           logDetails: logs.map(log => ({
@@ -165,15 +241,21 @@ async function debugReminderLogs() {
             provider: 'FONNTE'
           }))
         })),
-        schedulesWithLogs: todaySchedules.map(schedule => ({
-          scheduleId: schedule.id,
-          patientName: schedule.patient.name,
-          medicationName: schedule.medicationName,
-          scheduledTime: schedule.scheduledTime,
-          isActive: schedule.isActive,
-          logCount: schedule.reminderLogs.length,
-          shouldBeFiltered: schedule.reminderLogs.some(log => log.status === 'DELIVERED')
-        }))
+        schedulesWithLogs: todaySchedulesData.map(schedule => {
+          const patient = patientMap.get(schedule.patientId)
+          const logCount = scheduleLogCounts.get(schedule.id) || 0
+          const shouldBeFiltered = scheduleDeliveredStatus.get(schedule.id) || false
+          
+          return {
+            scheduleId: schedule.id,
+            patientName: patient?.name || 'Unknown',
+            medicationName: schedule.medicationName,
+            scheduledTime: schedule.scheduledTime,
+            isActive: schedule.isActive,
+            logCount,
+            shouldBeFiltered
+          }
+        })
       }
     })
 

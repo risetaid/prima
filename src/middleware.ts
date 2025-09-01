@@ -1,13 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
-// Temporary: Simple middleware without Stack Auth
-export async function middleware(request: NextRequest) {
-  const pathname = request.nextUrl.pathname
+const isProtectedRoute = createRouteMatcher([
+  '/dashboard(.*)',
+  '/api/patients(.*)',
+  '/api/admin(.*)',
+  '/api/reminders(.*)',
+  '/api/user(.*)',
+  '/api/cron(.*)',
+  '/api/upload(.*)'
+])
+
+const isPublicRoute = createRouteMatcher([
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhooks(.*)',
+  '/pending-approval',
+  '/unauthorized'
+])
+
+export default clerkMiddleware(async (auth, req) => {
+  // Handle legacy route redirects
+  const { pathname } = req.nextUrl
   
-  // For now, just pass everything through
-  // We'll add Stack Auth middleware back in Phase 3
+  if (pathname === '/pengingat') {
+    const url = req.nextUrl.clone()
+    url.pathname = '/dashboard/pengingat'
+    return NextResponse.redirect(url)
+  }
+  
+  // Allow public routes
+  if (isPublicRoute(req)) {
+    return NextResponse.next()
+  }
+
+  // Protect dashboard and API routes
+  if (isProtectedRoute(req)) {
+    await auth.protect()
+  }
+
   return NextResponse.next()
-}
+})
 
 export const config = {
   matcher: [

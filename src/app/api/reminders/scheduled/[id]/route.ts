@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, reminderSchedules, patients } from '@/db'
+import { eq } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/timezone'
 
 export async function PUT(
@@ -21,22 +22,23 @@ export async function PUT(
     }
 
     // Find the reminder schedule
-    const reminderSchedule = await prisma.reminderSchedule.findUnique({
-      where: { id },
-      include: {
-        patient: {
-          select: {
-            id: true,
-            name: true,
-            phoneNumber: true
-          }
-        }
-      }
-    })
+    const reminderScheduleResult = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        scheduledTime: reminderSchedules.scheduledTime,
+        customMessage: reminderSchedules.customMessage,
+        medicationName: reminderSchedules.medicationName
+      })
+      .from(reminderSchedules)
+      .where(eq(reminderSchedules.id, id))
+      .limit(1)
 
-    if (!reminderSchedule) {
+    if (reminderScheduleResult.length === 0) {
       return NextResponse.json({ error: 'Reminder not found' }, { status: 404 })
     }
+
+    const reminderSchedule = reminderScheduleResult[0]
 
     // Extract medication name from custom message
     function extractMedicationName(message: string): string {
@@ -53,15 +55,23 @@ export async function PUT(
     }
 
     // Update the reminder schedule
-    const updatedReminder = await prisma.reminderSchedule.update({
-      where: { id },
-      data: {
+    const updatedReminderResult = await db
+      .update(reminderSchedules)
+      .set({
         scheduledTime: reminderTime,
         customMessage: customMessage,
         medicationName: extractMedicationName(customMessage),
         updatedAt: getWIBTime()
-      }
-    })
+      })
+      .where(eq(reminderSchedules.id, id))
+      .returning({
+        id: reminderSchedules.id,
+        scheduledTime: reminderSchedules.scheduledTime,
+        customMessage: reminderSchedules.customMessage,
+        medicationName: reminderSchedules.medicationName
+      })
+
+    const updatedReminder = updatedReminderResult[0]
 
     return NextResponse.json({
       message: 'Reminder updated successfully',

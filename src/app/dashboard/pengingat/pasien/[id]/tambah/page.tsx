@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Clock, Repeat, X, ChevronDown, Zap } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { toast } from '@/components/ui/toast'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
@@ -147,12 +147,12 @@ export default function AddReminderPage() {
       // Apply template with auto-filled data
       const messageWithData = applyTemplateVariables(template.templateText, {
         nama: autoFillData.nama,
-        obat: autoFillData.obat,
-        dosis: autoFillData.dosis,
+        obat: autoFillData.obat || '',
+        dosis: autoFillData.dosis || '',
         waktu: formData.time,
         tanggal: selectedDates.length > 0 ? selectedDates[0] : '{tanggal}',
-        dokter: autoFillData.dokter,
-        rumahSakit: autoFillData.rumahSakit,
+        dokter: autoFillData.dokter || '',
+        rumahSakit: autoFillData.rumahSakit || '',
         volunteer: autoFillData.volunteer
       })
       setFormData(prev => ({ ...prev, message: messageWithData }))
@@ -309,7 +309,7 @@ export default function AddReminderPage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

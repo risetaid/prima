@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, type AdminUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, users } from '@/db'
+import { eq } from 'drizzle-orm'
 
 export async function POST(
   request: NextRequest,
@@ -12,14 +13,24 @@ export async function POST(
     const { userId } = await params
 
     // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, isActive: true, role: true, firstName: true, lastName: true }
-    })
+    const userResult = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        isActive: users.isActive,
+        role: users.role,
+        firstName: users.firstName,
+        lastName: users.lastName
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
 
-    if (!user) {
+    if (userResult.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    const user = userResult[0]
 
     // Prevent admin from deactivating themselves or other admins
     if (user.role === 'ADMIN') {
@@ -29,19 +40,21 @@ export async function POST(
     }
 
     // Toggle user status
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
+    const updatedUserResult = await db
+      .update(users)
+      .set({
         isActive: !user.isActive
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        isActive: true
-      }
-    })
+      })
+      .where(eq(users.id, userId))
+      .returning({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        isActive: users.isActive
+      })
+
+    const updatedUser = updatedUserResult[0]
 
     console.log(`🔄 User status toggled: ${user.email} -> ${updatedUser.isActive ? 'active' : 'inactive'} by admin: ${admin.email}`)
 

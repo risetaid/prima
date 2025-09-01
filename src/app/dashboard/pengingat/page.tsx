@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { DesktopHeader } from '@/components/ui/desktop-header'
 import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
 import Image from 'next/image'
@@ -169,7 +169,7 @@ export default function ReminderPage() {
               <ArrowLeft className="w-6 h-6 text-blue-600" />
             </button>
             <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-            <UserMenu />
+            <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
       </div>

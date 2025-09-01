@@ -30,7 +30,7 @@ export default function AdminTemplatesPage() {
         }
         setHasAccess(true);
       } else {
-        router.push("/handler/signin");
+        router.push("/sign-in");
         return;
       }
     } catch (error) {

@@ -1,46 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, users } from '@/db'
+import { eq, desc, asc } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireAdmin()
-    
     if (!admin) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    // Get all users with approval info
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        isApproved: true,
-        createdAt: true,
-        approvedAt: true,
-        approver: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        }
-      },
-      orderBy: [
-        { isApproved: 'asc' }, // Pending approvals first
-        { createdAt: 'desc' }
-      ]
-    })
+    // Create alias for approver table to avoid naming conflicts
+    const approver = alias(users, 'approver')
+    
+    // Get all users with approval info using Drizzle
+    const allUsers = await db
+      .select({
+        // User fields
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        role: users.role,
+        isActive: users.isActive,
+        isApproved: users.isApproved,
+        createdAt: users.createdAt,
+        approvedAt: users.approvedAt,
+        approvedBy: users.approvedBy,
+        // Approver fields
+        approverFirstName: approver.firstName,
+        approverLastName: approver.lastName,
+        approverEmail: approver.email
+      })
+      .from(users)
+      .leftJoin(approver, eq(users.approvedBy, approver.id)) // Self-join for approver info with alias
+      .orderBy(
+        asc(users.isApproved), // Pending approvals first
+        desc(users.createdAt)
+      )
+
+    // Format response to match Prisma structure
+    const formattedUsers = allUsers.map(user => ({
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isActive: user.isActive,
+      isApproved: user.isApproved,
+      createdAt: user.createdAt,
+      approvedAt: user.approvedAt,
+      approver: user.approverFirstName ? {
+        firstName: user.approverFirstName,
+        lastName: user.approverLastName,
+        email: user.approverEmail
+      } : null
+    }))
 
     return NextResponse.json({
       success: true,
-      users,
-      count: users.length,
-      pendingCount: users.filter(u => !u.isApproved).length
+      users: formattedUsers,
+      count: formattedUsers.length,
+      pendingCount: formattedUsers.filter(u => !u.isApproved).length
     })
 
   } catch (error) {

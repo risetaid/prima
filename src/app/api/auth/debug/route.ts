@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stackServerApp } from '@/stack'
-import { prisma } from '@/lib/prisma'
+import { auth, currentUser } from '@clerk/nextjs/server'
+import { db, users } from '@/db'
+import { eq, count } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
@@ -23,34 +24,50 @@ export async function GET(request: NextRequest) {
 
 async function debugEmail() {
   try {
-    const user = await stackServerApp.getUser()
+    const { userId } = await auth()
+    const user = await currentUser()
     
-    if (!user) {
+    if (!userId || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const email = user.primaryEmail || ''
+    const email = user.primaryEmailAddress?.emailAddress || ''
 
-    const userByStackId = await prisma.user.findUnique({
-      where: { stackId: user.id }
-    })
+    const userByClerkIdResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1)
+    
+    const userByClerkId = userByClerkIdResult.length > 0 ? userByClerkIdResult[0] : null
 
-    const userByEmail = await prisma.user.findUnique({
-      where: { email: email }
-    })
+    const userByEmailResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1)
+    
+    const userByEmail = userByEmailResult.length > 0 ? userByEmailResult[0] : null
 
-    const allUsersWithEmail = await prisma.user.findMany({
-      where: { email: email },
-      select: { id: true, stackId: true, email: true, firstName: true, lastName: true, createdAt: true }
-    })
+    const allUsersWithEmail = await db
+      .select({
+        id: users.id,
+        clerkId: users.clerkId,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        createdAt: users.createdAt
+      })
+      .from(users)
+      .where(eq(users.email, email))
 
     return NextResponse.json({
-      currentStackId: user.id,
+      currentClerkId: userId,
       currentEmail: email,
-      userByStackId,
+      userByClerkId,
       userByEmail,
       allUsersWithEmail,
-      conflict: userByEmail && userByEmail.stackId !== user.id
+      conflict: userByEmail && userByEmail.clerkId !== userId
     })
   } catch (error) {
     console.error('Debug email error:', error)
@@ -63,20 +80,29 @@ async function debugEmail() {
 
 async function debugUser() {
   try {
-    const user = await stackServerApp.getUser()
+    const { userId } = await auth()
+    const user = await currentUser()
     
-    if (!user) {
+    if (!userId || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { stackId: user.id }
-    })
+    const dbUserResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1)
+    
+    const dbUser = dbUserResult.length > 0 ? dbUserResult[0] : null
 
-    const totalUsers = await prisma.user.count()
+    const totalUsersResult = await db
+      .select({ count: count(users.id) })
+      .from(users)
+    
+    const totalUsers = totalUsersResult[0]?.count || 0
 
     return NextResponse.json({
-      stackUserId: user.id,
+      clerkUserId: userId,
       userFoundInDb: !!dbUser,
       userDetails: dbUser,
       totalUsersInDb: totalUsers

@@ -1,11 +1,11 @@
 "use client";
 
-import { useUser } from "@stackframe/stack";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
 import { DesktopHeader } from "@/components/ui/desktop-header";
-import { UserMenu } from "@/components/ui/user-menu";
+import { UserButton } from "@clerk/nextjs";
 import { Shield } from "lucide-react";
 
 function MobileAdminActions() {
@@ -44,7 +44,7 @@ function MobileAdminActions() {
 }
 
 export default function DashboardPage() {
-  const user = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const [approvalStatus, setApprovalStatus] = useState<
     "loading" | "approved" | "pending" | "error"
@@ -53,7 +53,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // Redirect to sign-in if not authenticated
     if (!user) {
-      router.push("/handler/signin");
+      router.push("/sign-in");
       return;
     }
 
@@ -166,7 +166,7 @@ export default function DashboardPage() {
             {/* Mobile Admin & User Actions */}
             <div className="flex items-center space-x-3">
               <MobileAdminActions />
-              <UserMenu />
+              <UserButton afterSignOutUrl="/sign-in" />
             </div>
           </div>
         </header>

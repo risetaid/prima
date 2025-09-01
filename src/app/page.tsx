@@ -1,19 +1,19 @@
 "use client";
 
-import { useUser } from "@stackframe/stack";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { DesktopHeader } from "@/components/ui/desktop-header";
-import { UserMenu } from "@/components/ui/user-menu";
+import { UserButton } from "@clerk/nextjs";
 
 export default function LandingPage() {
-  const user = useUser();
+  const { user } = useUser();
   const router = useRouter();
 
   const handleGetStarted = () => {
     if (user) {
       router.push("/dashboard");
     } else {
-      router.push("/handler/signin");
+      router.push("/sign-in");
     }
   };
 
@@ -59,11 +59,11 @@ export default function LandingPage() {
                   >
                     Dashboard
                   </button>
-                  <UserMenu />
+                  <UserButton afterSignOutUrl="/sign-in" />
                 </>
               ) : (
                 <button
-                  onClick={() => router.push("/handler/signin")}
+                  onClick={() => router.push("/sign-in")}
                   className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
                 >
                   Masuk

@@ -1,6 +1,6 @@
 'use client'
 
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { useRouter } from 'next/navigation'
 
 export default function UnauthorizedPage() {
@@ -37,7 +37,7 @@ export default function UnauthorizedPage() {
             </button>
             
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4 pt-3 sm:pt-4 border-t border-gray-200">
-              <UserMenu />
+              <UserButton afterSignOutUrl="/sign-in" />
               <span className="text-xs sm:text-sm text-gray-500 text-center">
                 atau keluar untuk ganti akun
               </span>

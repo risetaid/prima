@@ -6,14 +6,13 @@
  * Usage: bun run scripts/seed-templates.ts
  * 
  * REQUIREMENTS:
- * - Database must be reset first: bunx prisma migrate reset --force
+ * - Database must be reset first: bunx drizzle-kit migrate
  * - davidyusaku13@gmail.com must be logged in first to create user record
  * - User must be approved (ADMIN role)
  */
 
-import { PrismaClient } from '../src/generated/prisma/index.js'
-
-const prisma = new PrismaClient()
+import { db, users, whatsappTemplates } from '../src/db/index'
+import { eq, and, count, sql } from 'drizzle-orm'
 
 interface TemplateData {
   templateName: string
@@ -141,14 +140,18 @@ const templates: TemplateData[] = [
 async function findAdminUser(): Promise<any> {
   console.log('🔍 Mencari user admin: davidyusaku13@gmail.com...')
   
-  const adminUser = await prisma.user.findFirst({
-    where: {
-      email: 'davidyusaku13@gmail.com',
-      role: 'ADMIN',
-      isActive: true,
-      isApproved: true
-    }
-  })
+  const adminUserResult = await db
+    .select()
+    .from(users)
+    .where(and(
+      eq(users.email, 'davidyusaku13@gmail.com'),
+      eq(users.role, 'ADMIN'),
+      eq(users.isActive, true),
+      eq(users.isApproved, true)
+    ))
+    .limit(1)
+  
+  const adminUser = adminUserResult.length > 0 ? adminUserResult[0] : null
   
   if (!adminUser) {
     console.error('❌ ERROR: User davidyusaku13@gmail.com tidak ditemukan atau belum approved!')
@@ -169,8 +172,11 @@ async function findAdminUser(): Promise<any> {
 async function clearExistingTemplates() {
   console.log('🧹 Menghapus template yang sudah ada...')
   
-  const deleteResult = await prisma.whatsAppTemplate.deleteMany({})
-  console.log(`✅ Berhasil menghapus ${deleteResult.count} template lama`)
+  const deletedTemplates = await db
+    .delete(whatsappTemplates)
+    .returning({ id: whatsappTemplates.id })
+  
+  console.log(`✅ Berhasil menghapus ${deletedTemplates.length} template lama`)
 }
 
 async function seedTemplates() {
@@ -192,16 +198,16 @@ async function seedTemplates() {
     
     for (const template of templates) {
       try {
-        await prisma.whatsAppTemplate.create({
-          data: {
+        await db
+          .insert(whatsappTemplates)
+          .values({
             templateName: template.templateName,
             templateText: template.templateText,
             variables: template.variables,
             category: template.category,
             isActive: true,
             createdBy: creatorUser.id
-          }
-        })
+          })
         
         console.log(`  ✅ ${template.templateName} (${template.category})`)
         successCount++
@@ -219,16 +225,19 @@ async function seedTemplates() {
     console.log(`❌ Template gagal: ${errorCount}`)
     
     // Show category breakdown
-    const categoryStats = await prisma.whatsAppTemplate.groupBy({
-      by: ['category'],
-      _count: { category: true },
-      where: { isActive: true }
-    })
+    const categoryStats = await db
+      .select({
+        category: whatsappTemplates.category,
+        count: count(whatsappTemplates.id)
+      })
+      .from(whatsappTemplates)
+      .where(eq(whatsappTemplates.isActive, true))
+      .groupBy(whatsappTemplates.category)
     
     console.log('')
     console.log('📊 BREAKDOWN PER KATEGORI:')
     for (const stat of categoryStats) {
-      console.log(`   ${stat.category}: ${stat._count.category} template`)
+      console.log(`   ${stat.category}: ${stat.count} template`)
     }
     
     console.log('')
@@ -240,7 +249,7 @@ async function seedTemplates() {
     console.error('')
     process.exit(1)
   } finally {
-    await prisma.$disconnect()
+    // No disconnect needed for Drizzle
   }
 }
 

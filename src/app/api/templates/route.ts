@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, whatsappTemplates } from '@/db'
+import { eq, and, asc } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
     if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -16,29 +16,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category') as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL' | null
 
-    const whereClause: any = {
-      isActive: true
-    }
-    
-    if (category) {
-      whereClause.category = category
-    }
+    // Build Drizzle query with conditional where clause
+    const baseQuery = db
+      .select({
+        id: whatsappTemplates.id,
+        templateName: whatsappTemplates.templateName,
+        templateText: whatsappTemplates.templateText,
+        variables: whatsappTemplates.variables,
+        category: whatsappTemplates.category,
+        createdAt: whatsappTemplates.createdAt
+      })
+      .from(whatsappTemplates)
+      .where(
+        category 
+          ? and(eq(whatsappTemplates.isActive, true), eq(whatsappTemplates.category, category))
+          : eq(whatsappTemplates.isActive, true)
+      )
+      .orderBy(asc(whatsappTemplates.category), asc(whatsappTemplates.templateName))
 
-    const templates = await prisma.whatsAppTemplate.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        templateName: true,
-        templateText: true,
-        variables: true,
-        category: true,
-        createdAt: true
-      },
-      orderBy: [
-        { category: 'asc' },
-        { templateName: 'asc' }
-      ]
-    })
+    const templates = await baseQuery
 
     // Group templates by category
     const groupedTemplates = templates.reduce((acc, template) => {

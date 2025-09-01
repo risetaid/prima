@@ -322,6 +322,10 @@ export default function TemplateManagement() {
               onTextChange={handleTextChange}
               onInsertVariable={insertVariable}
               onSubmit={handleCreateTemplate}
+              onCancel={() => {
+                resetForm()
+                setIsCreateDialogOpen(false)
+              }}
               loading={actionLoading === 'create'}
               submitLabel="Buat Template"
             />
@@ -474,6 +478,10 @@ export default function TemplateManagement() {
             onTextChange={handleTextChange}
             onInsertVariable={insertVariable}
             onSubmit={handleEditTemplate}
+            onCancel={() => {
+              resetForm()
+              setIsEditDialogOpen(false)
+            }}
             loading={actionLoading === 'edit'}
             submitLabel="Perbarui Template"
           />
@@ -547,6 +555,7 @@ function TemplateForm({
   onTextChange,
   onInsertVariable,
   onSubmit,
+  onCancel,
   loading,
   submitLabel
 }: {
@@ -555,6 +564,7 @@ function TemplateForm({
   onTextChange: (text: string) => void
   onInsertVariable: (variable: string) => void
   onSubmit: () => void
+  onCancel: () => void
   loading: boolean
   submitLabel: string
 }) {
@@ -632,7 +642,7 @@ function TemplateForm({
       )}
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" disabled={loading} className="cursor-pointer">
+        <Button type="button" variant="outline" disabled={loading} onClick={onCancel} className="cursor-pointer">
           Batal
         </Button>
         <Button 

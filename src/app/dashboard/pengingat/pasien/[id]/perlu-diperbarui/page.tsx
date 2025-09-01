@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Download, Clock } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { toast } from 'sonner'
 
 interface PendingReminder {
@@ -127,7 +127,7 @@ export default function PendingUpdatePage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

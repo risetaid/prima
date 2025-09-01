@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
+import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
+import { eq, and, notExists, desc } from 'drizzle-orm'
 import { getWIBTodayStart } from '@/lib/timezone'
 
 export async function GET(
@@ -19,51 +20,131 @@ export async function GET(
     const todayWIBStart = getWIBTodayStart()
     console.log("🔍 STATS API DEBUG - WIB Today Start:", todayWIBStart)
     
-    // SCHEDULED COUNT: Reminders that haven't been delivered yet (simple logic)
-    const scheduledReminders = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id,
-        isActive: true,
-        // Haven't been delivered yet
-        reminderLogs: {
-          none: {
-            status: 'DELIVERED'
-          }
-        }
-      },
-      include: {
-        reminderLogs: {
-          orderBy: { sentAt: 'desc' },
-          take: 3
-        }
-      }
-    })
+    // SCHEDULED COUNT: Reminders that haven't been delivered yet (optimized with subquery)
+    const scheduledReminderIds = await db
+      .select({ id: reminderSchedules.id })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.patientId, id),
+          eq(reminderSchedules.isActive, true),
+          // Haven't been delivered yet - use notExists for efficiency
+          notExists(
+            db.select()
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                  eq(reminderLogs.status, 'DELIVERED')
+                )
+              )
+          )
+        )
+      )
+
+    // Get full details for scheduled reminders with recent logs
+    const scheduledReminders = await db
+      .select({
+        id: reminderSchedules.id,
+        startDate: reminderSchedules.startDate,
+        // We'll fetch logs separately for better performance
+      })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.patientId, id),
+          eq(reminderSchedules.isActive, true),
+          notExists(
+            db.select()
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                  eq(reminderLogs.status, 'DELIVERED')
+                )
+              )
+          )
+        )
+      )
 
     console.log("🔍 STATS API DEBUG - Scheduled count:", scheduledReminders.length)
     scheduledReminders.forEach(reminder => {
-      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${reminder.reminderLogs.length} | Latest: ${reminder.reminderLogs[0]?.status} at ${reminder.reminderLogs[0]?.sentAt}`)
+      console.log(`- ${reminder.startDate.toISOString()} | Schedule ID: ${reminder.id}`)
     })
 
     // ALL REMINDERS: Get all active reminders for other status calculations
-    const allReminderSchedules = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id,
-        isActive: true
-      },
-      include: {
-        reminderLogs: {
-          orderBy: { sentAt: 'desc' },
-          take: 1, // Latest log only
-          include: {
-            manualConfirmations: true // Include confirmations for this specific log
-          }
-        },
-        manualConfirmations: {
-          orderBy: { visitDate: 'desc' },
-          take: 1 // Latest confirmation only
-        }
+    // First get all active reminder schedules
+    const allReminderSchedules = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        startDate: reminderSchedules.startDate
+      })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.patientId, id),
+          eq(reminderSchedules.isActive, true)
+        )
+      )
+
+    // Get latest logs for each schedule (separate query for better performance)
+    const latestLogs: any[] = []
+    for (const schedule of allReminderSchedules) {
+      const logs = await db
+        .select({
+          id: reminderLogs.id,
+          reminderScheduleId: reminderLogs.reminderScheduleId,
+          status: reminderLogs.status,
+          sentAt: reminderLogs.sentAt
+        })
+        .from(reminderLogs)
+        .where(eq(reminderLogs.reminderScheduleId, schedule.id))
+        .orderBy(desc(reminderLogs.sentAt))
+        .limit(1)
+
+      if (logs.length > 0) {
+        latestLogs.push(logs[0])
       }
-    })
+    }
+
+    // Get manual confirmations for each schedule
+    const scheduleConfirmations: any[] = []
+    for (const schedule of allReminderSchedules) {
+      const confirmations = await db
+        .select({
+          id: manualConfirmations.id,
+          patientId: manualConfirmations.patientId,
+          reminderLogId: manualConfirmations.reminderLogId,
+          visitDate: manualConfirmations.visitDate
+        })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.patientId, schedule.patientId))
+        .orderBy(desc(manualConfirmations.visitDate))
+        .limit(1)
+
+      if (confirmations.length > 0) {
+        scheduleConfirmations.push(confirmations[0])
+      }
+    }
+
+    // Get log confirmations for specific logs
+    const logConfirmations: any[] = []
+    for (const log of latestLogs) {
+      const confirmations = await db
+        .select({
+          id: manualConfirmations.id,
+          reminderLogId: manualConfirmations.reminderLogId,
+          visitDate: manualConfirmations.visitDate
+        })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.reminderLogId, log.id))
+        .limit(1)
+
+      if (confirmations.length > 0) {
+        logConfirmations.push(confirmations[0])
+      }
+    }
 
     // Count by status using same logic as /all endpoint
     const statusCounts = {
@@ -74,14 +155,17 @@ export async function GET(
 
     // Count pending and completed from all reminders
     allReminderSchedules.forEach(schedule => {
-      const latestLog = schedule.reminderLogs[0]
-      const scheduleConfirmation = schedule.manualConfirmations[0]
+      // Find latest log for this schedule
+      const latestLog = latestLogs.find(log => log.reminderScheduleId === schedule.id)
+      // Find schedule confirmation for this patient
+      const scheduleConfirmation = scheduleConfirmations.find(conf => conf.patientId === schedule.patientId)
       
       // Determine status based on proper relations (same logic as /all)
       let status = 'scheduled'
 
       if (latestLog) {
-        const logConfirmation = latestLog.manualConfirmations[0]
+        // Find log confirmation for this specific log
+        const logConfirmation = logConfirmations.find(conf => conf.reminderLogId === latestLog.id)
         
         if (logConfirmation) {
           // This specific log has been confirmed

@@ -1,8 +1,8 @@
 "use client";
 
-import { useUser } from "@stackframe/stack";
+import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
-import { UserMenu } from "@/components/ui/user-menu";
+import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Shield, Bug, Settings } from "lucide-react";
@@ -68,7 +68,7 @@ function AdminActions() {
 }
 
 export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
-  const user = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -106,7 +106,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
 
     // If user not authenticated and trying to access dashboard, redirect to signin
     if (!user && href.startsWith("/dashboard")) {
-      router.push("/handler/signin");
+      router.push("/sign-in");
       return;
     }
 
@@ -171,10 +171,10 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
           {/* User Menu or Sign In */}
           <div className="flex items-center space-x-4">
             {user ? (
-              <UserMenu />
+              <UserButton afterSignOutUrl="/sign-in" />
             ) : (
               <button
-                onClick={() => router.push("/handler/signin")}
+                onClick={() => router.push("/sign-in")}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 Masuk

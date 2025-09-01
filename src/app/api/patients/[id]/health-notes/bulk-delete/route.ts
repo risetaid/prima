@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@/generated/prisma'
 import { requireAuth } from '@/lib/auth-utils'
-
-const prisma = new PrismaClient()
+import { db, patients, healthNotes } from '@/db'
+import { eq, and, inArray } from 'drizzle-orm'
 
 // POST /api/patients/[id]/health-notes/bulk-delete - Delete multiple health notes
 export async function POST(
@@ -29,24 +28,30 @@ export async function POST(
     }
 
     // Verify patient exists
-    const patient = await prisma.patient.findFirst({
-      where: {
-        id: patientId,
-        isActive: true
-      }
-    })
+    const patientResult = await db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(
+        eq(patients.id, patientId),
+        eq(patients.isActive, true)
+      ))
+      .limit(1)
 
-    if (!patient) {
+    if (patientResult.length === 0) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
     // Check if all notes exist and belong to this patient
-    const existingNotes = await prisma.healthNote.findMany({
-      where: {
-        id: { in: noteIds },
-        patientId: patientId
-      }
-    })
+    const existingNotes = await db
+      .select({
+        id: healthNotes.id,
+        recordedBy: healthNotes.recordedBy
+      })
+      .from(healthNotes)
+      .where(and(
+        inArray(healthNotes.id, noteIds),
+        eq(healthNotes.patientId, patientId)
+      ))
 
     if (existingNotes.length !== noteIds.length) {
       return NextResponse.json(
@@ -68,12 +73,15 @@ export async function POST(
     }
 
     // Delete the notes
-    const deleteResult = await prisma.healthNote.deleteMany({
-      where: {
-        id: { in: noteIds },
-        patientId: patientId
-      }
-    })
+    const deletedNotes = await db
+      .delete(healthNotes)
+      .where(and(
+        inArray(healthNotes.id, noteIds),
+        eq(healthNotes.patientId, patientId)
+      ))
+      .returning({ id: healthNotes.id })
+
+    const deleteResult = { count: deletedNotes.length }
 
     return NextResponse.json({
       message: `${deleteResult.count} health notes deleted successfully`,

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Calendar, Activity } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { DesktopHeader } from '@/components/ui/desktop-header'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
@@ -148,7 +148,7 @@ export default function PatientSymptomsPage() {
             <ArrowLeft className="w-6 h-6 text-blue-600" />
           </button>
           <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

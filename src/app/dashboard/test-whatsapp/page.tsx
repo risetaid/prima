@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Send, Settings } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
 
 export default function TestWhatsAppPage() {
@@ -106,7 +106,7 @@ Tim PRIMA - Berbagi Kasih`
             </button>
             <h1 className="text-2xl font-bold text-blue-600">Test WhatsApp System</h1>
           </div>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

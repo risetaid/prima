@@ -1,49 +1,58 @@
 import { NextResponse } from 'next/server'
-import { stackServerApp } from '@/stack'
-import { prisma } from '@/lib/prisma'
+import { auth, currentUser } from '@clerk/nextjs/server'
+import { db, users } from '@/db'
+import { eq, count } from 'drizzle-orm'
 
 export async function POST() {
   try {
-    const user = await stackServerApp.getUser()
+    const { userId } = await auth()
+    const user = await currentUser()
     
-    if (!user) {
+    if (!userId || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { stackId: user.id }
-    })
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1)
 
-    if (existingUser) {
+    if (existingUser.length > 0) {
       return NextResponse.json({ 
         success: true, 
         message: 'User already exists in database',
-        user: existingUser
+        user: existingUser[0]
       })
     }
 
     // Check if this is the first user (should be admin)
-    const userCount = await prisma.user.count()
+    const userCountResult = await db
+      .select({ count: count(users.id) })
+      .from(users)
+    
+    const userCount = userCountResult[0]?.count || 0
     const isFirstUser = userCount === 0
 
     // Create user in database
-    const newUser = await prisma.user.create({
-      data: {
-        stackId: user.id,
-        email: user.primaryEmail || '',
-        firstName: user.displayName?.split(' ')[0] || '',
-        lastName: user.displayName?.split(' ')[1] || '',
+    const newUser = await db
+      .insert(users)
+      .values({
+        clerkId: userId,
+        email: user.primaryEmailAddress?.emailAddress || '',
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
         role: isFirstUser ? 'ADMIN' : 'MEMBER',
         isApproved: isFirstUser, // First user auto-approved
         approvedAt: isFirstUser ? new Date() : null,
-      },
-    })
+      })
+      .returning()
 
     return NextResponse.json({ 
       success: true, 
       message: 'User synced successfully',
-      user: newUser
+      user: newUser[0]
     })
   } catch (error) {
     console.error('Sync user error:', error)

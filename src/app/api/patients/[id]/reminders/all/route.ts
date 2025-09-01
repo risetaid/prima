@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { prisma } from '@/lib/prisma'
-import { createEfficientPagination } from '@/lib/query-optimizer'
+import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
+import { eq, and, desc } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
@@ -19,39 +19,95 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
-    const pagination = createEfficientPagination(page, limit)
+    const offset = (page - 1) * limit
 
-    // Revert to Prisma ORM query with optimizations - keeping original UI logic intact
-    const reminderSchedules = await prisma.reminderSchedule.findMany({
-      where: {
-        patientId: id,
-        isActive: true
-      },
-      include: {
-        reminderLogs: {
-          orderBy: { sentAt: 'desc' },
-          take: 1, // Latest log only
-          include: {
-            manualConfirmations: {
-              orderBy: { confirmedAt: 'desc' },
-              take: 1 // Only latest confirmation per log
-            }
-          }
-        },
-        manualConfirmations: {
-          orderBy: { visitDate: 'desc' },
-          take: 1 // Latest confirmation only
-        }
-      },
-      orderBy: { startDate: 'desc' },
-      take: limit,
-      skip: (page - 1) * limit
-    })
+    // Get all active reminder schedules first (optimized approach)
+    const allReminderSchedules = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        startDate: reminderSchedules.startDate,
+        customMessage: reminderSchedules.customMessage
+      })
+      .from(reminderSchedules)
+      .where(
+        and(
+          eq(reminderSchedules.patientId, id),
+          eq(reminderSchedules.isActive, true)
+        )
+      )
+      .orderBy(desc(reminderSchedules.startDate))
+      .offset(offset)
+      .limit(limit)
 
-    // Transform Prisma results to unified format (keeping original logic)
-    const allReminders = reminderSchedules.map(schedule => {
-      const latestLog = schedule.reminderLogs[0]
-      const scheduleConfirmation = schedule.manualConfirmations[0]
+    // Get latest logs for each schedule (separate query for better performance)
+    const latestLogs: any[] = []
+    for (const schedule of allReminderSchedules) {
+      const logs = await db
+        .select({
+          id: reminderLogs.id,
+          reminderScheduleId: reminderLogs.reminderScheduleId,
+          status: reminderLogs.status,
+          sentAt: reminderLogs.sentAt
+        })
+        .from(reminderLogs)
+        .where(eq(reminderLogs.reminderScheduleId, schedule.id))
+        .orderBy(desc(reminderLogs.sentAt))
+        .limit(1)
+
+      if (logs.length > 0) {
+        latestLogs.push(logs[0])
+      }
+    }
+
+    // Get manual confirmations for each schedule
+    const scheduleConfirmations: any[] = []
+    for (const schedule of allReminderSchedules) {
+      const confirmations = await db
+        .select({
+          id: manualConfirmations.id,
+          patientId: manualConfirmations.patientId,
+          reminderLogId: manualConfirmations.reminderLogId,
+          visitDate: manualConfirmations.visitDate,
+          medicationsTaken: manualConfirmations.medicationsTaken
+        })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.patientId, schedule.patientId))
+        .orderBy(desc(manualConfirmations.visitDate))
+        .limit(1)
+
+      if (confirmations.length > 0) {
+        scheduleConfirmations.push(confirmations[0])
+      }
+    }
+
+    // Get log confirmations for specific logs
+    const logConfirmations: any[] = []
+    for (const log of latestLogs) {
+      const confirmations = await db
+        .select({
+          id: manualConfirmations.id,
+          reminderLogId: manualConfirmations.reminderLogId,
+          visitDate: manualConfirmations.visitDate,
+          medicationsTaken: manualConfirmations.medicationsTaken
+        })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.reminderLogId, log.id))
+        .limit(1)
+
+      if (confirmations.length > 0) {
+        logConfirmations.push(confirmations[0])
+      }
+    }
+
+    // Transform results to unified format (using Drizzle data with same logic)
+    const allReminders = allReminderSchedules.map(schedule => {
+      // Find latest log for this schedule
+      const latestLog = latestLogs.find(log => log.reminderScheduleId === schedule.id)
+      // Find schedule confirmation for this patient
+      const scheduleConfirmation = scheduleConfirmations.find(conf => conf.patientId === schedule.patientId)
       
       // Determine status based on proper relations
       let status = 'scheduled'
@@ -59,7 +115,8 @@ export async function GET(
       let id_suffix = schedule.id
 
       if (latestLog) {
-        const logConfirmation = latestLog.manualConfirmations[0]
+        // Find log confirmation for this specific log
+        const logConfirmation = logConfirmations.find(conf => conf.reminderLogId === latestLog.id)
         
         if (logConfirmation) {
           // This specific log has been confirmed

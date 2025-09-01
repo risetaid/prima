@@ -2,7 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 
 export default function VideoPage() {
   const router = useRouter()
@@ -20,7 +20,7 @@ export default function VideoPage() {
             </button>
             <h1 className="text-2xl font-bold text-blue-600">Video Edukasi</h1>
           </div>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

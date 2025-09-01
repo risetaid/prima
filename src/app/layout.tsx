@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
-import { StackProvider, StackTheme } from "@stackframe/stack";
-import { stackServerApp } from "../stack";
+import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -59,8 +58,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <StackProvider app={stackServerApp}>
-          <StackTheme />
+        <ClerkProvider>
           {children}
           <Toaster
             position="top-center"
@@ -89,7 +87,7 @@ export default function RootLayout({
               `,
             }}
           />
-        </StackProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

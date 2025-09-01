@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search, Filter } from 'lucide-react'
-import { UserMenu } from '@/components/ui/user-menu'
+import { UserButton } from '@clerk/nextjs'
 
 interface Patient {
   id: string
@@ -105,7 +105,7 @@ export default function PatientListPage() {
             </button>
             <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
           </div>
-          <UserMenu />
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 

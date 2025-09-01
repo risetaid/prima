@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@stackframe/stack";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Shield, Users, MessageSquareText, Settings, Bug, ChevronRight, AlertCircle, FlaskConical } from "lucide-react";
@@ -8,7 +8,7 @@ import { DesktopHeader } from "@/components/ui/desktop-header";
 import { toast } from "sonner";
 
 export default function AdminPanelPage() {
-  const user = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +38,7 @@ export default function AdminPanelPage() {
         }
         setUserRole(data.role);
       } else {
-        router.push("/handler/signin");
+        router.push("/sign-in");
         return;
       }
     } catch (error) {

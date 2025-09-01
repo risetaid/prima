@@ -1,13 +1,18 @@
-import { prisma } from '../src/lib/prisma'
+import { db, users } from '../src/db/index'
+import { eq, asc } from 'drizzle-orm'
 
 async function createFirstAdmin() {
   try {
     console.log('🔍 Checking for existing admin users...')
     
     // Check if any admin user exists
-    const existingAdmin = await prisma.user.findFirst({
-      where: { role: 'ADMIN' }
-    })
+    const existingAdminResult = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, 'ADMIN'))
+      .limit(1)
+    
+    const existingAdmin = existingAdminResult.length > 0 ? existingAdminResult[0] : null
 
     if (existingAdmin) {
       console.log('✅ Admin user already exists:', existingAdmin.email)
@@ -16,10 +21,14 @@ async function createFirstAdmin() {
 
     console.log('📝 No admin user found. Creating first admin...')
     
-    // Get the first user from Clerk (assuming they should be admin)
-    const firstUser = await prisma.user.findFirst({
-      orderBy: { createdAt: 'asc' }
-    })
+    // Get the first user from database (assuming they should be admin)
+    const firstUserResult = await db
+      .select()
+      .from(users)
+      .orderBy(asc(users.createdAt))
+      .limit(1)
+    
+    const firstUser = firstUserResult.length > 0 ? firstUserResult[0] : null
 
     if (!firstUser) {
       console.log('❌ No users found in database. Please register a user first.')
@@ -27,15 +36,18 @@ async function createFirstAdmin() {
     }
 
     // Update the first user to be admin and approved
-    const adminUser = await prisma.user.update({
-      where: { id: firstUser.id },
-      data: {
+    const adminUserResult = await db
+      .update(users)
+      .set({
         role: 'ADMIN',
         isApproved: true,
         approvedAt: new Date(),
         approvedBy: firstUser.id // Self-approved
-      }
-    })
+      })
+      .where(eq(users.id, firstUser.id))
+      .returning()
+    
+    const adminUser = adminUserResult[0]
 
     console.log('🎉 First admin user created successfully!')
     console.log('📧 Email:', adminUser.email)
@@ -46,7 +58,7 @@ async function createFirstAdmin() {
   } catch (error) {
     console.error('❌ Error creating first admin:', error)
   } finally {
-    await prisma.$disconnect()
+    // No disconnect needed for Drizzle
   }
 }
 

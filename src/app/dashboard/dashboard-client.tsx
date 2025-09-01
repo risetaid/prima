@@ -6,7 +6,7 @@ import { useCallback, memo, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import Image from "next/image";
-import { useUser } from "@stackframe/stack";
+import { useUser } from "@clerk/nextjs";
 import { PatientListTable } from "@/components/dashboard/patient-list-table";
 
 interface Patient {
@@ -20,7 +20,7 @@ interface Patient {
 
 function DashboardClient() {
   const router = useRouter();
-  const user = useUser();
+  const { user } = useUser();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
