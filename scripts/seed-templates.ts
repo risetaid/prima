@@ -138,14 +138,14 @@ const templates: TemplateData[] = [
 ]
 
 async function findAdminUser(): Promise<any> {
-  console.log('🔍 Mencari user admin: davidyusaku13@gmail.com...')
+  console.log('🔍 Mencari user superadmin: davidyusaku13@gmail.com...')
   
   const adminUserResult = await db
     .select()
     .from(users)
     .where(and(
       eq(users.email, 'davidyusaku13@gmail.com'),
-      eq(users.role, 'ADMIN'),
+      eq(users.role, 'SUPERADMIN'),
       eq(users.isActive, true),
       eq(users.isApproved, true)
     ))
@@ -160,12 +160,12 @@ async function findAdminUser(): Promise<any> {
     console.error('1. Jalankan aplikasi: bun run dev')  
     console.error('2. Login dengan davidyusaku13@gmail.com via Stack Auth')
     console.error('3. Approve user tersebut di admin panel')
-    console.error('4. Pastikan role = ADMIN')
+    console.error('4. Pastikan role = SUPERADMIN')
     console.error('')
-    throw new Error('Admin user tidak tersedia untuk seeding')
+    throw new Error('Superadmin user tidak tersedia untuk seeding')
   }
   
-  console.log(`✅ Admin user ditemukan: ${adminUser.email} (${adminUser.firstName} ${adminUser.lastName})`)
+  console.log(`✅ Superadmin user ditemukan: ${adminUser.email} (${adminUser.firstName} ${adminUser.lastName})`)
   return adminUser
 }
 
