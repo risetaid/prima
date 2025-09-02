@@ -4,6 +4,8 @@ import { useState, useRef } from 'react'
 import { User, X, Camera, Upload } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 interface AddPatientDialogProps {
   isOpen: boolean
@@ -121,26 +123,16 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-4 sm:p-6 w-full max-w-sm mx-auto max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <div className="flex items-center space-x-2">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-sm max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center space-x-2">
             <User className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900">Tambah Pasien</h2>
-          </div>
-          <button 
-            onClick={handleCancel}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-1"
-          >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
-          </button>
-        </div>
+            <span>Tambah Pasien</span>
+          </DialogTitle>
+        </DialogHeader>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           {/* Photo Upload */}
           <div>
@@ -216,25 +208,25 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
             />
           </div>
 
-          {/* Buttons */}
-          <div className="flex space-x-3 pt-3 sm:pt-4">
-            <button
+          <DialogFooter className="gap-3 pt-3 sm:pt-4">
+            <Button
               type="button"
+              variant="outline"
               onClick={handleCancel}
-              className="flex-1 bg-gray-200 text-gray-700 py-2.5 sm:py-3 rounded-xl font-medium hover:bg-gray-300 transition-colors text-sm sm:text-base cursor-pointer"
+              className="flex-1"
             >
               Batal
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-blue-500 text-white py-2.5 sm:py-3 rounded-xl font-medium hover:bg-blue-600 transition-colors disabled:opacity-50 text-sm sm:text-base cursor-pointer"
+              className="flex-1"
             >
               {loading ? 'Loading...' : 'Tambah'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

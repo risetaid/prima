@@ -6,6 +6,8 @@ import { X, Clock, Repeat, ChevronDown, Zap } from 'lucide-react'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 interface Patient {
   id: string
@@ -287,24 +289,15 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b flex-shrink-0">
-          <h2 className="text-xl font-bold text-gray-900">Tambah Pengingat Baru</h2>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-        
-        {/* Modal Content */}
-        <div className="p-6 overflow-y-auto flex-1">
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Tambah Pengingat Baru</DialogTitle>
+          </DialogHeader>
+          
+          <div className="overflow-y-auto flex-1 px-1">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
@@ -599,43 +592,36 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
         
         {/* Modal Footer */}
         {!loading && (
-          <div className="flex space-x-4 p-6 border-t flex-shrink-0">
-            <button
+          <DialogFooter className="gap-3">
+            <Button
               type="button"
+              variant="outline"
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
+              className="flex-1"
             >
               ✕ Batal
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1 bg-red-500 text-white py-3 px-6 rounded-xl font-semibold hover:bg-red-600 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="flex-1 bg-red-500 hover:bg-red-600"
             >
-              <span>▶</span>
-              <span>{submitting ? 'Loading...' : 'Submit'}</span>
-            </button>
-          </div>
+              <span className="mr-2">▶</span>
+              {submitting ? 'Loading...' : 'Submit'}
+            </Button>
+          </DialogFooter>
         )}
-      </div>
-      
-      {/* Custom Recurrence Modal */}
-      {isCustomRecurrenceOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
-          <div className="bg-white rounded-lg w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-900">Pengulangan Kustom</h3>
-              <button
-                onClick={() => setIsCustomRecurrenceOpen(false)}
-                className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-            
-            {/* Modal Content */}
-            <div className="p-4 space-y-4 overflow-y-auto flex-1">
+      </DialogContent>
+    </Dialog>
+
+    {/* Custom Recurrence Modal */}
+    <Dialog open={isCustomRecurrenceOpen} onOpenChange={setIsCustomRecurrenceOpen}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Pengulangan Kustom</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4 overflow-y-auto flex-1">
               {/* Repeat every */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -753,28 +739,27 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                 </div>
               </div>
             </div>
-            
-            {/* Modal Footer */}
-            <div className="flex space-x-3 p-4 border-t flex-shrink-0">
-              <button
-                onClick={() => setIsCustomRecurrenceOpen(false)}
-                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                onClick={() => {
-                  setCustomRecurrence(prev => ({ ...prev, enabled: true }))
-                  setIsCustomRecurrenceOpen(false)
-                }}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer"
-              >
-                Selesai
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+          
+          <DialogFooter className="gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setIsCustomRecurrenceOpen(false)}
+              className="flex-1"
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={() => {
+                setCustomRecurrence(prev => ({ ...prev, enabled: true }))
+                setIsCustomRecurrenceOpen(false)
+              }}
+              className="flex-1"
+            >
+              Selesai
+            </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

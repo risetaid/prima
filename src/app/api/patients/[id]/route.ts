@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules, patientMedications, medications } from '@/db'
 import { eq, and, isNull, count } from 'drizzle-orm'
+import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL, invalidatePatientCache } from '@/lib/cache'
 
 export async function GET(
   request: NextRequest,
@@ -14,6 +15,14 @@ export async function GET(
     }
 
     const { id } = await params
+    
+    // Try to get from cache first
+    const cacheKey = CACHE_KEYS.patient(id)
+    const cachedPatient = await getCachedData(cacheKey)
+    
+    if (cachedPatient) {
+      return NextResponse.json(cachedPatient)
+    }
     
     // Get patient with assigned volunteer
     const patientResult = await db
@@ -122,6 +131,9 @@ export async function GET(
       complianceRate
     }
 
+    // Cache the patient data
+    await setCachedData(cacheKey, patient, CACHE_TTL.PATIENT)
+
     return NextResponse.json(patient)
   } catch (error) {
     console.error('Error fetching patient:', error)
@@ -197,6 +209,9 @@ export async function PUT(
 
     const patient = updatedPatientResult[0]
 
+    // Invalidate patient cache after update
+    await invalidatePatientCache(id)
+
     return NextResponse.json(patient)
   } catch (error) {
     console.error('Error updating patient:', error)
@@ -250,6 +265,9 @@ export async function DELETE(
         updatedAt: deleteTime
       })
       .where(eq(reminderSchedules.patientId, id))
+
+    // Invalidate patient cache after deletion
+    await invalidatePatientCache(id)
 
     return NextResponse.json({ 
       message: 'Patient deleted successfully',

@@ -14,6 +14,7 @@ export default function VerificationActionsPanel({
 }: VerificationActionsPanelProps) {
   const [sending, setSending] = useState(false)
   const [showManualVerify, setShowManualVerify] = useState(false)
+  const [reactivating, setReactivating] = useState(false)
 
   const handleSendVerification = async () => {
     setSending(true)
@@ -63,6 +64,33 @@ export default function VerificationActionsPanel({
     }
   }
 
+  const handleReactivation = async () => {
+    if (!confirm('Yakin ingin mengaktifkan kembali pasien ini? Pasien akan kembali ke status "Menunggu Verifikasi".')) {
+      return
+    }
+
+    setReactivating(true)
+    try {
+      const response = await fetch(`/api/patients/${patient.id}/reactivate`, {
+        method: 'POST'
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        toast.success(`✅ ${data.message}`)
+        toast.info(`ℹ️ ${data.nextStep}`)
+        onUpdate()
+      } else {
+        toast.error(`❌ Gagal mengaktifkan kembali: ${data.error}`)
+      }
+    } catch (error) {
+      console.error('Reactivation error:', error)
+      toast.error('❌ Terjadi kesalahan saat mengaktifkan kembali')
+    }
+    setReactivating(false)
+  }
+
   return (
     <div className="actions-panel">
       <div className="flex items-center gap-3 mb-4">
@@ -83,7 +111,7 @@ export default function VerificationActionsPanel({
             <button
               onClick={handleSendVerification}
               disabled={sending}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all duration-200 font-medium"
             >
               {sending ? (
                 <>
@@ -102,7 +130,7 @@ export default function VerificationActionsPanel({
             
             <button
               onClick={() => setShowManualVerify(!showManualVerify)}
-              className="flex-1 sm:flex-none px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 font-medium"
+              className="flex-1 sm:flex-none px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 cursor-pointer transition-all duration-200 font-medium"
             >
               Verifikasi Manual
             </button>
@@ -114,7 +142,7 @@ export default function VerificationActionsPanel({
             <button
               onClick={handleSendVerification}
               disabled={sending}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all duration-200 font-medium"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all duration-200 font-medium"
             >
               {sending ? (
                 <>
@@ -133,7 +161,7 @@ export default function VerificationActionsPanel({
             
             <button
               onClick={() => handleManualVerification('verified')}
-              className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 font-medium"
+              className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-all duration-200 font-medium"
             >
               Setujui Manual
             </button>
@@ -165,6 +193,48 @@ export default function VerificationActionsPanel({
             </div>
           </div>
         )}
+
+        {/* Inactive Patient (BERHENTI) Section */}
+        {!patient.isActive && patient.verificationStatus === 'declined' && (
+          <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-red-800 font-medium mb-1">
+                  Pasien Tidak Aktif (BERHENTI)
+                </p>
+                <p className="text-red-700 text-sm mb-3">
+                  Pasien telah mengirim pesan BERHENTI dan tidak menerima reminder.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleReactivation}
+                    disabled={reactivating}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all duration-200 font-medium"
+                  >
+                    {reactivating ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
+                        Mengaktifkan...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Aktifkan Kembali
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Manual Verification Options */}
@@ -186,7 +256,7 @@ export default function VerificationActionsPanel({
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={() => handleManualVerification('verified')}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-all duration-200 font-medium"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 cursor-pointer transition-all duration-200 font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -195,7 +265,7 @@ export default function VerificationActionsPanel({
             </button>
             <button
               onClick={() => handleManualVerification('declined')}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-all duration-200 font-medium"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 cursor-pointer transition-all duration-200 font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -204,7 +274,7 @@ export default function VerificationActionsPanel({
             </button>
             <button
               onClick={() => setShowManualVerify(false)}
-              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 transition-all duration-200 font-medium"
+              className="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 cursor-pointer transition-all duration-200 font-medium"
             >
               Batal
             </button>

@@ -1,79 +1,60 @@
 'use client'
 
+import { getPatientDisplayStatus } from '@/lib/patient-status'
+
 type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
 
 interface VerificationBadgeProps {
   status: VerificationStatus
   size?: 'small' | 'large'
   className?: string
+  // For BERHENTI detection
+  isActive?: boolean
+  patient?: any // Full patient object for better status detection
 }
 
 export default function VerificationBadge({ 
   status, 
   size = 'small', 
-  className = '' 
+  className = '',
+  isActive = true,
+  patient
 }: VerificationBadgeProps) {
-  const statusConfig = {
-    pending_verification: {
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      icon: '⏳',
-      text: 'Menunggu'
-    },
-    verified: {
-      color: 'bg-green-100 text-green-800 border-green-200',
-      icon: '✅',
-      text: 'Terverifikasi'
-    },
-    declined: {
-      color: 'bg-red-100 text-red-800 border-red-200',
-      icon: '❌',
-      text: 'Menolak'
-    },
-    expired: {
-      color: 'bg-orange-100 text-orange-800 border-orange-200',
-      icon: '⏰',
-      text: 'Kedaluwarsa'
-    },
-    unsubscribed: {
-      color: 'bg-gray-100 text-gray-800 border-gray-200',
-      icon: '🛑',
-      text: 'Berhenti'
-    }
-  }
+  // Use new centralized status logic
+  const statusInfo = patient 
+    ? getPatientDisplayStatus(patient)
+    : getPatientDisplayStatus({ verificationStatus: status, isActive })
 
-  const config = statusConfig[status] || statusConfig.pending_verification
   const sizeClasses = size === 'large' 
     ? 'px-4 py-2 text-sm font-semibold' 
     : 'px-2.5 py-0.5 text-xs font-medium'
 
   return (
     <span 
-      className={`inline-flex items-center rounded-full border ${config.color} ${sizeClasses} ${className}`}
+      className={`inline-flex items-center rounded-full border ${statusInfo.badgeColor} ${sizeClasses} ${className}`}
     >
-      <span className="mr-1">{config.icon}</span>
-      {config.text}
+      <span className="mr-1">{statusInfo.badgeIcon}</span>
+      {statusInfo.displayStatus}
     </span>
   )
 }
 
-export function getVerificationStatusTitle(status: string): string {
-  const titles: Record<string, string> = {
-    pending_verification: 'Menunggu Persetujuan',
-    verified: 'Telah Disetujui',
-    declined: 'Ditolak Pasien',
-    expired: 'Tidak Ada Respon',
-    unsubscribed: 'Berhenti dari Layanan'
+export function getVerificationStatusTitle(status: string, isActive: boolean = true): string {
+  const statusInfo = getPatientDisplayStatus({ verificationStatus: status, isActive })
+  
+  // Map display status to detailed titles
+  const titleMap: Record<string, string> = {
+    'BERHENTI': 'Berhenti dari Layanan',
+    'Terverifikasi': 'Telah Disetujui',
+    'Menolak': 'Ditolak Pasien',
+    'Kedaluwarsa': 'Tidak Ada Respon',
+    'Menunggu Verifikasi': 'Menunggu Persetujuan'
   }
-  return titles[status] || 'Status Tidak Dikenal'
+  
+  return titleMap[statusInfo.displayStatus] || 'Status Tidak Dikenal'
 }
 
-export function getVerificationStatusDescription(status: string): string {
-  const descriptions: Record<string, string> = {
-    pending_verification: 'Pesan verifikasi sudah dikirim, menunggu respon pasien',
-    verified: 'Pasien menyetujui untuk menerima reminder WhatsApp',
-    declined: 'Pasien menolak untuk menerima reminder WhatsApp',
-    expired: 'Pasien tidak merespon dalam 48 jam setelah pesan dikirim',
-    unsubscribed: 'Pasien mengirim BERHENTI dan keluar dari layanan'
-  }
-  return descriptions[status] || 'Status verifikasi tidak dikenal'
+export function getVerificationStatusDescription(status: string, isActive: boolean = true): string {
+  const statusInfo = getPatientDisplayStatus({ verificationStatus: status, isActive })
+  return statusInfo.description
 }

@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, notExists, desc } from 'drizzle-orm'
 import { getWIBTodayStart } from '@/lib/timezone'
+import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 export async function GET(
   request: NextRequest,
@@ -15,6 +16,14 @@ export async function GET(
     }
 
     const { id } = await params
+    
+    // Try to get from cache first
+    const cacheKey = CACHE_KEYS.reminderStats(id)
+    const cachedStats = await getCachedData(cacheKey)
+    
+    if (cachedStats) {
+      return NextResponse.json(cachedStats)
+    }
     
     // DEBUG: Log the filter criteria
     const todayWIBStart = getWIBTodayStart()
@@ -187,6 +196,9 @@ export async function GET(
       selesai: statusCounts.selesai,
       semua: statusCounts.terjadwal + statusCounts.perluDiperbarui + statusCounts.selesai
     }
+
+    // Cache the stats with shorter TTL since they change more frequently
+    await setCachedData(cacheKey, stats, CACHE_TTL.REMINDER_STATS)
 
     return NextResponse.json(stats)
   } catch (error) {

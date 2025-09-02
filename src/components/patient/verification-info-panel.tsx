@@ -1,6 +1,7 @@
 'use client'
 
 import { formatDateTimeWIB } from '@/lib/datetime'
+import { getPatientDisplayStatus } from '@/lib/patient-status'
 
 interface VerificationInfoPanelProps {
   status: string
@@ -8,9 +9,12 @@ interface VerificationInfoPanelProps {
 }
 
 export default function VerificationInfoPanel({ status, patient }: VerificationInfoPanelProps) {
-  const getStatusInfo = (status: string) => {
-    switch (status) {
-      case 'pending_verification':
+  // Use centralized status logic to detect BERHENTI vs genuine declined
+  const patientStatus = getPatientDisplayStatus(patient)
+  
+  const getStatusInfo = (displayStatus: string) => {
+    switch (displayStatus) {
+      case 'Menunggu Verifikasi':
         return {
           type: 'warning',
           icon: '⏳',
@@ -22,7 +26,7 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
           borderColor: 'border-yellow-200'
         }
         
-      case 'verified':
+      case 'Terverifikasi':
         return {
           type: 'success',
           icon: '✅',
@@ -34,7 +38,7 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
           borderColor: 'border-green-200'
         }
         
-      case 'declined':
+      case 'Menolak':
         return {
           type: 'error',
           icon: '❌',
@@ -46,7 +50,19 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
           borderColor: 'border-red-200'
         }
         
-      case 'expired':
+      case 'BERHENTI':
+        return {
+          type: 'error',
+          icon: '🛑',
+          title: 'Pasien BERHENTI dari Layanan',
+          description: 'Pasien mengirim pesan BERHENTI dan keluar dari layanan.',
+          reminder: '• Pasien TIDAK AKTIF dan tidak menerima reminder\n• Semua reminder telah dinonaktifkan otomatis\n• Gunakan tombol "Aktifkan Kembali" jika pasien ingin bergabung lagi',
+          bgColor: 'bg-red-50',
+          textColor: 'text-red-800',
+          borderColor: 'border-red-200'
+        }
+        
+      case 'Kedaluwarsa':
         return {
           type: 'warning',
           icon: '⏰',
@@ -63,7 +79,7 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
     }
   }
 
-  const statusInfo = getStatusInfo(status)
+  const statusInfo = getStatusInfo(patientStatus.displayStatus)
   if (!statusInfo) return null
 
   return (
@@ -121,7 +137,7 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
           )}
           
           {/* Phone number display for easy calling */}
-          {(status === 'expired' || status === 'declined') && (
+          {(patientStatus.displayStatus === 'Kedaluwarsa' || patientStatus.displayStatus === 'Menolak' || patientStatus.displayStatus === 'BERHENTI') && (
             <div className="mt-3 p-3 bg-white rounded border">
               <p className="text-sm text-gray-600 mb-1">📞 Kontak pasien untuk follow-up:</p>
               <div className="flex items-center gap-2">

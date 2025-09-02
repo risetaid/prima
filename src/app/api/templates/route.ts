@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates } from '@/db'
 import { eq, and, asc } from 'drizzle-orm'
+import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +16,16 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category') as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL' | null
+
+    // Create cache key based on category filter
+    const cacheKey = category ? `${CACHE_KEYS.templates}:${category}` : CACHE_KEYS.templates
+    
+    // Try to get from cache first
+    const cachedTemplates = await getCachedData(cacheKey)
+    
+    if (cachedTemplates) {
+      return NextResponse.json(cachedTemplates)
+    }
 
     // Build Drizzle query with conditional where clause
     const baseQuery = db
@@ -45,10 +56,15 @@ export async function GET(request: NextRequest) {
       return acc
     }, {} as Record<string, typeof templates>)
 
-    return NextResponse.json({ 
+    const response = { 
       templates,
       grouped: groupedTemplates
-    })
+    }
+    
+    // Cache the templates (longer TTL since they don't change often)
+    await setCachedData(cacheKey, response, CACHE_TTL.TEMPLATES)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Template fetch error:', error)
     return NextResponse.json(

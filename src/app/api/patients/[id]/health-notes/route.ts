@@ -18,6 +18,7 @@ export async function GET(
     const { id: patientId } = await params
 
     // Verify patient exists and user has access
+    // Note: Allow health notes access for inactive patients (BERHENTI) too
     const patient = await db
       .select({
         id: patients.id,
@@ -28,7 +29,6 @@ export async function GET(
       .where(
         and(
           eq(patients.id, patientId),
-          eq(patients.isActive, true),
           isNull(patients.deletedAt)
         )
       )
@@ -127,6 +127,7 @@ export async function POST(
     }
 
     // Verify patient exists and user has access
+    // Note: Allow health notes access for inactive patients (BERHENTI) too
     const patient = await db
       .select({
         id: patients.id,
@@ -137,7 +138,6 @@ export async function POST(
       .where(
         and(
           eq(patients.id, patientId),
-          eq(patients.isActive, true),
           isNull(patients.deletedAt)
         )
       )
