@@ -1,6 +1,6 @@
 'use client'
 
-type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired'
+type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
 
 interface VerificationBadgeProps {
   status: VerificationStatus
@@ -33,6 +33,11 @@ export default function VerificationBadge({
       color: 'bg-orange-100 text-orange-800 border-orange-200',
       icon: '⏰',
       text: 'Kedaluwarsa'
+    },
+    unsubscribed: {
+      color: 'bg-gray-100 text-gray-800 border-gray-200',
+      icon: '🛑',
+      text: 'Berhenti'
     }
   }
 
@@ -56,7 +61,8 @@ export function getVerificationStatusTitle(status: string): string {
     pending_verification: 'Menunggu Persetujuan',
     verified: 'Telah Disetujui',
     declined: 'Ditolak Pasien',
-    expired: 'Tidak Ada Respon'
+    expired: 'Tidak Ada Respon',
+    unsubscribed: 'Berhenti dari Layanan'
   }
   return titles[status] || 'Status Tidak Dikenal'
 }
@@ -66,7 +72,8 @@ export function getVerificationStatusDescription(status: string): string {
     pending_verification: 'Pesan verifikasi sudah dikirim, menunggu respon pasien',
     verified: 'Pasien menyetujui untuk menerima reminder WhatsApp',
     declined: 'Pasien menolak untuk menerima reminder WhatsApp',
-    expired: 'Pasien tidak merespon dalam 48 jam setelah pesan dikirim'
+    expired: 'Pasien tidak merespon dalam 48 jam setelah pesan dikirim',
+    unsubscribed: 'Pasien mengirim BERHENTI dan keluar dari layanan'
   }
   return descriptions[status] || 'Status verifikasi tidak dikenal'
 }

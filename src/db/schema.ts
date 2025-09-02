@@ -17,7 +17,7 @@ export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE']
 export const reminderStatusEnum = pgEnum('reminder_status', ['PENDING', 'SENT', 'DELIVERED', 'FAILED'])
 export const patientConditionEnum = pgEnum('patient_condition', ['GOOD', 'FAIR', 'POOR'])
 export const templateCategoryEnum = pgEnum('template_category', ['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
-export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired'])
+export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired', 'unsubscribed'])
 
 // ===== TABLES =====
 

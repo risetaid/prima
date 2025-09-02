@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db, patients, verificationLogs } from '@/db'
+import { db, patients, verificationLogs, reminderSchedules } from '@/db'
 import { eq, and, or } from 'drizzle-orm'
 
 // Process WhatsApp verification responses from patients
@@ -107,10 +107,26 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date()
     }
 
+    // Special handling for unsubscribe (BERHENTI)
+    if (verificationResult === 'unsubscribed') {
+      updateData.isActive = false // Deactivate patient completely
+    }
+
     await db
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patient.id))
+
+    // If unsubscribed, also deactivate all related reminders
+    if (verificationResult === 'unsubscribed') {
+      await db
+        .update(reminderSchedules)
+        .set({
+          isActive: false,
+          updatedAt: new Date()
+        })
+        .where(eq(reminderSchedules.patientId, patient.id))
+    }
 
     // Log verification response
     await db
@@ -119,7 +135,7 @@ export async function POST(request: NextRequest) {
         patientId: patient.id,
         action: 'responded',
         patientResponse: message,
-        verificationResult: verificationResult as 'verified' | 'declined' | 'pending_verification'
+        verificationResult: verificationResult as 'verified' | 'declined' | 'pending_verification' | 'unsubscribed'
       })
 
     // Send confirmation message back to patient
@@ -160,9 +176,9 @@ function processVerificationResponse(message: string): string | null {
     return 'declined'
   }
 
-  // Stop/cancel responses
+  // Stop/cancel responses (unsubscribe)
   if (['berhenti', 'stop', 'cancel', 'batal', 'keluar', 'hapus'].includes(response)) {
-    return 'declined'
+    return 'unsubscribed'
   }
   
   return null // Unknown response
@@ -180,6 +196,14 @@ Untuk berhenti, ketik: BERHENTI`
     return `Baik ${patient.name}, terima kasih atas responsnya.
 
 Semoga sehat selalu! 🙏`
+  } else if (status === 'unsubscribed') {
+    return `${patient.name}, Anda telah berhasil berhenti dari layanan PRIMA. 🛑
+
+Semua reminder telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.
+
+Jika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.
+
+Semoga sehat selalu! 🙏💙`
   }
   
   return ''

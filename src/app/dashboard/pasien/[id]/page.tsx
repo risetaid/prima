@@ -954,7 +954,7 @@ export default function PatientDetailPage() {
                           </p>
                         </div>
                       </div>
-                      <VerificationBadge status={patient.verificationStatus as 'pending_verification' | 'verified' | 'declined' | 'expired'} size="large" />
+                      <VerificationBadge status={patient.verificationStatus as 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'} size="large" />
                     </div>
 
                     {/* Quick Info Cards */}

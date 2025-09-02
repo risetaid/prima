@@ -1,0 +1,1 @@
+ALTER TYPE "verification_status" ADD VALUE 'unsubscribed';

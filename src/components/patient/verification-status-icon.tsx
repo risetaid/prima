@@ -15,14 +15,16 @@ export default function VerificationStatusIcon({
     pending_verification: '⏳',
     verified: '✅',
     declined: '❌',
-    expired: '⏰'
+    expired: '⏰',
+    unsubscribed: '🛑'
   }
   
   const backgroundMap: Record<string, string> = {
     pending_verification: 'bg-yellow-100',
     verified: 'bg-green-100',
     declined: 'bg-red-100',
-    expired: 'bg-orange-100'
+    expired: 'bg-orange-100',
+    unsubscribed: 'bg-gray-100'
   }
   
   const sizeClasses = {
