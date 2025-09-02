@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
 
     // Special handling for unsubscribe (BERHENTI)
     if (verificationResult === 'unsubscribed') {
+      // For now, just set as declined and inactive until migration runs
+      updateData.verificationStatus = 'declined'
       updateData.isActive = false // Deactivate patient completely
     }
 
@@ -125,13 +127,18 @@ export async function POST(request: NextRequest) {
 
     // If unsubscribed, also deactivate all related reminders
     if (verificationResult === 'unsubscribed') {
-      await db
-        .update(reminderSchedules)
-        .set({
-          isActive: false,
-          updatedAt: new Date()
-        })
-        .where(eq(reminderSchedules.patientId, patient.id))
+      try {
+        await db
+          .update(reminderSchedules)
+          .set({
+            isActive: false,
+            updatedAt: new Date()
+          })
+          .where(eq(reminderSchedules.patientId, patient.id))
+      } catch (error) {
+        console.warn('Failed to deactivate reminders:', error)
+        // Continue anyway
+      }
     }
 
     // Log verification response
@@ -141,7 +148,7 @@ export async function POST(request: NextRequest) {
         patientId: patient.id,
         action: 'responded',
         patientResponse: message,
-        verificationResult: verificationResult as 'verified' | 'declined' | 'pending_verification' | 'unsubscribed'
+        verificationResult: (verificationResult === 'unsubscribed' ? 'declined' : verificationResult) as 'verified' | 'declined' | 'pending_verification'
       })
 
     // Send confirmation message back to patient
