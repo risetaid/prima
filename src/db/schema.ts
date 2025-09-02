@@ -17,6 +17,7 @@ export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE']
 export const reminderStatusEnum = pgEnum('reminder_status', ['PENDING', 'SENT', 'DELIVERED', 'FAILED'])
 export const patientConditionEnum = pgEnum('patient_condition', ['GOOD', 'FAIR', 'POOR'])
 export const templateCategoryEnum = pgEnum('template_category', ['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
+export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired'])
 
 // ===== TABLES =====
 
@@ -59,12 +60,21 @@ export const patients = pgTable('patients', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   photoUrl: text('photo_url'),
+  // Verification fields
+  verificationStatus: verificationStatusEnum('verification_status').notNull().default('pending_verification'),
+  verificationSentAt: timestamp('verification_sent_at', { withTimezone: true }),
+  verificationResponseAt: timestamp('verification_response_at', { withTimezone: true }),
+  verificationMessage: text('verification_message'),
+  verificationAttempts: text('verification_attempts').default('0'),
+  verificationExpiresAt: timestamp('verification_expires_at', { withTimezone: true }),
 }, (table) => ({
   isActiveIdx: index('patients_is_active_idx').on(table.isActive),
   assignedVolunteerIdx: index('patients_assigned_volunteer_idx').on(table.assignedVolunteerId),
   assignedVolunteerActiveIdx: index('patients_assigned_volunteer_active_idx').on(table.assignedVolunteerId, table.isActive),
   phoneNumberIdx: index('patients_phone_number_idx').on(table.phoneNumber),
   createdAtIdx: index('patients_created_at_idx').on(table.createdAt),
+  verificationStatusIdx: index('patients_verification_status_idx').on(table.verificationStatus),
+  verificationStatusActiveIdx: index('patients_verification_status_active_idx').on(table.verificationStatus, table.isActive),
 }))
 
 export const medicalRecords = pgTable('medical_records', {
@@ -213,6 +223,21 @@ export const patientVariables = pgTable('patient_variables', {
   patientActiveVarIdx: index('patient_variables_patient_active_idx').on(table.patientId, table.isActive),
 }))
 
+export const verificationLogs = pgTable('verification_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  patientId: uuid('patient_id').notNull(),
+  action: text('action').notNull(), // 'sent', 'responded', 'manual_verified', 'expired'
+  messageSent: text('message_sent'),
+  patientResponse: text('patient_response'),
+  verificationResult: verificationStatusEnum('verification_result'),
+  processedBy: uuid('processed_by'), // volunteer who processed manual verification
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  patientLogIdx: index('verification_logs_patient_idx').on(table.patientId),
+  createdAtIdx: index('verification_logs_created_at_idx').on(table.createdAt),
+  actionIdx: index('verification_logs_action_idx').on(table.action),
+}))
+
 // ===== RELATIONS =====
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -245,6 +270,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   patientMedications: many(patientMedications),
   healthNotes: many(healthNotes),
   patientVariables: many(patientVariables),
+  verificationLogs: many(verificationLogs),
 }))
 
 export const reminderSchedulesRelations = relations(reminderSchedules, ({ one, many }) => ({
@@ -350,6 +376,17 @@ export const patientVariablesRelations = relations(patientVariables, ({ one }) =
   }),
 }))
 
+export const verificationLogsRelations = relations(verificationLogs, ({ one }) => ({
+  patient: one(patients, {
+    fields: [verificationLogs.patientId],
+    references: [patients.id]
+  }),
+  processedByUser: one(users, {
+    fields: [verificationLogs.processedBy],
+    references: [users.id]
+  }),
+}))
+
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -365,3 +402,5 @@ export type ManualConfirmation = typeof manualConfirmations.$inferSelect
 export type NewManualConfirmation = typeof manualConfirmations.$inferInsert
 export type PatientVariable = typeof patientVariables.$inferSelect
 export type NewPatientVariable = typeof patientVariables.$inferInsert
+export type VerificationLog = typeof verificationLogs.$inferSelect
+export type NewVerificationLog = typeof verificationLogs.$inferInsert

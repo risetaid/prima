@@ -35,6 +35,13 @@ export async function GET(
         createdAt: patients.createdAt,
         updatedAt: patients.updatedAt,
         photoUrl: patients.photoUrl,
+        // Verification fields
+        verificationStatus: patients.verificationStatus,
+        verificationSentAt: patients.verificationSentAt,
+        verificationResponseAt: patients.verificationResponseAt,
+        verificationMessage: patients.verificationMessage,
+        verificationAttempts: patients.verificationAttempts,
+        verificationExpiresAt: patients.verificationExpiresAt,
         // Volunteer fields
         volunteerId: users.id,
         volunteerFirstName: users.firstName,
@@ -96,6 +103,13 @@ export async function GET(
       createdAt: patientData.createdAt,
       updatedAt: patientData.updatedAt,
       photoUrl: patientData.photoUrl,
+      // Verification fields
+      verificationStatus: patientData.verificationStatus,
+      verificationSentAt: patientData.verificationSentAt,
+      verificationResponseAt: patientData.verificationResponseAt,
+      verificationMessage: patientData.verificationMessage,
+      verificationAttempts: patientData.verificationAttempts,
+      verificationExpiresAt: patientData.verificationExpiresAt,
       assignedVolunteer: patientData.volunteerId ? {
         id: patientData.volunteerId,
         firstName: patientData.volunteerFirstName,

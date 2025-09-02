@@ -11,6 +11,11 @@ import { toast } from 'sonner'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 import { PatientVariablesManager } from '@/components/patient/patient-variables-manager'
+import VerificationBadge, { getVerificationStatusTitle, getVerificationStatusDescription } from '@/components/patient/verification-badge'
+import VerificationActionsPanel from '@/components/patient/verification-actions-panel'
+import VerificationInfoPanel from '@/components/patient/verification-info-panel'
+import VerificationHistory from '@/components/patient/verification-history'
+import VerificationStatusIcon from '@/components/patient/verification-status-icon'
 
 interface Patient {
   id: string
@@ -28,6 +33,13 @@ interface Patient {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  // Verification fields
+  verificationStatus: string
+  verificationSentAt?: string
+  verificationResponseAt?: string
+  verificationMessage?: string
+  verificationAttempts?: string
+  verificationExpiresAt?: string
 }
 
 interface HealthNote {
@@ -923,6 +935,81 @@ export default function PatientDetailPage() {
                     />
                   </div>
                 </div>
+
+                {/* Verification Management Section - Optimized UI */}
+                {patient && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+                    {/* Header with Status */}
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <VerificationStatusIcon status={patient.verificationStatus} />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            Status Verifikasi WhatsApp
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {getVerificationStatusDescription(patient.verificationStatus)}
+                          </p>
+                        </div>
+                      </div>
+                      <VerificationBadge status={patient.verificationStatus} size="large" />
+                    </div>
+
+                    {/* Quick Info Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                      {/* Status Card */}
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm font-medium text-gray-500 mb-1">Status</div>
+                        <div className="font-semibold text-gray-900">
+                          {getVerificationStatusTitle(patient.verificationStatus)}
+                        </div>
+                      </div>
+                      
+                      {/* Last Sent Card */}
+                      {patient.verificationSentAt && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-500 mb-1">Terkirim</div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatDateTimeWIB(new Date(patient.verificationSentAt))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Response Card */}
+                      {patient.verificationResponseAt && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-500 mb-1">Direspon</div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {formatDateTimeWIB(new Date(patient.verificationResponseAt))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Attempts Card */}
+                      {patient.verificationAttempts && parseInt(patient.verificationAttempts) > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="text-sm font-medium text-gray-500 mb-1">Percobaan</div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {patient.verificationAttempts}x
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Actions Panel - Simplified */}
+                    <VerificationActionsPanel 
+                      patient={patient}
+                      onUpdate={() => fetchPatient(params.id as string)}
+                    />
+                    
+                    {/* Verification History */}
+                    <div className="mt-4">
+                      <VerificationHistory patientId={patient.id} />
+                    </div>
+                  </div>
+                )}
 
                 {/* Statistics Chart Placeholder */}
                 <div className="bg-gray-50 p-6 rounded-xl mb-6">
