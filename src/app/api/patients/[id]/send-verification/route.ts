@@ -148,6 +148,6 @@ async function sendWhatsAppMessage(phoneNumber: string, message: string) {
 
   } catch (error) {
     console.error('WhatsApp sending error:', error)
-    return { success: false, error: error.message || 'Failed to send message' }
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to send message' }
   }
 }

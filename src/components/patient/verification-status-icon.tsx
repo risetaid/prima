@@ -11,14 +11,14 @@ export default function VerificationStatusIcon({
   size = 'medium', 
   className = '' 
 }: VerificationStatusIconProps) {
-  const iconMap = {
+  const iconMap: Record<string, string> = {
     pending_verification: '⏳',
     verified: '✅',
     declined: '❌',
     expired: '⏰'
   }
   
-  const backgroundMap = {
+  const backgroundMap: Record<string, string> = {
     pending_verification: 'bg-yellow-100',
     verified: 'bg-green-100',
     declined: 'bg-red-100',

@@ -58,7 +58,7 @@ export async function GET(
     const history = historyResult.map(entry => ({
       id: entry.id,
       timestamp: entry.createdAt.toISOString(),
-      action: formatAction(entry.action, entry.verificationResult),
+      action: formatAction(entry.action, entry.verificationResult || undefined),
       message: entry.messageSent,
       response: entry.patientResponse,
       result: entry.verificationResult,

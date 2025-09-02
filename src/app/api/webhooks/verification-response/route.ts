@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         patientId: patient.id,
         action: 'responded',
         patientResponse: message,
-        verificationResult: verificationResult
+        verificationResult: verificationResult as 'verified' | 'declined' | 'pending_verification'
       })
 
     // Send confirmation message back to patient

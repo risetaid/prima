@@ -1,7 +1,9 @@
 'use client'
 
+type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired'
+
 interface VerificationBadgeProps {
-  status: string
+  status: VerificationStatus
   size?: 'small' | 'large'
   className?: string
 }
@@ -50,7 +52,7 @@ export default function VerificationBadge({
 }
 
 export function getVerificationStatusTitle(status: string): string {
-  const titles = {
+  const titles: Record<string, string> = {
     pending_verification: 'Menunggu Persetujuan',
     verified: 'Telah Disetujui',
     declined: 'Ditolak Pasien',
@@ -60,7 +62,7 @@ export function getVerificationStatusTitle(status: string): string {
 }
 
 export function getVerificationStatusDescription(status: string): string {
-  const descriptions = {
+  const descriptions: Record<string, string> = {
     pending_verification: 'Pesan verifikasi sudah dikirim, menunggu respon pasien',
     verified: 'Pasien menyetujui untuk menerima reminder WhatsApp',
     declined: 'Pasien menolak untuk menerima reminder WhatsApp',
