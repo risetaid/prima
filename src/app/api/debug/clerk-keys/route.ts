@@ -13,10 +13,6 @@ export async function GET() {
     ? `${secretKey.substring(0, 10)}...${secretKey.slice(-10)}`
     : 'NOT SET'
 
-  console.log('🔍 Clerk Keys Debug:')
-  console.log('  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:', maskedPublishable)
-  console.log('  CLERK_SECRET_KEY:', maskedSecret)
-  
   // Check if keys are from same environment
   const publishableEnv = publishableKey?.includes('test') ? 'test' : 
                         publishableKey?.includes('live') ? 'live' : 'unknown'

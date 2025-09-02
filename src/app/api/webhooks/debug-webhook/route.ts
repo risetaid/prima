@@ -11,14 +11,12 @@ export async function POST(request: NextRequest) {
   try {
     // Get raw body
     const body = await request.text()
-    console.log('🔍 Raw webhook body:', body)
 
     // Try to parse as JSON
     let parsedBody
     try {
       parsedBody = JSON.parse(body)
     } catch (parseError) {
-      console.log('❌ Failed to parse as JSON:', parseError)
       parsedBody = { rawBody: body, parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error' }
     }
 
@@ -67,21 +65,14 @@ export async function POST(request: NextRequest) {
       contentLength: request.headers.get('content-length'),
     }
 
-    console.log('📱 Webhook Debug Info:', JSON.stringify(debugInfo, null, 2))
-
     // Also log to help with debugging
-    console.log('🔍 Raw body received:', body)
-    console.log('🔍 Headers received:', JSON.stringify(headers, null, 2))
     
     // Force log to Vercel logs
     if (fonnteData) {
-      console.log('✅ FONNTE MESSAGE DETECTED:', JSON.stringify(fonnteData, null, 2))
       
       // Store in webhook store
       const storedLog = webhookStore.addLog(fonnteData)
-      console.log(`📝 Webhook stored with ID: ${storedLog.id}`)
     } else {
-      console.log('❌ No Fonnte data detected in webhook')
       
       // Store raw data anyway for debugging
       webhookStore.addLog({
@@ -101,7 +92,6 @@ export async function POST(request: NextRequest) {
     }, { status: 200 })
 
   } catch (error) {
-    console.error('❌ Webhook debug error:', error)
     
     return NextResponse.json({
       success: false,
@@ -122,17 +112,11 @@ export async function GET(request: NextRequest) {
   } else if (action === 'clear') {
     return await clearWebhookLogs()
   }
-  
-  console.log('🔍 GET webhook verification request:', {
-    url: request.url,
-    params: Object.fromEntries(searchParams.entries())
-  })
 
   // Echo back any challenge parameter (common for webhook verification)
   const challenge = searchParams.get('challenge') || searchParams.get('hub.challenge')
   
   if (challenge) {
-    console.log('✅ Responding to webhook challenge:', challenge)
     return new Response(challenge, { 
       status: 200,
       headers: { 'Content-Type': 'text/plain' }
@@ -158,8 +142,6 @@ async function handleTestWebhook(request: NextRequest) {
       location: null
     }
 
-    console.log('🧪 TEST WEBHOOK TRIGGERED:', JSON.stringify(mockFonnteData, null, 2))
-
     const fonnteData = {
       device: mockFonnteData.device || 'Unknown',
       sender: mockFonnteData.sender || 'Unknown',
@@ -172,7 +154,6 @@ async function handleTestWebhook(request: NextRequest) {
     }
 
     const storedLog = webhookStore.addLog(fonnteData)
-    console.log(`📝 Test webhook stored with ID: ${storedLog.id}`)
 
     return NextResponse.json({
       success: true,
@@ -183,7 +164,6 @@ async function handleTestWebhook(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ Test webhook error:', error)
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -202,7 +182,6 @@ async function handleWebhookLogs() {
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    console.error('❌ Error fetching webhook logs:', error)
     return NextResponse.json({
       success: false,
       error: 'Failed to fetch logs',
@@ -222,7 +201,6 @@ async function clearWebhookLogs() {
       timestamp: new Date().toISOString()
     })
   } catch (error) {
-    console.error('❌ Error clearing webhook logs:', error)
     return NextResponse.json({
       success: false,
       error: 'Failed to clear logs'

@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
       .select({
         // User fields
         id: users.id,
+        clerkId: users.clerkId,
         email: users.email,
         firstName: users.firstName,
         lastName: users.lastName,
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     // Format response to match Prisma structure
     const formattedUsers = allUsers.map(user => ({
       id: user.id,
+      clerkId: user.clerkId,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,

@@ -64,7 +64,6 @@ async function processReminders() {
 
   try {
     const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`
-    console.log(logMessage)
     debugLogs.push(logMessage)
 
     // Get all active reminder schedules for today
@@ -102,8 +101,6 @@ async function processReminders() {
       )
     
     const totalCount = totalCountResult[0]?.count || 0
-
-    console.log(`📊 Found ${totalCount} reminder schedules to potentially process`)
 
     let reminderSchedulesToProcess: any[] = []
     if (totalCount > batchSize) {
@@ -221,8 +218,6 @@ async function processReminders() {
       }))
     }
 
-    console.log(`📋 Found ${reminderSchedulesToProcess.length} reminder schedules for today`)
-
     for (const schedule of reminderSchedulesToProcess) {
       processedCount++
       
@@ -231,12 +226,9 @@ async function processReminders() {
         const scheduleDate = schedule.startDate.toISOString().split('T')[0]
         const shouldSend = shouldSendReminderNow(scheduleDate, schedule.scheduledTime)
 
-        console.log(`⏰ Schedule ${schedule.id}: ${schedule.scheduledTime} - Should send: ${shouldSend}`)
-
         if (shouldSend) {
           // Validate phone number exists
           if (!schedule.patient.phoneNumber) {
-            console.error(`📱 Skipping reminder for ${schedule.patient.name}: No phone number`)
             errorCount++
             continue
           }
@@ -249,8 +241,6 @@ async function processReminders() {
             continue
           }
           
-          console.log(`📱 Sending reminder to ${schedule.patient.name} via FONNTE`)
-          
           try {
             // Send WhatsApp message via Fonnte with phone validation
             const messageBody = schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
@@ -262,7 +252,6 @@ async function processReminders() {
             })
 
             const providerLogMessage = `🔍 FONNTE result for ${schedule.patient.name}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
-            console.log(providerLogMessage)
             debugLogs.push(providerLogMessage)
 
             // Create reminder log
@@ -277,16 +266,10 @@ async function processReminders() {
               fonnteMessageId: result.messageId
             }
 
-            console.log(`🔍 Attempting to create log with data:`, JSON.stringify({
-              ...logData,
-              sentAt: logData.sentAt.toISOString()
-            }, null, 2))
-
             // Create reminder log with error handling
             try {
               const createdLogResult = await db.insert(reminderLogs).values(logData).returning()
               const createdLog = createdLogResult[0]
-              console.log(`📝 Created log for ${schedule.patient.name}: ${createdLog.id}`)
             } catch (logError) {
               console.error(`❌ Failed to create reminder log for ${schedule.patient.name}:`, logError)
               console.error(`❌ Log data that failed:`, logData)
@@ -296,20 +279,16 @@ async function processReminders() {
 
             if (result.success) {
               sentCount++
-              console.log(`✅ Successfully sent reminder to ${schedule.patient.name}`)
             } else {
               errorCount++
-              console.log(`❌ Failed to send reminder to ${schedule.patient.name}: ${result.error}`)
             }
           } catch (phoneError) {
-            console.error(`❌ Phone validation error for ${schedule.patient.name}: ${phoneError}`)
             errorCount++
             continue
           }
         }
       } catch (scheduleError) {
         errorCount++
-        console.error(`❌ Error processing schedule ${schedule.id}:`, scheduleError)
       }
     }
 
@@ -335,12 +314,9 @@ async function processReminders() {
       details: debugLogs.length > 0 ? debugLogs : ['No detailed logs available']
     }
 
-    console.log('✅ Cron job completed:', summary)
     return NextResponse.json(summary)
 
   } catch (error) {
-    console.error('❌ Cron job failed:', error)
-    
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

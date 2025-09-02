@@ -69,7 +69,6 @@ export async function GET(
 
     return NextResponse.json(formattedReminders)
   } catch (error) {
-    console.error('Error fetching reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -149,7 +148,6 @@ export async function POST(
       
       // Validate date is not invalid
       if (isNaN(reminderDate.getTime())) {
-        console.error('Invalid date in datesToSchedule:', dateString)
         continue // Skip invalid dates
       }
       
@@ -174,26 +172,16 @@ export async function POST(
     }
 
     // Debug logging
-    console.log('=== REMINDER CREATION DEBUG ===')
-    console.log('Created', datesToSchedule.length, 'reminder schedules')
-    console.log('datesToSchedule:', datesToSchedule)
-    console.log('customRecurrence:', customRecurrence)
-    console.log('time:', time)
-    console.log('currentWIBDate:', getWIBDateString())
-    console.log('currentWIBTime:', getWIBTimeString())
-    console.log('=== END DEBUG ===')
 
     // Check if any of today's reminders should be sent now
     for (const schedule of createdSchedules) {
       const scheduleDate = schedule.startDate.toISOString().split('T')[0]
       
       if (shouldSendReminderNow(scheduleDate, time)) {
-        console.log('Sending immediate reminder for date:', scheduleDate)
         
         // Check rate limit before sending immediate reminder
         const rateLimitKey = `user_${user.id}` // Per-user rate limiting
         if (!whatsappRateLimiter.isAllowed(rateLimitKey)) {
-          console.warn(`🚫 Rate limit exceeded for user ${user.id}. Skipping immediate send.`)
           // Don't break, just skip immediate send but still create the schedule
         } else {
           // Send via Fonnte
@@ -232,7 +220,6 @@ export async function POST(
       recurrenceType: customRecurrence ? 'custom' : 'manual'
     })
   } catch (error) {
-    console.error('Error creating reminder:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

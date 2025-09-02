@@ -36,15 +36,12 @@ export async function POST(
       .delete(users)
       .where(eq(users.id, userId))
 
-    console.log(`❌ User rejected and deleted: ${user.email} by admin: ${admin.email}`)
-
     return NextResponse.json({
       success: true,
       message: 'User rejected and removed from system'
     })
 
   } catch (error) {
-    console.error('Error rejecting user:', error)
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

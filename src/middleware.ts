@@ -26,20 +26,9 @@ export default clerkMiddleware(async (auth, req) => {
   
   // Enhanced debugging for all protected routes
   if (pathname.startsWith('/dashboard')) {
-    console.log('🔍 Request to:', pathname)
-    console.log('🔍 User-Agent:', isMobile ? 'Mobile' : 'Desktop')
-    
     try {
       const { userId } = await auth()
-      console.log('🔍 Auth status:', userId ? `authenticated (${userId})` : 'not authenticated')
-      
-      // Additional debug info
-      const cookies = req.headers.get('cookie')
-      const hasSessionCookie = cookies?.includes('__session') || cookies?.includes('__clerk')
-      console.log('🔍 Has session cookies:', hasSessionCookie)
-      
     } catch (error) {
-      console.log('🔍 Auth error:', error)
     }
   }
 

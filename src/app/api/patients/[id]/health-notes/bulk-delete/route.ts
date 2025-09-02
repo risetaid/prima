@@ -62,7 +62,7 @@ export async function POST(
 
     // Check permissions - only allow deletion of own notes (unless admin)
     const unauthorizedNotes = existingNotes.filter(
-      note => note.recordedBy !== user.id && user.role !== 'ADMIN'
+      note => note.recordedBy !== user.id && user.role !== 'SUPERADMIN'
     )
 
     if (unauthorizedNotes.length > 0) {

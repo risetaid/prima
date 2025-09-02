@@ -76,10 +76,8 @@ export function PatientReminderDashboard({
         const statsData = await response.json();
         setStats(statsData);
       } else {
-        console.error("❌ Stats API failed:", response.status);
       }
     } catch (error) {
-      console.error("Error fetching stats:", error);
     }
   };
 
@@ -90,7 +88,6 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const allData = await response.json();
-        console.log("🔍 All Reminders API Response:", allData);
 
         // Filter and categorize based on status from API
         const terjadwal = allData.filter(
@@ -136,31 +133,14 @@ export function PatientReminderDashboard({
           confirmedAt: item.confirmedAt,
         }));
 
-        console.log(
-          "🔍 Display Data - Terjadwal:",
-          mappedTerjadwal.length,
-          "Perlu:",
-          mappedPerlu.length,
-          "Selesai:",
-          mappedSelesai.length
-        );
-
-        console.log('🔍 Desktop: Setting reminder states:', {
-          terjadwal: mappedTerjadwal.length,
-          perlu: mappedPerlu.length,
-          selesai: mappedSelesai.length
-        });
-
         setTerjadwalReminders(mappedTerjadwal);
         setPerluDiperbaruiReminders(mappedPerlu);
         setSelesaiReminders(mappedSelesai);
 
       } else {
-        console.error("❌ All Reminders API failed:", response.status);
         toast.error("Gagal memuat data pengingat");
       }
     } catch (error) {
-      console.error("Error fetching reminders:", error);
       toast.error("Gagal memuat data pengingat");
     } finally {
       setLoading(false);
@@ -214,7 +194,6 @@ export function PatientReminderDashboard({
         toast.error(error.error || "Gagal memperbarui pengingat");
       }
     } catch (error) {
-      console.error("Error updating reminder:", error);
       toast.error("Gagal memperbarui pengingat");
     }
   };
@@ -253,7 +232,6 @@ export function PatientReminderDashboard({
 
   const performDelete = async () => {
     try {
-      console.log('🔍 Desktop: Deleting reminders:', selectedReminders);
       
       const deletePromises = selectedReminders.map(async (reminderId) => {
         // Extract real UUID from formatted ID (remove status prefix)
@@ -261,25 +239,20 @@ export function PatientReminderDashboard({
           reminderId.split('-').slice(1).join('-') : 
           reminderId;
         
-        console.log('🔍 Desktop: Converting ID', reminderId, 'to', realId);
-        
         const response = await fetch(`/api/reminders/scheduled/${realId}`, { 
           method: "DELETE" 
         });
         
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('🔍 Desktop: Delete failed for', realId, errorData);
           throw new Error(`Delete failed for ${realId}`);
         }
         
         const result = await response.json();
-        console.log('🔍 Desktop: Delete success for', realId, result);
         return result;
       });
 
       const results = await Promise.all(deletePromises);
-      console.log('🔍 Desktop: All deletions completed:', results);
       
       // Update local state immediately (like mobile does)
       setTerjadwalReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
@@ -299,7 +272,6 @@ export function PatientReminderDashboard({
       setDeleteMode(false);
 
       // Optional: Refresh data in background for accuracy (but UI already updated)
-      console.log('🔍 Desktop: Background refresh...');
       fetchStats().catch(console.error);
       fetchAllReminders().catch(console.error);
     } catch (error) {
@@ -319,12 +291,6 @@ export function PatientReminderDashboard({
       const actualReminderId = reminderId.startsWith("pending-")
         ? reminderId.replace("pending-", "")
         : reminderId;
-
-      console.log("🔍 Desktop handlePendingAction:", {
-        originalId: reminderId,
-        actualId: actualReminderId,
-        action,
-      });
 
       const response = await fetch(
         `/api/patients/${params.id}/reminders/${actualReminderId}/confirm`,
@@ -347,11 +313,9 @@ export function PatientReminderDashboard({
       await fetchAllReminders();
       } else {
         const errorData = await response.json();
-        console.error("❌ Desktop API Error:", errorData);
         throw new Error(errorData.error || "Failed to save confirmation");
       }
     } catch (error) {
-      console.error("Error saving confirmation:", error);
       toast.error("Gagal menyimpan konfirmasi");
     }
   };

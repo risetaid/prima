@@ -56,8 +56,6 @@ export async function POST(
 
     const updatedUser = updatedUserResult[0]
 
-    console.log(`🔄 User status toggled: ${user.email} -> ${updatedUser.isActive ? 'active' : 'inactive'} by admin: ${admin.email}`)
-
     return NextResponse.json({
       success: true,
       message: `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully`,
@@ -65,7 +63,6 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Error toggling user status:', error)
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

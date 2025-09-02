@@ -121,7 +121,6 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
         })
       }
     } catch (error) {
-      console.error('Error fetching patient:', error)
     } finally {
       setLoading(false)
     }
@@ -132,12 +131,9 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
       const response = await fetch('/api/templates') // Remove category filter to get all templates
       if (response.ok) {
         const data = await response.json()
-        console.log('📋 Modal Templates fetched:', data.templates?.length || 0)
-        console.log('🎯 Modal Template data:', data.templates)
         setTemplates(data.templates || [])
       }
     } catch (error) {
-      console.error('Error fetching templates:', error)
     }
   }
 
@@ -149,7 +145,6 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
         setAutoFillData(data.autoFillData)
       }
     } catch (error) {
-      console.error('Error fetching auto-fill data:', error)
     }
   }
 
@@ -286,7 +281,6 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
         toast.error(error.error || 'Gagal membuat pengingat')
       }
     } catch (error) {
-      console.error('Error creating reminder:', error)
       toast.error('Gagal membuat pengingat')
     } finally {
       setSubmitting(false)

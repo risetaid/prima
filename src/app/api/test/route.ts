@@ -168,7 +168,6 @@ Minum setelah makan dengan air putih
 Semangat sembuh! 💪
 Tim PRIMA - Berbagi Kasih`;
 
-    console.log("🧪 Testing FONNTE provider");
     const result = await sendWhatsAppMessage({
       to: formatWhatsAppNumber(phoneNumber),
       body: testMessage,
@@ -182,7 +181,6 @@ Tim PRIMA - Berbagi Kasih`;
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("WhatsApp test failed:", error);
     return NextResponse.json(
       {
         success: false,
@@ -269,8 +267,6 @@ async function logTest() {
       },
     });
   } catch (error) {
-    console.error("❌ Test log creation failed:", error);
-
     return NextResponse.json(
       {
         success: false,

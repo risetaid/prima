@@ -55,8 +55,6 @@ export async function POST(
 
     const updatedUser = updatedUserResult[0]
 
-    console.log(`✅ User approved: ${user.email} by admin: ${admin.email}`)
-
     return NextResponse.json({
       success: true,
       message: 'User approved successfully',
@@ -64,7 +62,6 @@ export async function POST(
     })
 
   } catch (error) {
-    console.error('Error approving user:', error)
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

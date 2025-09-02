@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
       'svix-signature': svix_signature
     }) as WebhookEvent
   } catch (err) {
-    console.error('Error verifying webhook:', err)
     return new Response('Error occured', {
       status: 400
     })
@@ -66,10 +65,6 @@ export async function POST(request: NextRequest) {
       
       const userCount = userCountResult[0]?.count || 0
       const isFirstUser = userCount === 0
-      
-      console.log(`🔍 Webhook - Current user count in DB: ${userCount}`)
-      console.log(`🔍 Webhook - Is first user? ${isFirstUser}`)
-      console.log(`🔍 Webhook - Will set role to: ${isFirstUser ? 'SUPERADMIN' : 'MEMBER'}`)
 
       // Create user in database
       await db
@@ -84,15 +79,11 @@ export async function POST(request: NextRequest) {
           approvedAt: isFirstUser ? new Date() : null
         })
 
-      console.log(`✅ User created from Clerk webhook: ${email_addresses[0]?.email_address}`)
-      
       if (isFirstUser) {
-        console.log(`🎉 First user created as SUPERADMIN: ${email_addresses[0]?.email_address}`)
       }
 
       return NextResponse.json({ success: true })
     } catch (error) {
-      console.error('Error creating user from webhook:', error)
       return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
     }
   }

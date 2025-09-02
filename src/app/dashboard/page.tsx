@@ -56,12 +56,10 @@ export default function DashboardPage() {
 
     // Redirect to sign-in if not authenticated after loading
     if (!user) {
-      console.log('🔍 Dashboard: No user found after load, redirecting to sign-in');
       router.push("/sign-in");
       return;
     }
 
-    console.log('🔍 Dashboard: User found:', user.id, user.primaryEmailAddress?.emailAddress);
     // Check approval status when user is loaded
     checkApprovalStatus();
   }, [user, isLoaded, router]);

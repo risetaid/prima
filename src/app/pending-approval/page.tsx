@@ -9,6 +9,7 @@ export default function PendingApprovalPage() {
   const { user } = useUser()
   const router = useRouter()
   const [userData, setUserData] = useState<any>(null)
+  const [superadminContact, setSuperadminContact] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,14 +18,17 @@ export default function PendingApprovalPage() {
       return
     }
 
-    // Fetch user status from database
-    fetch('/api/user/status')
-      .then(res => res.json())
-      .then(data => {
-        if (data.canAccessDashboard) {
+    // Fetch user status and superadmin contact info
+    Promise.all([
+      fetch('/api/user/status').then(res => res.json()),
+      fetch('/api/admin/superadmin-contact').then(res => res.json())
+    ])
+      .then(([userData, superadminData]) => {
+        if (userData.canAccessDashboard) {
           router.push('/dashboard')
         } else {
-          setUserData(data)
+          setUserData(userData)
+          setSuperadminContact(superadminData)
           setLoading(false)
         }
       })
@@ -87,13 +91,14 @@ export default function PendingApprovalPage() {
                 Akun Anda telah berhasil dibuat namun masih menunggu persetujuan dari administrator.
               </p>
               <p>
-                Silakan hubungi administrator untuk memproses persetujuan akun Anda.
+                Untuk mempercepat proses persetujuan, silakan hubungi administrator melalui email di bawah ini.
               </p>
             </div>
 
+            {/* User Info Card */}
             <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
               <h3 className="font-medium text-blue-800 mb-2 flex items-center justify-center gap-2">
-                <span>📧</span> Informasi Kontak
+                <span>👤</span> Informasi Akun Anda
               </h3>
               <p className="text-sm text-blue-700">
                 Email: <strong>{userData.email}</strong>
@@ -103,6 +108,49 @@ export default function PendingApprovalPage() {
                   {userData.role === 'ADMIN' ? 'Administrator' : 'Member'}
                 </span>
               </p>
+            </div>
+
+            {/* Superadmin Contact Card */}
+            {superadminContact && (
+              <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-100">
+                <h3 className="font-medium text-green-800 mb-3 flex items-center justify-center gap-2">
+                  <span>📧</span> Hubungi Administrator
+                </h3>
+                <div className="text-center space-y-2">
+                  <p className="text-sm text-green-700">
+                    <strong>{superadminContact.name}</strong>
+                  </p>
+                  <p className="text-sm text-green-600">
+                    {superadminContact.hospitalName}
+                  </p>
+                  <div className="mt-3">
+                    <a 
+                      href={`mailto:${superadminContact.email}?subject=PRIMA - Permintaan Persetujuan Akun&body=Halo ${superadminContact.name},%0D%0A%0D%0ASaya ${userData.firstName} ${userData.lastName} (${userData.email}) memerlukan persetujuan untuk mengakses sistem PRIMA.%0D%0A%0D%0AMohon bantuannya untuk memproses persetujuan akun saya.%0D%0A%0D%0ATerima kasih,%0D%0A${userData.firstName} ${userData.lastName}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <span>✉️</span>
+                      Kirim Email Sekarang
+                    </a>
+                  </div>
+                  <p className="text-xs text-green-600 mt-2">
+                    Email: {superadminContact.email}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Manual Contact Instructions */}
+            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+              <h4 className="font-medium text-gray-800 mb-2 text-center">
+                📝 Template Email (Manual)
+              </h4>
+              <div className="text-xs text-gray-600 bg-white p-3 rounded border text-left">
+                <p className="font-medium mb-2">Subject: PRIMA - Permintaan Persetujuan Akun</p>
+                <p className="mb-2">Halo {superadminContact?.name || 'Administrator'},</p>
+                <p className="mb-2">Saya <strong>{userData.firstName} {userData.lastName}</strong> ({userData.email}) memerlukan persetujuan untuk mengakses sistem PRIMA.</p>
+                <p className="mb-2">Mohon bantuannya untuk memproses persetujuan akun saya.</p>
+                <p>Terima kasih,<br/>{userData.firstName} {userData.lastName}</p>
+              </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-gray-200">

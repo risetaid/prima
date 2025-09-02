@@ -10,23 +10,14 @@ export default function DebugAuth() {
 
   useEffect(() => {
     if (isLoaded) {
-      console.log('🔍 Debug Auth State:', {
-        isLoaded,
-        isSignedIn,
-        userId,
-        user: user?.id,
-        email: user?.primaryEmailAddress?.emailAddress
-      })
 
       // Test API call
       fetch('/api/user/profile')
         .then(res => res.json())
         .then(data => {
-          console.log('🔍 API Response:', data)
           setApiResult(data)
         })
         .catch(err => {
-          console.error('🔍 API Error:', err)
           setApiResult({ error: err.message })
         })
     }

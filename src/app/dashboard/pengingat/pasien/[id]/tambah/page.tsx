@@ -108,7 +108,6 @@ export default function AddReminderPage() {
         })
       }
     } catch (error) {
-      console.error('Error fetching patient:', error)
     }
   }
 
@@ -120,7 +119,6 @@ export default function AddReminderPage() {
         setAutoFillData(data.autoFillData)
       }
     } catch (error) {
-      console.error('Error fetching auto-fill data:', error)
     } finally {
       setLoading(false)
     }
@@ -131,12 +129,9 @@ export default function AddReminderPage() {
       const response = await fetch('/api/templates') // Remove category filter to get all templates
       if (response.ok) {
         const data = await response.json()
-        console.log('📋 /tambah Templates fetched:', data.templates?.length || 0)
-        console.log('🎯 /tambah Template data:', data.templates)
         setTemplates(data.templates || [])
       }
     } catch (error) {
-      console.error('Error fetching templates:', error)
     }
   }
 
@@ -232,12 +227,6 @@ export default function AddReminderPage() {
     
     setSubmitting(true)
 
-    console.log('=== FRONTEND SUBMIT ===')
-    console.log('params.id:', params.id)
-    console.log('formData:', formData)
-    console.log('selectedDates:', selectedDates)
-    console.log('customRecurrence:', customRecurrence)
-
     try {
       const requestBody = {
         message: formData.message,
@@ -277,7 +266,6 @@ export default function AddReminderPage() {
         })
       }
     } catch (error) {
-      console.error('Error creating reminder:', error)
       toast.error('Gagal membuat pengingat', {
         description: 'Terjadi kesalahan jaringan'
       })

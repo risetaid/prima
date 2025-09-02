@@ -29,7 +29,6 @@ export default function DebugWebhookPage() {
 
       if (result.success) {
         setWebhookLogs(result.logs);
-        console.log(`📊 Fetched ${result.count} webhook logs`);
       }
     } catch (error) {
       console.error("Error fetching logs:", error);
@@ -46,7 +45,6 @@ export default function DebugWebhookPage() {
 
       if (result.success) {
         setWebhookLogs([]);
-        console.log("🗑️ Logs cleared via API");
       }
     } catch (error) {
       console.error("Error clearing logs:", error);
@@ -198,12 +196,10 @@ export default function DebugWebhookPage() {
                       { method: "POST" }
                     );
                     const result = await response.json();
-                    console.log("Test webhook result:", result);
                     if (result.success) {
                       alert("Test webhook sent! Check console for details.");
                     }
                   } catch (error) {
-                    console.error("Test webhook error:", error);
                     alert("Test webhook failed!");
                   }
                 }}

@@ -35,8 +35,6 @@ export async function dbOperationWithRetry<T>(
       )
       
       if (isRetryableError && attempt < maxRetries) {
-        console.log(`🔄 DB operation failed (attempt ${attempt}/${maxRetries}): ${error.code || error.errno}`)
-        console.log(`   Retrying in ${delayMs}ms...`)
         await new Promise(resolve => setTimeout(resolve, delayMs))
         continue
       }
@@ -87,7 +85,5 @@ export function logDbPerformance(operationName: string, startTime: number) {
   const duration = Date.now() - startTime
   if (duration > 1000) {
     console.warn(`⚠️ Slow DB operation: ${operationName} took ${duration}ms`)
-  } else {
-    console.log(`✅ DB operation: ${operationName} completed in ${duration}ms`)
   }
 }

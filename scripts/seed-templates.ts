@@ -63,26 +63,32 @@ const templates: TemplateData[] = [
   // APPOINTMENT TEMPLATES - Medical appointments & tests
   {
     templateName: 'kontrol-dokter-besok',
-    templateText: 'Hai {nama}! Besok {tanggal} jam {waktu} kontrol ke Dr. {dokter}. Siapkan kartu BPJS & catatan keluhan ya! 🏥📋',
-    variables: ['nama', 'dokter', 'tanggal', 'waktu'],
+    templateText: 'Hai {nama}! Besok {tanggal} jam {waktu} kontrol ke Dr. {dokter} di {rumahSakit}. Siapkan kartu BPJS & catatan keluhan ya! 🏥📋',
+    variables: ['nama', 'dokter', 'tanggal', 'waktu', 'rumahSakit'],
     category: 'APPOINTMENT'
   },
   {
     templateName: 'kontrol-dokter-hari-ini', 
-    templateText: 'Selamat pagi {nama}! Hari ini jam {waktu} kontrol ke Dr. {dokter}. Jangan lupa bawa kartu & hasil lab! 🩺',
-    variables: ['nama', 'dokter', 'waktu'],
+    templateText: 'Selamat pagi {nama}! Hari ini jam {waktu} kontrol ke Dr. {dokter} di {rumahSakit}. Jangan lupa bawa kartu & hasil lab! 🩺',
+    variables: ['nama', 'dokter', 'waktu', 'rumahSakit'],
     category: 'APPOINTMENT'
   },
   {
     templateName: 'persiapan-lab-test',
-    templateText: 'Halo {nama}! Besok {tanggal} jam {waktu} cek lab. PENTING: Puasa {lamaPuasa} jam sebelumnya. Boleh minum air putih! 🔬',
-    variables: ['nama', 'tanggal', 'waktu', 'lamaPuasa'],
+    templateText: 'Halo {nama}! Besok {tanggal} jam {waktu} cek lab di {rumahSakit}. PENTING: Puasa 12 jam sebelumnya. Boleh minum air putih! 🔬',
+    variables: ['nama', 'tanggal', 'waktu', 'rumahSakit'],
     category: 'APPOINTMENT'
   },
   {
     templateName: 'reminder-bawa-obat',
     templateText: 'Hai {nama}! Saat kontrol nanti, bawa semua obat yang sedang diminum untuk ditunjukkan ke dokter ya! 💊👨‍⚕️',
     variables: ['nama'],
+    category: 'APPOINTMENT'
+  },
+  {
+    templateName: 'konfirmasi-kunjungan',
+    templateText: 'Halo {nama}! {volunteer} akan berkunjung besok {tanggal} jam {waktu} untuk cek kondisi. Mohon disiapkan ya! 👩‍⚕️🏠',
+    variables: ['nama', 'volunteer', 'tanggal', 'waktu'],
     category: 'APPOINTMENT'
   },
 
@@ -101,8 +107,8 @@ const templates: TemplateData[] = [
   },
   {
     templateName: 'dukungan-semangat',
-    templateText: 'Hai {nama}! Ingat, kamu tidak sendirian. Keluarga & tim medis selalu mendukungmu. Tetap kuat! 🤗❤️',
-    variables: ['nama'],
+    templateText: 'Hai {nama}! Ingat, kamu tidak sendirian. {volunteer} dan keluarga selalu mendukungmu. Tetap kuat! 🤗❤️',
+    variables: ['nama', 'volunteer'],
     category: 'EDUCATIONAL'
   },
   {
@@ -133,6 +139,18 @@ const templates: TemplateData[] = [
     templateName: 'dukungan-keluarga',
     templateText: 'Untuk keluarga {nama}: Terima kasih sudah setia mendampingi. Dukungan kalian sangat berarti! 👨‍👩‍👧‍👦💙',
     variables: ['nama'],
+    category: 'EDUCATIONAL'
+  },
+  {
+    templateName: 'kontak-darurat',
+    templateText: 'DARURAT {nama}! Jika ada keluhan serius, segera hubungi Dr. {dokter} di {rumahSakit} atau {volunteer} di {nomor}. Jangan tunda! 🚨📞',
+    variables: ['nama', 'dokter', 'rumahSakit', 'volunteer', 'nomor'],
+    category: 'EDUCATIONAL'
+  },
+  {
+    templateName: 'konfirmasi-data',
+    templateText: 'Halo {nama}! Konfirmasi data: Obat {obat} {dosis}, kontrol ke Dr. {dokter} di {rumahSakit}. Jika ada yang salah, hubungi {volunteer}. ✅',
+    variables: ['nama', 'obat', 'dosis', 'dokter', 'rumahSakit', 'volunteer'],
     category: 'EDUCATIONAL'
   }
 ]

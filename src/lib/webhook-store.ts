@@ -25,7 +25,6 @@ class WebhookStore {
       this.logs = this.logs.slice(0, this.maxLogs)
     }
 
-    console.log(`📝 Webhook log stored. Total logs: ${this.logs.length}`)
     return log
   }
 
@@ -35,7 +34,6 @@ class WebhookStore {
 
   clearLogs() {
     this.logs = []
-    console.log('🗑️ Webhook logs cleared')
   }
 
   getLogCount(): number {

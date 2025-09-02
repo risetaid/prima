@@ -17,15 +17,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Superadmin access required' }, { status: 403 })
     }
 
-    console.log('🔄 Starting Clerk sync process...')
-
     // Get all users from Clerk using await clerkClient()
     const clerk = await clerkClient()
     const clerkUsers = await clerk.users.getUserList({
       limit: 500, // Adjust as needed
     })
-
-    console.log(`📊 Found ${clerkUsers.data.length} users in Clerk`)
 
     // Get all users from our database
     const dbUsers = await db
@@ -40,8 +36,6 @@ export async function POST(request: NextRequest) {
         isApproved: users.isApproved
       })
       .from(users)
-
-    console.log(`📊 Found ${dbUsers.length} users in database`)
 
     const syncResults = {
       updated: 0,
@@ -83,7 +77,6 @@ export async function POST(request: NextRequest) {
               .where(eq(users.clerkId, clerkUser.id))
             
             syncResults.updated++
-            console.log(`✅ Updated user: ${primaryEmail.emailAddress}`)
           }
 
           // Reactivate if user was inactive
@@ -97,12 +90,9 @@ export async function POST(request: NextRequest) {
               .where(eq(users.clerkId, clerkUser.id))
             
             syncResults.reactivated++
-            console.log(`🔄 Reactivated user: ${primaryEmail.emailAddress}`)
           }
 
         } else if (existingUserByEmail) {
-          // Same email but different Clerk ID - update Clerk ID
-          console.log(`🔄 Updating Clerk ID for existing email: ${primaryEmail.emailAddress}`)
           
           await db
             .update(users)
@@ -116,7 +106,6 @@ export async function POST(request: NextRequest) {
             .where(eq(users.email, primaryEmail.emailAddress))
           
           syncResults.updated++
-          console.log(`✅ Updated Clerk ID for: ${primaryEmail.emailAddress}`)
 
         } else {
           // Create new user
@@ -135,7 +124,6 @@ export async function POST(request: NextRequest) {
             })
           
           syncResults.created++
-          console.log(`🆕 Created new user: ${primaryEmail.emailAddress}`)
         }
 
       } catch (error) {
@@ -160,14 +148,11 @@ export async function POST(request: NextRequest) {
           .where(eq(users.clerkId, user.clerkId))
         
         syncResults.deactivated++
-        console.log(`⏸️ Deactivated user: ${user.email}`)
       } catch (error) {
         console.error(`❌ Error deactivating user ${user.email}:`, error)
         syncResults.errors.push(`Deactivate ${user.email}: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
-
-    console.log('✅ Clerk sync completed:', syncResults)
 
     return NextResponse.json({
       success: true,
@@ -176,7 +161,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ Clerk sync failed:', error)
     return NextResponse.json({
       success: false,
       error: 'Clerk sync failed',

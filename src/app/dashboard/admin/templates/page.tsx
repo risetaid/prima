@@ -21,7 +21,7 @@ export default function AdminTemplatesPage() {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
         const data = await response.json();
-        if (data.role !== "ADMIN") {
+        if (data.role !== "SUPERADMIN") {
           toast.error("Akses Ditolak", {
             description: "Anda tidak memiliki akses ke halaman admin."
           });

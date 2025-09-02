@@ -42,7 +42,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       } catch (dbError: any) {
         retries--
         if (dbError.code === 'CONNECT_TIMEOUT' && retries > 0) {
-          console.log(`🔍 Auth: DB connection timeout, retrying... (${retries} attempts left)`)
           await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
           continue
         }
@@ -53,7 +52,6 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const dbUser = dbUserResult?.[0]
 
     if (!dbUser) {
-      console.log('🔍 Auth: User not found in database for Clerk ID:', userId)
       return null
     }
 

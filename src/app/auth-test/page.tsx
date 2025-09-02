@@ -11,20 +11,10 @@ export default function AuthTest() {
 
   useEffect(() => {
     if (authLoaded && userLoaded) {
-      console.log('🔍 Auth Test Results:', {
-        authLoaded,
-        userLoaded,
-        isSignedIn,
-        userId,
-        userEmail: user?.primaryEmailAddress?.emailAddress,
-        userName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
-      })
       
       if (isSignedIn) {
-        console.log('✅ Authentication successful - redirecting to dashboard')
         router.push('/dashboard')
       } else {
-        console.log('❌ Not signed in - redirecting to sign-in')
         router.push('/sign-in')
       }
     }

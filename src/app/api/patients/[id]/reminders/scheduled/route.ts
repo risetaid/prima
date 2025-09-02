@@ -109,9 +109,6 @@ export async function GET(
 
     // DEBUG: Log the filter criteria first
     const todayWIBStart = getWIBTodayStart()
-    console.log("🔍 SCHEDULED API DEBUG - Filter criteria:")
-    console.log("Today WIB start:", todayWIBStart)
-    console.log("Found reminders:", scheduledReminders.length)
 
     // Filter out reminders that have already been delivered
     const filteredReminders = scheduledReminders.filter(reminder => {
@@ -121,10 +118,8 @@ export async function GET(
     })
 
     // DEBUG: Log what we found after filtering
-    console.log("🔍 SCHEDULED API DEBUG - Found reminders after filtering:", filteredReminders.length)
     filteredReminders.forEach(reminder => {
       const logs = logsMap.get(reminder.id) || []
-      console.log(`- ${reminder.startDate.toISOString()} | Logs: ${logs.length} | Latest: ${logs[0]?.status} at ${logs[0]?.sentAt}`)
     })
 
     // Transform to match frontend interface
@@ -140,7 +135,6 @@ export async function GET(
 
     return NextResponse.json(formattedReminders)
   } catch (error) {
-    console.error('Error fetching scheduled reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -187,7 +181,6 @@ export async function DELETE(
       deletedCount: deleteResult.length
     })
   } catch (error) {
-    console.error('Error deleting scheduled reminders:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

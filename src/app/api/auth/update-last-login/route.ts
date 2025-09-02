@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
     }, { maxRetries: 2, delayMs: 500 }, 5000) // 5 second timeout
 
     if (existingUser.length === 0) {
-      console.log(`User with Clerk ID ${userId} not found in database. Auto-syncing user...`)
       
       // Check if this is the first user (should be admin) with retry
       const userCountResult = await safeDbOperation(async () => {
@@ -55,7 +54,6 @@ export async function POST(request: NextRequest) {
         }, { maxRetries: 2, delayMs: 500 }, 5000)
         
         logDbPerformance('user-auto-sync', startTime)
-        console.log(`✅ User auto-synced: ${user.primaryEmailAddress?.emailAddress}`)
         return NextResponse.json({ success: true, message: 'User synced and login updated' })
       } catch (syncError) {
         console.error('Auto-sync failed after retries:', syncError)
@@ -71,11 +69,9 @@ export async function POST(request: NextRequest) {
 
     // User login tracking removed as lastLoginAt field not needed for this system
     logDbPerformance('user-login-check', startTime)
-    console.log(`✅ User logged in: ${existingUser[0].email}`)
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error updating last login:', error)
     
     // Return success to not block user authentication flow
     return NextResponse.json({ 

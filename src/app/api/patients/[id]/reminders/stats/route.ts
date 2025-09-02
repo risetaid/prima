@@ -18,7 +18,6 @@ export async function GET(
     
     // DEBUG: Log the filter criteria
     const todayWIBStart = getWIBTodayStart()
-    console.log("🔍 STATS API DEBUG - WIB Today Start:", todayWIBStart)
     
     // SCHEDULED COUNT: Reminders that haven't been delivered yet (optimized with subquery)
     const scheduledReminderIds = await db
@@ -66,11 +65,6 @@ export async function GET(
           )
         )
       )
-
-    console.log("🔍 STATS API DEBUG - Scheduled count:", scheduledReminders.length)
-    scheduledReminders.forEach(reminder => {
-      console.log(`- ${reminder.startDate.toISOString()} | Schedule ID: ${reminder.id}`)
-    })
 
     // ALL REMINDERS: Get all active reminders for other status calculations
     // First get all active reminder schedules
@@ -196,7 +190,6 @@ export async function GET(
 
     return NextResponse.json(stats)
   } catch (error) {
-    console.error('Error fetching reminder stats:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

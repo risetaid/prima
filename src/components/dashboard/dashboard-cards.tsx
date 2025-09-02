@@ -7,18 +7,15 @@ export function DashboardCards() {
   const router = useRouter()
 
   const handlePengingatClick = () => {
-    console.log('Pengingat clicked')
     // For now, just show alert
     alert('Pengingat feature - Coming soon!')
   }
 
   const handleStatistikClick = () => {
-    console.log('Statistik clicked')
     alert('Statistik feature - Coming soon!')
   }
 
   const handleTutorialClick = () => {
-    console.log('Tutorial clicked')
     alert('Tutorial feature - Coming soon!')
   }
 

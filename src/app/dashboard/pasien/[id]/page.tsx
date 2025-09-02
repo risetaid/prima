@@ -126,11 +126,9 @@ export default function PatientDetailPage() {
         setPatient(data)
         setEditData({ name: data.name, phoneNumber: data.phoneNumber, photoUrl: data.photoUrl || '' })
       } else {
-        console.error('Patient not found')
         router.push('/dashboard/pasien')
       }
     } catch (error) {
-      console.error('Error fetching patient:', error)
       router.push('/dashboard/pasien')
     } finally {
       setLoading(false)
@@ -151,11 +149,9 @@ export default function PatientDetailPage() {
         }))
         setHealthNotes(formattedNotes)
       } else {
-        console.error('Failed to fetch health notes:', response.status)
         toast.error('Gagal memuat catatan kesehatan')
       }
     } catch (error) {
-      console.error('Error fetching health notes:', error)
       toast.error('Gagal memuat catatan kesehatan')
     }
   }
@@ -257,7 +253,6 @@ export default function PatientDetailPage() {
         toast.error(error.error || 'Gagal memperbarui catatan')
       }
     } catch (error) {
-      console.error('Error updating health note:', error)
       toast.error('Gagal memperbarui catatan')
     }
   }
@@ -291,7 +286,6 @@ export default function PatientDetailPage() {
         toast.error(error.error || 'Gagal menghapus catatan')
       }
     } catch (error) {
-      console.error('Error deleting health notes:', error)
       toast.error('Gagal menghapus catatan')
     }
   }
@@ -605,12 +599,9 @@ export default function PatientDetailPage() {
       const response = await fetch('/api/templates') // Remove category filter to get all templates
       if (response.ok) {
         const data = await response.json()
-        console.log('📋 Templates fetched:', data.templates?.length || 0)
-        console.log('🎯 Template data:', data.templates)
         setTemplates(data.templates || [])
       }
     } catch (error) {
-      console.error('Error fetching templates:', error)
     }
   }
 

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 
 interface User {
   id: string
+  clerkId: string
   email: string
   firstName: string | null
   lastName: string | null
@@ -26,6 +27,7 @@ interface User {
 
 export default function UserManagement() {
   const [users, setUsers] = useState<User[]>([])
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -43,14 +45,26 @@ export default function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/admin/users')
-      const data = await response.json()
       
-      if (data.success) {
-        setUsers(data.users)
+      // Fetch both users list and current user info
+      const [usersResponse, profileResponse] = await Promise.all([
+        fetch('/api/admin/users'),
+        fetch('/api/user/profile')
+      ])
+      
+      const usersData = await usersResponse.json()
+      const profileData = await profileResponse.json()
+      
+      if (usersData.success) {
+        setUsers(usersData.users)
       } else {
         toast.error('Failed to fetch users')
       }
+      
+      if (profileResponse.ok && profileData.id) {
+        setCurrentUser(profileData)
+      }
+      
     } catch (error) {
       console.error('Error fetching users:', error)
       toast.error('Failed to fetch users')
@@ -113,20 +127,32 @@ export default function UserManagement() {
     }
   }
 
-  const toggleUserRole = async (userId: string, currentRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER') => {
+  const toggleUserRole = async (user: User, currentRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER') => {
     try {
-      setActionLoading(userId)
+      setActionLoading(user.id)
       
-      // Cycle through roles: MEMBER -> ADMIN -> SUPERADMIN -> MEMBER
+      // Prevent Superadmin from demoting themselves
+      if (currentUser?.id === user.id && currentRole === 'SUPERADMIN') {
+        toast.error('Tidak dapat demote diri sendiri sebagai Superadmin')
+        return
+      }
+      
+      // Option B: Smart role cycling based on hierarchy
+      // Priority: Always allow promotion up, and demotion down
       let newRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
+      
       if (currentRole === 'MEMBER') {
+        // MEMBER can only go up to ADMIN
         newRole = 'ADMIN'
       } else if (currentRole === 'ADMIN') {
+        // ADMIN can go up to SUPERADMIN or down to MEMBER
+        // Default to promotion (up), but we'll add separate demotion button
         newRole = 'SUPERADMIN'  
-      } else {
-        newRole = 'MEMBER'
+      } else { // currentRole === 'SUPERADMIN'
+        // SUPERADMIN can go down to ADMIN (gradual demotion)
+        newRole = 'ADMIN'
       }
-      const response = await fetch(`/api/admin/users/${userId}/toggle-role`, {
+      const response = await fetch(`/api/admin/users/${user.clerkId}/toggle-role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,6 +171,40 @@ export default function UserManagement() {
     } catch (error) {
       console.error('Error toggling user role:', error)
       toast.error('Failed to update user role')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const demoteUserRole = async (user: User, targetRole: 'ADMIN' | 'MEMBER') => {
+    try {
+      setActionLoading(user.id)
+      
+      // Prevent Superadmin from demoting themselves
+      if (currentUser?.id === user.id && user.role === 'SUPERADMIN') {
+        toast.error('Tidak dapat demote diri sendiri sebagai Superadmin')
+        return
+      }
+      
+      const response = await fetch(`/api/admin/users/${user.clerkId}/toggle-role`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: targetRole })
+      })
+
+      const data = await response.json()
+      
+      if (data.success) {
+        toast.success(`User demoted to ${targetRole} successfully`)
+        fetchUsers()
+      } else {
+        toast.error(data.error || 'Failed to demote user')
+      }
+    } catch (error) {
+      console.error('Error demoting user role:', error)
+      toast.error('Failed to demote user')
     } finally {
       setActionLoading(null)
     }
@@ -416,10 +476,11 @@ export default function UserManagement() {
                   <div className="flex flex-col space-y-1.5 sm:flex-row sm:space-y-0 sm:space-x-2">
                     {/* Role Toggle Button */}
                     <Button
-                      onClick={() => toggleUserRole(user.id, user.role)}
-                      disabled={actionLoading === user.id}
+                      onClick={() => toggleUserRole(user, user.role)}
+                      disabled={actionLoading === user.id || (currentUser?.id === user.id && user.role === 'SUPERADMIN')}
                       size="sm"
                       variant={user.role === 'MEMBER' ? 'outline' : 'default'}
+                      title={currentUser?.id === user.id && user.role === 'SUPERADMIN' ? 'Tidak dapat demote diri sendiri' : 'Click untuk ganti role'}
                       className={`cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap ${
                         user.role === 'SUPERADMIN' 
                           ? 'bg-purple-600 hover:bg-purple-700 text-white' 
@@ -435,25 +496,46 @@ export default function UserManagement() {
                           {user.role === 'SUPERADMIN' ? (
                             <>
                               <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              <span className="hidden sm:inline">→ Member</span>
-                              <span className="sm:hidden">→ Member</span>
+                              <span className="hidden sm:inline">↓ Admin</span>
+                              <span className="sm:hidden">↓ Admin</span>
                             </>
                           ) : user.role === 'ADMIN' ? (
                             <>
                               <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              <span className="hidden sm:inline">→ Superadmin</span>
-                              <span className="sm:hidden">→ Super</span>
+                              <span className="hidden sm:inline">↑ Superadmin</span>
+                              <span className="sm:hidden">↑ Super</span>
                             </>
                           ) : (
                             <>
                               <UserCheck className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              <span className="hidden sm:inline">→ Admin</span>
-                              <span className="sm:hidden">→ Admin</span>
+                              <span className="hidden sm:inline">↑ Admin</span>
+                              <span className="sm:hidden">↑ Admin</span>
                             </>
                           )}
                         </>
                       )}
                     </Button>
+
+                    {/* Demote Button - Only for ADMIN to demote to MEMBER */}
+                    {user.role === 'ADMIN' && (
+                      <Button
+                        onClick={() => demoteUserRole(user, 'MEMBER')}
+                        disabled={actionLoading === user.id || (currentUser?.id === user.id)}
+                        size="sm"
+                        variant="outline"
+                        title="Demote to Member"
+                        className="cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+                      >
+                        {actionLoading === user.id ? (
+                          <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <span className="hidden sm:inline">↓ Member</span>
+                            <span className="sm:hidden">↓ Member</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
                     
                     {/* Status Toggle Button - Only for regular members */}
                     {user.role === 'MEMBER' && (

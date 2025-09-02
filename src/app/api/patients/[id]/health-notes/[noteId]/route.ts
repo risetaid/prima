@@ -143,7 +143,7 @@ export async function PUT(
     const existingNote = existingNoteResult[0]
 
     // Only allow the original recorder or admin to edit
-    if (existingNote.recordedBy !== user.id && user.role !== 'ADMIN') {
+    if (existingNote.recordedBy !== user.id && user.role !== 'SUPERADMIN') {
       return NextResponse.json(
         { error: 'You can only edit notes you created' },
         { status: 403 }
@@ -238,7 +238,7 @@ export async function DELETE(
     const existingNote = existingNoteResult[0]
 
     // Only allow the original recorder or admin to delete
-    if (existingNote.recordedBy !== user.id && user.role !== 'ADMIN') {
+    if (existingNote.recordedBy !== user.id && user.role !== 'SUPERADMIN') {
       return NextResponse.json(
         { error: 'You can only delete notes you created' },
         { status: 403 }

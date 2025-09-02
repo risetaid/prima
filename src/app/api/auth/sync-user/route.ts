@@ -34,10 +34,6 @@ export async function POST() {
     
     const userCount = userCountResult[0]?.count || 0
     const isFirstUser = userCount === 0
-    
-    console.log(`🔍 Sync User - Current user count in DB: ${userCount}`)
-    console.log(`🔍 Sync User - Is first user? ${isFirstUser}`)
-    console.log(`🔍 Sync User - Will set role to: ${isFirstUser ? 'SUPERADMIN' : 'MEMBER'}`)
 
     // Create user in database
     const newUser = await db
@@ -59,7 +55,6 @@ export async function POST() {
       user: newUser[0]
     })
   } catch (error) {
-    console.error('Sync user error:', error)
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
