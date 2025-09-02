@@ -52,35 +52,41 @@ export async function POST(request: NextRequest) {
 
     console.log('Looking for patient with phone:', { phone, alternativePhone })
 
-    // Find patient by phone number (try both formats)
+    // Process patient response
+    const response = message.toLowerCase().trim()
+    const verificationResult = processVerificationResponse(response)
+
+    // For BERHENTI (unsubscribe), accept from any active patient
+    // For verification responses (YA/TIDAK), only from pending verification
+    const baseWhereClause = and(
+      alternativePhone ? 
+        or(
+          eq(patients.phoneNumber, phone),
+          eq(patients.phoneNumber, alternativePhone)
+        ) :
+        eq(patients.phoneNumber, phone),
+      eq(patients.isActive, true)
+    )
+
+    const whereClause = verificationResult === 'unsubscribed' 
+      ? baseWhereClause
+      : and(baseWhereClause, eq(patients.verificationStatus, 'pending_verification'))
+
     const patientResult = await db
       .select()
       .from(patients)
-      .where(and(
-        alternativePhone ? 
-          or(
-            eq(patients.phoneNumber, phone),
-            eq(patients.phoneNumber, alternativePhone)
-          ) :
-          eq(patients.phoneNumber, phone),
-        eq(patients.isActive, true),
-        eq(patients.verificationStatus, 'pending_verification')
-      ))
+      .where(whereClause)
       .limit(1)
 
     if (patientResult.length === 0) {
-      console.log('No pending verification found for phone:', phone)
+      console.log('No patient found for phone:', phone, 'with verification result:', verificationResult)
       return NextResponse.json(
-        { message: 'No pending verification found' },
+        { message: 'No patient found or patient not eligible for this action' },
         { status: 200 }
       )
     }
 
     const patient = patientResult[0]
-
-    // Process patient response
-    const response = message.toLowerCase().trim()
-    const verificationResult = processVerificationResponse(response)
 
     if (!verificationResult) {
       // Unknown response - log it but don't change status
