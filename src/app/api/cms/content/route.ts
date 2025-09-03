@@ -18,9 +18,14 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
 
     // Get articles
-    let articles = []
+    let articles: any[] = []
     if (type === 'all' || type === 'articles') {
-      const articleQuery = db
+      const articleConditions = []
+      if (status !== 'all') {
+        articleConditions.push(eq(cmsArticles.status, status as any))
+      }
+
+      articles = await db
         .select({
           id: cmsArticles.id,
           title: cmsArticles.title,
@@ -29,24 +34,26 @@ export async function GET(request: NextRequest) {
           status: cmsArticles.status,
           publishedAt: cmsArticles.publishedAt,
           createdAt: cmsArticles.createdAt,
-          updatedAt: cmsArticles.updatedAt,
-          type: 'article' as const
+          updatedAt: cmsArticles.updatedAt
         })
         .from(cmsArticles)
-
-      if (status !== 'all') {
-        articleQuery.where(eq(cmsArticles.status, status as any))
-      }
-
-      articles = await articleQuery
+        .where(articleConditions.length > 0 ? and(...articleConditions) : undefined)
         .orderBy(desc(cmsArticles.updatedAt))
         .limit(type === 'articles' ? limit : Math.ceil(limit / 2))
+      
+      // Add type after query
+      articles = articles.map(article => ({ ...article, type: 'article' as const }))
     }
 
     // Get videos
-    let videos = []
+    let videos: any[] = []
     if (type === 'all' || type === 'videos') {
-      const videoQuery = db
+      const videoConditions = []
+      if (status !== 'all') {
+        videoConditions.push(eq(cmsVideos.status, status as any))
+      }
+
+      videos = await db
         .select({
           id: cmsVideos.id,
           title: cmsVideos.title,
@@ -55,18 +62,15 @@ export async function GET(request: NextRequest) {
           status: cmsVideos.status,
           publishedAt: cmsVideos.publishedAt,
           createdAt: cmsVideos.createdAt,
-          updatedAt: cmsVideos.updatedAt,
-          type: 'video' as const
+          updatedAt: cmsVideos.updatedAt
         })
         .from(cmsVideos)
-
-      if (status !== 'all') {
-        videoQuery.where(eq(cmsVideos.status, status as any))
-      }
-
-      videos = await videoQuery
+        .where(videoConditions.length > 0 ? and(...videoConditions) : undefined)
         .orderBy(desc(cmsVideos.updatedAt))
         .limit(type === 'videos' ? limit : Math.ceil(limit / 2))
+      
+      // Add type after query
+      videos = videos.map(video => ({ ...video, type: 'video' as const }))
     }
 
     // Combine and sort by updated date

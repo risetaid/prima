@@ -43,7 +43,6 @@ export async function generateMetadata({ params }: VideoPageProps): Promise<Meta
       title: video.seoTitle || video.title,
       description: video.seoDescription || video.description || 'Video edukasi kesehatan dari PRIMA',
       type: 'video.other',
-      publishedTime: video.publishedAt?.toISOString(),
       images: video.thumbnailUrl ? [
         {
           url: video.thumbnailUrl,

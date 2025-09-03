@@ -10,14 +10,14 @@ import {
 import { relations } from 'drizzle-orm'
 
 // ===== ENUMS =====
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MEMBER'])
+export const userRoleEnum = pgEnum('user_role', ['SUPERADMIN', 'ADMIN', 'MEMBER'])
 export const cancerStageEnum = pgEnum('cancer_stage', ['I', 'II', 'III', 'IV'])
 export const medicalRecordTypeEnum = pgEnum('medical_record_type', ['DIAGNOSIS', 'TREATMENT', 'PROGRESS', 'HEALTH_NOTE'])
 export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE'])
 export const reminderStatusEnum = pgEnum('reminder_status', ['PENDING', 'SENT', 'DELIVERED', 'FAILED'])
 export const patientConditionEnum = pgEnum('patient_condition', ['GOOD', 'FAIR', 'POOR'])
 export const templateCategoryEnum = pgEnum('template_category', ['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
-export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired'])
+export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired', 'unsubscribed'])
 
 // CMS Content Enums
 export const contentCategoryEnum = pgEnum('content_category', ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'])
