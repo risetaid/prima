@@ -7,7 +7,6 @@ const isProtectedRoute = createRouteMatcher([
   '/api/admin(.*)',
   '/api/reminders(.*)',
   '/api/user(.*)',
-  '/api/cron(.*)',
   '/api/upload(.*)'
 ])
 
@@ -15,6 +14,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks(.*)',
+  '/api/cron(.*)',
   '/pending-approval',
   '/unauthorized'
 ])
