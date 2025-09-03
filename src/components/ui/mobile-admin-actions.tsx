@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Shield, FileText, Calendar, Users, Newspaper, Video } from "lucide-react";
+import { Shield, FileText, Calendar, Users, Newspaper, Video, UserCheck } from "lucide-react";
 import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileAdminActionsProps {
@@ -157,6 +157,31 @@ export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) 
       title="Video Edukasi Kesehatan"
     >
       <Video className="w-5 h-5" />
+    </button>
+  );
+}
+
+export function MobilePasienActions({ className = "" }: MobileAdminActionsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const isActive = pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien");
+
+  return (
+    <button
+      onClick={() => router.push("/dashboard")}
+      className={`
+        p-2 rounded-full transition-colors
+        ${
+          isActive
+            ? "bg-blue-600 text-white"
+            : "bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white"
+        }
+        ${className}
+      `}
+      title="Daftar Pasien"
+    >
+      <UserCheck className="w-5 h-5" />
     </button>
   );
 }

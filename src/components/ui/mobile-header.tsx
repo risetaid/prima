@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { MobileAdminActions, MobileCMSActions, MobileReminderActions, MobileBeritaActions, MobileVideoActions } from "./mobile-admin-actions";
+import { MobileAdminActions, MobileCMSActions, MobileReminderActions, MobileBeritaActions, MobileVideoActions, MobilePasienActions } from "./mobile-admin-actions";
 import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileHeaderProps {
@@ -15,9 +15,10 @@ function MobileNavigationActions() {
   const { role: userRole } = useRoleCache();
   
   if (userRole === 'MEMBER') {
-    // MEMBER users only see: Pengingat, Berita, Video Edukasi
+    // MEMBER users see: Pasien (view-only), Pengingat, Berita, Video Edukasi
     return (
       <div className="flex items-center space-x-2">
+        <MobilePasienActions />  
         <MobileReminderActions />
         <MobileBeritaActions />
         <MobileVideoActions />
@@ -31,6 +32,7 @@ function MobileNavigationActions() {
   // ADMIN and SUPERADMIN see all navigation options
   return (
     <div className="flex items-center space-x-2">
+      <MobilePasienActions />
       <MobileReminderActions />
       <MobileBeritaActions />
       <MobileVideoActions />

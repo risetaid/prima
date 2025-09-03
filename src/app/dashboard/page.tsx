@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
 import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
-import { postLoginCacheCleanup } from "@/lib/cache-utils";
+import { postLoginCacheCleanup, clearRoleCacheOnLogout } from "@/lib/cache-utils";
 import { initializePWA } from "@/lib/pwa-utils";
 
 
@@ -63,6 +63,9 @@ export default function DashboardPage() {
           setApprovalStatus("approved");
           console.log("✅ Dashboard: Session validated, accessing dashboard");
           
+          // Clear role cache to prevent stale role data after login
+          clearRoleCacheOnLogout();
+          
           // Clear browser cache after successful login to prevent development artifacts
           postLoginCacheCleanup().catch((error: any) => {
             console.warn('⚠️ Dashboard: Cache cleanup failed (non-critical):', error)
@@ -80,7 +83,11 @@ export default function DashboardPage() {
           console.log("🔐 Dashboard: Authentication required, redirecting");
           router.push("/sign-in");
         } else {
-          console.error("❌ Dashboard: Session validation failed:", sessionData.error);
+          console.error("❌ Dashboard: Session validation failed:", {
+            sessionData,
+            responseStatus: response.status,
+            responseOk: response.ok
+          });
           setApprovalStatus("error");
         }
         

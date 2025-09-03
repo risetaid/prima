@@ -61,9 +61,14 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
     if (!user) return baseNavItems;
 
     if (userRole === 'MEMBER') {
-      // MEMBER users only see: Pengingat, Berita, Video Edukasi
+      // MEMBER users see: Beranda, Pasien (view only), Pengingat, Berita, Video Edukasi
       return [
         ...baseNavItems,
+        {
+          label: "Pasien",
+          href: "/dashboard",
+          active: pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
+        },
         {
           label: "Pengingat",
           href: "/dashboard/pengingat",

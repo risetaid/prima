@@ -74,19 +74,25 @@ export async function fetchRoleWithCache(): Promise<string | null> {
     return cachedRole
   }
   
-  // Cache miss, fetch from API
-  console.log('🔍 Role Cache: Miss - fetching from API')
+  // Cache miss, fetch from API using consolidated endpoint
+  console.log('🔍 Role Cache: Miss - fetching from consolidated session API')
   
   try {
-    const response = await fetch('/api/user/profile')
+    // Use the same consolidated endpoint as dashboard for consistency
+    const response = await fetch('/api/user/session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
     
     if (!response.ok) {
-      console.warn('❌ Role Cache: API error:', response.status)
+      console.warn('❌ Role Cache: Session API error:', response.status)
       return null
     }
     
-    const data = await response.json()
-    const role = data.role || null
+    const sessionData = await response.json()
+    const role = sessionData.user?.role || null
     
     // Cache the result
     setCachedRole(role)

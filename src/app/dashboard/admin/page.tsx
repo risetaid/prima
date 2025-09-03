@@ -26,18 +26,23 @@ export default function AdminPanelPage() {
 
   const checkAdminAccess = async () => {
     try {
-      const response = await fetch("/api/user/profile");
+      const response = await fetch("/api/user/session", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
       if (response.ok) {
-        const data = await response.json();
+        const sessionData = await response.json();
+        const userRole = sessionData.user?.role;
         
-        if (data.role !== "SUPERADMIN") {
+        if (userRole !== "SUPERADMIN") {
           toast.error("Akses Ditolak", {
             description: "Anda tidak memiliki akses ke Superadmin Panel."
           });
           router.push("/dashboard");
           return;
         }
-        setUserRole(data.role);
+        setUserRole(userRole);
       } else {
         router.push("/sign-in");
         return;

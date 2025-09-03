@@ -136,9 +136,10 @@ export function clearRoleCache() {
   if (typeof window === 'undefined') return
   
   try {
-    // Clear role-related cache keys
+    // Clear role-related cache keys (matching role-cache.ts naming)
     const roleCacheKeys = [
-      'prima-user-role',
+      'prima_user_role',           // Main role cache (matches role-cache.ts)
+      'prima_user_role_expiry',    // Role cache expiry (matches role-cache.ts)
       'prima-user-permissions',
       'prima-navigation-cache',
       'prima-dashboard-stats'
@@ -152,6 +153,38 @@ export function clearRoleCache() {
     console.log('✅ Cache: Role-specific cache cleared')
   } catch (error) {
     console.warn('⚠️ Cache: Failed to clear role cache:', error)
+  }
+}
+
+/**
+ * Clear role cache specifically for user logout/role switches
+ * This ensures clean transitions between different user roles
+ */
+export function clearRoleCacheOnLogout() {
+  if (typeof window === 'undefined') return
+  
+  try {
+    // Import and use the dedicated role cache clearing function
+    // This ensures we use the same clearing logic as role-cache.ts
+    
+    // Clear all role-related data
+    clearRoleCache()
+    
+    // Also clear any Clerk-related role data that might be cached
+    const clerkRoleKeys = [
+      'clerk-role',
+      'clerk-permissions',
+      'clerk-user-data'
+    ]
+    
+    clerkRoleKeys.forEach(key => {
+      localStorage.removeItem(key)
+      sessionStorage.removeItem(key)
+    })
+    
+    console.log('✅ Cache: Role cache cleared for logout/switch')
+  } catch (error) {
+    console.warn('⚠️ Cache: Failed to clear role cache on logout:', error)
   }
 }
 
