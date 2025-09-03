@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
 import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
+import { postLoginCacheCleanup } from "@/lib/cache-utils";
+import { initializePWA } from "@/lib/pwa-utils";
 
 
 export default function DashboardPage() {
@@ -55,9 +57,21 @@ export default function DashboardPage() {
           canAccess: sessionData.user?.canAccessDashboard
         });
         
+        console.log('🧹 Dashboard: Initiating post-login cache cleanup...');
+        
         if (response.ok && sessionData.success) {
           setApprovalStatus("approved");
           console.log("✅ Dashboard: Session validated, accessing dashboard");
+          
+          // Clear browser cache after successful login to prevent development artifacts
+          postLoginCacheCleanup().catch((error: any) => {
+            console.warn('⚠️ Dashboard: Cache cleanup failed (non-critical):', error)
+          });
+          
+          // Initialize PWA features after successful login
+          initializePWA().catch((error: any) => {
+            console.warn('⚠️ Dashboard: PWA initialization failed (non-critical):', error)
+          });
         } else if (sessionData.needsApproval) {
           setApprovalStatus("pending");
           console.log("⏳ Dashboard: User needs approval, redirecting");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Shield, FileText, Calendar, Users } from "lucide-react";
+import { Shield, FileText, Calendar, Users, Newspaper, Video } from "lucide-react";
 import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileAdminActionsProps {
@@ -107,6 +107,56 @@ export function MobileReminderActions({ className = "" }: MobileAdminActionsProp
       title="Pengingat Obat"
     >
       <Calendar className="w-5 h-5" />
+    </button>
+  );
+}
+
+export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const isActive = pathname.startsWith("/dashboard/berita");
+
+  return (
+    <button
+      onClick={() => router.push("/dashboard/berita")}
+      className={`
+        p-2 rounded-full transition-colors
+        ${
+          isActive
+            ? "bg-green-600 text-white"
+            : "bg-green-100 hover:bg-green-600 text-green-600 hover:text-white"
+        }
+        ${className}
+      `}
+      title="Berita & Artikel Kesehatan"
+    >
+      <Newspaper className="w-5 h-5" />
+    </button>
+  );
+}
+
+export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const isActive = pathname.startsWith("/dashboard/video");
+
+  return (
+    <button
+      onClick={() => router.push("/dashboard/video")}
+      className={`
+        p-2 rounded-full transition-colors
+        ${
+          isActive
+            ? "bg-red-600 text-white"
+            : "bg-red-100 hover:bg-red-600 text-red-600 hover:text-white"
+        }
+        ${className}
+      `}
+      title="Video Edukasi Kesehatan"
+    >
+      <Video className="w-5 h-5" />
     </button>
   );
 }

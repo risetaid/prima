@@ -51,24 +51,69 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const pathname = usePathname();
   const { role: userRole, loading: roleLoading } = useRoleCache();
 
+  // Base navigation for all authenticated users
   const baseNavItems = [
     { label: "Beranda", href: "/", active: pathname === "/" },
-    {
-      label: "Pasien",
-      href: "/dashboard",
-      active:
-        pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
-    },
-    {
-      label: "Pengingat",
-      href: "/dashboard/pengingat",
-      active: pathname.startsWith("/dashboard/pengingat"),
-    },
   ];
+
+  // Role-specific navigation items
+  const getRoleBasedNavItems = () => {
+    if (!user) return baseNavItems;
+
+    if (userRole === 'MEMBER') {
+      // MEMBER users only see: Pengingat, Berita, Video Edukasi
+      return [
+        ...baseNavItems,
+        {
+          label: "Pengingat",
+          href: "/dashboard/pengingat",
+          active: pathname.startsWith("/dashboard/pengingat"),
+        },
+        {
+          label: "Berita",
+          href: "/dashboard/berita",
+          active: pathname.startsWith("/dashboard/berita"),
+        },
+        {
+          label: "Video Edukasi",
+          href: "/dashboard/video",
+          active: pathname.startsWith("/dashboard/video"),
+        },
+      ];
+    }
+
+    // ADMIN and SUPERADMIN see all navigation including patient management
+    return [
+      ...baseNavItems,
+      {
+        label: "Pasien",
+        href: "/dashboard",
+        active:
+          pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
+      },
+      {
+        label: "Pengingat",
+        href: "/dashboard/pengingat",
+        active: pathname.startsWith("/dashboard/pengingat"),
+      },
+      {
+        label: "Berita",
+        href: "/dashboard/berita",
+        active: pathname.startsWith("/dashboard/berita"),
+      },
+      {
+        label: "Video Edukasi",
+        href: "/dashboard/video",
+        active: pathname.startsWith("/dashboard/video"),
+      },
+    ];
+  };
+
+  const roleBasedNavItems = getRoleBasedNavItems();
 
   // Add CMS navigation only for ADMIN and SUPERADMIN
   const navItems = [
-    ...baseNavItems,
+    ...roleBasedNavItems,
     ...(userRole === 'ADMIN' || userRole === 'SUPERADMIN' ? [{
       label: "CMS",
       href: "/dashboard/cms",
@@ -124,20 +169,22 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
               {/* Admin Actions - Only visible to admins */}
               <AdminActions />
 
-              {/* Special Pengingat Button */}
-              <button
-                onClick={() => handleNavigation("/dashboard/pengingat")}
-                className={`
-                  px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer
-                  ${
-                    pathname.startsWith("/dashboard/pengingat")
-                      ? "bg-blue-700 text-white"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }
-                `}
-              >
-                🗓️ Pengingat
-              </button>
+              {/* Special Pengingat Button - Only show for non-MEMBER roles since MEMBER has it in main nav */}
+              {userRole !== 'MEMBER' && (
+                <button
+                  onClick={() => handleNavigation("/dashboard/pengingat")}
+                  className={`
+                    px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer
+                    ${
+                      pathname.startsWith("/dashboard/pengingat")
+                        ? "bg-blue-700 text-white"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }
+                  `}
+                >
+                  🗓️ Pengingat
+                </button>
+              )}
             </nav>
           )}
 

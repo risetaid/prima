@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { AdminUsersTableSkeleton } from '@/components/ui/dashboard-skeleton'
 import { CheckCircle, XCircle, Clock, User, Mail, Calendar, Crown, UserCheck, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -306,11 +307,7 @@ export default function UserManagement() {
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+    return <AdminUsersTableSkeleton />
   }
 
   const pendingUsers = users.filter(user => !user.isApproved)

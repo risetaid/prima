@@ -9,6 +9,7 @@ import { Plus, FileText, Video, TrendingUp, Clock, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { DashboardStatsCardsSkeleton, CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
+import { RoleGuard } from '@/components/auth/role-guard'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { Home } from 'lucide-react'
 
@@ -42,7 +43,7 @@ interface Statistics {
   }
 }
 
-export default function CMSPage() {
+function CMSPageContent() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [statistics, setStatistics] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(true)
@@ -419,5 +420,13 @@ export default function CMSPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function CMSPage() {
+  return (
+    <RoleGuard allowedRoles={['ADMIN', 'SUPERADMIN']}>
+      <CMSPageContent />
+    </RoleGuard>
   )
 }

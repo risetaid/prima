@@ -7,6 +7,7 @@ import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB } from '@/lib/datetime'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toast'
+import { ReminderListSkeleton } from '@/components/ui/dashboard-skeleton'
 
 interface ScheduledReminder {
   id: string
@@ -187,11 +188,26 @@ export default function ScheduledRemindersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-gray-100">
+        {/* Header */}
+        <header className="bg-white shadow-sm">
+          <div className="flex items-center justify-between p-4">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              Kembali
+            </button>
+            <h1 className="text-lg font-semibold text-gray-900">Pengingat Terjadwal</h1>
+            <UserButton />
+          </div>
+        </header>
+
+        {/* Main Content with Skeleton */}
+        <main className="px-4 py-6">
+          <ReminderListSkeleton />
+        </main>
       </div>
     )
   }

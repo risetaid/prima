@@ -78,18 +78,27 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, limit)
 
-    // Get statistics
-    const stats = await Promise.all([
-      // Article stats
-      db.select({ count: count() }).from(cmsArticles),
-      db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'published')),
-      db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'draft')),
-      
-      // Video stats
-      db.select({ count: count() }).from(cmsVideos),
-      db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'published')),
-      db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'draft')),
-    ])
+    // Get statistics with error handling
+    let stats
+    try {
+      console.log('📊 CMS: Starting statistics queries...')
+      stats = await Promise.all([
+        // Article stats
+        db.select({ count: count() }).from(cmsArticles),
+        db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'published')),
+        db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'draft')),
+        
+        // Video stats
+        db.select({ count: count() }).from(cmsVideos),
+        db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'published')),
+        db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'draft')),
+      ])
+      console.log('✅ CMS: Statistics queries successful')
+    } catch (statsError) {
+      console.error('❌ CMS: Statistics query failed:', statsError)
+      // Fallback to zero stats if database queries fail
+      stats = [[], [], [], [], [], []]
+    }
 
     const statistics = {
       articles: {
@@ -116,9 +125,24 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error fetching content:', error)
+    console.error('❌ CMS Content: Unexpected error:', error)
+    
+    // Enhanced error logging
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
+    }
+    
+    // Return more specific error information
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        success: false,
+        error: 'CMS content loading failed',
+        details: process.env.NODE_ENV === 'development' ? error instanceof Error ? error.message : 'Unknown error' : 'Server error'
+      },
       { status: 500 }
     )
   }

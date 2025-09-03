@@ -3,10 +3,44 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { MobileAdminActions, MobileCMSActions, MobileReminderActions } from "./mobile-admin-actions";
+import { MobileAdminActions, MobileCMSActions, MobileReminderActions, MobileBeritaActions, MobileVideoActions } from "./mobile-admin-actions";
+import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileHeaderProps {
   showNavigation?: boolean;
+}
+
+// Role-based mobile navigation component
+function MobileNavigationActions() {
+  const { role: userRole } = useRoleCache();
+  
+  if (userRole === 'MEMBER') {
+    // MEMBER users only see: Pengingat, Berita, Video Edukasi
+    return (
+      <div className="flex items-center space-x-2">
+        <MobileReminderActions />
+        <MobileBeritaActions />
+        <MobileVideoActions />
+        <div className="ml-2">
+          <UserButton afterSignOutUrl="/sign-in" />
+        </div>
+      </div>
+    );
+  }
+  
+  // ADMIN and SUPERADMIN see all navigation options
+  return (
+    <div className="flex items-center space-x-2">
+      <MobileReminderActions />
+      <MobileBeritaActions />
+      <MobileVideoActions />
+      <MobileCMSActions />
+      <MobileAdminActions />
+      <div className="ml-2">
+        <UserButton afterSignOutUrl="/sign-in" />
+      </div>
+    </div>
+  );
 }
 
 export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
@@ -29,17 +63,7 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
 
         {/* Mobile Actions & User Menu */}
         {showNavigation && user && (
-          <div className="flex items-center space-x-2">
-            {/* Navigation Actions */}
-            <MobileReminderActions />
-            <MobileCMSActions />
-            <MobileAdminActions />
-            
-            {/* User Button */}
-            <div className="ml-2">
-              <UserButton afterSignOutUrl="/sign-in" />
-            </div>
-          </div>
+          <MobileNavigationActions />
         )}
 
         {/* Sign In Button for unauthenticated users */}

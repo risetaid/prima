@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 import { PatientVariablesManager } from '@/components/patient/patient-variables-manager'
+import { PatientDetailSkeleton } from '@/components/ui/dashboard-skeleton'
 import VerificationBadge, { getVerificationStatusTitle, getVerificationStatusDescription } from '@/components/patient/verification-badge'
 import VerificationActionsPanel from '@/components/patient/verification-actions-panel'
 import VerificationInfoPanel from '@/components/patient/verification-info-panel'
@@ -588,11 +589,45 @@ export default function PatientDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="min-h-screen bg-gray-50 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            style={{
+              backgroundImage: "url(/bg_desktop.png)",
+            }}
+          />
         </div>
+
+        {/* Desktop Header */}
+        <div className="hidden lg:block relative z-10">
+          <DesktopHeader showNavigation={true} />
+        </div>
+
+        {/* Mobile Header */}
+        <div className="lg:hidden relative z-10">
+          <header className="bg-white shadow-sm">
+            <div className="flex items-center justify-between p-4">
+              <button
+                onClick={() => router.back()}
+                className="flex items-center text-gray-600 hover:text-gray-900"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Kembali
+              </button>
+              <h1 className="text-lg font-semibold text-gray-900">Detail Pasien</h1>
+              <UserButton />
+            </div>
+          </header>
+        </div>
+
+        {/* Main Content with Skeleton */}
+        <main className="relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <PatientDetailSkeleton />
+          </div>
+        </main>
       </div>
     )
   }
