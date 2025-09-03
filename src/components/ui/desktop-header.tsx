@@ -69,8 +69,28 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const [userRole, setUserRole] = useState<string | null>(null);
 
-  const navItems = [
+  // Fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      
+      try {
+        const response = await fetch('/api/user/profile');
+        if (response.ok) {
+          const data = await response.json();
+          setUserRole(data.role);
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      }
+    };
+
+    fetchUserRole();
+  }, [user]);
+
+  const baseNavItems = [
     { label: "Beranda", href: "/", active: pathname === "/" },
     {
       label: "Pasien",
@@ -79,15 +99,20 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
         pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
     },
     {
-      label: "CMS",
-      href: "/dashboard/cms",
-      active: pathname.startsWith("/dashboard/cms"),
-    },
-    {
       label: "Pengingat",
       href: "/dashboard/pengingat",
       active: pathname.startsWith("/dashboard/pengingat"),
     },
+  ];
+
+  // Add CMS navigation only for ADMIN and SUPERADMIN
+  const navItems = [
+    ...baseNavItems,
+    ...(userRole === 'ADMIN' || userRole === 'SUPERADMIN' ? [{
+      label: "CMS",
+      href: "/dashboard/cms",
+      active: pathname.startsWith("/dashboard/cms"),
+    }] : [])
   ];
 
   const handleNavigation = (href: string) => {
