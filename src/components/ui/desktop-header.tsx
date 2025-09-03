@@ -6,36 +6,16 @@ import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Shield, Bug, Settings } from "lucide-react";
+import { useRoleCache } from "@/lib/role-cache";
 
 interface DesktopHeaderProps {
   showNavigation?: boolean;
 }
 
 function AdminActions() {
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { role: userRole, loading } = useRoleCache();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    fetchUserRole();
-  }, []);
-
-  const fetchUserRole = async () => {
-    try {
-      const response = await fetch("/api/user/profile");
-      if (response.ok) {
-        const data = await response.json();
-        setUserRole(data.role);
-      } else if (response.status === 401 || response.status === 403) {
-        setUserRole(null);
-      } else {
-        setUserRole(null);
-      }
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-      setUserRole(null);
-    }
-  };
 
   if (userRole !== "SUPERADMIN") {
     return null;
@@ -69,30 +49,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const [userRole, setUserRole] = useState<string | null>(null);
-
-  // Fetch user role
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!user) return;
-      
-      try {
-        const response = await fetch('/api/user/profile');
-        if (response.ok) {
-          const data = await response.json();
-          setUserRole(data.role);
-        } else {
-          console.warn('Failed to fetch user role:', response.status);
-          setUserRole(null);
-        }
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-        setUserRole(null);
-      }
-    };
-
-    fetchUserRole();
-  }, [user]);
+  const { role: userRole, loading: roleLoading } = useRoleCache();
 
   const baseNavItems = [
     { label: "Beranda", href: "/", active: pathname === "/" },

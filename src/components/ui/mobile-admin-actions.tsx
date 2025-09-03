@@ -1,41 +1,17 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Shield, FileText, Calendar, Users } from "lucide-react";
+import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileAdminActionsProps {
   className?: string;
 }
 
 export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) {
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { role: userRole, loading } = useRoleCache();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    fetchUserRole();
-  }, []);
-
-  const fetchUserRole = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/user/profile");
-      if (response.ok) {
-        const data = await response.json();
-        setUserRole(data.role);
-      } else {
-        console.warn("Failed to fetch user role for mobile admin:", response.status);
-        setUserRole(null);
-      }
-    } catch (error) {
-      console.error("Error fetching user role for mobile admin:", error);
-      setUserRole(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -72,33 +48,9 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
 }
 
 export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { role: userRole, loading } = useRoleCache();
   const router = useRouter();
   const pathname = usePathname();
-
-  useEffect(() => {
-    fetchUserRole();
-  }, []);
-
-  const fetchUserRole = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/user/profile");
-      if (response.ok) {
-        const data = await response.json();
-        setUserRole(data.role);
-      } else {
-        console.warn("Failed to fetch user role for mobile CMS:", response.status);
-        setUserRole(null);
-      }
-    } catch (error) {
-      console.error("Error fetching user role for mobile CMS:", error);
-      setUserRole(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
