@@ -4,44 +4,8 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
-import { DesktopHeader } from "@/components/ui/desktop-header";
-import { UserButton } from "@clerk/nextjs";
-import { Shield } from "lucide-react";
+import { Header } from "@/components/ui/header";
 
-function MobileAdminActions() {
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const router = useRouter();
-
-  useEffect(() => {
-    fetchUserRole();
-  }, []);
-
-  const fetchUserRole = async () => {
-    try {
-      const response = await fetch("/api/user/profile");
-      if (response.ok) {
-        const data = await response.json();
-        setUserRole(data.role);
-      }
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-    }
-  };
-
-  if (userRole !== "ADMIN") {
-    return null;
-  }
-
-  return (
-    <button
-      onClick={() => router.push("/dashboard/admin")}
-      className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 transition-colors"
-      title="Superadmin Panel"
-    >
-      <Shield className="w-5 h-5 text-purple-600" />
-    </button>
-  );
-}
 
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
@@ -66,32 +30,70 @@ export default function DashboardPage() {
 
   const checkApprovalStatus = async () => {
     try {
+      console.log("🔍 Dashboard: Starting approval status check");
+      
+      // Add timeout wrapper for API calls
+      const fetchWithTimeout = async (url: string, options: RequestInit = {}) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+          return response;
+        } catch (error) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      };
+
       // First ensure user exists and is synced
-      const syncResponse = await fetch("/api/auth/update-last-login", {
+      console.log("🔍 Dashboard: Syncing user login");
+      const syncResponse = await fetchWithTimeout("/api/auth/update-last-login", {
         method: "POST",
       });
 
       if (!syncResponse.ok) {
-        console.error("Failed to sync user");
+        console.error("❌ Dashboard: Failed to sync user:", syncResponse.status);
         setApprovalStatus("error");
         return;
       }
 
       // Then check user status (doesn't require approval)
-      const response = await fetch("/api/user/status");
+      console.log("🔍 Dashboard: Checking user status");
+      const response = await fetchWithTimeout("/api/user/status");
+      
       if (response.ok) {
         const userData = await response.json();
+        console.log("✅ Dashboard: User status received:", userData);
+        
         if (userData.canAccessDashboard) {
           setApprovalStatus("approved");
+          console.log("✅ Dashboard: User approved, accessing dashboard");
         } else {
           setApprovalStatus("pending");
+          console.log("⏳ Dashboard: User pending approval, redirecting");
           router.push("/pending-approval");
         }
       } else {
+        console.error("❌ Dashboard: Failed to check user status:", response.status);
         setApprovalStatus("error");
       }
     } catch (error) {
-      console.error("Error checking approval status:", error);
+      console.error("❌ Dashboard: Error checking approval status:", error);
+      
+      // Check if it's a timeout or network error
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error("❌ Dashboard: Request timeout - check network connection");
+        } else if (error.message.includes('fetch')) {
+          console.error("❌ Dashboard: Network error - check internet connection");
+        }
+      }
+      
       setApprovalStatus("error");
     }
   };
@@ -150,33 +152,8 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Desktop: Header with Navigation */}
-      <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
-      </div>
-
-      {/* Mobile: Enhanced Header */}
-      <div className="lg:hidden relative z-10">
-        <header className="bg-white shadow-sm">
-          <div className="flex justify-between items-center px-4 py-4">
-            <div 
-              className="flex items-center space-x-2 cursor-pointer"
-              onClick={() => router.push("/")}
-            >
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">P</span>
-              </div>
-              <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
-            </div>
-            
-            {/* Mobile Admin & User Actions */}
-            <div className="flex items-center space-x-3">
-              <MobileAdminActions />
-              <UserButton afterSignOutUrl="/sign-in" />
-            </div>
-          </div>
-        </header>
-      </div>
+      {/* Responsive Header */}
+      <Header showNavigation={true} className="relative z-10" />
 
       {/* Main Content */}
       <main className="relative z-10">

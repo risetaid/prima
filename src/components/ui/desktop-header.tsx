@@ -81,9 +81,13 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
         if (response.ok) {
           const data = await response.json();
           setUserRole(data.role);
+        } else {
+          console.warn('Failed to fetch user role:', response.status);
+          setUserRole(null);
         }
       } catch (error) {
         console.error('Error fetching user role:', error);
+        setUserRole(null);
       }
     };
 
