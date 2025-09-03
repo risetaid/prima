@@ -43,6 +43,13 @@
       "when": 1756874337466,
       "tag": "0005_windy_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1756904050867,
+      "tag": "0006_add_user_last_login_tracking",
+      "breakpoints": true
     }
   ]
 }

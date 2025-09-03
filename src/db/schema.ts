@@ -35,6 +35,7 @@ export const users = pgTable('users', {
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),
   approvedBy: uuid('approved_by'),
   isApproved: boolean('is_approved').notNull().default(false),
@@ -45,6 +46,7 @@ export const users = pgTable('users', {
   isApprovedIdx: index('users_is_approved_idx').on(table.isApproved),
   roleActiveApprovedIdx: index('users_role_active_approved_idx').on(table.role, table.isActive, table.isApproved),
   clerkIdApprovedActiveIdx: index('users_clerk_approved_active_idx').on(table.clerkId, table.isApproved, table.isActive),
+  lastLoginIdx: index('users_last_login_idx').on(table.lastLoginAt),
 }))
 
 export const patients = pgTable('patients', {
