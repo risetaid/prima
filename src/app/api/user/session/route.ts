@@ -84,10 +84,23 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Background login timestamp update temporarily disabled
-    // Will be re-enabled after database migration adds lastLoginAt column
-    // This still replaces the separate /api/auth/update-last-login call for performance
-    console.log('✅ Session: User sync and validation completed (login tracking disabled for deployment)')
+    // Background login timestamp update (non-blocking)
+    // This replaces the separate /api/auth/update-last-login call for performance
+    setImmediate(() => {
+      safeDbOperation(async () => {
+        await db
+          .update(users)
+          .set({ 
+            lastLoginAt: nowWIB(),
+            updatedAt: nowWIB()
+          })
+          .where(eq(users.clerkId, userId))
+      }, { maxRetries: 1, delayMs: 1000 }, 3000)
+      .catch(error => {
+        console.warn('⚠️ Background login update failed:', error)
+        // Don't throw - this is non-critical for user session
+      })
+    })
 
     // Return complete session data combining all three endpoints
     const sessionData = {
@@ -103,8 +116,8 @@ export async function POST(request: NextRequest) {
         isActive: user.isActive,
         canAccessDashboard: user.canAccessDashboard,
         needsApproval: user.needsApproval,
-        createdAt: user.createdAt
-        // lastLoginAt: user.lastLoginAt // Temporarily disabled for production deployment
+        createdAt: user.createdAt,
+        lastLoginAt: user.lastLoginAt
       },
       session: {
         authenticated: true,
