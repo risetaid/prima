@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
     const verificationResult = processVerificationResponse(response)
 
     // For BERHENTI (unsubscribe), accept from any active patient
-    // For verification responses (YA/TIDAK), only from pending verification
+    // For verification responses (YA/TIDAK), accept from any active patient regardless of current status
+    // This allows patients to change their mind (declined → verified or verified → declined)
     const baseWhereClause = and(
       alternativePhone ? 
         or(
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     const whereClause = verificationResult === 'unsubscribed' 
       ? baseWhereClause
-      : and(baseWhereClause, eq(patients.verificationStatus, 'pending_verification'))
+      : baseWhereClause // Remove restriction - allow status changes from any current verification status
 
     const patientResult = await db
       .select()
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (patientResult.length === 0) {
-      console.log('No patient found for phone:', phone, 'with verification result:', verificationResult)
+      console.log('No patient found for phone:', phone, 'with verification result:', verificationResult, 'alternative phone:', alternativePhone)
       return NextResponse.json(
         { message: 'No patient found or patient not eligible for this action' },
         { status: 200 }
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     const patient = patientResult[0]
+    console.log('Patient found:', { name: patient.name, currentStatus: patient.verificationStatus, newResult: verificationResult })
 
     if (!verificationResult) {
       // Unknown response - log it but don't change status
@@ -124,6 +126,12 @@ export async function POST(request: NextRequest) {
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patient.id))
+    
+    console.log('Patient status updated:', { 
+      name: patient.name, 
+      from: patient.verificationStatus, 
+      to: updateData.verificationStatus 
+    })
 
     // If unsubscribed, also deactivate all related reminders
     if (verificationResult === 'unsubscribed') {
