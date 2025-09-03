@@ -10,14 +10,18 @@ import {
 import { relations } from 'drizzle-orm'
 
 // ===== ENUMS =====
-export const userRoleEnum = pgEnum('user_role', ['SUPERADMIN', 'ADMIN', 'MEMBER'])
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'MEMBER'])
 export const cancerStageEnum = pgEnum('cancer_stage', ['I', 'II', 'III', 'IV'])
 export const medicalRecordTypeEnum = pgEnum('medical_record_type', ['DIAGNOSIS', 'TREATMENT', 'PROGRESS', 'HEALTH_NOTE'])
 export const frequencyEnum = pgEnum('frequency', ['CUSTOM', 'CUSTOM_RECURRENCE'])
 export const reminderStatusEnum = pgEnum('reminder_status', ['PENDING', 'SENT', 'DELIVERED', 'FAILED'])
 export const patientConditionEnum = pgEnum('patient_condition', ['GOOD', 'FAIR', 'POOR'])
 export const templateCategoryEnum = pgEnum('template_category', ['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
-export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired', 'unsubscribed'])
+export const verificationStatusEnum = pgEnum('verification_status', ['pending_verification', 'verified', 'declined', 'expired'])
+
+// CMS Content Enums
+export const contentCategoryEnum = pgEnum('content_category', ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'])
+export const contentStatusEnum = pgEnum('content_status', ['draft', 'published', 'archived'])
 
 // ===== TABLES =====
 
@@ -238,6 +242,61 @@ export const verificationLogs = pgTable('verification_logs', {
   actionIdx: index('verification_logs_action_idx').on(table.action),
 }))
 
+// ===== CMS CONTENT TABLES =====
+
+export const cmsArticles = pgTable('cms_articles', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  slug: text('slug').notNull().unique(),
+  content: text('content').notNull(),
+  excerpt: text('excerpt'),
+  featuredImageUrl: text('featured_image_url'),
+  category: contentCategoryEnum('category').notNull().default('general'),
+  tags: text('tags').array().notNull().default([]),
+  seoTitle: text('seo_title'),
+  seoDescription: text('seo_description'),
+  status: contentStatusEnum('status').notNull().default('draft'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull(), // Clerk user ID
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index('cms_articles_slug_idx').on(table.slug),
+  statusIdx: index('cms_articles_status_idx').on(table.status),
+  categoryIdx: index('cms_articles_category_idx').on(table.category),
+  publishedAtIdx: index('cms_articles_published_at_idx').on(table.publishedAt),
+  statusPublishedIdx: index('cms_articles_status_published_idx').on(table.status, table.publishedAt),
+  categoryStatusIdx: index('cms_articles_category_status_idx').on(table.category, table.status),
+  createdByIdx: index('cms_articles_created_by_idx').on(table.createdBy),
+}))
+
+export const cmsVideos = pgTable('cms_videos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  slug: text('slug').notNull().unique(),
+  description: text('description'),
+  videoUrl: text('video_url').notNull(), // YouTube/Vimeo embed URL
+  thumbnailUrl: text('thumbnail_url'),
+  durationMinutes: text('duration_minutes'), // Using text for flexibility (e.g., "5:30")
+  category: contentCategoryEnum('category').notNull().default('motivational'),
+  tags: text('tags').array().notNull().default([]),
+  seoTitle: text('seo_title'),
+  seoDescription: text('seo_description'),
+  status: contentStatusEnum('status').notNull().default('draft'),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull(), // Clerk user ID
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index('cms_videos_slug_idx').on(table.slug),
+  statusIdx: index('cms_videos_status_idx').on(table.status),
+  categoryIdx: index('cms_videos_category_idx').on(table.category),
+  publishedAtIdx: index('cms_videos_published_at_idx').on(table.publishedAt),
+  statusPublishedIdx: index('cms_videos_status_published_idx').on(table.status, table.publishedAt),
+  categoryStatusIdx: index('cms_videos_category_status_idx').on(table.category, table.status),
+  createdByIdx: index('cms_videos_created_by_idx').on(table.createdBy),
+}))
+
 // ===== RELATIONS =====
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -404,3 +463,9 @@ export type PatientVariable = typeof patientVariables.$inferSelect
 export type NewPatientVariable = typeof patientVariables.$inferInsert
 export type VerificationLog = typeof verificationLogs.$inferSelect
 export type NewVerificationLog = typeof verificationLogs.$inferInsert
+
+// CMS Content Types
+export type CmsArticle = typeof cmsArticles.$inferSelect
+export type NewCmsArticle = typeof cmsArticles.$inferInsert
+export type CmsVideo = typeof cmsVideos.$inferSelect
+export type NewCmsVideo = typeof cmsVideos.$inferInsert

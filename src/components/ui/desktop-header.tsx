@@ -79,29 +79,18 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
         pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
     },
     {
-      label: "Berita",
-      href: "/dashboard/cms?type=articles",
-      active:
-        pathname.startsWith("/dashboard/cms") && pathname.includes("articles"),
+      label: "CMS",
+      href: "/dashboard/cms",
+      active: pathname.startsWith("/dashboard/cms"),
     },
     {
-      label: "Video Edukasi",
-      href: "/dashboard/cms?type=videos",
-      active:
-        pathname.startsWith("/dashboard/cms") && pathname.includes("videos"),
+      label: "Pengingat",
+      href: "/dashboard/pengingat",
+      active: pathname.startsWith("/dashboard/pengingat"),
     },
   ];
 
   const handleNavigation = (href: string) => {
-    // For CMS routes that don't exist yet, show coming soon
-    if (href.includes("/dashboard/cms")) {
-      toast.info("Fitur ini akan segera hadir!", {
-        description:
-          "CMS untuk berita dan video edukasi sedang dalam pengembangan",
-      });
-      return;
-    }
-
     // If user not authenticated and trying to access dashboard, redirect to signin
     if (!user && href.startsWith("/dashboard")) {
       router.push("/sign-in");

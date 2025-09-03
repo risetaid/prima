@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth-utils'
+import { db, cmsArticles, cmsVideos } from '@/db'
+import { eq, desc, and, or, ilike, count } from 'drizzle-orm'
+
+// GET - Combined content feed for dashboard overview
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser()
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const type = searchParams.get('type') || 'all' // all, articles, videos
+    const status = searchParams.get('status') || 'all' // all, draft, published, archived
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    // Get articles
+    let articles = []
+    if (type === 'all' || type === 'articles') {
+      const articleQuery = db
+        .select({
+          id: cmsArticles.id,
+          title: cmsArticles.title,
+          slug: cmsArticles.slug,
+          category: cmsArticles.category,
+          status: cmsArticles.status,
+          publishedAt: cmsArticles.publishedAt,
+          createdAt: cmsArticles.createdAt,
+          updatedAt: cmsArticles.updatedAt,
+          type: 'article' as const
+        })
+        .from(cmsArticles)
+
+      if (status !== 'all') {
+        articleQuery.where(eq(cmsArticles.status, status as any))
+      }
+
+      articles = await articleQuery
+        .orderBy(desc(cmsArticles.updatedAt))
+        .limit(type === 'articles' ? limit : Math.ceil(limit / 2))
+    }
+
+    // Get videos
+    let videos = []
+    if (type === 'all' || type === 'videos') {
+      const videoQuery = db
+        .select({
+          id: cmsVideos.id,
+          title: cmsVideos.title,
+          slug: cmsVideos.slug,
+          category: cmsVideos.category,
+          status: cmsVideos.status,
+          publishedAt: cmsVideos.publishedAt,
+          createdAt: cmsVideos.createdAt,
+          updatedAt: cmsVideos.updatedAt,
+          type: 'video' as const
+        })
+        .from(cmsVideos)
+
+      if (status !== 'all') {
+        videoQuery.where(eq(cmsVideos.status, status as any))
+      }
+
+      videos = await videoQuery
+        .orderBy(desc(cmsVideos.updatedAt))
+        .limit(type === 'videos' ? limit : Math.ceil(limit / 2))
+    }
+
+    // Combine and sort by updated date
+    const combinedContent = [...articles, ...videos]
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, limit)
+
+    // Get statistics
+    const stats = await Promise.all([
+      // Article stats
+      db.select({ count: count() }).from(cmsArticles),
+      db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'published')),
+      db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'draft')),
+      
+      // Video stats
+      db.select({ count: count() }).from(cmsVideos),
+      db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'published')),
+      db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'draft')),
+    ])
+
+    const statistics = {
+      articles: {
+        total: stats[0][0]?.count || 0,
+        published: stats[1][0]?.count || 0,
+        draft: stats[2][0]?.count || 0,
+      },
+      videos: {
+        total: stats[3][0]?.count || 0,
+        published: stats[4][0]?.count || 0,
+        draft: stats[5][0]?.count || 0,
+      },
+      total: {
+        content: (stats[0][0]?.count || 0) + (stats[3][0]?.count || 0),
+        published: (stats[1][0]?.count || 0) + (stats[4][0]?.count || 0),
+        draft: (stats[2][0]?.count || 0) + (stats[5][0]?.count || 0),
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: combinedContent,
+      statistics
+    })
+
+  } catch (error) {
+    console.error('Error fetching content:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
