@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Search, FileText, Eye, Edit, Trash2, Filter } from 'lucide-react'
+import { Plus, Search, FileText, Eye, Edit, Trash2, Filter, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
+import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
 
 interface Article {
   id: string
@@ -72,11 +74,17 @@ export default function ArticlesPage() {
         setArticles(data.data)
         setPagination(data.pagination)
       } else {
-        toast.error('Gagal memuat artikel')
+        console.warn('⚠️ Articles: API returned failure, might be missing database tables')
+        toast.error('CMS belum dikonfigurasi. Hubungi administrator.')
       }
     } catch (error) {
       console.error('Error fetching articles:', error)
-      toast.error('Terjadi kesalahan saat memuat artikel')
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error('Koneksi bermasalah. Periksa internet Anda.')
+      } else {
+        toast.error('CMS belum siap. Hubungi administrator.')
+      }
     } finally {
       setLoading(false)
     }
@@ -159,15 +167,26 @@ export default function ArticlesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <CMSBreadcrumb />
+      
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Artikel
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Kelola artikel edukasi untuk pasien kanker paliatif
-          </p>
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/cms">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Kembali ke CMS
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Artikel
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Kelola artikel edukasi untuk pasien kanker paliatif
+            </p>
+          </div>
         </div>
         <Button asChild>
           <Link href="/dashboard/cms/articles/create">
@@ -247,8 +266,8 @@ export default function ArticlesPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <div className="py-6">
+              <CMSContentListSkeleton />
             </div>
           ) : articles.length === 0 ? (
             <div className="text-center py-12">

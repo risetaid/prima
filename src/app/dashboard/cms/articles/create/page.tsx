@@ -14,6 +14,7 @@ import RichTextEditor from '@/components/cms/RichTextEditor'
 import { ArrowLeft, Save, Eye, Plus, X } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
 
 interface FormData {
   title: string
@@ -142,7 +143,7 @@ export default function CreateArticlePage() {
 
       if (result.success) {
         toast.success(`Artikel berhasil ${status === 'published' ? 'dipublikasikan' : 'disimpan sebagai draft'}`)
-        router.push('/dashboard/cms/articles')
+        router.push('/dashboard/cms')
       } else {
         if (result.details) {
           // Handle validation errors from API
@@ -165,11 +166,14 @@ export default function CreateArticlePage() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <CMSBreadcrumb />
+      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/cms/articles">
+            <Link href="/dashboard/cms">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Kembali
             </Link>

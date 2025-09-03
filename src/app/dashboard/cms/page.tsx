@@ -8,6 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, FileText, Video, TrendingUp, Clock, Eye } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { DashboardStatsCardsSkeleton, CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
+import { Home } from 'lucide-react'
 
 interface ContentItem {
   id: string
@@ -43,46 +46,69 @@ export default function CMSPage() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [statistics, setStatistics] = useState<Statistics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [contentLoading, setContentLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all')
 
+  // Progressive loading: Statistics first, then content
   const fetchContent = async () => {
     try {
-      console.log('🔍 CMS: Fetching content, activeTab:', activeTab)
+      console.log('🔍 CMS: Starting progressive content fetch, activeTab:', activeTab)
       
-      const response = await fetch(`/api/cms/content?type=${activeTab}`)
-      console.log('🔍 CMS: Response status:', response.status)
+      // Phase 1: Load statistics quickly (priority data)
+      setStatsLoading(true)
+      const response = await fetch(`/api/cms/content?type=${activeTab}&limit=0&stats_only=true`)
       
-      if (!response.ok) {
-        console.error('❌ CMS: API request failed:', response.status, response.statusText)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.statistics) {
+          setStatistics(data.statistics)
+          console.log('✅ CMS: Statistics loaded first (progressive)', data.statistics)
+        }
+      }
+      setStatsLoading(false)
+      
+      // Small delay for better perceived performance
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Phase 2: Load actual content
+      setContentLoading(true)
+      const contentResponse = await fetch(`/api/cms/content?type=${activeTab}`)
+      console.log('🔍 CMS: Content response status:', contentResponse.status)
+      
+      if (!contentResponse.ok) {
+        console.error('❌ CMS: Content API request failed:', contentResponse.status, contentResponse.statusText)
         
-        if (response.status === 401) {
+        if (contentResponse.status === 401) {
           toast.error('Tidak memiliki akses ke CMS. Hubungi administrator.')
-        } else if (response.status === 403) {
+        } else if (contentResponse.status === 403) {
           toast.error('Akses ditolak. Butuh role ADMIN atau SUPERADMIN.')
-        } else if (response.status === 500) {
+        } else if (contentResponse.status === 500) {
           toast.error('Server error. Silakan coba lagi nanti.')
         } else {
-          toast.error(`HTTP ${response.status}: ${response.statusText}`)
+          toast.error(`HTTP ${contentResponse.status}: ${contentResponse.statusText}`)
         }
         return
       }
 
-      const data = await response.json()
-      console.log('✅ CMS: Data received:', {
-        success: data.success,
-        contentCount: data.data?.length,
-        statistics: data.statistics
+      const contentData = await contentResponse.json()
+      console.log('✅ CMS: Content data received (progressive):', {
+        success: contentData.success,
+        contentCount: contentData.data?.length
       })
 
-      if (data.success) {
-        setContent(data.data || [])
-        setStatistics(data.statistics || null)
+      if (contentData.success) {
+        setContent(contentData.data || [])
+        // Update statistics with latest data if available
+        if (contentData.statistics) {
+          setStatistics(contentData.statistics)
+        }
       } else {
-        console.error('❌ CMS: API returned error:', data.error)
-        toast.error(data.error || 'Gagal memuat konten')
+        console.error('❌ CMS: Content API returned error:', contentData.error)
+        toast.error(contentData.error || 'Gagal memuat konten')
       }
     } catch (error) {
-      console.error('❌ CMS: Network/parsing error:', error)
+      console.error('❌ CMS: Progressive loading error:', error)
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Koneksi bermasalah. Periksa internet Anda.')
@@ -90,6 +116,7 @@ export default function CMSPage() {
         toast.error('Terjadi kesalahan saat memuat konten')
       }
     } finally {
+      setContentLoading(false)
       setLoading(false)
     }
   }
@@ -134,16 +161,54 @@ export default function CMSPage() {
     })
   }
 
-  if (loading) {
+  // Show progressive loading states
+  if (loading && statsLoading) {
     return (
-      <div className="flex items-center justify-center min-h-96">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <DashboardStatsCardsSkeleton />
+
+        {/* Content Tabs Skeleton */}
+        <Card>
+          <CardHeader>
+            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+          </CardHeader>
+          <CardContent>
+            <div className="mb-6">
+              <div className="grid w-full grid-cols-3 h-10 bg-gray-100 rounded">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-8 mx-1 my-1 bg-gray-200 rounded animate-pulse" />
+                ))}
+              </div>
+            </div>
+            <CMSContentListSkeleton />
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb items={[
+        { label: 'Dashboard', href: '/dashboard', icon: Home },
+        { label: 'Manajemen Konten', href: '/dashboard/cms' }
+      ]} />
+      
       {/* Header - Mobile Responsive */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
@@ -170,8 +235,10 @@ export default function CMSPage() {
         </div>
       </div>
 
-      {/* Statistics Cards - Mobile Optimized */}
-      {statistics && (
+      {/* Statistics Cards - Progressive Loading */}
+      {statsLoading ? (
+        <DashboardStatsCardsSkeleton />
+      ) : statistics ? (
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -233,7 +300,7 @@ export default function CMSPage() {
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
 
       {/* Content Tabs */}
       <Card>
@@ -252,7 +319,11 @@ export default function CMSPage() {
             </TabsList>
 
             <TabsContent value={activeTab} className="mt-6">
-              {content.length === 0 ? (
+              {contentLoading ? (
+                <div className="py-6">
+                  <CMSContentListSkeleton />
+                </div>
+              ) : content.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-4 text-lg font-medium text-gray-900">

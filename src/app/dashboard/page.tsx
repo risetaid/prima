@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
+import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
 
 
 export default function DashboardPage() {
@@ -30,67 +31,58 @@ export default function DashboardPage() {
 
   const checkApprovalStatus = async () => {
     try {
-      console.log("🔍 Dashboard: Starting approval status check");
+      console.log("🔍 Dashboard: Starting consolidated session check");
       
-      // Add timeout wrapper for API calls
-      const fetchWithTimeout = async (url: string, options: RequestInit = {}) => {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        try {
-          const response = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-          return response;
-        } catch (error) {
-          clearTimeout(timeoutId);
-          throw error;
-        }
-      };
-
-      // First ensure user exists and is synced
-      console.log("🔍 Dashboard: Syncing user login");
-      const syncResponse = await fetchWithTimeout("/api/auth/update-last-login", {
-        method: "POST",
-      });
-
-      if (!syncResponse.ok) {
-        console.error("❌ Dashboard: Failed to sync user:", syncResponse.status);
-        setApprovalStatus("error");
-        return;
-      }
-
-      // Then check user status (doesn't require approval)
-      console.log("🔍 Dashboard: Checking user status");
-      const response = await fetchWithTimeout("/api/user/status");
+      // Single consolidated API call replaces 3 separate calls
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
-      if (response.ok) {
-        const userData = await response.json();
-        console.log("✅ Dashboard: User status received:", userData);
+      try {
+        const response = await fetch("/api/user/session", {
+          method: "POST",
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
         
-        if (userData.canAccessDashboard) {
+        const sessionData = await response.json();
+        console.log("📊 Dashboard: Session data received:", {
+          success: sessionData.success,
+          authenticated: sessionData.session?.authenticated,
+          role: sessionData.user?.role,
+          canAccess: sessionData.user?.canAccessDashboard
+        });
+        
+        if (response.ok && sessionData.success) {
           setApprovalStatus("approved");
-          console.log("✅ Dashboard: User approved, accessing dashboard");
-        } else {
+          console.log("✅ Dashboard: Session validated, accessing dashboard");
+        } else if (sessionData.needsApproval) {
           setApprovalStatus("pending");
-          console.log("⏳ Dashboard: User pending approval, redirecting");
+          console.log("⏳ Dashboard: User needs approval, redirecting");
           router.push("/pending-approval");
+        } else if (sessionData.needsLogin) {
+          console.log("🔐 Dashboard: Authentication required, redirecting");
+          router.push("/sign-in");
+        } else {
+          console.error("❌ Dashboard: Session validation failed:", sessionData.error);
+          setApprovalStatus("error");
         }
-      } else {
-        console.error("❌ Dashboard: Failed to check user status:", response.status);
-        setApprovalStatus("error");
+        
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
       }
     } catch (error) {
-      console.error("❌ Dashboard: Error checking approval status:", error);
+      console.error("❌ Dashboard: Session check failed:", error);
       
-      // Check if it's a timeout or network error
+      // Enhanced error handling for consolidated endpoint
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          console.error("❌ Dashboard: Request timeout - check network connection");
+          console.error("❌ Dashboard: Session timeout - server may be slow");
         } else if (error.message.includes('fetch')) {
-          console.error("❌ Dashboard: Network error - check internet connection");
+          console.error("❌ Dashboard: Network error - check connection");
         }
       }
       
@@ -98,16 +90,38 @@ export default function DashboardPage() {
     }
   };
 
-  // Show loading while Clerk is loading or while checking approval status
+  // Show enhanced loading with header skeleton while Clerk is loading or checking approval
   if (!isLoaded || approvalStatus === "loading") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">
-            {!isLoaded ? 'Initializing...' : 'Loading dashboard...'}
-          </p>
+      <div className="min-h-screen bg-gray-50 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            style={{
+              backgroundImage: "url(/bg_desktop.png)",
+            }}
+          />
         </div>
+
+        {/* Header Skeleton */}
+        <div className="relative z-10">
+          <HeaderSkeleton />
+        </div>
+
+        {/* Loading Content */}
+        <main className="relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-6 py-4 rounded-lg shadow-sm">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                <span className="text-gray-700 font-medium">
+                  {!isLoaded ? 'Menginisialisasi sistem...' : 'Memuat dashboard...'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }
