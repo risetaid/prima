@@ -61,18 +61,13 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
     if (!user) return baseNavItems;
 
     if (userRole === 'MEMBER') {
-      // MEMBER users see: Beranda, Pasien (view only), Pengingat, Berita, Video Edukasi
+      // MEMBER users see: Beranda, Pasien (view only), Berita, Video Edukasi
       return [
         ...baseNavItems,
         {
           label: "Pasien",
           href: "/dashboard",
           active: pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
-        },
-        {
-          label: "Pengingat",
-          href: "/dashboard/pengingat",
-          active: pathname.startsWith("/dashboard/pengingat"),
         },
         {
           label: "Berita",
@@ -95,11 +90,6 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
         href: "/dashboard",
         active:
           pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
-      },
-      {
-        label: "Pengingat",
-        href: "/dashboard/pengingat",
-        active: pathname.startsWith("/dashboard/pengingat"),
       },
       {
         label: "Berita",
@@ -174,8 +164,8 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
               {/* Admin Actions - Only visible to admins */}
               <AdminActions />
 
-              {/* Special Pengingat Button - Only show for non-MEMBER roles since MEMBER has it in main nav */}
-              {userRole !== 'MEMBER' && (
+              {/* Special Pengingat Button - Prominent button for all users */}
+              {user && (
                 <button
                   onClick={() => handleNavigation("/dashboard/pengingat")}
                   className={`

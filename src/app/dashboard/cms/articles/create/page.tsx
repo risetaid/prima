@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import RichTextEditor from '@/components/cms/RichTextEditor'
-import { ArrowLeft, Save, Eye, Plus, X } from 'lucide-react'
+import { ArrowLeft, Save, Eye, Plus, X, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
@@ -166,41 +166,53 @@ export default function CreateArticlePage() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb Navigation */}
-      <CMSBreadcrumb />
-      
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/cms">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Buat Artikel Baru
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Buat artikel edukasi untuk pasien kanker paliatif
-            </p>
+          <Link 
+            href="/dashboard/cms"
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="font-medium">Kembali ke CMS</span>
+          </Link>
+          <div className="h-6 w-px bg-gray-300" />
+          <div className="flex items-center gap-2">
+            <FileText className="h-6 w-6 text-blue-500" />
+            <h1 className="text-2xl font-bold text-gray-900">Artikel Baru</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex items-center gap-3">
           <Button 
-            variant="outline" 
-            onClick={() => handleSave('draft')}
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/dashboard/cms')}
             disabled={saving}
           >
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Menyimpan...' : 'Simpan Draft'}
+            Batal
+          </Button>
+          <Button 
+            onClick={() => handleSave('draft')}
+            disabled={saving || !formData.title.trim()}
+            variant="outline"
+          >
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Simpan Draft
           </Button>
           <Button 
             onClick={() => handleSave('published')}
-            disabled={saving}
+            disabled={saving || !formData.title.trim()}
           >
-            <Eye className="h-4 w-4 mr-2" />
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+            ) : (
+              <Eye className="h-4 w-4 mr-2" />
+            )}
             Publikasikan
           </Button>
         </div>
@@ -212,9 +224,9 @@ export default function CreateArticlePage() {
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Informasi Dasar</CardTitle>
+              <CardTitle>Informasi Artikel</CardTitle>
               <CardDescription>
-                Isi informasi dasar artikel yang akan dibuat
+                Masukkan detail artikel edukasi kesehatan
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -253,44 +265,54 @@ export default function CreateArticlePage() {
                   onChange={(e) => handleInputChange('excerpt', e.target.value)}
                   placeholder="Ringkasan singkat artikel (opsional)..."
                   rows={3}
+                  className="mt-2"
                 />
                 <p className="text-sm text-gray-500 mt-1">
                   Ringkasan akan tampil dalam daftar artikel dan preview
                 </p>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Content */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Konten Artikel</CardTitle>
-              <CardDescription>
-                Tulis konten lengkap artikel menggunakan format teks
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RichTextEditor
-                value={formData.content}
-                onChange={(value) => handleInputChange('content', value)}
-                error={errors.content}
-              />
+              {/* Content */}
+              <div>
+                <Label htmlFor="content">Konten Artikel *</Label>
+                <div className="mt-2">
+                  <RichTextEditor
+                    value={formData.content}
+                    onChange={(value) => handleInputChange('content', value)}
+                    error={errors.content}
+                  />
+                </div>
+                {errors.content && <p className="text-sm text-red-600 mt-1">{errors.content}</p>}
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Category & Tags */}
+          {/* Publish Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Kategori & Tag</CardTitle>
+              <CardTitle>Pengaturan Publikasi</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value as 'draft' | 'published')}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
                 <Label htmlFor="category">Kategori *</Label>
                 <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                  <SelectTrigger className={errors.category ? 'border-red-500' : ''}>
+                  <SelectTrigger className={`mt-2 ${errors.category ? 'border-red-500' : ''}`}>
                     <SelectValue placeholder="Pilih kategori..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -303,36 +325,40 @@ export default function CreateArticlePage() {
                 </Select>
                 {errors.category && <p className="text-sm text-red-600 mt-1">{errors.category}</p>}
               </div>
+            </CardContent>
+          </Card>
 
-              <div>
-                <Label>Tag</Label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Tambah tag..."
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  />
-                  <Button type="button" size="sm" onClick={addTag}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {formData.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="ml-1 hover:text-red-600"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+          {/* Tags */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tags</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Tambah tag..."
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                />
+                <Button type="button" size="sm" onClick={addTag}>
+                  +
+                </Button>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {formData.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => removeTag(tag)}
+                      className="ml-1 hover:text-red-500"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -365,18 +391,16 @@ export default function CreateArticlePage() {
           <Card>
             <CardHeader>
               <CardTitle>SEO</CardTitle>
-              <CardDescription>
-                Optimasi untuk mesin pencari dan media sosial
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="seoTitle">Judul SEO</Label>
+                <Label htmlFor="seoTitle">SEO Title</Label>
                 <Input
                   id="seoTitle"
                   value={formData.seoTitle}
                   onChange={(e) => handleInputChange('seoTitle', e.target.value)}
-                  placeholder="Judul untuk mesin pencari..."
+                  placeholder="Otomatis dari judul"
+                  className="mt-2"
                   maxLength={60}
                 />
                 <p className="text-sm text-gray-500 mt-1">
@@ -385,13 +409,14 @@ export default function CreateArticlePage() {
               </div>
 
               <div>
-                <Label htmlFor="seoDescription">Deskripsi SEO</Label>
+                <Label htmlFor="seoDescription">SEO Description</Label>
                 <Textarea
                   id="seoDescription"
                   value={formData.seoDescription}
                   onChange={(e) => handleInputChange('seoDescription', e.target.value)}
-                  placeholder="Deskripsi untuk mesin pencari dan media sosial..."
+                  placeholder="Otomatis dari ringkasan"
                   rows={3}
+                  className="mt-2"
                   maxLength={160}
                 />
                 <p className="text-sm text-gray-500 mt-1">

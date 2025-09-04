@@ -1,10 +1,11 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { MobileAdminActions, MobileCMSActions, MobileReminderActions, MobileBeritaActions, MobileVideoActions, MobilePasienActions } from "./mobile-admin-actions";
 import { useRoleCache } from "@/lib/role-cache";
+import { Home } from "lucide-react";
 
 interface MobileHeaderProps {
   showNavigation?: boolean;
@@ -13,7 +14,40 @@ interface MobileHeaderProps {
 // Role-based mobile navigation component
 function MobileNavigationActions() {
   const { role: userRole } = useRoleCache();
+  const pathname = usePathname();
+  const router = useRouter();
   
+  // If on homepage, show simplified navigation
+  if (pathname === "/") {
+    return (
+      <div className="flex items-center space-x-2">
+        {/* Dashboard Button */}
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="p-2 rounded-full bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white transition-colors"
+          title="Dashboard"
+        >
+          <Home className="w-5 h-5" />
+        </button>
+        
+        {/* CMS for ADMIN/SUPERADMIN */}
+        {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
+          <MobileCMSActions />
+        )}
+        
+        {/* Superadmin Panel for SUPERADMIN */}
+        {userRole === 'SUPERADMIN' && (
+          <MobileAdminActions />
+        )}
+        
+        <div className="ml-2">
+          <UserButton afterSignOutUrl="/sign-in" />
+        </div>
+      </div>
+    );
+  }
+  
+  // For other pages, show full navigation
   if (userRole === 'MEMBER') {
     // MEMBER users see: Pasien (view-only), Pengingat, Berita, Video Edukasi
     return (
