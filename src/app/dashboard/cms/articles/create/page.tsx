@@ -1,181 +1,179 @@
-'use client'
+"use client";
 
-import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import RichTextEditor from '@/components/cms/RichTextEditor'
-import { ArrowLeft, Save, Eye, Plus, X, FileText } from 'lucide-react'
-import Link from 'next/link'
-import { toast } from 'sonner'
-import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { TinyMCEEditor } from "@/components/cms/TinyMCEEditor";
+import { generateRandomString } from "@/lib/slug-utils";
+import { Save, Eye, Plus, X, FileText } from "lucide-react";
+import { BackButton } from '@/components/ui/back-button';
+import { toast } from "sonner";
+import { CMSBreadcrumb } from "@/components/ui/breadcrumb";
 
 interface FormData {
-  title: string
-  slug: string
-  content: string
-  excerpt: string
-  featuredImageUrl: string
-  category: string
-  tags: string[]
-  seoTitle: string
-  seoDescription: string
-  status: 'draft' | 'published' | 'archived'
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  featuredImageUrl: string;
+  category: string;
+  tags: string[];
+  status: "draft" | "published" | "archived";
 }
 
 export default function CreateArticlePage() {
-  const router = useRouter()
-  const [saving, setSaving] = useState(false)
-  const [newTag, setNewTag] = useState('')
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [newTag, setNewTag] = useState("");
   const [formData, setFormData] = useState<FormData>({
-    title: '',
-    slug: '',
-    content: '',
-    excerpt: '',
-    featuredImageUrl: '',
-    category: '',
+    title: "",
+    slug: generateRandomString(8), // Generate random slug by default
+    content: "",
+    excerpt: "",
+    featuredImageUrl: "",
+    category: "",
     tags: [],
-    seoTitle: '',
-    seoDescription: '',
-    status: 'draft'
-  })
-  const [errors, setErrors] = useState<Record<string, string>>({})
+    status: "draft",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const categories = [
-    { value: 'general', label: 'Umum' },
-    { value: 'nutrisi', label: 'Nutrisi' },
-    { value: 'olahraga', label: 'Olahraga' },
-    { value: 'motivational', label: 'Motivasi' },
-    { value: 'medical', label: 'Medis' },
-    { value: 'faq', label: 'FAQ' },
-    { value: 'testimoni', label: 'Testimoni' }
-  ]
+    { value: "general", label: "Umum" },
+    { value: "nutrisi", label: "Nutrisi" },
+    { value: "olahraga", label: "Olahraga" },
+    { value: "motivational", label: "Motivasi" },
+    { value: "medical", label: "Medis" },
+    { value: "faq", label: "FAQ" },
+    { value: "testimoni", label: "Testimoni" },
+  ];
 
-  const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .trim()
-  }
+  const generateNewSlug = () => {
+    return generateRandomString(8);
+  };
 
   const handleInputChange = (field: keyof FormData, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [field]: value,
-      // Auto-generate slug from title
-      ...(field === 'title' && !prev.slug ? { slug: generateSlug(value) } : {}),
-      // Auto-generate SEO title from title
-      ...(field === 'title' && !prev.seoTitle ? { seoTitle: value } : {})
-    }))
-    
+    }));
+
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
-  }
+  };
 
   const addTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        tags: [...prev.tags, newTag.trim()]
-      }))
-      setNewTag('')
+        tags: [...prev.tags, newTag.trim()],
+      }));
+      setNewTag("");
     }
-  }
+  };
 
   const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
+      tags: prev.tags.filter((tag) => tag !== tagToRemove),
+    }));
+  };
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
+    const newErrors: Record<string, string> = {};
 
-    if (!formData.title.trim()) newErrors.title = 'Judul wajib diisi'
-    if (!formData.slug.trim()) newErrors.slug = 'Slug wajib diisi'
-    if (!formData.content.trim()) newErrors.content = 'Konten wajib diisi'
-    if (!formData.category) newErrors.category = 'Kategori wajib dipilih'
-    
+    if (!formData.title.trim()) newErrors.title = "Judul wajib diisi";
+    if (!formData.slug.trim()) newErrors.slug = "Slug wajib diisi";
+    if (!formData.content.trim()) newErrors.content = "Konten wajib diisi";
+    if (!formData.category) newErrors.category = "Kategori wajib dipilih";
+
     if (formData.featuredImageUrl && !isValidUrl(formData.featuredImageUrl)) {
-      newErrors.featuredImageUrl = 'URL gambar tidak valid'
+      newErrors.featuredImageUrl = "URL gambar tidak valid";
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const isValidUrl = (url: string): boolean => {
     try {
-      new URL(url)
-      return true
+      new URL(url);
+      return true;
     } catch {
-      return false
+      return false;
     }
-  }
+  };
 
-  const handleSave = async (status: 'draft' | 'published') => {
-    const dataToSave = { ...formData, status }
-    
-    if (!validateForm()) return
+  const handleSave = async (status: "draft" | "published") => {
+    const dataToSave = { ...formData, status };
 
-    setSaving(true)
+    if (!validateForm()) return;
+
+    setSaving(true);
     try {
-      const response = await fetch('/api/cms/articles', {
-        method: 'POST',
+      const response = await fetch("/api/cms/articles", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(dataToSave),
-      })
+      });
 
-      const result = await response.json()
+      const result = await response.json();
 
       if (result.success) {
-        toast.success(`Artikel berhasil ${status === 'published' ? 'dipublikasikan' : 'disimpan sebagai draft'}`)
-        router.push('/dashboard/cms')
+        toast.success(
+          `Artikel berhasil ${
+            status === "published" ? "dipublikasikan" : "disimpan sebagai draft"
+          }`
+        );
+        router.push("/dashboard/cms");
       } else {
         if (result.details) {
           // Handle validation errors from API
-          const apiErrors: Record<string, string> = {}
+          const apiErrors: Record<string, string> = {};
           result.details.forEach((error: any) => {
-            apiErrors[error.path[0]] = error.message
-          })
-          setErrors(apiErrors)
+            apiErrors[error.path[0]] = error.message;
+          });
+          setErrors(apiErrors);
         } else {
-          toast.error(result.error || 'Terjadi kesalahan')
+          toast.error(result.error || "Terjadi kesalahan");
         }
       }
     } catch (error) {
-      console.error('Error saving article:', error)
-      toast.error('Terjadi kesalahan saat menyimpan artikel')
+      console.error("Error saving article:", error);
+      toast.error("Terjadi kesalahan saat menyimpan artikel");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link 
-            href="/dashboard/cms"
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium">Kembali ke CMS</span>
-          </Link>
+          <BackButton text="Kembali ke CMS" />
           <div className="h-6 w-px bg-gray-300" />
           <div className="flex items-center gap-2">
             <FileText className="h-6 w-6 text-blue-500" />
@@ -184,16 +182,16 @@ export default function CreateArticlePage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button 
+          <Button
             type="button"
             variant="outline"
-            onClick={() => router.push('/dashboard/cms')}
+            onClick={() => router.push("/dashboard/cms")}
             disabled={saving}
           >
             Batal
           </Button>
-          <Button 
-            onClick={() => handleSave('draft')}
+          <Button
+            onClick={() => handleSave("draft")}
             disabled={saving || !formData.title.trim()}
             variant="outline"
           >
@@ -204,8 +202,8 @@ export default function CreateArticlePage() {
             )}
             Simpan Draft
           </Button>
-          <Button 
-            onClick={() => handleSave('published')}
+          <Button
+            onClick={() => handleSave("published")}
             disabled={saving || !formData.title.trim()}
           >
             {saving ? (
@@ -235,25 +233,45 @@ export default function CreateArticlePage() {
                 <Input
                   id="title"
                   value={formData.title}
-                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  onChange={(e) => handleInputChange("title", e.target.value)}
                   placeholder="Masukkan judul artikel..."
-                  className={errors.title ? 'border-red-500' : ''}
+                  className={errors.title ? "border-red-500 mt-2" : "mt-2"}
                 />
-                {errors.title && <p className="text-sm text-red-600 mt-1">{errors.title}</p>}
+                {errors.title && (
+                  <p className="text-sm text-red-600 mt-1">{errors.title}</p>
+                )}
               </div>
 
               <div>
                 <Label htmlFor="slug">Slug URL *</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => handleInputChange('slug', e.target.value)}
-                  placeholder="artikel-slug-url"
-                  className={errors.slug ? 'border-red-500' : ''}
-                />
-                {errors.slug && <p className="text-sm text-red-600 mt-1">{errors.slug}</p>}
+                <div className="flex gap-2">
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => handleInputChange("slug", e.target.value)}
+                    placeholder="Random slug"
+                    className={errors.slug ? "border-red-500 mt-2" : "mt-2"}
+                    readOnly
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        slug: generateNewSlug(),
+                      }))
+                    }
+                  >
+                    Generate
+                  </Button>
+                </div>
+                {errors.slug && (
+                  <p className="text-sm text-red-600 mt-1">{errors.slug}</p>
+                )}
                 <p className="text-sm text-gray-500 mt-1">
-                  URL artikel: /content/articles/{formData.slug || 'artikel-slug-url'}
+                  URL artikel: /content/articles/
+                  {formData.slug || "random-slug"}
                 </p>
               </div>
 
@@ -262,7 +280,7 @@ export default function CreateArticlePage() {
                 <Textarea
                   id="excerpt"
                   value={formData.excerpt}
-                  onChange={(e) => handleInputChange('excerpt', e.target.value)}
+                  onChange={(e) => handleInputChange("excerpt", e.target.value)}
                   placeholder="Ringkasan singkat artikel (opsional)..."
                   rows={3}
                   className="mt-2"
@@ -276,13 +294,17 @@ export default function CreateArticlePage() {
               <div>
                 <Label htmlFor="content">Konten Artikel *</Label>
                 <div className="mt-2">
-                  <RichTextEditor
+                  <TinyMCEEditor
                     value={formData.content}
-                    onChange={(value) => handleInputChange('content', value)}
-                    error={errors.content}
+                    onEditorChange={(content) =>
+                      handleInputChange("content", content)
+                    }
+                    placeholder="Tulis konten artikel lengkap di sini..."
                   />
                 </div>
-                {errors.content && <p className="text-sm text-red-600 mt-1">{errors.content}</p>}
+                {errors.content && (
+                  <p className="text-sm text-red-600 mt-1">{errors.content}</p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -297,22 +319,18 @@ export default function CreateArticlePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value as 'draft' | 'published')}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="published">Published</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
                 <Label htmlFor="category">Kategori *</Label>
-                <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-                  <SelectTrigger className={`mt-2 ${errors.category ? 'border-red-500' : ''}`}>
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    handleInputChange("category", value)
+                  }
+                >
+                  <SelectTrigger
+                    className={`mt-2 ${
+                      errors.category ? "border-red-500" : ""
+                    }`}
+                  >
                     <SelectValue placeholder="Pilih kategori..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -323,7 +341,32 @@ export default function CreateArticlePage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.category && <p className="text-sm text-red-600 mt-1">{errors.category}</p>}
+                {errors.category && (
+                  <p className="text-sm text-red-600 mt-1">{errors.category}</p>
+                )}
+              </div>
+
+              <div className="pt-4 border-t">
+                <p className="text-sm text-gray-600 mb-3">
+                  Status artikel akan ditentukan berdasarkan tombol yang
+                  dipilih:
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Save className="h-4 w-4" />
+                    <span>
+                      <strong>Simpan Draft:</strong> Artikel disimpan sebagai
+                      draft
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <Eye className="h-4 w-4" />
+                    <span>
+                      <strong>Publikasikan:</strong> Artikel langsung
+                      dipublikasikan
+                    </span>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -339,16 +382,22 @@ export default function CreateArticlePage() {
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   placeholder="Tambah tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                  onKeyPress={(e) =>
+                    e.key === "Enter" && (e.preventDefault(), addTag())
+                  }
                 />
                 <Button type="button" size="sm" onClick={addTag}>
                   +
                 </Button>
               </div>
-              
+
               <div className="flex flex-wrap gap-2">
                 {formData.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
                     {tag}
                     <button
                       type="button"
@@ -375,52 +424,21 @@ export default function CreateArticlePage() {
                   id="featuredImage"
                   type="url"
                   value={formData.featuredImageUrl}
-                  onChange={(e) => handleInputChange('featuredImageUrl', e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("featuredImageUrl", e.target.value)
+                  }
                   placeholder="https://example.com/image.jpg"
-                  className={errors.featuredImageUrl ? 'border-red-500' : ''}
+                  className={
+                    errors.featuredImageUrl ? "border-red-500 mt-2" : "mt-2"
+                  }
                 />
-                {errors.featuredImageUrl && <p className="text-sm text-red-600 mt-1">{errors.featuredImageUrl}</p>}
+                {errors.featuredImageUrl && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {errors.featuredImageUrl}
+                  </p>
+                )}
                 <p className="text-sm text-gray-500 mt-1">
                   Opsional. Gambar akan tampil di preview artikel
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SEO */}
-          <Card>
-            <CardHeader>
-              <CardTitle>SEO</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="seoTitle">SEO Title</Label>
-                <Input
-                  id="seoTitle"
-                  value={formData.seoTitle}
-                  onChange={(e) => handleInputChange('seoTitle', e.target.value)}
-                  placeholder="Otomatis dari judul"
-                  className="mt-2"
-                  maxLength={60}
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  {formData.seoTitle.length}/60 karakter
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="seoDescription">SEO Description</Label>
-                <Textarea
-                  id="seoDescription"
-                  value={formData.seoDescription}
-                  onChange={(e) => handleInputChange('seoDescription', e.target.value)}
-                  placeholder="Otomatis dari ringkasan"
-                  rows={3}
-                  className="mt-2"
-                  maxLength={160}
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  {formData.seoDescription.length}/160 karakter
                 </p>
               </div>
             </CardContent>
@@ -428,5 +446,5 @@ export default function CreateArticlePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }

@@ -1,13 +1,13 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { db, cmsArticles } from '@/db'
-import { eq } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Calendar, Tag, Share, Clock } from 'lucide-react'
-import Link from 'next/link'
+import { Calendar, Tag, Clock } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
 import Image from 'next/image'
+import { ShareButton } from '@/components/content/ShareButton'
 
 interface ArticlePageProps {
   params: Promise<{ slug: string }>
@@ -17,10 +17,14 @@ async function getArticle(slug: string) {
   const article = await db
     .select()
     .from(cmsArticles)
-    .where(eq(cmsArticles.slug, slug))
+    .where(and(
+      eq(cmsArticles.slug, slug),
+      eq(cmsArticles.status, 'published'),
+      isNull(cmsArticles.deletedAt)
+    ))
     .limit(1)
 
-  if (article.length === 0 || article[0].status !== 'published') {
+  if (article.length === 0) {
     return null
   }
 
@@ -107,28 +111,6 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     })
   }
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: article.title,
-          text: article.excerpt || 'Artikel edukasi kesehatan dari PRIMA',
-          url: window.location.href,
-        })
-      } catch (error) {
-        // User cancelled sharing or error occurred
-        console.log('Share cancelled or failed:', error)
-      }
-    } else {
-      // Fallback: copy URL to clipboard
-      try {
-        await navigator.clipboard.writeText(window.location.href)
-        alert('Link artikel telah disalin!')
-      } catch (error) {
-        console.error('Failed to copy to clipboard:', error)
-      }
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -136,14 +118,11 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard/cms" className="flex items-center gap-2 text-blue-600">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium">Kembali</span>
-            </Link>
-            <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share className="h-4 w-4 mr-2" />
-              Bagikan
-            </Button>
+            <BackButton />
+            <ShareButton 
+              title={article.title}
+              text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
+            />
           </div>
         </div>
       </header>
@@ -217,15 +196,14 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <CardContent className="p-6">
             <div className="prose prose-lg max-w-none">
               <div 
-                className="whitespace-pre-wrap text-gray-900 leading-relaxed"
+                className="text-gray-900 leading-relaxed"
                 style={{ 
                   fontSize: '18px', 
                   lineHeight: '1.7',
                   fontFamily: 'system-ui, -apple-system, sans-serif' 
                 }}
-              >
-                {article.content}
-              </div>
+                dangerouslySetInnerHTML={{ __html: article.content }}
+              />
             </div>
           </CardContent>
         </Card>
@@ -238,10 +216,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
                 <p className="font-semibold text-gray-900 mb-1">PRIMA Healthcare</p>
                 <p>Sistem pengingat obat untuk pasien kanker paliatif</p>
               </div>
-              <Button onClick={handleShare} className="shrink-0">
-                <Share className="h-4 w-4 mr-2" />
-                Bagikan Artikel
-              </Button>
+              <ShareButton 
+                title={article.title}
+                text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
+                variant="default"
+                className="shrink-0"
+              />
             </div>
           </CardContent>
         </Card>

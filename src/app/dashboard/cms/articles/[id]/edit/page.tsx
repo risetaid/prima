@@ -7,20 +7,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, FileText, Save, Eye, X, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import { FileText, Save, Eye, X, Trash2 } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import RichTextEditor from '@/components/cms/RichTextEditor'
+import { TinyMCEEditor } from '@/components/cms/TinyMCEEditor'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
 
 const categories = [
-  { value: 'general', label: 'Umum', color: 'bg-blue-100 text-blue-800' },
-  { value: 'nutrisi', label: 'Nutrisi', color: 'bg-green-100 text-green-800' },
-  { value: 'olahraga', label: 'Olahraga', color: 'bg-purple-100 text-purple-800' },
-  { value: 'motivational', label: 'Motivasi', color: 'bg-orange-100 text-orange-800' },
-  { value: 'medical', label: 'Medis', color: 'bg-red-100 text-red-800' },
-  { value: 'faq', label: 'FAQ', color: 'bg-indigo-100 text-indigo-800' },
-  { value: 'testimoni', label: 'Testimoni', color: 'bg-pink-100 text-pink-800' }
+  { value: 'general', label: 'Umum' },
+  { value: 'nutrisi', label: 'Nutrisi' },
+  { value: 'olahraga', label: 'Olahraga' },
+  { value: 'motivational', label: 'Motivasi' },
+  { value: 'medical', label: 'Medis' },
+  { value: 'faq', label: 'FAQ' },
+  { value: 'testimoni', label: 'Testimoni' }
 ]
 
 interface ArticleEditPageProps {
@@ -41,8 +43,6 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
     featuredImageUrl: '',
     category: 'general',
     tags: [] as string[],
-    seoTitle: '',
-    seoDescription: '',
     status: 'draft' as 'draft' | 'published' | 'archived'
   })
   const [newTag, setNewTag] = useState('')
@@ -82,8 +82,6 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
             featuredImageUrl: article.featuredImageUrl || '',
             category: article.category || 'general',
             tags: article.tags || [],
-            seoTitle: article.seoTitle || '',
-            seoDescription: article.seoDescription || '',
             status: article.status || 'draft'
           })
         }
@@ -133,11 +131,7 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          seoTitle: formData.seoTitle || formData.title,
-          seoDescription: formData.seoDescription || formData.excerpt
-        }),
+        body: JSON.stringify(formData),
       })
 
       if (!response.ok) {
@@ -204,13 +198,7 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link 
-            href="/dashboard/cms"
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium">Kembali ke CMS</span>
-          </Link>
+          <BackButton text="Kembali ke CMS" />
           <div className="h-6 w-px bg-gray-300" />
           <div className="flex items-center gap-2">
             <FileText className="h-6 w-6 text-blue-500" />
@@ -265,79 +253,69 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
         </div>
       </div>
 
-      {/* Main Form */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Konten Artikel</CardTitle>
+              <CardTitle>Informasi Artikel</CardTitle>
               <CardDescription>
-                Edit konten artikel edukasi kesehatan
+                Edit detail artikel edukasi kesehatan
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form id="edit-article-form" onSubmit={handleSubmit} className="space-y-6">
-                {/* Title */}
-                <div>
-                  <Label htmlFor="title">Judul Artikel *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    className="mt-2"
-                    required
-                  />
-                </div>
-
-                {/* Slug */}
-                <div>
-                  <Label htmlFor="slug">URL Slug</Label>
-                  <Input
-                    id="slug"
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    className="mt-2"
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    URL: /content/articles/{formData.slug || 'slug-artikel'}
-                  </p>
-                </div>
-
-                {/* Content */}
-                <div>
-                  <Label htmlFor="content">Konten *</Label>
-                  <div className="mt-2">
-                    <RichTextEditor
-                      value={formData.content}
-                      onChange={(content: string) => setFormData(prev => ({ ...prev, content }))}
-                      placeholder="Tulis konten artikel di sini..."
+            <CardContent className="space-y-4">
+              <form id="edit-article-form" onSubmit={handleSubmit}>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="title">Judul Artikel *</Label>
+                    <Input
+                      id="title"
+                      value={formData.title}
+                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Masukkan judul artikel..."
                     />
                   </div>
-                </div>
 
-                {/* Excerpt */}
-                <div>
-                  <Label htmlFor="excerpt">Ringkasan</Label>
-                  <Textarea
-                    id="excerpt"
-                    value={formData.excerpt}
-                    onChange={(e) => setFormData(prev => ({ ...prev, excerpt: e.target.value }))}
-                    placeholder="Ringkasan singkat artikel untuk preview..."
-                    rows={3}
-                    className="mt-2"
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="slug">Slug URL *</Label>
+                    <Input
+                      id="slug"
+                      value={formData.slug}
+                      onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                      placeholder="slug-artikel"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      URL artikel: /content/articles/{formData.slug || 'slug-artikel'}
+                    </p>
+                  </div>
 
-                {/* Featured Image */}
-                <div>
-                  <Label htmlFor="featuredImage">URL Gambar Utama</Label>
-                  <Input
-                    id="featuredImage"
-                    value={formData.featuredImageUrl}
-                    onChange={(e) => setFormData(prev => ({ ...prev, featuredImageUrl: e.target.value }))}
-                    placeholder="https://images.unsplash.com/..."
-                    className="mt-2"
-                  />
+                  <div>
+                    <Label htmlFor="excerpt">Ringkasan</Label>
+                    <Textarea
+                      id="excerpt"
+                      value={formData.excerpt}
+                      onChange={(e) => setFormData(prev => ({ ...prev, excerpt: e.target.value }))}
+                      placeholder="Ringkasan singkat artikel (opsional)..."
+                      rows={3}
+                      className="mt-2"
+                    />
+                    <p className="text-sm text-gray-500 mt-1">
+                      Ringkasan akan tampil dalam daftar artikel dan preview
+                    </p>
+                  </div>
+
+                  {/* Content */}
+                  <div>
+                    <Label htmlFor="content">Konten Artikel *</Label>
+                    <div className="mt-2">
+                      <TinyMCEEditor
+                        value={formData.content}
+                        onEditorChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                        placeholder="Edit konten artikel lengkap di sini..."
+                      />
+                    </div>
+                  </div>
                 </div>
               </form>
             </CardContent>
@@ -354,32 +332,32 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  value={formData.status}
-                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                  className="w-full mt-2 p-2 border border-gray-300 rounded-md"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Pilih status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <Label htmlFor="category">Kategori</Label>
-                <select
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full mt-2 p-2 border border-gray-300 rounded-md"
-                >
-                  {categories.map(cat => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="category">Kategori *</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Pilih kategori..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -419,31 +397,24 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
             </CardContent>
           </Card>
 
-          {/* SEO */}
+          {/* Featured Image */}
           <Card>
             <CardHeader>
-              <CardTitle>SEO</CardTitle>
+              <CardTitle>Gambar Unggulan</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div>
-                <Label htmlFor="seoTitle">SEO Title</Label>
+                <Label htmlFor="featuredImage">URL Gambar</Label>
                 <Input
-                  id="seoTitle"
-                  value={formData.seoTitle}
-                  onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
-                  className="mt-2"
+                  id="featuredImage"
+                  type="url"
+                  value={formData.featuredImageUrl}
+                  onChange={(e) => setFormData(prev => ({ ...prev, featuredImageUrl: e.target.value }))}
+                  placeholder="https://example.com/image.jpg"
                 />
-              </div>
-
-              <div>
-                <Label htmlFor="seoDescription">SEO Description</Label>
-                <Textarea
-                  id="seoDescription"
-                  value={formData.seoDescription}
-                  onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
-                  rows={3}
-                  className="mt-2"
-                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Opsional. Gambar akan tampil di preview artikel
+                </p>
               </div>
             </CardContent>
           </Card>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsArticles } from '@/db'
-import { eq, desc, and, or, ilike } from 'drizzle-orm'
+import { eq, desc, and, or, ilike, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 // Validation schemas
@@ -47,7 +47,10 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build where conditions
-    const whereConditions = []
+    const whereConditions = [
+      // Exclude deleted articles
+      isNull(cmsArticles.deletedAt)
+    ]
     
     if (search) {
       whereConditions.push(
@@ -55,7 +58,7 @@ export async function GET(request: NextRequest) {
           ilike(cmsArticles.title, `%${search}%`),
           ilike(cmsArticles.content, `%${search}%`),
           ilike(cmsArticles.excerpt, `%${search}%`)
-        )
+        )!
       )
     }
     
@@ -67,7 +70,7 @@ export async function GET(request: NextRequest) {
       whereConditions.push(eq(cmsArticles.status, status as any))
     }
 
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined
+    const whereClause = and(...whereConditions)
 
     // Get articles with pagination
     const articles = await db
@@ -134,7 +137,10 @@ export async function POST(request: NextRequest) {
       const existingArticle = await db
         .select()
         .from(cmsArticles)
-        .where(eq(cmsArticles.slug, finalSlug))
+        .where(and(
+          eq(cmsArticles.slug, finalSlug),
+          isNull(cmsArticles.deletedAt)
+        ))
         .limit(1)
       
       if (existingArticle.length === 0) break

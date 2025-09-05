@@ -1,0 +1,34 @@
+{
+  "id": "7d7e1f4f-3b5a-4c8f-9a2b-1d8e7f6c9b3a",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {},
+  "enums": {
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": ["SUPERADMIN", "ADMIN", "MEMBER"]
+    },
+    "public.verification_status": {
+      "name": "verification_status", 
+      "schema": "public",
+      "values": ["pending_verification", "verified", "declined", "expired", "unsubscribed"]
+    },
+    "public.content_category": {
+      "name": "content_category",
+      "schema": "public", 
+      "values": ["general", "nutrisi", "olahraga", "motivational", "medical", "faq", "testimoni"]
+    },
+    "public.content_status": {
+      "name": "content_status",
+      "schema": "public",
+      "values": ["draft", "published", "archived"] 
+    }
+  },
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

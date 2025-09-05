@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsVideos } from '@/db'
-import { eq, desc, and, or, ilike } from 'drizzle-orm'
+import { eq, desc, and, or, ilike, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 // Validation schemas
@@ -77,14 +77,17 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build where conditions
-    const whereConditions = []
+    const whereConditions = [
+      // Exclude deleted videos
+      isNull(cmsVideos.deletedAt)
+    ]
     
     if (search) {
       whereConditions.push(
         or(
           ilike(cmsVideos.title, `%${search}%`),
           ilike(cmsVideos.description, `%${search}%`)
-        )
+        )!
       )
     }
     
@@ -96,7 +99,7 @@ export async function GET(request: NextRequest) {
       whereConditions.push(eq(cmsVideos.status, status as any))
     }
 
-    const whereClause = whereConditions.length > 0 ? and(...whereConditions) : undefined
+    const whereClause = and(...whereConditions)
 
     // Get videos with pagination
     const videos = await db
@@ -166,7 +169,10 @@ export async function POST(request: NextRequest) {
       const existingVideo = await db
         .select()
         .from(cmsVideos)
-        .where(eq(cmsVideos.slug, finalSlug))
+        .where(and(
+          eq(cmsVideos.slug, finalSlug),
+          isNull(cmsVideos.deletedAt)
+        ))
         .limit(1)
       
       if (existingVideo.length === 0) break

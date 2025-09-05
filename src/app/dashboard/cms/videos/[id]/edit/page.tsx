@@ -6,20 +6,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Video, Save, Eye, X, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import { Video, Save, Eye, X, Trash2, Download } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { generateRandomSlug } from '@/lib/slug-utils'
+import { extractYouTubeVideoId, fetchYouTubeVideoData } from '@/lib/youtube-utils'
 
 const categories = [
-  { value: 'general', label: 'Umum', color: 'bg-blue-100 text-blue-800' },
-  { value: 'nutrisi', label: 'Nutrisi', color: 'bg-green-100 text-green-800' },
-  { value: 'olahraga', label: 'Olahraga', color: 'bg-purple-100 text-purple-800' },
-  { value: 'motivational', label: 'Motivasi', color: 'bg-orange-100 text-orange-800' },
-  { value: 'medical', label: 'Medis', color: 'bg-red-100 text-red-800' },
-  { value: 'faq', label: 'FAQ', color: 'bg-indigo-100 text-indigo-800' },
-  { value: 'testimoni', label: 'Testimoni', color: 'bg-pink-100 text-pink-800' }
+  { value: 'general', label: 'Umum' },
+  { value: 'nutrisi', label: 'Nutrisi' },
+  { value: 'olahraga', label: 'Olahraga' },
+  { value: 'motivational', label: 'Motivasi' },
+  { value: 'medical', label: 'Medis' },
+  { value: 'faq', label: 'FAQ' },
+  { value: 'testimoni', label: 'Testimoni' }
 ]
 
 interface VideoEditPageProps {
@@ -32,6 +35,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [fetchingVideoData, setFetchingVideoData] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
@@ -41,8 +45,6 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
     durationMinutes: '',
     category: 'general',
     tags: [] as string[],
-    seoTitle: '',
-    seoDescription: '',
     status: 'draft' as 'draft' | 'published' | 'archived'
   })
   const [newTag, setNewTag] = useState('')
@@ -83,8 +85,6 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             durationMinutes: video.durationMinutes || '',
             category: video.category || 'general',
             tags: video.tags || [],
-            seoTitle: video.seoTitle || '',
-            seoDescription: video.seoDescription || '',
             status: video.status || 'draft'
           })
         }
@@ -99,6 +99,43 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
 
     loadVideo()
   }, [params, router])
+
+  const generateNewSlug = () => {
+    return generateRandomSlug()
+  }
+
+  const fetchVideoDataFromUrl = async () => {
+    if (!formData.videoUrl.trim()) {
+      toast.error('URL video tidak boleh kosong')
+      return
+    }
+
+    const videoId = extractYouTubeVideoId(formData.videoUrl)
+    if (!videoId) {
+      toast.error('URL YouTube tidak valid')
+      return
+    }
+
+    setFetchingVideoData(true)
+    try {
+      const videoData = await fetchYouTubeVideoData(videoId)
+      
+      setFormData(prev => ({
+        ...prev,
+        title: videoData.title || prev.title,
+        description: videoData.description || prev.description,
+        thumbnailUrl: videoData.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+        durationMinutes: videoData.duration || prev.durationMinutes
+      }))
+      
+      toast.success('Data video berhasil diperbarui!')
+    } catch (error) {
+      console.error('Error fetching video data:', error)
+      toast.error('Gagal mengambil data video. Pastikan URL valid.')
+    } finally {
+      setFetchingVideoData(false)
+    }
+  }
 
   const addTag = () => {
     if (newTag.trim() && !formData.tags.includes(newTag.trim().toLowerCase())) {
@@ -139,11 +176,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...formData,
-          seoTitle: formData.seoTitle || formData.title,
-          seoDescription: formData.seoDescription || formData.description?.substring(0, 160)
-        }),
+        body: JSON.stringify(formData),
       })
 
       if (!response.ok) {
@@ -210,13 +243,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Link 
-            href="/dashboard/cms"
-            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="font-medium">Kembali ke CMS</span>
-          </Link>
+          <BackButton text="Kembali ke CMS" />
           <div className="hidden sm:block h-6 w-px bg-gray-300" />
           <div className="flex items-center gap-2">
             <Video className="h-6 w-6 text-red-500" />
@@ -273,18 +300,47 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         </div>
       </div>
 
-      {/* Main Form */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Informasi Video</CardTitle>
               <CardDescription>
-                Edit detail video edukasi kesehatan
+                Edit URL YouTube untuk auto-fetch data video
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form id="edit-video-form" onSubmit={handleSubmit} className="space-y-6">
+            <CardContent className="space-y-6">
+              <form id="edit-video-form" onSubmit={handleSubmit}>
+                {/* Video URL with Auto-fetch */}
+                <div>
+                  <Label htmlFor="videoUrl">URL YouTube *</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      id="videoUrl"
+                      value={formData.videoUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      required
+                    />
+                    <Button
+                      type="button"
+                      onClick={fetchVideoDataFromUrl}
+                      disabled={fetchingVideoData || !formData.videoUrl.trim()}
+                      variant="outline"
+                    >
+                      {fetchingVideoData ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Auto-fetch
+                    </Button>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Klik "Auto-fetch" untuk mengambil data video terbaru
+                  </p>
+                </div>
+
                 {/* Title */}
                 <div>
                   <Label htmlFor="title">Judul Video *</Label>
@@ -292,6 +348,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Contoh: Latihan Pernapasan untuk Pasien Kanker"
                     className="mt-2"
                     required
                   />
@@ -299,71 +356,73 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
 
                 {/* Slug */}
                 <div>
-                  <Label htmlFor="slug">URL Slug</Label>
-                  <Input
-                    id="slug"
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    className="mt-2"
-                  />
+                  <Label htmlFor="slug">URL Slug *</Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      id="slug"
+                      value={formData.slug}
+                      onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                      placeholder="YouTube-style random slug"
+                      readOnly
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setFormData(prev => ({ ...prev, slug: generateNewSlug() }))}
+                    >
+                      Generate
+                    </Button>
+                  </div>
                   <p className="text-sm text-gray-500 mt-1">
-                    URL: /content/videos/{formData.slug || 'slug-video'}
+                    URL: /content/videos/{formData.slug || 'random-slug'}
                   </p>
                 </div>
 
-                {/* Video URL */}
-                <div>
-                  <Label htmlFor="videoUrl">URL Video *</Label>
-                  <Input
-                    id="videoUrl"
-                    value={formData.videoUrl}
-                    onChange={(e) => setFormData(prev => ({ ...prev, videoUrl: e.target.value }))}
-                    className="mt-2"
-                    required
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Dukung YouTube dan Vimeo. Thumbnail akan otomatis diambil.
-                  </p>
-                </div>
-
-                {/* Duration */}
+                {/* Duration - Auto-filled */}
                 <div>
                   <Label htmlFor="duration">Durasi</Label>
                   <Input
                     id="duration"
                     value={formData.durationMinutes}
                     onChange={(e) => setFormData(prev => ({ ...prev, durationMinutes: e.target.value }))}
-                    placeholder="8 menit"
-                    className="mt-2"
-                  />
-                </div>
-
-                {/* Thumbnail URL */}
-                <div>
-                  <Label htmlFor="thumbnailUrl">URL Thumbnail (Opsional)</Label>
-                  <Input
-                    id="thumbnailUrl"
-                    value={formData.thumbnailUrl}
-                    onChange={(e) => setFormData(prev => ({ ...prev, thumbnailUrl: e.target.value }))}
-                    placeholder="https://img.youtube.com/..."
+                    placeholder="Auto-filled dari YouTube (atau isi manual)"
                     className="mt-2"
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    Kosongkan untuk otomatis menggunakan thumbnail dari video
+                    Akan diperbarui saat auto-fetch (jika tersedia)
                   </p>
                 </div>
 
-                {/* Description */}
+                {/* Description - Auto-filled */}
                 <div>
                   <Label htmlFor="description">Deskripsi</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Deskripsi video yang akan ditampilkan untuk pasien..."
+                    placeholder="Auto-filled dari deskripsi YouTube (atau isi manual)"
                     rows={6}
                     className="mt-2"
                   />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Akan diperbarui saat auto-fetch dari deskripsi YouTube
+                  </p>
+                </div>
+
+                {/* Thumbnail URL - Auto-filled */}
+                <div>
+                  <Label htmlFor="thumbnailUrl">URL Thumbnail</Label>
+                  <Input
+                    id="thumbnailUrl"
+                    value={formData.thumbnailUrl}
+                    onChange={(e) => setFormData(prev => ({ ...prev, thumbnailUrl: e.target.value }))}
+                    placeholder="Auto-filled dari YouTube thumbnail"
+                    className="mt-2"
+                    readOnly
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Thumbnail otomatis diambil dari YouTube dengan kualitas maksimal
+                  </p>
                 </div>
               </form>
             </CardContent>
@@ -380,32 +439,32 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="status">Status</Label>
-                <select
-                  id="status"
-                  value={formData.status}
-                  onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
-                  className="w-full mt-2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
+                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Pilih status..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
-                <Label htmlFor="category">Kategori</Label>
-                <select
-                  id="category"
-                  value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full mt-2 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {categories.map(cat => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
+                <Label htmlFor="category">Kategori *</Label>
+                <Select value={formData.category} onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Pilih kategori..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
@@ -450,42 +509,24 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             </CardContent>
           </Card>
 
-          {/* SEO */}
-          <Card>
-            <CardHeader>
-              <CardTitle>SEO</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="seoTitle">SEO Title</Label>
-                <Input
-                  id="seoTitle"
-                  value={formData.seoTitle}
-                  onChange={(e) => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
-                  placeholder="Otomatis dari judul"
-                  className="mt-2"
+          {/* Video Preview */}
+          {formData.thumbnailUrl && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <img 
+                  src={formData.thumbnailUrl} 
+                  alt="Video thumbnail"
+                  className="w-full rounded-lg"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-video.jpg'
+                  }}
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  {formData.seoTitle.length}/60 karakter
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="seoDescription">SEO Description</Label>
-                <Textarea
-                  id="seoDescription"
-                  value={formData.seoDescription}
-                  onChange={(e) => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
-                  placeholder="Otomatis dari deskripsi"
-                  rows={3}
-                  className="mt-2"
-                />
-                <p className="text-sm text-gray-500 mt-1">
-                  {formData.seoDescription.length}/160 karakter
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

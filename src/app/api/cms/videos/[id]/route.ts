@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsVideos } from '@/db'
-import { eq } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 // Validation schema for updates
@@ -65,7 +65,10 @@ export async function GET(
     const video = await db
       .select()
       .from(cmsVideos)
-      .where(eq(cmsVideos.id, id))
+      .where(and(
+        eq(cmsVideos.id, id),
+        isNull(cmsVideos.deletedAt)
+      ))
       .limit(1)
 
     if (video.length === 0) {
@@ -107,11 +110,14 @@ export async function PUT(
     // Validate request body
     const validatedData = updateVideoSchema.parse(body)
     
-    // Check if video exists
+    // Check if video exists and is not deleted
     const existingVideo = await db
       .select()
       .from(cmsVideos)
-      .where(eq(cmsVideos.id, id))
+      .where(and(
+        eq(cmsVideos.id, id),
+        isNull(cmsVideos.deletedAt)
+      ))
       .limit(1)
 
     if (existingVideo.length === 0) {
@@ -126,7 +132,10 @@ export async function PUT(
       const slugConflict = await db
         .select()
         .from(cmsVideos)
-        .where(eq(cmsVideos.slug, validatedData.slug))
+        .where(and(
+          eq(cmsVideos.slug, validatedData.slug),
+          isNull(cmsVideos.deletedAt)
+        ))
         .limit(1)
       
       if (slugConflict.length > 0 && slugConflict[0].id !== id) {
@@ -194,7 +203,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete video
+// DELETE - Soft delete video
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -208,11 +217,14 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if video exists
+    // Check if video exists and is not already deleted
     const existingVideo = await db
       .select()
       .from(cmsVideos)
-      .where(eq(cmsVideos.id, id))
+      .where(and(
+        eq(cmsVideos.id, id),
+        isNull(cmsVideos.deletedAt)
+      ))
       .limit(1)
 
     if (existingVideo.length === 0) {
@@ -222,9 +234,13 @@ export async function DELETE(
       )
     }
 
-    // Delete video
+    // Soft delete video by setting deletedAt timestamp
     await db
-      .delete(cmsVideos)
+      .update(cmsVideos)
+      .set({ 
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      })
       .where(eq(cmsVideos.id, id))
 
     return NextResponse.json({

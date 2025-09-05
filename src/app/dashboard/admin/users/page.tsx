@@ -3,7 +3,8 @@
 import UserManagement from "@/components/admin/user-management";
 import { DesktopHeader } from "@/components/ui/desktop-header";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Users } from "lucide-react";
+import { Users } from "lucide-react";
+import { BackButton } from '@/components/ui/back-button';
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -29,12 +30,9 @@ export default function AdminUsersPage() {
       <div className="lg:hidden relative z-10">
         <header className="bg-white shadow-sm">
           <div className="flex items-center px-4 py-4">
-            <button
-              onClick={() => router.push("/dashboard/admin")}
-              className="mr-4 p-2 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
+            <div className="mr-4">
+              <BackButton variant="simple" className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600" text="" />
+            </div>
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-purple-600" />
               <h1 className="text-lg font-semibold text-gray-900">Superadmin Panel</h1>

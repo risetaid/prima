@@ -1,12 +1,12 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { db, cmsVideos } from '@/db'
-import { eq } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft, Calendar, Tag, Share, Clock, Play } from 'lucide-react'
-import Link from 'next/link'
+import { Calendar, Tag, Clock, Play, Share } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
+import { ShareButton } from '@/components/content/ShareButton'
 
 interface VideoPageProps {
   params: Promise<{ slug: string }>
@@ -16,10 +16,14 @@ async function getVideo(slug: string) {
   const video = await db
     .select()
     .from(cmsVideos)
-    .where(eq(cmsVideos.slug, slug))
+    .where(and(
+      eq(cmsVideos.slug, slug),
+      eq(cmsVideos.status, 'published'),
+      isNull(cmsVideos.deletedAt)
+    ))
     .limit(1)
 
-  if (video.length === 0 || video[0].status !== 'published') {
+  if (video.length === 0) {
     return null
   }
 
@@ -104,28 +108,6 @@ export default async function VideoPage({ params }: VideoPageProps) {
     })
   }
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: video.title,
-          text: video.description || 'Video edukasi kesehatan dari PRIMA',
-          url: window.location.href,
-        })
-      } catch (error) {
-        // User cancelled sharing or error occurred
-        console.log('Share cancelled or failed:', error)
-      }
-    } else {
-      // Fallback: copy URL to clipboard
-      try {
-        await navigator.clipboard.writeText(window.location.href)
-        alert('Link video telah disalin!')
-      } catch (error) {
-        console.error('Failed to copy to clipboard:', error)
-      }
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -133,14 +115,11 @@ export default async function VideoPage({ params }: VideoPageProps) {
       <header className="bg-white border-b sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/dashboard/cms" className="flex items-center gap-2 text-blue-600">
-              <ArrowLeft className="h-5 w-5" />
-              <span className="font-medium">Kembali</span>
-            </Link>
-            <Button variant="outline" size="sm" onClick={handleShare}>
-              <Share className="h-4 w-4 mr-2" />
-              Bagikan
-            </Button>
+            <BackButton />
+            <ShareButton 
+              title={video.title}
+              text={video.description || 'Video edukasi kesehatan dari PRIMA'}
+            />
           </div>
         </div>
       </header>
@@ -259,10 +238,12 @@ export default async function VideoPage({ params }: VideoPageProps) {
                 <p className="font-semibold text-gray-900 mb-1">PRIMA Healthcare</p>
                 <p>Sistem pengingat obat untuk pasien kanker paliatif</p>
               </div>
-              <Button onClick={handleShare} className="shrink-0">
-                <Share className="h-4 w-4 mr-2" />
-                Bagikan Video
-              </Button>
+              <ShareButton 
+                title={video.title}
+                text={video.description || 'Video edukasi kesehatan dari PRIMA'}
+                variant="default"
+                className="shrink-0"
+              />
             </div>
           </CardContent>
         </Card>

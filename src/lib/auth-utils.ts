@@ -27,7 +27,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null
     }
 
-    // Get user from database using Clerk ID with retry on connection timeout
+    // Get user from database using Clerk ID with retry logic
     let dbUserResult
     let retries = 3
     
@@ -41,10 +41,18 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         break
       } catch (dbError: any) {
         retries--
-        if (dbError.code === 'CONNECT_TIMEOUT' && retries > 0) {
+        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, dbError.message)
+        
+        // Retry on various database errors
+        if ((dbError.code === 'CONNECT_TIMEOUT' || 
+             dbError.code === 'CONNECTION_REFUSED' || 
+             dbError.message?.includes('connection') ||
+             dbError.message?.includes('timeout')) && retries > 0) {
           await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
           continue
         }
+        
+        // Don't retry on other types of errors
         throw dbError
       }
     }
@@ -52,6 +60,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const dbUser = dbUserResult?.[0]
 
     if (!dbUser) {
+      console.log(`🔍 Auth: No database user found for Clerk ID: ${userId}`)
       return null
     }
 

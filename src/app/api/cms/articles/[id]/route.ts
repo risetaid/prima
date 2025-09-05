@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsArticles } from '@/db'
-import { eq } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 
 // Validation schema for updates
@@ -35,7 +35,10 @@ export async function GET(
     const article = await db
       .select()
       .from(cmsArticles)
-      .where(eq(cmsArticles.id, id))
+      .where(and(
+        eq(cmsArticles.id, id),
+        isNull(cmsArticles.deletedAt)
+      ))
       .limit(1)
 
     if (article.length === 0) {
@@ -77,11 +80,14 @@ export async function PUT(
     // Validate request body
     const validatedData = updateArticleSchema.parse(body)
     
-    // Check if article exists
+    // Check if article exists and is not deleted
     const existingArticle = await db
       .select()
       .from(cmsArticles)
-      .where(eq(cmsArticles.id, id))
+      .where(and(
+        eq(cmsArticles.id, id),
+        isNull(cmsArticles.deletedAt)
+      ))
       .limit(1)
 
     if (existingArticle.length === 0) {
@@ -96,7 +102,10 @@ export async function PUT(
       const slugConflict = await db
         .select()
         .from(cmsArticles)
-        .where(eq(cmsArticles.slug, validatedData.slug))
+        .where(and(
+          eq(cmsArticles.slug, validatedData.slug),
+          isNull(cmsArticles.deletedAt)
+        ))
         .limit(1)
       
       if (slugConflict.length > 0 && slugConflict[0].id !== id) {
@@ -152,7 +161,7 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete article
+// DELETE - Soft delete article
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -166,11 +175,14 @@ export async function DELETE(
 
     const { id } = await params
 
-    // Check if article exists
+    // Check if article exists and is not already deleted
     const existingArticle = await db
       .select()
       .from(cmsArticles)
-      .where(eq(cmsArticles.id, id))
+      .where(and(
+        eq(cmsArticles.id, id),
+        isNull(cmsArticles.deletedAt)
+      ))
       .limit(1)
 
     if (existingArticle.length === 0) {
@@ -180,9 +192,13 @@ export async function DELETE(
       )
     }
 
-    // Delete article
+    // Soft delete article by setting deletedAt timestamp
     await db
-      .delete(cmsArticles)
+      .update(cmsArticles)
+      .set({ 
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      })
       .where(eq(cmsArticles.id, id))
 
     return NextResponse.json({

@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, Search, FileText, Eye, Edit, Trash2, Filter, ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
+import { Plus, Search, FileText, Eye, Edit, Trash2, Filter } from 'lucide-react'
+import { BackButton } from '@/components/ui/back-button'
 import { toast } from 'sonner'
 import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
@@ -173,12 +173,7 @@ export default function ArticlesPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="sm">
-            <Link href="/dashboard/cms">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Kembali ke CMS
-            </Link>
-          </Button>
+          <BackButton text="Kembali ke CMS" variant="simple" className="text-sm" />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
               Artikel

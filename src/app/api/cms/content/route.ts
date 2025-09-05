@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsArticles, cmsVideos } from '@/db'
-import { eq, desc, and, or, ilike, count } from 'drizzle-orm'
+import { eq, desc, and, or, ilike, count, isNull } from 'drizzle-orm'
 
 // GET - Combined content feed for dashboard overview
 export async function GET(request: NextRequest) {
@@ -17,10 +17,14 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status') || 'all' // all, draft, published, archived
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Get articles
+    // Get articles (exclude deleted)
     let articles: any[] = []
     if (type === 'all' || type === 'articles') {
-      const articleConditions = []
+      const articleConditions = [
+        // Exclude soft-deleted articles
+        isNull(cmsArticles.deletedAt)
+      ]
+      
       if (status !== 'all') {
         articleConditions.push(eq(cmsArticles.status, status as any))
       }
@@ -37,7 +41,7 @@ export async function GET(request: NextRequest) {
           updatedAt: cmsArticles.updatedAt
         })
         .from(cmsArticles)
-        .where(articleConditions.length > 0 ? and(...articleConditions) : undefined)
+        .where(and(...articleConditions))
         .orderBy(desc(cmsArticles.updatedAt))
         .limit(type === 'articles' ? limit : Math.ceil(limit / 2))
       
@@ -45,10 +49,14 @@ export async function GET(request: NextRequest) {
       articles = articles.map(article => ({ ...article, type: 'article' as const }))
     }
 
-    // Get videos
+    // Get videos (exclude deleted)
     let videos: any[] = []
     if (type === 'all' || type === 'videos') {
-      const videoConditions = []
+      const videoConditions = [
+        // Exclude soft-deleted videos
+        isNull(cmsVideos.deletedAt)
+      ]
+      
       if (status !== 'all') {
         videoConditions.push(eq(cmsVideos.status, status as any))
       }
@@ -65,7 +73,7 @@ export async function GET(request: NextRequest) {
           updatedAt: cmsVideos.updatedAt
         })
         .from(cmsVideos)
-        .where(videoConditions.length > 0 ? and(...videoConditions) : undefined)
+        .where(and(...videoConditions))
         .orderBy(desc(cmsVideos.updatedAt))
         .limit(type === 'videos' ? limit : Math.ceil(limit / 2))
       
@@ -78,20 +86,20 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, limit)
 
-    // Get statistics with error handling
+    // Get statistics with error handling (exclude deleted content)
     let stats
     try {
       console.log('📊 CMS: Starting statistics queries...')
       stats = await Promise.all([
-        // Article stats
-        db.select({ count: count() }).from(cmsArticles),
-        db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'published')),
-        db.select({ count: count() }).from(cmsArticles).where(eq(cmsArticles.status, 'draft')),
+        // Article stats (exclude deleted)
+        db.select({ count: count() }).from(cmsArticles).where(isNull(cmsArticles.deletedAt)),
+        db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, 'published'), isNull(cmsArticles.deletedAt))),
+        db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, 'draft'), isNull(cmsArticles.deletedAt))),
         
-        // Video stats
-        db.select({ count: count() }).from(cmsVideos),
-        db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'published')),
-        db.select({ count: count() }).from(cmsVideos).where(eq(cmsVideos.status, 'draft')),
+        // Video stats (exclude deleted)
+        db.select({ count: count() }).from(cmsVideos).where(isNull(cmsVideos.deletedAt)),
+        db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, 'published'), isNull(cmsVideos.deletedAt))),
+        db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, 'draft'), isNull(cmsVideos.deletedAt))),
       ])
       console.log('✅ CMS: Statistics queries successful')
     } catch (statsError) {

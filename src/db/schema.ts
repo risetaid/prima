@@ -262,6 +262,7 @@ export const cmsArticles = pgTable('cms_articles', {
   createdBy: text('created_by').notNull(), // Clerk user ID
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }), // Soft delete
 }, (table) => ({
   slugIdx: index('cms_articles_slug_idx').on(table.slug),
   statusIdx: index('cms_articles_status_idx').on(table.status),
@@ -270,6 +271,8 @@ export const cmsArticles = pgTable('cms_articles', {
   statusPublishedIdx: index('cms_articles_status_published_idx').on(table.status, table.publishedAt),
   categoryStatusIdx: index('cms_articles_category_status_idx').on(table.category, table.status),
   createdByIdx: index('cms_articles_created_by_idx').on(table.createdBy),
+  deletedAtIdx: index('cms_articles_deleted_at_idx').on(table.deletedAt),
+  statusDeletedIdx: index('cms_articles_status_deleted_idx').on(table.status, table.deletedAt),
 }))
 
 export const cmsVideos = pgTable('cms_videos', {
@@ -289,6 +292,7 @@ export const cmsVideos = pgTable('cms_videos', {
   createdBy: text('created_by').notNull(), // Clerk user ID
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }), // Soft delete
 }, (table) => ({
   slugIdx: index('cms_videos_slug_idx').on(table.slug),
   statusIdx: index('cms_videos_status_idx').on(table.status),
@@ -297,6 +301,8 @@ export const cmsVideos = pgTable('cms_videos', {
   statusPublishedIdx: index('cms_videos_status_published_idx').on(table.status, table.publishedAt),
   categoryStatusIdx: index('cms_videos_category_status_idx').on(table.category, table.status),
   createdByIdx: index('cms_videos_created_by_idx').on(table.createdBy),
+  deletedAtIdx: index('cms_videos_deleted_at_idx').on(table.deletedAt),
+  statusDeletedIdx: index('cms_videos_status_deleted_idx').on(table.status, table.deletedAt),
 }))
 
 // ===== RELATIONS =====
