@@ -5,6 +5,7 @@ import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
 import { nowWIB } from '@/lib/datetime'
 import { safeDbOperation, logDbPerformance } from '@/lib/db-utils'
+import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 /**
  * Consolidated User Session API
@@ -32,23 +33,51 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
-    // Try to get existing user first
-    let user = await getCurrentUser()
+    // Try to get from cache first for massive performance boost
+    const cacheKey = CACHE_KEYS.userSession(userId)
+    const cachedSession = await getCachedData<any>(cacheKey)
+    
+    if (cachedSession) {
+      console.log('⚡ User session cache hit - instant response')
+      // Still update login timestamp in background (non-blocking)
+      setImmediate(() => {
+        safeDbOperation(async () => {
+          await db
+            .update(users)
+            .set({ 
+              lastLoginAt: nowWIB(),
+              updatedAt: nowWIB()
+            })
+            .where(eq(users.clerkId, userId))
+        }, { maxRetries: 1, delayMs: 300 }, 1000)
+        .catch(error => console.warn('⚠️ Background login update failed:', error))
+      })
+      
+      return NextResponse.json(cachedSession)
+    }
+
+    console.log('💾 User session cache miss - fetching from database')
+
+    // Try to get existing user first with reduced timeout
+    let user = await safeDbOperation(async () => {
+      return await getCurrentUser()
+    }, { maxRetries: 1, delayMs: 300 }, 2000)
     
     // If user not found in database, create/sync from Clerk
     if (!user) {
       try {
-        // Check if this is the first user (should be SUPERADMIN)
+        // Check if this is the first user (should be SUPERADMIN) - optimized query
         const userCountResult = await safeDbOperation(async () => {
           return await db
             .select({ count: count(users.id) })
             .from(users)
-        }, { maxRetries: 2, delayMs: 500 }, 5000)
+            .limit(1) // Only need to know if any exist
+        }, { maxRetries: 1, delayMs: 300 }, 2000)
         
         const userCount = userCountResult[0]?.count || 0
         const isFirstUser = userCount === 0
         
-        // Create user in database with retry mechanism
+        // Create user in database with reduced retry mechanism
         await safeDbOperation(async () => {
           return await db
             .insert(users)
@@ -61,10 +90,12 @@ export async function POST(request: NextRequest) {
               isApproved: isFirstUser,
               approvedAt: isFirstUser ? new Date() : null,
             })
-        }, { maxRetries: 2, delayMs: 500 }, 5000)
+        }, { maxRetries: 1, delayMs: 300 }, 2000)
         
-        // Get user again after creation
-        user = await getCurrentUser()
+        // Get user again after creation with reduced timeout
+        user = await safeDbOperation(async () => {
+          return await getCurrentUser()
+        }, { maxRetries: 1, delayMs: 300 }, 2000)
       } catch (syncError) {
         console.error('❌ User Session: Failed to sync user from Clerk:', syncError)
         return NextResponse.json({
@@ -84,7 +115,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Background login timestamp update (non-blocking)
+    // Background login timestamp update (non-blocking) - optimized with shorter timeouts
     // This replaces the separate /api/auth/update-last-login call for performance
     setImmediate(() => {
       safeDbOperation(async () => {
@@ -95,7 +126,7 @@ export async function POST(request: NextRequest) {
             updatedAt: nowWIB()
           })
           .where(eq(users.clerkId, userId))
-      }, { maxRetries: 1, delayMs: 1000 }, 3000)
+      }, { maxRetries: 1, delayMs: 500 }, 1500) // Reduced from 3000ms to 1500ms
       .catch(error => {
         console.warn('⚠️ Background login update failed:', error)
         // Don't throw - this is non-critical for user session
@@ -129,14 +160,21 @@ export async function POST(request: NextRequest) {
 
     // Handle unapproved users
     if (!user.canAccessDashboard) {
-      return NextResponse.json({
+      const unapprovedResponse = {
         ...sessionData,
         success: false,
         error: 'Account pending approval',
         needsApproval: true,
         redirectTo: '/pending-approval'
-      }, { status: 403 })
+      }
+      // Cache unapproved response too (shorter TTL)
+      setCachedData(cacheKey, unapprovedResponse, 60) // 1 minute for unapproved
+      return NextResponse.json(unapprovedResponse, { status: 403 })
     }
+
+    // Cache successful session data for future requests
+    setCachedData(cacheKey, sessionData, CACHE_TTL.USER_SESSION)
+      .catch(error => console.warn('⚠️ Failed to cache session data:', error))
 
     logDbPerformance('consolidated-user-session', startTime)
     

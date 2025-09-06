@@ -16,6 +16,16 @@ function AdminActions() {
   const { role: userRole, loading } = useRoleCache();
   const router = useRouter();
   const pathname = usePathname();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Don't render anything during SSR to prevent hydration mismatch
+  if (!isHydrated) {
+    return null;
+  }
 
   if (userRole !== "SUPERADMIN") {
     return null;
@@ -50,6 +60,12 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { role: userRole, loading: roleLoading } = useRoleCache();
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Prevent hydration mismatch by only rendering dynamic content after hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Base navigation for all authenticated users
   const baseNavItems = [
@@ -144,7 +160,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
           {/* Desktop Navigation */}
           {showNavigation && (
             <nav className="hidden lg:flex items-center space-x-8">
-              {navItems.map((item) => (
+              {isHydrated ? navItems.map((item) => (
                 <button
                   key={item.href}
                   onClick={() => handleNavigation(item.href)}
@@ -159,13 +175,20 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
                 >
                   {item.label}
                 </button>
-              ))}
+              )) : (
+                // Show skeleton/placeholder during SSR
+                <div className="flex items-center space-x-8">
+                  <div className="px-3 py-2 rounded-md text-sm font-medium text-gray-600">
+                    Beranda
+                  </div>
+                </div>
+              )}
 
               {/* Admin Actions - Only visible to admins */}
               <AdminActions />
 
               {/* Special Pengingat Button - Prominent button for all users */}
-              {user && (
+              {isHydrated && user && (
                 <button
                   onClick={() => handleNavigation("/dashboard/pengingat")}
                   className={`
@@ -185,15 +208,22 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
 
           {/* User Menu or Sign In */}
           <div className="flex items-center space-x-4">
-            {user ? (
-              <UserButton afterSignOutUrl="/sign-in" />
+            {isHydrated ? (
+              user ? (
+                <UserButton afterSignOutUrl="/sign-in" />
+              ) : (
+                <button
+                  onClick={() => router.push("/sign-in")}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                >
+                  Masuk
+                </button>
+              )
             ) : (
-              <button
-                onClick={() => router.push("/sign-in")}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors cursor-pointer"
-              >
+              // Show skeleton during SSR
+              <div className="bg-gray-200 text-transparent px-4 py-2 rounded-lg font-medium">
                 Masuk
-              </button>
+              </div>
             )}
           </div>
         </div>

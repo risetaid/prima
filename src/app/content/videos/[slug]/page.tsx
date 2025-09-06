@@ -5,11 +5,32 @@ import { eq, and, isNull } from 'drizzle-orm'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Calendar, Tag, Clock, Play, Share } from 'lucide-react'
-import { BackButton } from '@/components/ui/back-button'
+import { ContentHeader } from '@/components/content/ContentHeader'
 import { ShareButton } from '@/components/content/ShareButton'
 
 interface VideoPageProps {
   params: Promise<{ slug: string }>
+}
+
+// Generate static paths for all published videos
+export async function generateStaticParams() {
+  try {
+    const videos = await db
+      .select({ slug: cmsVideos.slug })
+      .from(cmsVideos)
+      .where(and(
+        eq(cmsVideos.status, 'published'),
+        isNull(cmsVideos.deletedAt)
+      ))
+      .limit(100) // Limit for build performance
+    
+    return videos.map((video) => ({
+      slug: video.slug,
+    }))
+  } catch (error) {
+    console.error('Error generating static params for videos:', error)
+    return []
+  }
 }
 
 async function getVideo(slug: string) {
@@ -29,6 +50,9 @@ async function getVideo(slug: string) {
 
   return video[0]
 }
+
+// Enable ISR with 1 hour revalidation  
+export const revalidate = 3600 // 1 hour in seconds
 
 export async function generateMetadata({ params }: VideoPageProps): Promise<Metadata> {
   const { slug } = await params
@@ -112,17 +136,10 @@ export default async function VideoPage({ params }: VideoPageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile-optimized header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <BackButton />
-            <ShareButton 
-              title={video.title}
-              text={video.description || 'Video edukasi kesehatan dari PRIMA'}
-            />
-          </div>
-        </div>
-      </header>
+      <ContentHeader 
+        title={video.title}
+        text={video.description || 'Video edukasi kesehatan dari PRIMA'}
+      />
 
       {/* Video content */}
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">

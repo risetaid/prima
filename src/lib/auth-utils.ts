@@ -87,6 +87,17 @@ export async function requireAuth(): Promise<AuthUser> {
   return user
 }
 
+// Safe version for API routes that returns null instead of throwing redirect
+export async function getAuthUser(): Promise<AuthUser | null> {
+  try {
+    const user = await getCurrentUser()
+    return user
+  } catch (error) {
+    console.warn('🔍 Auth: Failed to get authenticated user for API route:', error)
+    return null
+  }
+}
+
 export async function requireApprovedUser(): Promise<AuthUser> {
   const user = await requireAuth()
   

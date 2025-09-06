@@ -7,6 +7,7 @@ export const CACHE_TTL = {
   TEMPLATES: 600,      // 10 minutes
   AUTOFILL: 180,       // 3 minutes
   USER_PROFILE: 300,   // 5 minutes
+  USER_SESSION: 180,   // 3 minutes - aggressive caching for performance
   REMINDERS_ALL: 120,  // 2 minutes
 } as const
 
@@ -17,6 +18,7 @@ export const CACHE_KEYS = {
   templates: 'templates:all',
   autoFill: (patientId: string) => `autofill:${patientId}`,
   userProfile: (userId: string) => `user:${userId}`,
+  userSession: (clerkId: string) => `session:${clerkId}`,
   remindersAll: (patientId: string) => `reminders:${patientId}:all`,
   healthNotes: (patientId: string) => `health-notes:${patientId}`,
 } as const

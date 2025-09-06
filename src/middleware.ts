@@ -21,17 +21,7 @@ const isPublicRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl
-  const userAgent = req.headers.get('user-agent') || ''
-  const isMobile = /Mobile|Android|iPhone|iPad/i.test(userAgent)
   
-  // Enhanced debugging for all protected routes
-  if (pathname.startsWith('/dashboard')) {
-    try {
-      const { userId } = await auth()
-    } catch (error) {
-    }
-  }
-
   // Handle legacy route redirects
   if (pathname === '/pengingat') {
     const url = req.nextUrl.clone()
@@ -46,7 +36,17 @@ export default clerkMiddleware(async (auth, req) => {
 
   // Protect dashboard and API routes
   if (isProtectedRoute(req)) {
-    await auth.protect()
+    try {
+      await auth.protect()
+    } catch (error) {
+      // Only log non-redirect errors to reduce noise
+      if (!(error && typeof error === 'object' && 'digest' in error && (error as any).digest?.includes('REDIRECT'))) {
+        console.error('❌ Middleware: Auth protect failed for', pathname, error)
+      }
+      
+      // Re-throw the error to let Clerk handle it properly
+      throw error
+    }
   }
 
   return NextResponse.next()

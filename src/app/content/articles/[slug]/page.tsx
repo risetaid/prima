@@ -5,12 +5,33 @@ import { eq, and, isNull } from 'drizzle-orm'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Calendar, Tag, Clock } from 'lucide-react'
-import { BackButton } from '@/components/ui/back-button'
 import Image from 'next/image'
+import { ContentHeader } from '@/components/content/ContentHeader'
 import { ShareButton } from '@/components/content/ShareButton'
 
 interface ArticlePageProps {
   params: Promise<{ slug: string }>
+}
+
+// Generate static paths for all published articles
+export async function generateStaticParams() {
+  try {
+    const articles = await db
+      .select({ slug: cmsArticles.slug })
+      .from(cmsArticles)
+      .where(and(
+        eq(cmsArticles.status, 'published'),
+        isNull(cmsArticles.deletedAt)
+      ))
+      .limit(100) // Limit for build performance
+    
+    return articles.map((article) => ({
+      slug: article.slug,
+    }))
+  } catch (error) {
+    console.error('Error generating static params for articles:', error)
+    return []
+  }
 }
 
 async function getArticle(slug: string) {
@@ -30,6 +51,9 @@ async function getArticle(slug: string) {
 
   return article[0]
 }
+
+// Enable ISR with 1 hour revalidation
+export const revalidate = 3600 // 1 hour in seconds
 
 export async function generateMetadata({ params }: ArticlePageProps): Promise<Metadata> {
   const { slug } = await params
@@ -115,17 +139,10 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile-optimized header */}
-      <header className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <BackButton />
-            <ShareButton 
-              title={article.title}
-              text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
-            />
-          </div>
-        </div>
-      </header>
+      <ContentHeader 
+        title={article.title}
+        text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
+      />
 
       {/* Article content */}
       <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
