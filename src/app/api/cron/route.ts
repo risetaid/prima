@@ -102,7 +102,7 @@ async function processReminders() {
     
     const totalCount = totalCountResult[0]?.count || 0
 
-    let reminderSchedulesToProcess: Array<{id: string; patientId: string; medicationName: string; scheduledTime: string; startDate: Date; customMessage: string | null; patientName: string; patientPhoneNumber: string}> = []
+    let reminderSchedulesToProcess: Array<{id: string; patientId: string; medicationName: string; scheduledTime: string; startDate: Date; customMessage: string | null; patientName: string | null; patientPhoneNumber: string | null}> = []
     if (totalCount > batchSize) {
       // Process in batches to prevent memory overload
       for (let skip = 0; skip < totalCount; skip += batchSize) {
@@ -143,7 +143,7 @@ async function processReminders() {
           .limit(batchSize)
           .orderBy(reminderSchedules.scheduledTime) // Process by time order
 
-        // Transform to match Prisma structure
+        // Transform to match expected structure with null checks
         const formattedBatch = batch.map(item => ({
           id: item.id,
           patientId: item.patientId,
@@ -151,12 +151,9 @@ async function processReminders() {
           scheduledTime: item.scheduledTime,
           startDate: item.startDate,
           customMessage: item.customMessage,
-          patient: {
-            id: item.patientId,
-            name: item.patientName,
-            phoneNumber: item.patientPhoneNumber
-          }
-        }))
+          patientName: item.patientName,
+          patientPhoneNumber: item.patientPhoneNumber
+        })).filter(item => item.patientName && item.patientPhoneNumber)
         
         reminderSchedulesToProcess.push(...formattedBatch)
         
@@ -202,7 +199,7 @@ async function processReminders() {
         )
         .orderBy(reminderSchedules.scheduledTime)
 
-      // Transform to match Prisma structure
+      // Transform to match expected structure with null checks
       reminderSchedulesToProcess = allSchedules.map(item => ({
         id: item.id,
         patientId: item.patientId,
@@ -210,12 +207,9 @@ async function processReminders() {
         scheduledTime: item.scheduledTime,
         startDate: item.startDate,
         customMessage: item.customMessage,
-        patient: {
-          id: item.patientId,
-          name: item.patientName,
-          phoneNumber: item.patientPhoneNumber
-        }
-      }))
+        patientName: item.patientName,
+        patientPhoneNumber: item.patientPhoneNumber
+      })).filter(item => item.patientName && item.patientPhoneNumber)
     }
 
     for (const schedule of reminderSchedulesToProcess) {
@@ -228,7 +222,7 @@ async function processReminders() {
 
         if (shouldSend) {
           // Validate phone number exists
-          if (!schedule.patient.phoneNumber) {
+          if (!schedule.patientPhoneNumber) {
             errorCount++
             continue
           }
@@ -243,26 +237,26 @@ async function processReminders() {
           
           try {
             // Send WhatsApp message via Fonnte with phone validation
-            const messageBody = schedule.customMessage || `Halo ${schedule.patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
-            const formattedNumber = formatWhatsAppNumber(schedule.patient.phoneNumber)
+            const messageBody = schedule.customMessage || `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
+            const formattedNumber = formatWhatsAppNumber(schedule.patientPhoneNumber)
             
             const result = await sendWhatsAppMessage({
               to: formattedNumber,
               body: messageBody
             })
 
-            const providerLogMessage = `🔍 FONNTE result for ${schedule.patient.name}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
+            const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
             debugLogs.push(providerLogMessage)
 
             // Create reminder log
             const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
             const logData = {
               reminderScheduleId: schedule.id,
-              patientId: schedule.patient.id,
+              patientId: schedule.patientId,
               sentAt: getWIBTime(),
               status: status,
               message: messageBody,
-              phoneNumber: schedule.patient.phoneNumber,
+              phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId
             }
 
@@ -271,7 +265,7 @@ async function processReminders() {
               const createdLogResult = await db.insert(reminderLogs).values(logData).returning()
               // Log created successfully
             } catch (logError) {
-              console.error(`❌ Failed to create reminder log for ${schedule.patient.name}:`, logError)
+              console.error(`❌ Failed to create reminder log for ${schedule.patientName}:`, logError)
               console.error(`❌ Log data that failed:`, logData)
               errorCount++
               continue // Skip to next schedule

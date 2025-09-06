@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -77,11 +77,7 @@ export default function TemplateManagement() {
     category: 'REMINDER'
   })
 
-  useEffect(() => {
-    fetchTemplates()
-  }, [filterCategory, fetchTemplates])
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -103,7 +99,11 @@ export default function TemplateManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filterCategory])
+
+  useEffect(() => {
+    fetchTemplates()
+  }, [filterCategory, fetchTemplates])
 
   const resetForm = () => {
     setFormData({

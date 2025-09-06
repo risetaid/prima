@@ -27,7 +27,7 @@ export async function dbOperationWithRetry<T>(
     try {
       return await operation()
     } catch (error: unknown) {
-      lastError = error
+      lastError = error instanceof Error ? error : new Error(String(error))
       
       // Check if this is a retryable error
       const isRetryableError = error && typeof error === 'object' && 'code' in error && timeoutCodes.some(code => 

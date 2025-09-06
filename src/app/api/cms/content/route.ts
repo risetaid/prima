@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
         articleConditions.push(eq(cmsArticles.status, status as 'draft' | 'published' | 'archived'))
       }
 
-      articles = await db
+      const articleResults = await db
         .select({
           id: cmsArticles.id,
           title: cmsArticles.title,
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         .limit(type === 'articles' ? limit : Math.ceil(limit / 2))
       
       // Add type after query
-      articles = articles.map(article => ({ ...article, type: 'article' as const }))
+      articles = articleResults.map(article => ({ ...article, type: 'article' as const }))
     }
 
     // Get videos (exclude deleted)
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         videoConditions.push(eq(cmsVideos.status, status as 'draft' | 'published' | 'archived'))
       }
 
-      videos = await db
+      const videoResults = await db
         .select({
           id: cmsVideos.id,
           title: cmsVideos.title,
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         .limit(type === 'videos' ? limit : Math.ceil(limit / 2))
       
       // Add type after query
-      videos = videos.map(video => ({ ...video, type: 'video' as const }))
+      videos = videoResults.map(video => ({ ...video, type: 'video' as const }))
     }
 
     // Combine and sort by updated date

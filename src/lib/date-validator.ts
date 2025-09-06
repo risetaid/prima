@@ -14,7 +14,7 @@ export function validateAndParseDate(dateString: unknown, fieldName: string = 'd
     throw new Error(`Invalid ${fieldName}: ${dateString}. Must be a valid ISO date string (YYYY-MM-DD).`)
   }
   
-  return new Date(dateString)
+  return new Date(dateString as string)
 }
 
 export function isReasonableDate(date: Date, fieldName: string = 'date'): boolean {

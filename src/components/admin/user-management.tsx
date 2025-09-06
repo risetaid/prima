@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,16 +32,6 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
-
-  useEffect(() => {
-    fetchUsers()
-    // Auto-sync when Superadmin Panel opens
-    const autoSync = setTimeout(() => {
-      handleClerkSync()
-    }, 1000) // Delay 1 second after initial load
-
-    return () => clearTimeout(autoSync)
-  }, [handleClerkSync])
 
   const fetchUsers = async () => {
     try {
@@ -211,7 +201,7 @@ export default function UserManagement() {
     }
   }
 
-  const handleClerkSync = async () => {
+  const handleClerkSync = useCallback(async () => {
     if (syncing) return // Prevent multiple simultaneous syncs
     
     try {
@@ -256,7 +246,17 @@ export default function UserManagement() {
     } finally {
       setSyncing(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchUsers()
+    // Auto-sync when Superadmin Panel opens
+    const autoSync = setTimeout(() => {
+      handleClerkSync()
+    }, 1000) // Delay 1 second after initial load
+
+    return () => clearTimeout(autoSync)
+  }, [handleClerkSync])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
