@@ -22,6 +22,7 @@ export default function SignInPage() {
         {/* Sign In Form */}
         <div className="flex justify-center">
           <SignIn 
+            afterSignInUrl="/dashboard"
             appearance={{
               elements: {
                 rootBox: "w-full",

@@ -1,7 +1,7 @@
-import { createClient } from 'redis'
+import { createClient, RedisClientType } from 'redis'
 
 class RedisClient {
-  private client: any = null
+  private client: RedisClientType | null = null
   private isConnecting: boolean = false
 
   constructor() {

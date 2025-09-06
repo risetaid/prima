@@ -40,7 +40,7 @@ export default clerkMiddleware(async (auth, req) => {
       await auth.protect()
     } catch (error) {
       // Only log non-redirect errors to reduce noise
-      if (!(error && typeof error === 'object' && 'digest' in error && (error as any).digest?.includes('REDIRECT'))) {
+      if (!(error && typeof error === 'object' && 'digest' in error && typeof (error as { digest?: string }).digest === 'string' && (error as { digest: string }).digest.includes('REDIRECT'))) {
         console.error('❌ Middleware: Auth protect failed for', pathname, error)
       }
       

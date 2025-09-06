@@ -1,14 +1,13 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Shield, Users, MessageSquareText, Settings, Bug, ChevronRight, AlertCircle, FlaskConical } from "lucide-react";
+import { Shield, Users, MessageSquareText, Settings, ChevronRight, AlertCircle, FlaskConical } from "lucide-react";
 import { DesktopHeader } from "@/components/ui/desktop-header";
 import { toast } from "sonner";
 
 export default function AdminPanelPage() {
-  const { user } = useUser();
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,17 +131,6 @@ export default function AdminPanelPage() {
   ];
 
   const developmentTools = [
-    {
-      title: "Debug Webhook",
-      description: "Test dan debug integrasi WhatsApp",
-      icon: Bug,
-      color: "bg-orange-500",
-      hoverColor: "hover:bg-orange-600",
-      path: "/debug-webhook",
-      badge: null,
-      badgeColor: "",
-      stats: "Development Only"
-    },
     {
       title: "Test WhatsApp API",
       description: "Testing pengiriman pesan WhatsApp langsung",

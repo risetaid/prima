@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, reminderSchedules, reminderLogs, patients } from '@/db'
 import { eq, and, gte, lt, desc, inArray } from 'drizzle-orm'
-import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
+import { shouldSendReminderNow, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 async function debugCron() {
   try {
-    const nowWIB = getWIBTime()
+    // const nowWIB = getWIBTime()
     const todayWIB = getWIBDateString()
     const currentTimeWIB = getWIBTimeString()
 
@@ -174,6 +174,11 @@ async function debugReminderLogs() {
     })
 
     // Group logs by schedule
+    type LogWithDetails = typeof todayLogsData[0] & {
+      reminderSchedule: typeof scheduleDetails[0] | undefined;
+      patient: typeof patientDetails[0] | undefined;
+    }
+    
     const logsBySchedule = todayLogsData.reduce((acc, log) => {
       const scheduleId = log.reminderScheduleId || 'no-schedule'
       if (!acc[scheduleId]) {
@@ -185,7 +190,7 @@ async function debugReminderLogs() {
         patient: patientMap.get(log.patientId)
       })
       return acc
-    }, {} as Record<string, any[]>)
+    }, {} as Record<string, LogWithDetails[]>)
 
     // Get today's schedules
     const todayEndTime = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)

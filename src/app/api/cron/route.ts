@@ -262,7 +262,7 @@ async function processReminders() {
 
             // Create reminder log with error handling
             try {
-              const createdLogResult = await db.insert(reminderLogs).values(logData).returning()
+              await db.insert(reminderLogs).values(logData).returning()
               // Log created successfully
             } catch (logError) {
               console.error(`❌ Failed to create reminder log for ${schedule.patientName}:`, logError)
@@ -310,7 +310,7 @@ async function processReminders() {
 
     return NextResponse.json(summary)
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Internal server error',

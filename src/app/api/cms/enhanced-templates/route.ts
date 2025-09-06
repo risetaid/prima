@@ -4,7 +4,7 @@ import { db, cmsArticles, cmsVideos } from '@/db'
 import { eq } from 'drizzle-orm'
 
 // Enhanced reminder templates with CMS content integration
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const user = await getCurrentUser()
     
@@ -12,9 +12,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
-    // Get type and category from search params (available for future use)
-    const _type = searchParams.get('type') || 'all' // template, article, video, all
+    // Future: Add filtering by type and category from search params
+    // const { searchParams } = new URL(request.url)
+    // const type = searchParams.get('type') || 'all' // template, article, video, all
 
     // Enhanced template suggestions with content integration
     const enhancedTemplates = [
