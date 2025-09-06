@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, whatsappTemplates, cmsArticles, cmsVideos } from '@/db'
-import { eq, and, or, ilike } from 'drizzle-orm'
+import { db, cmsArticles, cmsVideos } from '@/db'
+import { eq } from 'drizzle-orm'
 
 // Enhanced reminder templates with CMS content integration
 export async function GET(request: NextRequest) {
@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const type = searchParams.get('type') || 'all' // template, article, video, all
-    const category = searchParams.get('category') || ''
+    // Get type and category from search params (available for future use)
+    const _type = searchParams.get('type') || 'all' // template, article, video, all
 
     // Enhanced template suggestions with content integration
     const enhancedTemplates = [

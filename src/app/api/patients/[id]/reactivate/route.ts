@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, verificationLogs } from '@/db'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 // Reactivate patient after BERHENTI (unsubscribe)
 export async function POST(

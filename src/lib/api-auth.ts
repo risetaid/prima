@@ -1,9 +1,9 @@
-import { NextRequest } from 'next/server'
+// Authentication utilities
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
 
-export async function getAuthenticatedUser(request?: NextRequest) {
+export async function getAuthenticatedUser() {
   try {
     const { userId } = await auth()
     const user = await currentUser()

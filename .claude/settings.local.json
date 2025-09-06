@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir E:PortfolioWebprimasrcappdashboard)",
+      "Bash(bun run lint:*)",
+      "Bash(bun lint:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -54,7 +54,7 @@ export const createWIBDateTime = (dateStr: string, timeStr: string): Date => {
  * Only send within a 10-minute window after the scheduled time
  */
 export const shouldSendReminderNow = (startDate: string, scheduledTime: string): boolean => {
-  const nowWIB = getWIBTime()
+  // const nowWIB = getWIBTime() // Available for future use
   const todayWIB = getWIBDateString()
   const currentTimeWIB = getWIBTimeString()
   

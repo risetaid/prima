@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin, type AdminUser } from '@/lib/auth-utils'
+import { requireAdmin } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
 
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const admin: AdminUser = await requireAdmin()
+    await requireAdmin()
 
     const { userId } = await params
 
@@ -29,7 +29,7 @@ export async function POST(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const user = userResult[0]
+    // User found, proceed with deletion
 
     // Delete the user (reject means remove from system)
     await db
@@ -41,7 +41,7 @@ export async function POST(
       message: 'User rejected and removed from system'
     })
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

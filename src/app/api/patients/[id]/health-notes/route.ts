@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth-utils'
 import { db, patients, healthNotes, users } from '@/db'
-import { eq, and, isNull, desc, sql, inArray } from 'drizzle-orm'
+import { eq, and, isNull, desc, inArray } from 'drizzle-orm'
 
 // GET /api/patients/[id]/health-notes - Get all health notes for a patient
 export async function GET(

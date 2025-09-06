@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates, users } from '@/db'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 export async function GET(
   request: NextRequest,
@@ -139,7 +139,7 @@ export async function PUT(
       )
     }
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     
     if (templateName !== undefined) updateData.templateName = templateName
     if (templateText !== undefined) updateData.templateText = templateText

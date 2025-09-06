@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, patients, users, reminderLogs, manualConfirmations } from '@/db'
-import { eq, and, isNull, isNotNull, or, like, ilike, sql, count, inArray } from 'drizzle-orm'
+import { eq, and, isNull, isNotNull, or, ilike, count, inArray } from 'drizzle-orm'
 import { getAuthUser, getUserPatients } from '@/lib/auth-utils'
 import { validateBirthDate, validateAndParseDate } from '@/lib/date-validator'
-import { validateString, validateBoolean } from '@/lib/type-validator'
+import { validateString } from '@/lib/type-validator'
 
 export async function GET(request: NextRequest) {
   try {

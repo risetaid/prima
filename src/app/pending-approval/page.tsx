@@ -8,8 +8,8 @@ import { UserButton } from '@clerk/nextjs'
 export default function PendingApprovalPage() {
   const { user } = useUser()
   const router = useRouter()
-  const [userData, setUserData] = useState<any>(null)
-  const [superadminContact, setSuperadminContact] = useState<any>(null)
+  const [userData, setUserData] = useState<{firstName?: string; lastName?: string; email?: string; role?: string; canAccessDashboard?: boolean} | null>(null)
+  const [superadminContact, setSuperadminContact] = useState<{name?: string; email?: string; hospitalName?: string} | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

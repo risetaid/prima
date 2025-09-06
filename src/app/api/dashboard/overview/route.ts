@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, patients, users, reminderLogs, manualConfirmations } from '@/db'
+import { NextResponse } from 'next/server'
+import { db, patients, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, isNull, count, sql, inArray } from 'drizzle-orm'
 import { getCurrentUser } from '@/lib/auth-utils'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser()
     if (!user || !user.canAccessDashboard) {

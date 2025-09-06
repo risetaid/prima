@@ -264,7 +264,7 @@ export default function CreateVideoPage() {
                 </div>
                 {errors.videoUrl && <p className="text-sm text-red-600 mt-1">{errors.videoUrl}</p>}
                 <p className="text-sm text-gray-500 mt-1">
-                  Klik "Auto-fetch" untuk mengambil data video secara otomatis
+                  Klik &quot;Auto-fetch&quot; untuk mengambil data video secara otomatis
                 </p>
               </div>
 

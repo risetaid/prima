@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     // Use sender as phone number (Fonnte format)
     const phone = sender
     
-    // Try to match phone number in both formats (international and local)
-    let phoneToMatch = phone
+    // Try to match phone number in both formats (international and local)  
+    const phoneToMatch = phone
     let alternativePhone = ''
     
     // If phone starts with 62, also try with 0

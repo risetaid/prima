@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates, users } from '@/db'
-import { eq, and, asc, sql, inArray } from 'drizzle-orm'
+import { eq, and, asc, inArray } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {

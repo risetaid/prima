@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdmin, type AdminUser } from '@/lib/auth-utils'
+import { requireAdmin } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
 
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
-    const admin: AdminUser = await requireAdmin()
+    await requireAdmin()
 
     const { userId } = await params
 
@@ -62,7 +62,7 @@ export async function POST(
       user: updatedUser
     })
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

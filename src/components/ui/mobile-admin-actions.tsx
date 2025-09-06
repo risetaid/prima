@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Shield, FileText, Calendar, Users, Newspaper, Video, UserCheck } from "lucide-react";
+import { Shield, FileText, Calendar, Newspaper, Video, UserCheck } from "lucide-react";
 import { useRoleCache } from "@/lib/role-cache";
 
 interface MobileAdminActionsProps {

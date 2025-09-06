@@ -15,7 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed:templates": "bun run scripts/seed-templates.ts"
+    "seed": "bun run scripts/seed-all.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.6",
@@ -56,7 +56,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@payloadcms/eslint-config": "^3.28.0",
     "drizzle-kit": "^0.24.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
@@ -70,11 +69,8 @@
   },
   "trustedDependencies": [
     "@clerk/shared",
-    "@prisma/client",
-    "@prisma/engines",
     "@tailwindcss/oxide",
     "esbuild",
-    "prisma",
     "sharp",
     "unrs-resolver"
   ]

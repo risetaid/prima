@@ -1,5 +1,5 @@
 // Date validation utilities to prevent data corruption
-export function isValidDate(dateString: any): boolean {
+export function isValidDate(dateString: unknown): boolean {
   if (!dateString) return false
   if (typeof dateString !== 'string') return false
   
@@ -7,7 +7,7 @@ export function isValidDate(dateString: any): boolean {
   return !isNaN(date.getTime()) && date.toISOString().startsWith(dateString.substring(0, 10))
 }
 
-export function validateAndParseDate(dateString: any, fieldName: string = 'date'): Date | null {
+export function validateAndParseDate(dateString: unknown, fieldName: string = 'date'): Date | null {
   if (!dateString) return null
   
   if (!isValidDate(dateString)) {
@@ -29,7 +29,7 @@ export function isReasonableDate(date: Date, fieldName: string = 'date'): boolea
   return true
 }
 
-export function validateBirthDate(dateString: any): Date | null {
+export function validateBirthDate(dateString: unknown): Date | null {
   if (!dateString) return null
   
   const date = validateAndParseDate(dateString, 'birth date')
@@ -45,7 +45,7 @@ export function validateBirthDate(dateString: any): Date | null {
   return date
 }
 
-export function validateFutureDate(dateString: any, fieldName: string = 'date'): Date {
+export function validateFutureDate(dateString: unknown, fieldName: string = 'date'): Date {
   const date = validateAndParseDate(dateString, fieldName)
   if (!date) throw new Error(`${fieldName} is required`)
   

@@ -1,5 +1,5 @@
 // Type validation utilities to prevent data corruption
-export function validateBoolean(value: any, fieldName: string, defaultValue: boolean = false): boolean {
+export function validateBoolean(value: unknown, fieldName: string, defaultValue: boolean = false): boolean {
   if (value === undefined || value === null) {
     return defaultValue
   }
@@ -25,7 +25,7 @@ export function validateBoolean(value: any, fieldName: string, defaultValue: boo
   throw new Error(`Invalid ${fieldName}: expected boolean, got ${typeof value}`)
 }
 
-export function validateString(value: any, fieldName: string, options: { 
+export function validateString(value: unknown, fieldName: string, options: { 
   required?: boolean, 
   minLength?: number, 
   maxLength?: number,
@@ -63,7 +63,7 @@ export function validateString(value: any, fieldName: string, options: {
   return trimmed.length === 0 ? null : trimmed
 }
 
-export function validateNumber(value: any, fieldName: string, options: {
+export function validateNumber(value: unknown, fieldName: string, options: {
   required?: boolean,
   min?: number,
   max?: number,

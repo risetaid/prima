@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, reminderLogs, manualConfirmations } from '@/db'
-import { eq, and, isNull, count, sql, inArray } from 'drizzle-orm'
+import { eq, and, isNull, count, inArray } from 'drizzle-orm'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const user = await getCurrentUser()
     if (!user) {

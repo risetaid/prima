@@ -1,5 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server'
-import { db, users, patients, manualConfirmations, reminderLogs, reminderSchedules } from '@/db'
+import { db, users, patients } from '@/db'
 import { redirect } from 'next/navigation'
 import { eq, and, isNull, desc, asc } from 'drizzle-orm'
 import type { User } from '@/db/schema'
@@ -39,15 +39,17 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
           .where(eq(users.clerkId, userId))
           .limit(1)
         break
-      } catch (dbError: any) {
+      } catch (dbError: unknown) {
         retries--
-        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, dbError.message)
+        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
+        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, errorMessage)
         
         // Retry on various database errors
-        if ((dbError.code === 'CONNECT_TIMEOUT' || 
-             dbError.code === 'CONNECTION_REFUSED' || 
-             dbError.message?.includes('connection') ||
-             dbError.message?.includes('timeout')) && retries > 0) {
+        if (((dbError && typeof dbError === 'object' && 'code' in dbError && (
+             (dbError as {code: string}).code === 'CONNECT_TIMEOUT' || 
+             (dbError as {code: string}).code === 'CONNECTION_REFUSED')) || 
+             errorMessage.includes('connection') ||
+             errorMessage.includes('timeout')) && retries > 0) {
           await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
           continue
         }

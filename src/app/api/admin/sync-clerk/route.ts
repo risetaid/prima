@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/timezone'
 import { clerkClient } from '@clerk/nextjs/server'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {

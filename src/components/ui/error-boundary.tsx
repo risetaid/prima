@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   getContextualError() {
     const { context } = this.props
-    const { error } = this.state
+    // const { error } = this.state
 
     // Healthcare-specific error messages
     const contextualErrors = {

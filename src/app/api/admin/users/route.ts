@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq, desc, asc } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const currentUser = await getCurrentUser()
     if (!currentUser) {

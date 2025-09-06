@@ -102,7 +102,7 @@ async function processReminders() {
     
     const totalCount = totalCountResult[0]?.count || 0
 
-    let reminderSchedulesToProcess: any[] = []
+    let reminderSchedulesToProcess: Array<{id: string; patientId: string; medicationName: string; scheduledTime: string; startDate: Date; customMessage: string | null; patientName: string; patientPhoneNumber: string}> = []
     if (totalCount > batchSize) {
       // Process in batches to prevent memory overload
       for (let skip = 0; skip < totalCount; skip += batchSize) {
@@ -269,7 +269,7 @@ async function processReminders() {
             // Create reminder log with error handling
             try {
               const createdLogResult = await db.insert(reminderLogs).values(logData).returning()
-              const createdLog = createdLogResult[0]
+              // Log created successfully
             } catch (logError) {
               console.error(`❌ Failed to create reminder log for ${schedule.patient.name}:`, logError)
               console.error(`❌ Log data that failed:`, logData)
@@ -282,12 +282,12 @@ async function processReminders() {
             } else {
               errorCount++
             }
-          } catch (phoneError) {
+          } catch {
             errorCount++
             continue
           }
         }
-      } catch (scheduleError) {
+      } catch {
         errorCount++
       }
     }

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 export default function DebugAuth() {
   const { user, isLoaded } = useUser()
   const { isSignedIn, userId } = useAuth()
-  const [apiResult, setApiResult] = useState<any>(null)
+  const [apiResult, setApiResult] = useState<unknown>(null)
 
   useEffect(() => {
     if (isLoaded) {
@@ -21,7 +21,7 @@ export default function DebugAuth() {
           setApiResult({ error: err.message })
         })
     }
-  }, [isLoaded, user])
+  }, [isLoaded])
 
   if (!isLoaded) {
     return <div>Loading...</div>

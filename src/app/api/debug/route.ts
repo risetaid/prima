@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, reminderSchedules, reminderLogs, patients } from '@/db'
-import { eq, and, gte, lt, isNull, desc, sql, inArray } from 'drizzle-orm'
+import { eq, and, gte, lt, desc, inArray } from 'drizzle-orm'
 import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
 
 export async function GET(request: NextRequest) {

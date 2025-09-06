@@ -63,11 +63,11 @@ export async function GET(request: NextRequest) {
     }
     
     if (category) {
-      whereConditions.push(eq(cmsArticles.category, category as any))
+      whereConditions.push(eq(cmsArticles.category, category as 'general' | 'nutrisi' | 'olahraga' | 'motivational' | 'medical' | 'faq' | 'testimoni'))
     }
     
     if (status) {
-      whereConditions.push(eq(cmsArticles.status, status as any))
+      whereConditions.push(eq(cmsArticles.status, status as 'draft' | 'published' | 'archived'))
     }
 
     const whereClause = and(...whereConditions)
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     const validatedData = createArticleSchema.parse(body)
     
     // Generate slug if not provided or auto-generate from title
-    let slug = validatedData.slug || generateSlug(validatedData.title)
+    const slug = validatedData.slug || generateSlug(validatedData.title)
     
     // Ensure slug is unique
     let slugSuffix = 0

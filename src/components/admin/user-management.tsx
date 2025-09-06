@@ -41,7 +41,7 @@ export default function UserManagement() {
     }, 1000) // Delay 1 second after initial load
 
     return () => clearTimeout(autoSync)
-  }, [])
+  }, [handleClerkSync])
 
   const fetchUsers = async () => {
     try {
@@ -311,7 +311,7 @@ export default function UserManagement() {
   }
 
   const pendingUsers = users.filter(user => !user.isApproved)
-  const approvedUsers = users.filter(user => user.isApproved)
+  // const approvedUsers = users.filter(user => user.isApproved) // Not currently used
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-8">

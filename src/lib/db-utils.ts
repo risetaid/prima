@@ -26,12 +26,12 @@ export async function dbOperationWithRetry<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await operation()
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error
       
       // Check if this is a retryable error
-      const isRetryableError = timeoutCodes.some(code => 
-        error.code === code || error.errno === code
+      const isRetryableError = error && typeof error === 'object' && 'code' in error && timeoutCodes.some(code => 
+        (error as {code: string}).code === code || ('errno' in error && (error as {errno: string}).errno === code)
       )
       
       if (isRetryableError && attempt < maxRetries) {
@@ -81,7 +81,7 @@ export async function safeDbOperation<T>(
 /**
  * Log database performance metrics with enhanced monitoring
  */
-export function logDbPerformance(operationName: string, startTime: number, additionalInfo?: any) {
+export function logDbPerformance(operationName: string, startTime: number, additionalInfo?: unknown) {
   const duration = Date.now() - startTime
   
   // Log slow operations (over 1 second)
@@ -182,7 +182,7 @@ export async function checkDatabaseHealth() {
   
   try {
     // Simple health check query
-    const result = await safeDbOperation(
+    await safeDbOperation(
       async () => {
         // This is a lightweight query to test connection - will be implemented when needed
         console.log('Database health check - connection test')

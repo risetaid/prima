@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { ComponentType, Suspense } from 'react'
+import { ComponentType } from 'react'
 import { 
   DashboardStatsCardsSkeleton, 
   CMSContentListSkeleton, 
@@ -51,7 +51,7 @@ const getLoadingComponent = (type: LoadingComponent) => {
 /**
  * Create a lazy-loaded component with appropriate loading state
  */
-export function createLazyComponent<T = any>(
+export function createLazyComponent<T = Record<string, unknown>>(
   importFn: () => Promise<{ default: ComponentType<T> }>,
   loadingType: LoadingComponent = 'default',
   options?: {
@@ -67,7 +67,7 @@ export function createLazyComponent<T = any>(
 /**
  * Create a lazy-loaded page component with background and header structure
  */
-export function createLazyPageComponent<T = any>(
+export function createLazyPageComponent<T = Record<string, unknown>>(
   importFn: () => Promise<{ default: ComponentType<T> }>,
   loadingType: LoadingComponent = 'default',
   options?: {

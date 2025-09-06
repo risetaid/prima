@@ -57,7 +57,7 @@ export async function isUserAdmin(): Promise<boolean> {
   try {
     const user = await getCurrentUser()
     return user?.role === 'ADMIN'
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -66,7 +66,7 @@ export async function isUserAdmin(): Promise<boolean> {
  * Admin access validation for API routes
  */
 export function createAdminMiddleware() {
-  return async (req: Request) => {
+  return async () => {
     try {
       await requireAdminAccess()
       return null // No error, continue

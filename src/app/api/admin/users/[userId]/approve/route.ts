@@ -61,7 +61,7 @@ export async function POST(
       user: updatedUser
     })
 
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Internal server error'

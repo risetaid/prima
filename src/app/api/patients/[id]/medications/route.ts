@@ -4,7 +4,7 @@ import { db, patientMedications, medications } from '@/db'
 import { eq, and, desc, sql } from 'drizzle-orm'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

@@ -1,11 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
-import { nowWIB } from '@/lib/datetime'
 import { safeDbOperation, logDbPerformance } from '@/lib/db-utils'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   const startTime = Date.now()
   
   try {
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
     logDbPerformance('user-login-check', startTime)
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch {
     
     // Return success to not block user authentication flow
     return NextResponse.json({ 

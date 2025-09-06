@@ -192,7 +192,7 @@ export function isPWAInstalled(): boolean {
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
   
   // Check for iOS PWA
-  const isIOSPWA = 'standalone' in (window.navigator as any) && (window.navigator as any).standalone
+  const isIOSPWA = 'standalone' in window.navigator && (window.navigator as {standalone?: boolean}).standalone
   
   // Check for Android PWA
   const isAndroidPWA = document.referrer.includes('android-app://')
@@ -308,7 +308,7 @@ function showOfflineToast() {
   // })
 }
 
-function showInstallButton(deferredPrompt: PWAInstallPrompt) {
+function showInstallButton(_deferredPrompt: PWAInstallPrompt) {
   console.log('📲 PWA: Showing install button')
   
   // You can show an install button in your UI
@@ -331,7 +331,7 @@ export function getNetworkStatus() {
 
   return {
     online: navigator.onLine,
-    effectiveType: (navigator as any).connection?.effectiveType || 'unknown'
+    effectiveType: (navigator as {connection?: {effectiveType?: string}}).connection?.effectiveType || 'unknown'
   }
 }
 

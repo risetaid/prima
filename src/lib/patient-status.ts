@@ -8,7 +8,7 @@ export interface PatientStatusInfo {
   actionable: boolean
 }
 
-export function getPatientDisplayStatus(patient: any): PatientStatusInfo {
+export function getPatientDisplayStatus(patient: {verificationStatus?: string; isActive?: boolean; lastVerificationResponse?: string | null; lastVerificationAt?: Date | null}): PatientStatusInfo {
   // Priority order: BERHENTI > Verified > Declined > Pending > Expired > Unknown
   
   // BERHENTI: Unsubscribed patients (declined + inactive)

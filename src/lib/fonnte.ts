@@ -34,7 +34,7 @@ export const sendWhatsAppMessage = async (
   }
 
   try {
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       target: message.to,
       message: message.body
     }
@@ -193,7 +193,7 @@ _Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_`
  */
 export const validateFonnteWebhook = (
   signature: string,
-  body: any
+  _body: unknown
 ): boolean => {
   if (!FONNTE_TOKEN) return false
   

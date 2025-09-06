@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsArticles, cmsVideos } from '@/db'
-import { eq, desc, and, or, ilike, count, isNull } from 'drizzle-orm'
+import { eq, desc, and, count, isNull } from 'drizzle-orm'
 
 // GET - Combined content feed for dashboard overview
 export async function GET(request: NextRequest) {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
 
     // Get articles (exclude deleted)
-    let articles: any[] = []
+    let articles: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; type: 'article'}> = []
     if (type === 'all' || type === 'articles') {
       const articleConditions = [
         // Exclude soft-deleted articles
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       ]
       
       if (status !== 'all') {
-        articleConditions.push(eq(cmsArticles.status, status as any))
+        articleConditions.push(eq(cmsArticles.status, status as 'draft' | 'published' | 'archived'))
       }
 
       articles = await db
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get videos (exclude deleted)
-    let videos: any[] = []
+    let videos: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; type: 'video'}> = []
     if (type === 'all' || type === 'videos') {
       const videoConditions = [
         // Exclude soft-deleted videos
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
       ]
       
       if (status !== 'all') {
-        videoConditions.push(eq(cmsVideos.status, status as any))
+        videoConditions.push(eq(cmsVideos.status, status as 'draft' | 'published' | 'archived'))
       }
 
       videos = await db
