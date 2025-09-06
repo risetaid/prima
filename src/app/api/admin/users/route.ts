@@ -40,7 +40,7 @@ export async function GET() {
         approverEmail: approver.email
       })
       .from(users)
-      .leftJoin(approver, eq(users.approvedBy, approver.id)) // Self-join for approver info with alias
+      .leftJoin(approver, eq(users.approvedBy, approver.id))
       .orderBy(
         asc(users.isApproved), // Pending approvals first
         desc(users.createdAt)

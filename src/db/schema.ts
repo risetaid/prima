@@ -5,7 +5,8 @@ import {
   boolean, 
   uuid, 
   pgEnum,
-  index
+  index,
+  foreignKey
 } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 
@@ -47,6 +48,12 @@ export const users = pgTable('users', {
   roleActiveApprovedIdx: index('users_role_active_approved_idx').on(table.role, table.isActive, table.isApproved),
   clerkIdApprovedActiveIdx: index('users_clerk_approved_active_idx').on(table.clerkId, table.isApproved, table.isActive),
   lastLoginIdx: index('users_last_login_idx').on(table.lastLoginAt),
+  // Self-reference foreign key for approvedBy
+  approvedByFk: foreignKey({
+    columns: [table.approvedBy],
+    foreignColumns: [table.id],
+    name: 'users_approved_by_users_id_fk'
+  })
 }))
 
 export const patients = pgTable('patients', {
@@ -57,7 +64,7 @@ export const patients = pgTable('patients', {
   birthDate: timestamp('birth_date', { withTimezone: true }),
   diagnosisDate: timestamp('diagnosis_date', { withTimezone: true }),
   cancerStage: cancerStageEnum('cancer_stage'),
-  assignedVolunteerId: uuid('assigned_volunteer_id'),
+  assignedVolunteerId: uuid('assigned_volunteer_id').references(() => users.id),
   emergencyContactName: text('emergency_contact_name'),
   emergencyContactPhone: text('emergency_contact_phone'),
   notes: text('notes'),
@@ -85,12 +92,12 @@ export const patients = pgTable('patients', {
 
 export const medicalRecords = pgTable('medical_records', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   recordType: medicalRecordTypeEnum('record_type').notNull(),
   title: text('title').notNull(),
   description: text('description').notNull(),
   recordedDate: timestamp('recorded_date', { withTimezone: true }).notNull(),
-  recordedBy: uuid('recorded_by').notNull(),
+  recordedBy: uuid('recorded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -102,21 +109,21 @@ export const medications = pgTable('medications', {
 
 export const patientMedications = pgTable('patient_medications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
-  medicationId: uuid('medication_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
+  medicationId: uuid('medication_id').notNull().references(() => medications.id),
   dosage: text('dosage').notNull(),
   frequency: text('frequency').notNull(),
   instructions: text('instructions'),
   startDate: timestamp('start_date', { withTimezone: true }).notNull(),
   endDate: timestamp('end_date', { withTimezone: true }),
   isActive: boolean('is_active').notNull().default(true),
-  createdBy: uuid('created_by').notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
 export const reminderSchedules = pgTable('reminder_schedules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   medicationName: text('medication_name').notNull(),
   dosage: text('dosage'),
   doctorName: text('doctor_name'),
@@ -126,7 +133,7 @@ export const reminderSchedules = pgTable('reminder_schedules', {
   endDate: timestamp('end_date', { withTimezone: true }),
   customMessage: text('custom_message'),
   isActive: boolean('is_active').notNull().default(true),
-  createdById: uuid('created_by_id').notNull(),
+  createdById: uuid('created_by_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -140,8 +147,8 @@ export const reminderSchedules = pgTable('reminder_schedules', {
 
 export const reminderLogs = pgTable('reminder_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  reminderScheduleId: uuid('reminder_schedule_id'),
-  patientId: uuid('patient_id').notNull(),
+  reminderScheduleId: uuid('reminder_schedule_id').references(() => reminderSchedules.id),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   message: text('message').notNull(),
   phoneNumber: text('phone_number').notNull(),
   sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
@@ -159,10 +166,10 @@ export const reminderLogs = pgTable('reminder_logs', {
 
 export const manualConfirmations = pgTable('manual_confirmations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
-  volunteerId: uuid('volunteer_id').notNull(),
-  reminderScheduleId: uuid('reminder_schedule_id'),
-  reminderLogId: uuid('reminder_log_id'),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
+  volunteerId: uuid('volunteer_id').notNull().references(() => users.id),
+  reminderScheduleId: uuid('reminder_schedule_id').references(() => reminderSchedules.id),
+  reminderLogId: uuid('reminder_log_id').references(() => reminderLogs.id),
   visitDate: timestamp('visit_date', { withTimezone: true }).notNull(),
   visitTime: text('visit_time').notNull(),
   medicationsTaken: boolean('medications_taken').notNull(),
@@ -190,7 +197,7 @@ export const whatsappTemplates = pgTable('whatsapp_templates', {
   variables: text('variables').array().notNull().default([]),
   category: templateCategoryEnum('category').notNull().default('REMINDER'),
   isActive: boolean('is_active').notNull().default(true),
-  createdBy: uuid('created_by').notNull(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -202,10 +209,10 @@ export const whatsappTemplates = pgTable('whatsapp_templates', {
 
 export const healthNotes = pgTable('health_notes', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   note: text('note').notNull(),
   noteDate: timestamp('note_date', { withTimezone: true }).notNull(),
-  recordedBy: uuid('recorded_by').notNull(),
+  recordedBy: uuid('recorded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
@@ -216,13 +223,13 @@ export const healthNotes = pgTable('health_notes', {
 
 export const patientVariables = pgTable('patient_variables', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   variableName: text('variable_name').notNull(), // nama, obat, dosis, dokter, etc
   variableValue: text('variable_value').notNull(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  createdById: uuid('created_by_id').notNull(),
+  createdById: uuid('created_by_id').notNull().references(() => users.id),
 }, (table) => ({
   patientVarIdx: index('patient_variables_patient_idx').on(table.patientId),
   patientVarNameIdx: index('patient_variables_name_idx').on(table.patientId, table.variableName),
@@ -231,12 +238,12 @@ export const patientVariables = pgTable('patient_variables', {
 
 export const verificationLogs = pgTable('verification_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  patientId: uuid('patient_id').notNull(),
+  patientId: uuid('patient_id').notNull().references(() => patients.id),
   action: text('action').notNull(), // 'sent', 'responded', 'manual_verified', 'expired'
   messageSent: text('message_sent'),
   patientResponse: text('patient_response'),
   verificationResult: verificationStatusEnum('verification_result'),
-  processedBy: uuid('processed_by'), // volunteer who processed manual verification
+  processedBy: uuid('processed_by').references(() => users.id), // volunteer who processed manual verification
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   patientLogIdx: index('verification_logs_patient_idx').on(table.patientId),
