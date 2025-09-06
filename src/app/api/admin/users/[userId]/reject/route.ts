@@ -31,9 +31,15 @@ export async function POST(
 
     // User found, proceed with deletion
 
-    // Delete the user (reject means remove from system)
+    // Soft delete the user (reject means remove from system but keep audit trail)
     await db
-      .delete(users)
+      .update(users)
+      .set({
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+        isActive: false,
+        isApproved: false
+      })
       .where(eq(users.id, userId))
 
     return NextResponse.json({

@@ -72,9 +72,13 @@ export async function POST(
       )
     }
 
-    // Delete the notes
+    // Soft delete the notes by setting deletedAt timestamp
     const deletedNotes = await db
-      .delete(healthNotes)
+      .update(healthNotes)
+      .set({ 
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      })
       .where(and(
         inArray(healthNotes.id, noteIds),
         eq(healthNotes.patientId, patientId)

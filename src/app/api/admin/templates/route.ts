@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates, users } from '@/db'
-import { eq, and, asc, inArray } from 'drizzle-orm'
+import { eq, and, asc, inArray, isNull } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL' | null
     const isActive = searchParams.get('active')
 
-    // Build base query with filters
-    const conditions = []
+    // Build base query with filters - always exclude soft-deleted templates
+    const conditions = [isNull(whatsappTemplates.deletedAt)]
     
     if (category) {
       conditions.push(eq(whatsappTemplates.category, category))
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         updatedAt: whatsappTemplates.updatedAt
       })
       .from(whatsappTemplates)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(
         asc(whatsappTemplates.category),
         asc(whatsappTemplates.templateName)

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth-utils'
 import { db, patientVariables, patients } from '@/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, isNull } from 'drizzle-orm'
 
 // GET /api/patients/[id]/variables - Get all variables for a patient
 export async function GET(
@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
-    // Get all active variables for this patient
+    // Get all active variables for this patient (excluding soft-deleted)
     const variables = await db
       .select({
         id: patientVariables.id,
@@ -39,7 +39,8 @@ export async function GET(
       .from(patientVariables)
       .where(and(
         eq(patientVariables.patientId, patientId),
-        eq(patientVariables.isActive, true)
+        eq(patientVariables.isActive, true),
+        isNull(patientVariables.deletedAt)
       ))
       .orderBy(patientVariables.variableName)
 
@@ -215,10 +216,11 @@ export async function DELETE(
       }, { status: 400 })
     }
 
-    // Soft delete the variable (set isActive = false)
+    // Soft delete the variable (set deletedAt timestamp)
     const result = await db
       .update(patientVariables)
       .set({
+        deletedAt: new Date(),
         isActive: false,
         updatedAt: new Date()
       })

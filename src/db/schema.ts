@@ -41,6 +41,7 @@ export const users = pgTable('users', {
   approvedBy: uuid('approved_by'),
   isApproved: boolean('is_approved').notNull().default(false),
   clerkId: text('clerk_id').notNull().unique(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   roleIdx: index('users_role_idx').on(table.role),
   isActiveIdx: index('users_is_active_idx').on(table.isActive),
@@ -48,6 +49,7 @@ export const users = pgTable('users', {
   roleActiveApprovedIdx: index('users_role_active_approved_idx').on(table.role, table.isActive, table.isApproved),
   clerkIdApprovedActiveIdx: index('users_clerk_approved_active_idx').on(table.clerkId, table.isApproved, table.isActive),
   lastLoginIdx: index('users_last_login_idx').on(table.lastLoginAt),
+  deletedAtIdx: index('users_deleted_at_idx').on(table.deletedAt),
   // Self-reference foreign key for approvedBy
   approvedByFk: foreignKey({
     columns: [table.approvedBy],
@@ -136,6 +138,7 @@ export const reminderSchedules = pgTable('reminder_schedules', {
   createdById: uuid('created_by_id').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   patientIdIdx: index('reminder_schedules_patient_id_idx').on(table.patientId),
   isActiveIdx: index('reminder_schedules_is_active_idx').on(table.isActive),
@@ -143,6 +146,7 @@ export const reminderSchedules = pgTable('reminder_schedules', {
   startDateIdx: index('reminder_schedules_start_date_idx').on(table.startDate),
   endDateIdx: index('reminder_schedules_end_date_idx').on(table.endDate),
   createdAtActiveIdx: index('reminder_schedules_created_active_idx').on(table.createdAt, table.isActive),
+  deletedAtIdx: index('reminder_schedules_deleted_at_idx').on(table.deletedAt),
 }))
 
 export const reminderLogs = pgTable('reminder_logs', {
@@ -200,11 +204,13 @@ export const whatsappTemplates = pgTable('whatsapp_templates', {
   createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   categoryIdx: index('whatsapp_templates_category_idx').on(table.category),
   isActiveIdx: index('whatsapp_templates_is_active_idx').on(table.isActive),
   categoryActiveIdx: index('whatsapp_templates_category_active_idx').on(table.category, table.isActive),
   createdByIdx: index('whatsapp_templates_created_by_idx').on(table.createdBy),
+  deletedAtIdx: index('whatsapp_templates_deleted_at_idx').on(table.deletedAt),
 }))
 
 export const healthNotes = pgTable('health_notes', {
@@ -215,10 +221,12 @@ export const healthNotes = pgTable('health_notes', {
   recordedBy: uuid('recorded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   patientIdIdx: index('health_notes_patient_id_idx').on(table.patientId),
   patientIdNoteDateIdx: index('health_notes_patient_note_date_idx').on(table.patientId, table.noteDate),
   recordedByIdx: index('health_notes_recorded_by_idx').on(table.recordedBy),
+  deletedAtIdx: index('health_notes_deleted_at_idx').on(table.deletedAt),
 }))
 
 export const patientVariables = pgTable('patient_variables', {
@@ -230,10 +238,12 @@ export const patientVariables = pgTable('patient_variables', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   createdById: uuid('created_by_id').notNull().references(() => users.id),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
   patientVarIdx: index('patient_variables_patient_idx').on(table.patientId),
   patientVarNameIdx: index('patient_variables_name_idx').on(table.patientId, table.variableName),
   patientActiveVarIdx: index('patient_variables_patient_active_idx').on(table.patientId, table.isActive),
+  deletedAtIdx: index('patient_variables_deleted_at_idx').on(table.deletedAt),
 }))
 
 export const verificationLogs = pgTable('verification_logs', {

@@ -156,10 +156,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid reminderIds' }, { status: 400 })
     }
 
-    // Soft delete multiple scheduled reminders by setting isActive to false
+    // Soft delete multiple scheduled reminders by setting deletedAt timestamp
     const deleteResult = await db
       .update(reminderSchedules)
       .set({
+        deletedAt: getWIBTime(),
         isActive: false,
         updatedAt: getWIBTime()
       })

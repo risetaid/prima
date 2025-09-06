@@ -228,10 +228,14 @@ export async function DELETE(
       )
     }
 
-    // Soft delete by setting isActive = false
+    // Soft delete by setting deletedAt timestamp
     const templateResult = await db
       .update(whatsappTemplates)
-      .set({ isActive: false })
+      .set({ 
+        deletedAt: new Date(),
+        isActive: false,
+        updatedAt: new Date()
+      })
       .where(eq(whatsappTemplates.id, id))
       .returning()
 

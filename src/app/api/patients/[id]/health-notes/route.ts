@@ -50,7 +50,10 @@ export async function GET(
         updatedAt: healthNotes.updatedAt
       })
       .from(healthNotes)
-      .where(eq(healthNotes.patientId, patientId))
+      .where(and(
+        eq(healthNotes.patientId, patientId),
+        isNull(healthNotes.deletedAt)
+      ))
       .orderBy(desc(healthNotes.noteDate))
 
     // Get user details for all health notes

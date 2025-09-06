@@ -245,9 +245,13 @@ export async function DELETE(
       )
     }
 
-    // Delete health note
+    // Soft delete health note by setting deletedAt timestamp
     await db
-      .delete(healthNotes)
+      .update(healthNotes)
+      .set({ 
+        deletedAt: new Date(),
+        updatedAt: new Date()
+      })
       .where(eq(healthNotes.id, noteId))
 
     return NextResponse.json({ message: 'Health note deleted successfully' })

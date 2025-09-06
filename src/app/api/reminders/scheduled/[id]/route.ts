@@ -118,10 +118,11 @@ export async function DELETE(
 
     const reminder = reminderScheduleResult[0]
 
-    // Soft delete by setting isActive to false
+    // Soft delete by setting deletedAt timestamp
     await db
       .update(reminderSchedules)
       .set({
+        deletedAt: getWIBTime(),
         isActive: false,
         updatedAt: getWIBTime()
       })
