@@ -2,20 +2,19 @@ import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from './schema'
 
-// Optimized connection settings for Supabase with aggressive timeouts
+// Use pooled connection (DATABASE_URL) for regular operations
+// This uses pgbouncer connection pooling which is more efficient for serverless
 const client = postgres(process.env.DATABASE_URL!, { 
-  prepare: false,
-  max: 5,                     // Reduced max connections for better reliability
-  idle_timeout: 10,           // Reduced idle timeout to 10 seconds
-  connect_timeout: 5,         // Reduced connect timeout to 5 seconds
-  // statement_timeout: 15000,   // 15 second statement timeout (not supported in this postgres client)
-  // query_timeout: 10000,       // 10 second query timeout (not supported in this postgres client)
+  prepare: false,              // Required for pgbouncer compatibility
+  max: 10,                     // Increase max connections for pooled setup
+  idle_timeout: 20,            // Longer idle timeout for pooled connections
+  connect_timeout: 10,         // Connect timeout
   transform: {
     undefined: null,          // Transform undefined to null
   },
   onnotice: () => {},         // Disable notices for cleaner logs
   ssl: {
-    rejectUnauthorized: false // For Supabase SSL issues
+    rejectUnauthorized: false // For Supabase SSL
   }
 })
 
