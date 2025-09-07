@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
-import { eq, and, desc, asc, gte, lte, sql, inArray } from 'drizzle-orm'
+import { eq, and, desc, asc, gte, lte, sql, inArray, isNull } from 'drizzle-orm'
 import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
 import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
@@ -24,21 +24,29 @@ export async function GET(
     const dateFilter = searchParams.get('date')
     const offset = (page - 1) * limit
 
-    // Build conditions array
+    // Build conditions array with soft delete filter
     const conditions = [
       eq(reminderSchedules.patientId, id),
-      eq(reminderSchedules.isActive, true)
+      eq(reminderSchedules.isActive, true),
+      isNull(reminderSchedules.deletedAt) // Critical: soft delete filter
     ]
 
-    // Add date range filter if provided for startDate
+    // Add date range filter if provided for startDate - use consistent timezone logic
     if (dateFilter) {
-      const filterDate = new Date(dateFilter)
-      const startOfDay = new Date(filterDate)
-      startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
-      const endOfDay = new Date(filterDate)
-      endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB
-      endOfDay.setDate(endOfDay.getDate() + 1)
+      // Use the same helper function as cron and instant send for consistency
+      function createWIBDateRange(dateString: string) {
+        const date = new Date(dateString)
+        const startOfDay = new Date(date)
+        startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
+        
+        const endOfDay = new Date(date)
+        endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB (UTC+7)
+        endOfDay.setDate(endOfDay.getDate() + 1)
+        
+        return { startOfDay, endOfDay }
+      }
       
+      const { startOfDay, endOfDay } = createWIBDateRange(dateFilter)
       conditions.push(
         gte(reminderSchedules.startDate, startOfDay),
         lte(reminderSchedules.startDate, endOfDay)
