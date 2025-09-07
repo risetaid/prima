@@ -582,41 +582,43 @@ function DashboardClient() {
 
       {/* Instant Send Dialog */}
       <Dialog open={showInstantSendDialog} onOpenChange={setShowInstantSendDialog}>
-        <DialogContent className="max-w-md mx-4 sm:mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">Konfirmasi Kirim Semua Pengingat</DialogTitle>
-            <DialogDescription className="text-sm">
+        <DialogContent className="max-w-sm sm:max-w-md mx-2 sm:mx-4">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-base sm:text-lg font-semibold leading-tight">
+              Konfirmasi Kirim Pengingat Hari Ini
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
               {!instantSendResult ? (
-                "Apakah Anda yakin ingin mengirim pesan pengingat ke SEMUA pasien yang Anda kelola sekarang? Tindakan ini tidak dapat dibatalkan."
+                "Kirim pesan pengingat hari ini ke semua pasien Anda sekarang?"
               ) : (
-                "Hasil pengiriman pesan:"
+                "Hasil pengiriman:"
               )}
             </DialogDescription>
           </DialogHeader>
 
           {instantSendResult && (
-            <div className={`p-3 sm:p-4 rounded-lg ${instantSendResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-              <div className={`font-medium text-sm sm:text-base ${instantSendResult.success ? 'text-green-800' : 'text-red-800'}`}>
+            <div className={`p-3 sm:p-4 rounded-lg text-sm ${instantSendResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`font-medium ${instantSendResult.success ? 'text-green-800' : 'text-red-800'} mb-2`}>
                 {instantSendResult.message || instantSendResult.error}
               </div>
               {instantSendResult.results && (
-                <div className="mt-2 text-xs sm:text-sm text-gray-600 space-y-1">
-                  <div>📊 Pengingat ditemukan: <span className="font-medium">{instantSendResult.results.remindersFound}</span></div>
-                  <div>✅ Berhasil dikirim: <span className="font-medium">{instantSendResult.results.messagesSent}</span></div>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div>📊 Ditemukan: <span className="font-medium">{instantSendResult.results.remindersFound}</span></div>
+                  <div>✅ Terkirim: <span className="font-medium">{instantSendResult.results.messagesSent}</span></div>
                   <div>❌ Error: <span className="font-medium">{instantSendResult.results.errors}</span></div>
-                  <div>📈 Tingkat keberhasilan: <span className="font-medium">{instantSendResult.results.successRate}</span></div>
+                  <div>📈 Sukses: <span className="font-medium">{instantSendResult.results.successRate}</span></div>
                 </div>
               )}
             </div>
           )}
 
-          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:justify-end pt-2">
             {!instantSendResult ? (
               <>
                 <Button 
                   variant="outline" 
                   onClick={() => setShowInstantSendDialog(false)}
-                  className="w-full sm:w-auto order-2 sm:order-1"
+                  className="w-full sm:w-auto order-2 sm:order-1 h-10"
                 >
                   Batal
                 </Button>
@@ -624,24 +626,20 @@ function DashboardClient() {
                   variant="destructive" 
                   onClick={handleInstantSendAll}
                   disabled={isInstantSending}
-                  className="w-full sm:w-auto order-1 sm:order-2"
+                  className="w-full sm:w-auto order-1 sm:order-2 h-10"
                 >
                   {isInstantSending ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 justify-center">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span className="hidden sm:inline">Mengirim...</span>
-                      <span className="sm:hidden">Kirim...</span>
+                      Mengirim...
                     </div>
                   ) : (
-                    <>
-                      <span className="hidden sm:inline">Ya, Kirim Semua</span>
-                      <span className="sm:hidden">Kirim Semua</span>
-                    </>
+                    "Ya, Kirim Sekarang"
                   )}
                 </Button>
               </>
             ) : (
-              <Button onClick={handleInstantSendClose} className="w-full sm:w-auto">
+              <Button onClick={handleInstantSendClose} className="w-full sm:w-auto h-10">
                 Tutup
               </Button>
             )}

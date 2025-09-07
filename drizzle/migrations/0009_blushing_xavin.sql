@@ -1,0 +1,19 @@
+CREATE INDEX IF NOT EXISTS "medical_records_patient_id_idx" ON "medical_records" USING btree ("patient_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "medical_records_record_type_idx" ON "medical_records" USING btree ("record_type");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "medical_records_recorded_date_idx" ON "medical_records" USING btree ("recorded_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "medical_records_recorded_by_idx" ON "medical_records" USING btree ("recorded_by");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "medical_records_patient_recorded_date_idx" ON "medical_records" USING btree ("patient_id","recorded_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patient_medications_patient_id_idx" ON "patient_medications" USING btree ("patient_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patient_medications_medication_id_idx" ON "patient_medications" USING btree ("medication_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patient_medications_is_active_idx" ON "patient_medications" USING btree ("is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patient_medications_patient_active_idx" ON "patient_medications" USING btree ("patient_id","is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patient_medications_start_date_idx" ON "patient_medications" USING btree ("start_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patients_deleted_at_idx" ON "patients" USING btree ("deleted_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patients_deleted_active_idx" ON "patients" USING btree ("deleted_at","is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patients_deleted_active_name_idx" ON "patients" USING btree ("deleted_at","is_active","name");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "patients_assigned_deleted_active_idx" ON "patients" USING btree ("assigned_volunteer_id","deleted_at","is_active");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reminder_logs_delivered_patient_idx" ON "reminder_logs" USING btree ("status","patient_id");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reminder_logs_schedule_status_sent_idx" ON "reminder_logs" USING btree ("reminder_schedule_id","status","sent_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reminder_schedules_active_deleted_start_idx" ON "reminder_schedules" USING btree ("is_active","deleted_at","start_date");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reminder_schedules_start_active_deleted_idx" ON "reminder_schedules" USING btree ("start_date","is_active","deleted_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reminder_schedules_today_reminders_idx" ON "reminder_schedules" USING btree ("start_date","is_active","deleted_at","scheduled_time");

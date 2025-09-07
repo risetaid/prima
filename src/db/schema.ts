@@ -91,6 +91,12 @@ export const patients = pgTable('patients', {
   createdAtIdx: index('patients_created_at_idx').on(table.createdAt),
   verificationStatusIdx: index('patients_verification_status_idx').on(table.verificationStatus),
   verificationStatusActiveIdx: index('patients_verification_status_active_idx').on(table.verificationStatus, table.isActive),
+  deletedAtIdx: index('patients_deleted_at_idx').on(table.deletedAt),
+  // Critical composite indexes for dashboard queries
+  deletedActiveIdx: index('patients_deleted_active_idx').on(table.deletedAt, table.isActive),
+  deletedActiveNameIdx: index('patients_deleted_active_name_idx').on(table.deletedAt, table.isActive, table.name),
+  // For volunteer assignment queries
+  assignedDeletedActiveIdx: index('patients_assigned_deleted_active_idx').on(table.assignedVolunteerId, table.deletedAt, table.isActive),
 }))
 
 export const medicalRecords = pgTable('medical_records', {
@@ -102,7 +108,13 @@ export const medicalRecords = pgTable('medical_records', {
   recordedDate: timestamp('recorded_date', { withTimezone: true }).notNull(),
   recordedBy: uuid('recorded_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (table) => ({
+  patientIdIdx: index('medical_records_patient_id_idx').on(table.patientId),
+  recordTypeIdx: index('medical_records_record_type_idx').on(table.recordType),
+  recordedDateIdx: index('medical_records_recorded_date_idx').on(table.recordedDate),
+  recordedByIdx: index('medical_records_recorded_by_idx').on(table.recordedBy),
+  patientRecordedDateIdx: index('medical_records_patient_recorded_date_idx').on(table.patientId, table.recordedDate),
+}))
 
 export const medications = pgTable('medications', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -122,7 +134,13 @@ export const patientMedications = pgTable('patient_medications', {
   isActive: boolean('is_active').notNull().default(true),
   createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, (table) => ({
+  patientIdIdx: index('patient_medications_patient_id_idx').on(table.patientId),
+  medicationIdIdx: index('patient_medications_medication_id_idx').on(table.medicationId),
+  isActiveIdx: index('patient_medications_is_active_idx').on(table.isActive),
+  patientActiveIdx: index('patient_medications_patient_active_idx').on(table.patientId, table.isActive),
+  startDateIdx: index('patient_medications_start_date_idx').on(table.startDate),
+}))
 
 export const reminderSchedules = pgTable('reminder_schedules', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -148,6 +166,11 @@ export const reminderSchedules = pgTable('reminder_schedules', {
   endDateIdx: index('reminder_schedules_end_date_idx').on(table.endDate),
   createdAtActiveIdx: index('reminder_schedules_created_active_idx').on(table.createdAt, table.isActive),
   deletedAtIdx: index('reminder_schedules_deleted_at_idx').on(table.deletedAt),
+  // Critical indexes for cron and instant send queries
+  activeDeletedStartDateIdx: index('reminder_schedules_active_deleted_start_idx').on(table.isActive, table.deletedAt, table.startDate),
+  startDateActiveDeletedIdx: index('reminder_schedules_start_active_deleted_idx').on(table.startDate, table.isActive, table.deletedAt),
+  // For today's reminders filtering (most common query)
+  todayRemindersIdx: index('reminder_schedules_today_reminders_idx').on(table.startDate, table.isActive, table.deletedAt, table.scheduledTime),
 }))
 
 export const reminderLogs = pgTable('reminder_logs', {
@@ -167,6 +190,10 @@ export const reminderLogs = pgTable('reminder_logs', {
   sentAtIdx: index('reminder_logs_sent_at_idx').on(table.sentAt),
   patientIdStatusIdx: index('reminder_logs_patient_status_idx').on(table.patientId, table.status),
   sentAtStatusIdx: index('reminder_logs_sent_status_idx').on(table.sentAt, table.status),
+  // Critical index for compliance calculations - most frequent query
+  deliveredStatusPatientIdx: index('reminder_logs_delivered_patient_idx').on(table.status, table.patientId),
+  // For today's reminder tracking in cron job
+  scheduleStatusSentIdx: index('reminder_logs_schedule_status_sent_idx').on(table.reminderScheduleId, table.status, table.sentAt),
 }))
 
 export const manualConfirmations = pgTable('manual_confirmations', {

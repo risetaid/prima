@@ -1,12 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, patients, reminderLogs } from '@/db'
-import { eq, and, isNull } from 'drizzle-orm'
+import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
+import { eq, and, isNull, gte, lte, inArray } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
 import { whatsappRateLimiter } from '@/lib/rate-limiter'
 
-export async function POST(request: NextRequest) {
+// Helper function to create date range for WIB timezone (same as cron)
+function createWIBDateRange(dateString: string) {
+  const date = new Date(dateString)
+  // Start of day in WIB (00:00:00)
+  const startOfDay = new Date(date)
+  startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
+  
+  // End of day in WIB (23:59:59.999)
+  const endOfDay = new Date(date)
+  endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB (UTC+7)
+  endOfDay.setDate(endOfDay.getDate() + 1)
+  
+  return { startOfDay, endOfDay }
+}
+
+// Helper function to generate enhanced WhatsApp message with content links
+function generateEnhancedMessage(originalMessage: string, contentAttachments: Array<{id: string, type: 'article' | 'video', title: string, url: string}>) {
+  if (contentAttachments.length === 0) {
+    return originalMessage
+  }
+  
+  let enhancedMessage = originalMessage
+  
+  // Add content section
+  enhancedMessage += '\n\n📚 Baca juga:'
+  
+  contentAttachments.forEach(content => {
+    const icon = content.type === 'article' ? '📄' : '🎥'
+    enhancedMessage += `\n${icon} ${content.title}: ${content.url}`
+  })
+  
+  enhancedMessage += '\n\n💙 Tim PRIMA'
+  
+  return enhancedMessage
+}
+
+export async function POST() {
   try {
     const user = await getCurrentUser()
     if (!user) {
@@ -34,7 +70,10 @@ export async function POST(request: NextRequest) {
     }
     const patientFilter = patientConditions.length > 1 ? and(...patientConditions) : patientConditions[0]
 
-    // Get all active reminder schedules for managed patients
+    // Get TODAY's reminder schedules only (same logic as cron job)
+    const todayWIB = getWIBDateString()
+    const { startOfDay, endOfDay } = createWIBDateRange(todayWIB)
+    
     const activeReminders = await db
       .select({
         // Schedule fields
@@ -52,10 +91,41 @@ export async function POST(request: NextRequest) {
       .where(
         and(
           eq(reminderSchedules.isActive, true),
+          gte(reminderSchedules.startDate, startOfDay),
+          lte(reminderSchedules.startDate, endOfDay),
           patientFilter,
           isNull(reminderSchedules.deletedAt)
         )
       )
+
+    // Get content attachments for all today's reminders
+    const reminderIds = activeReminders.map(r => r.id)
+    const contentAttachmentsMap = new Map()
+    
+    if (reminderIds.length > 0) {
+      const contentAttachments = await db
+        .select({
+          reminderScheduleId: reminderContentAttachments.reminderScheduleId,
+          contentType: reminderContentAttachments.contentType,
+          contentTitle: reminderContentAttachments.contentTitle,
+          contentUrl: reminderContentAttachments.contentUrl,
+        })
+        .from(reminderContentAttachments)
+        .where(inArray(reminderContentAttachments.reminderScheduleId, reminderIds))
+
+      // Create content attachments map
+      contentAttachments.forEach(attachment => {
+        if (!contentAttachmentsMap.has(attachment.reminderScheduleId)) {
+          contentAttachmentsMap.set(attachment.reminderScheduleId, [])
+        }
+        contentAttachmentsMap.get(attachment.reminderScheduleId).push({
+          id: attachment.reminderScheduleId,
+          type: attachment.contentType,
+          title: attachment.contentTitle,
+          url: attachment.contentUrl
+        })
+      })
+    }
 
     const logMessage = `🚀 Starting instant send for ${activeReminders.length} reminders at ${getWIBDateString()} ${getWIBTimeString()}`
     debugLogs.push(logMessage)
@@ -82,9 +152,13 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          // Generate message
-          const messageBody = reminder.customMessage || 
+          // Generate basic message
+          const basicMessage = reminder.customMessage || 
             `Halo ${reminder.patientName}, jangan lupa minum obat ${reminder.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
+          
+          // Get content attachments for this reminder and enhance message
+          const attachments = contentAttachmentsMap.get(reminder.id) || []
+          const messageBody = generateEnhancedMessage(basicMessage, attachments)
           
           const formattedNumber = formatWhatsAppNumber(reminder.patientPhoneNumber)
           
