@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search, Filter } from 'lucide-react'
+import { ArrowLeft, Search } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { PatientListMobileSkeleton } from '@/components/ui/dashboard-skeleton'
 
@@ -99,26 +99,26 @@ export default function PatientListPage() {
             </button>
             <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
           </div>
-          <UserButton afterSignOutUrl="/sign-in" />
+          <UserButton />
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="px-4 py-6">
+      <main className="px-4 py-8">
         {/* Search Bar */}
-        <div className="relative mb-4">
+        <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
             placeholder="Cari nama atau nomor telepon..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           />
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 mb-6 overflow-x-auto">
+        <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}

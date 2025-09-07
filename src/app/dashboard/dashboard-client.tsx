@@ -22,7 +22,7 @@ interface Patient {
 
 function DashboardClient() {
   const router = useRouter();
-  const { user } = useUser();
+  const { user: _user } = useUser();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ function DashboardClient() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [showAddPatientModal, setShowAddPatientModal] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
-  const [dashboardStats, setDashboardStats] = useState({
+  const [_dashboardStats, setDashboardStats] = useState({
     totalPatients: 0,
     activePatients: 0,
     inactivePatients: 0,
@@ -201,12 +201,6 @@ function DashboardClient() {
       .slice(0, 2);
   };
 
-  const getComplianceColor = (rate: number) => {
-    if (rate >= 80) return "bg-green-500";
-    if (rate >= 50) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
   const getRandomAvatarColor = (name: string) => {
     const colors = [
       "bg-blue-500",
@@ -241,8 +235,8 @@ function DashboardClient() {
   return (
     <>
       {/* Blue Background Section - Mobile Only */}
-      <div className="lg:hidden bg-blue-500 p-6">
-        <div className="flex space-x-4 justify-center pb-2">
+      <div className="lg:hidden bg-blue-500 px-6 py-8">
+        <div className="flex space-x-6 justify-center pb-4">
           {/* Pengingat */}
           <div className="text-center flex-shrink-0 min-w-[80px]">
             <div
@@ -367,8 +361,8 @@ function DashboardClient() {
 
       {/* Instant Send Section - Admin Only */}
       {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-4">
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-400">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-400">
             {/* Desktop Layout */}
             <div className="hidden lg:flex items-center justify-between">
               <div>
@@ -411,9 +405,9 @@ function DashboardClient() {
       )}
 
       {/* Patient List Section */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 my-6">
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
         {/* Mobile: Title and Controls */}
-        <div className="lg:hidden flex justify-between items-center mb-4">
+        <div className="lg:hidden flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
           <div className="flex items-center space-x-3">
             {/* Search Bar */}
@@ -438,7 +432,7 @@ function DashboardClient() {
         </div>
 
         {/* Mobile: Filter Buttons */}
-        <div className="lg:hidden flex space-x-2 mb-4">
+        <div className="lg:hidden flex space-x-3 mb-6">
           <button
             onClick={() => toggleFilter("active")}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
@@ -473,7 +467,7 @@ function DashboardClient() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {filteredPatients.slice(0, 8).map((patient) => {
                 const complianceLabel = getComplianceLabel(
                   patient.complianceRate
@@ -490,9 +484,9 @@ function DashboardClient() {
                   <div
                     key={patient.id}
                     onClick={() => handlePatientClick(patient.id)}
-                    className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center space-x-3">
+                     className="bg-white rounded-xl p-5 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                   >
+                     <div className="flex items-center space-x-4">
                       {patient.photoUrl ? (
                         <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
                           <Image

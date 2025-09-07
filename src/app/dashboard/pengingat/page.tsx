@@ -105,12 +105,6 @@ export default function ReminderPage() {
       .slice(0, 2)
   }
 
-  const getComplianceColor = (rate: number) => {
-    if (rate >= 80) return 'bg-green-500'
-    if (rate >= 50) return 'bg-yellow-500'
-    return 'bg-red-500'
-  }
-
   const getRandomAvatarColor = (name: string) => {
     const colors = [
       "bg-blue-500", "bg-purple-500", "bg-pink-500", "bg-indigo-500",
@@ -154,16 +148,16 @@ export default function ReminderPage() {
 
       {/* Mobile: Header */}
       <div className="lg:hidden relative z-10">
-        <header className="bg-white">
-          <div className="flex justify-between items-center px-4 py-4">
+        <header className="bg-white shadow-sm">
+          <div className="flex justify-between items-center px-4 py-5">
             <button 
               onClick={() => router.back()}
-              className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+              className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-blue-600" />
             </button>
             <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-            <UserButton afterSignOutUrl="/sign-in" />
+            <UserButton />
           </div>
         </header>
       </div>
@@ -227,9 +221,9 @@ export default function ReminderPage() {
 
       {/* Mobile: Card Layout */}
       <div className="lg:hidden relative z-10">
-        <main className="px-4 py-6">
+        <main className="px-4 py-8">
           {/* Mobile: Title and Controls */}
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
             <div className="flex items-center space-x-3">
               {/* Search Bar */}
@@ -247,7 +241,7 @@ export default function ReminderPage() {
           </div>
 
           {/* Mobile: Filter Buttons */}
-          <div className="flex space-x-2 mb-4">
+          <div className="flex space-x-3 mb-6">
             <button
               onClick={() => toggleFilter('active')}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${

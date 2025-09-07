@@ -1,7 +1,7 @@
-import { createClient, RedisClientType } from 'redis'
+import Redis from 'ioredis'
 
 class RedisClient {
-  private client: RedisClientType | null = null
+  private client: Redis | null = null
   private isConnecting: boolean = false
 
   constructor() {
@@ -17,23 +17,35 @@ class RedisClient {
     this.isConnecting = true
     
     try {
-      this.client = createClient({
-        url: process.env.REDIS_URL || process.env.KV_URL,
+      this.client = new Redis(process.env.REDIS_URL || process.env.KV_URL || '', {
+        // IORedis optimizations for medical system
+        maxRetriesPerRequest: 3,
+        connectTimeout: 10000,
+        commandTimeout: 5000,
+        // Graceful degradation
+        lazyConnect: true,
+        // Connection pool settings
+        family: 4,
       })
 
       this.client.on('error', (err: Error) => {
-        console.warn('Redis Client Error:', err)
+        console.warn('IORedis Client Error:', err)
         // Don't throw - gracefully degrade
         this.client = null
       })
 
       this.client.on('connect', () => {
-        console.log('Redis connected successfully')
+        console.log('IORedis connected successfully')
       })
 
-      await this.client.connect()
+      this.client.on('ready', () => {
+        console.log('IORedis ready for commands')
+      })
+
+      // Test connection
+      await this.client.ping()
     } catch (error) {
-      console.warn('Failed to initialize Redis:', error)
+      console.warn('Failed to initialize IORedis:', error)
       this.client = null
     } finally {
       this.isConnecting = false
@@ -46,7 +58,7 @@ class RedisClient {
     try {
       return await this.client.get(key)
     } catch (error) {
-      console.warn('Redis GET failed:', error)
+      console.warn('IORedis GET failed:', error)
       return null
     }
   }
@@ -56,13 +68,13 @@ class RedisClient {
     
     try {
       if (ttl) {
-        await this.client.setEx(key, ttl, value)
+        await this.client.setex(key, ttl, value)
       } else {
         await this.client.set(key, value)
       }
       return true
     } catch (error) {
-      console.warn('Redis SET failed:', error)
+      console.warn('IORedis SET failed:', error)
       return false
     }
   }
@@ -74,7 +86,7 @@ class RedisClient {
       await this.client.del(key)
       return true
     } catch (error) {
-      console.warn('Redis DEL failed:', error)
+      console.warn('IORedis DEL failed:', error)
       return false
     }
   }
@@ -86,14 +98,14 @@ class RedisClient {
       const result = await this.client.exists(key)
       return result === 1
     } catch (error) {
-      console.warn('Redis EXISTS failed:', error)
+      console.warn('IORedis EXISTS failed:', error)
       return false
     }
   }
 
   // For health checks
   isConnected(): boolean {
-    return this.client !== null && this.client.isReady
+    return this.client !== null && this.client.status === 'ready'
   }
 }
 
