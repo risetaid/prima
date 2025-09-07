@@ -52,19 +52,25 @@ bun run seed:templates         # Seed WhatsApp message templates
 - `src/db/schema.ts` - Database schema with comprehensive foreign keys
 - `src/db/index.ts` - Database connection and exports
 
-### API Routes Structure  
+### API Routes Structure (55+ endpoints)
 - `src/app/api/auth/` - Authentication endpoints
-- `src/app/api/patients/` - Patient management APIs
-- `src/app/api/admin/` - Admin panel APIs
-- `src/app/api/cms/` - Content management APIs
+- `src/app/api/patients/[id]/` - Individual patient management APIs
+- `src/app/api/patients/[id]/reminders/` - Patient reminder management
+- `src/app/api/admin/` - Admin panel APIs (users, templates)
+- `src/app/api/cms/` - Content management APIs (articles, videos)
 - `src/app/api/user/session/` - User session management
 - `src/app/api/cron/` - Automated WhatsApp reminder system
+- `src/app/api/reminders/scheduled/[id]/` - Scheduled reminder editing
+- `src/app/api/debug/` - Development debugging tools (non-production)
 
-### Dashboard Pages
+### Dashboard Pages (24+ pages)
 - `src/app/dashboard/` - Main dashboard interface
-- `src/app/dashboard/pasien/` - Patient management pages  
-- `src/app/dashboard/pengingat/` - Reminder management
-- `src/app/dashboard/cms/` - Content management system
+- `src/app/dashboard/pasien/` - Patient management pages with detailed views
+- `src/app/dashboard/pasien/[id]/` - Individual patient pages (details, health notes, editing)
+- `src/app/dashboard/pengingat/` - Reminder management system
+- `src/app/dashboard/pengingat/pasien/[id]/` - Patient-specific reminder views (scheduled, completed, needs updates)
+- `src/app/dashboard/cms/` - Content management system (articles, videos)
+- `src/app/dashboard/admin/` - Admin panel (user management, templates)
 - `src/app/content/` - Public content pages (articles/videos)
 
 ## 💾 Database Schema & Key Tables
@@ -82,6 +88,7 @@ bun run seed:templates         # Seed WhatsApp message templates
 - `health_notes` - Patient health condition tracking
 - `verification_logs` - Patient verification activity and status changes
 - `whatsapp_templates` - Message templates for automated communications
+- `reminder_content_attachments` - Content attachments for reminders (links articles/videos to reminders)
 - `cms_articles` & `cms_videos` - Content management system
 
 ### Key Database Relationships
@@ -157,10 +164,13 @@ bun run seed:templates         # Seed WhatsApp message templates
 - Compliance rate calculation and monitoring
 
 ### Reminder System ✅  
-- Automated WhatsApp reminders via cron jobs
-- WhatsApp API integration with delivery tracking
+- Automated WhatsApp reminders via cron jobs with debug endpoints
+- WhatsApp API integration with delivery tracking (Fonnte)
+- **Content Attachments**: Reminders can include article and video content
+- **Edit Functionality**: Full editing support for scheduled reminders including content updates
 - Delivery status tracking and retry mechanisms
 - Schedule management with timezone handling (WIB/UTC+7)
+- Comprehensive reminder views: scheduled, completed, needs updates, all reminders
 
 ### Content Management System ✅
 - Article creation with TinyMCE rich text editor
@@ -314,9 +324,15 @@ CRON_SECRET="..."
 - Eliminated "You're already signed in" redirect loop issue
 
 ### ✅ Codebase Cleanup (January 2025)
-- Removed 7 debug/test files and 4 empty directories
-- Fixed broken references and cleaned unused imports
-- Maintained zero functionality impact while improving maintainability
+- **First Cleanup**: Removed 7 debug/test files and 4 empty directories
+- **Recent Major Cleanup**: Removed 12 unused files including TSX components and library utilities
+  - Removed unused UI components (cancer-ribbon-background, client-only, file-upload, etc.)
+  - Cleaned up unused authentication utilities (admin-auth.ts, api-auth.ts)
+  - Removed unused library files (lazy-utils.tsx, storage.ts, empty-module.js)
+  - Eliminated unused dashboard components (dashboard-cards.tsx, navigation-card.tsx)
+- Fixed broken references and cleaned unused imports throughout codebase
+- Maintained zero functionality impact while significantly improving maintainability
+- **Current State**: Clean, optimized codebase with 55+ API routes and 45+ components
 
 ---
 
