@@ -1,9 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    // Basic experimental config - Turbopack handles most patterns automatically
+  // Standalone output for faster deployments
+  output: 'standalone',
+  
+  // Turbopack is now stable
+  turbopack: {
+    // Basic Turbopack config for faster builds
   },
+  
+  // External packages for server components (medical libs)
+  serverExternalPackages: ['ioredis', 'postgres', 'sharp'],
+  
+  experimental: {
+    // Optimize package imports
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-select'],
+  },
+  
   // Only include webpack config when NOT using Turbopack
   ...(process.env.NEXT_TURBO !== '1' && {
     webpack: (config, { dev }) => {
@@ -16,9 +29,37 @@ const nextConfig: NextConfig = {
           /Module not found: Can't resolve 'path'/,
         ];
       }
+      
+      // Production optimizations
+      if (!dev) {
+        config.optimization = {
+          ...config.optimization,
+          splitChunks: {
+            chunks: 'all',
+            cacheGroups: {
+              // Medical system specific chunks
+              medical: {
+                test: /[\\/]node_modules[\\/](date-fns|zod|drizzle-orm)[\\/]/,
+                name: 'medical-core',
+                priority: 10,
+                reuseExistingChunk: true,
+              },
+              // UI components chunk
+              ui: {
+                test: /[\\/]node_modules[\\/](@radix-ui|lucide-react)[\\/]/,
+                name: 'ui-components',
+                priority: 20,
+                reuseExistingChunk: true,
+              },
+            },
+          },
+        };
+      }
+      
       return config;
     },
   }),
+  
   // Performance optimizations  
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',

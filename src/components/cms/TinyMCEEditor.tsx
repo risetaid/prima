@@ -1,7 +1,20 @@
 'use client'
 
-import { Editor } from '@tinymce/tinymce-react'
+import dynamic from 'next/dynamic'
 import { useRef } from 'react'
+
+// Lazy load TinyMCE to reduce initial bundle size
+const Editor = dynamic(
+  () => import('@tinymce/tinymce-react').then((mod) => ({ default: mod.Editor })),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="h-[500px] w-full bg-gray-50 rounded-lg flex items-center justify-center">
+        <div className="text-gray-500">Memuat editor...</div>
+      </div>
+    )
+  }
+)
 
 interface TinyMCEEditorProps {
   value: string
@@ -18,7 +31,7 @@ export function TinyMCEEditor({
 }: TinyMCEEditorProps) {
   const editorRef = useRef<any>(null)
 
-  const handleEditorChange = (content: string, editor: any) => {
+  const handleEditorChange = (content: string) => {
     try {
       onEditorChange(content)
     } catch (error) {
@@ -30,7 +43,7 @@ export function TinyMCEEditor({
     <div className="tinymce-wrapper">
       <Editor
         apiKey="yclqbdg6wdb61kx0u2ap5d05s62stnkbj1wpdrtkushmn7ns"
-        onInit={(evt, editor) => {
+        onInit={(_evt, editor) => {
           editorRef.current = editor
           console.log('TinyMCE initialized successfully')
         }}
@@ -57,7 +70,7 @@ export function TinyMCEEditor({
           //   respondWith.string(() => Promise.reject('AI Assistant belum dikonfigurasi. Hubungi admin untuk mengaktifkan fitur ini.')),
           
           // Image handling - improved configuration
-          images_upload_handler: (blobInfo: any, progress: any) => new Promise<string>((resolve, reject) => {
+          images_upload_handler: (blobInfo: any, _progress: any) => new Promise<string>((resolve, reject) => {
             try {
               // Validate file size (max 5MB)
               if (blobInfo.blob().size > 5 * 1024 * 1024) {
@@ -112,7 +125,7 @@ export function TinyMCEEditor({
           
           // File picker for images (optional)
           file_picker_types: 'image',
-          file_picker_callback: (callback, value, meta) => {
+          file_picker_callback: (callback, _value, meta) => {
             if (meta.filetype === 'image') {
               try {
                 const input = document.createElement('input')
