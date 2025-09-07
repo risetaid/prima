@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, patients, verificationLogs, reminderSchedules } from '@/db'
 import { eq, and, or } from 'drizzle-orm'
+import { invalidatePatientCache } from '@/lib/cache'
 
 // Process WhatsApp verification responses from patients
 export async function POST(request: NextRequest) {
@@ -38,7 +39,6 @@ export async function POST(request: NextRequest) {
     const phone = sender
     
     // Try to match phone number in both formats (international and local)  
-    const phoneToMatch = phone
     let alternativePhone = ''
     
     // If phone starts with 62, also try with 0
@@ -126,6 +126,9 @@ export async function POST(request: NextRequest) {
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patient.id))
+    
+    // Invalidate patient cache after verification update
+    await invalidatePatientCache(patient.id)
     
     console.log('Patient status updated:', { 
       name: patient.name, 

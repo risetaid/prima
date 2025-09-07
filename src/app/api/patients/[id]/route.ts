@@ -55,7 +55,8 @@ export async function GET(
         volunteerId: users.id,
         volunteerFirstName: users.firstName,
         volunteerLastName: users.lastName,
-        volunteerEmail: users.email
+        volunteerEmail: users.email,
+        volunteerRole: users.role
       })
       .from(patients)
       .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
@@ -119,11 +120,19 @@ export async function GET(
       verificationMessage: patientData.verificationMessage,
       verificationAttempts: patientData.verificationAttempts,
       verificationExpiresAt: patientData.verificationExpiresAt,
+      // Individual volunteer fields
+      volunteerId: patientData.volunteerId,
+      volunteerFirstName: patientData.volunteerFirstName,
+      volunteerLastName: patientData.volunteerLastName,
+      volunteerEmail: patientData.volunteerEmail,
+      volunteerRole: patientData.volunteerRole,
+      // Volunteer object
       assignedVolunteer: patientData.volunteerId ? {
         id: patientData.volunteerId,
         firstName: patientData.volunteerFirstName,
         lastName: patientData.volunteerLastName,
-        email: patientData.volunteerEmail
+        email: patientData.volunteerEmail,
+        role: patientData.volunteerRole
       } : null,
       manualConfirmations: [], // Simplified for now
       reminderLogs: [], // Simplified for now

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, patients, reminderLogs } from '@/db'
+import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
 import { eq, and, desc, asc, gte, lte, sql, inArray } from 'drizzle-orm'
 import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
 import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
@@ -93,6 +93,21 @@ export async function GET(
       .orderBy(desc(reminderLogs.sentAt))
       .limit(reminderIds.length * 5) : []
 
+    // Get content attachments for reminders
+    const contentAttachments = reminderIds.length > 0 ? await db
+      .select({
+        id: reminderContentAttachments.id,
+        reminderScheduleId: reminderContentAttachments.reminderScheduleId,
+        contentType: reminderContentAttachments.contentType,
+        contentId: reminderContentAttachments.contentId,
+        contentTitle: reminderContentAttachments.contentTitle,
+        contentUrl: reminderContentAttachments.contentUrl,
+        attachmentOrder: reminderContentAttachments.attachmentOrder,
+      })
+      .from(reminderContentAttachments)
+      .where(inArray(reminderContentAttachments.reminderScheduleId, reminderIds))
+      .orderBy(asc(reminderContentAttachments.attachmentOrder)) : []
+
     // Create lookup maps
     const patientMap = new Map()
     patientDetails.forEach(patient => {
@@ -105,6 +120,21 @@ export async function GET(
         logsMap.set(log.reminderScheduleId, [])
       }
       logsMap.get(log.reminderScheduleId).push(log)
+    })
+
+    const contentAttachmentsMap = new Map()
+    contentAttachments.forEach(attachment => {
+      if (!contentAttachmentsMap.has(attachment.reminderScheduleId)) {
+        contentAttachmentsMap.set(attachment.reminderScheduleId, [])
+      }
+      contentAttachmentsMap.get(attachment.reminderScheduleId).push({
+        id: attachment.contentId,
+        type: attachment.contentType,
+        title: attachment.contentTitle,
+        url: attachment.contentUrl,
+        slug: attachment.contentUrl.split('/').pop(), // Extract slug from URL
+        order: attachment.attachmentOrder
+      })
     })
 
     // DEBUG: Log the filter criteria first
@@ -130,7 +160,8 @@ export async function GET(
       nextReminderDate: reminder.startDate.toISOString().split('T')[0],
       customMessage: reminder.customMessage,
       patient: patientMap.get(reminder.patientId) || null,
-      reminderLogs: logsMap.get(reminder.id) || []
+      reminderLogs: logsMap.get(reminder.id) || [],
+      attachedContent: contentAttachmentsMap.get(reminder.id) || []
     }))
 
     return NextResponse.json(formattedReminders)

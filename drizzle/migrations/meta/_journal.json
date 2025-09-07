@@ -57,6 +57,13 @@
       "when": 1757184061347,
       "tag": "0007_furry_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1757237113471,
+      "tag": "0008_silent_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }

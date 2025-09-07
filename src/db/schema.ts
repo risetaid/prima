@@ -4,6 +4,7 @@ import {
   timestamp, 
   boolean, 
   uuid, 
+  integer,
   pgEnum,
   index,
   foreignKey
@@ -322,6 +323,28 @@ export const cmsVideos = pgTable('cms_videos', {
   statusDeletedIdx: index('cms_videos_status_deleted_idx').on(table.status, table.deletedAt),
 }))
 
+// ===== REMINDER CONTENT ATTACHMENTS TABLE =====
+
+export const reminderContentAttachments = pgTable('reminder_content_attachments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  reminderScheduleId: uuid('reminder_schedule_id').notNull().references(() => reminderSchedules.id, { onDelete: 'cascade' }),
+  contentType: text('content_type').notNull().$type<'article' | 'video'>(), // CHECK constraint: article or video
+  contentId: uuid('content_id').notNull(), // References cms_articles.id OR cms_videos.id
+  contentTitle: text('content_title').notNull(), // Snapshot for historical data
+  contentUrl: text('content_url').notNull(), // Public URL at time of attachment
+  attachmentOrder: integer('attachment_order').notNull().default(1), // For multiple attachments
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+}, (table) => ({
+  // Prevent duplicate attachments
+  uniqueReminderContent: index('reminder_content_unique_idx').on(table.reminderScheduleId, table.contentType, table.contentId),
+  // Performance indexes
+  reminderScheduleIdIdx: index('reminder_content_reminder_idx').on(table.reminderScheduleId),
+  contentTypeIdIdx: index('reminder_content_type_id_idx').on(table.contentType, table.contentId),
+  createdAtIdx: index('reminder_content_created_at_idx').on(table.createdAt),
+  createdByIdx: index('reminder_content_created_by_idx').on(table.createdBy),
+}))
+
 // ===== RELATIONS =====
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -368,6 +391,7 @@ export const reminderSchedulesRelations = relations(reminderSchedules, ({ one, m
   }),
   reminderLogs: many(reminderLogs),
   manualConfirmations: many(manualConfirmations),
+  contentAttachments: many(reminderContentAttachments),
 }))
 
 export const reminderLogsRelations = relations(reminderLogs, ({ one, many }) => ({
@@ -471,6 +495,17 @@ export const verificationLogsRelations = relations(verificationLogs, ({ one }) =
   }),
 }))
 
+export const reminderContentAttachmentsRelations = relations(reminderContentAttachments, ({ one }) => ({
+  reminderSchedule: one(reminderSchedules, {
+    fields: [reminderContentAttachments.reminderScheduleId],
+    references: [reminderSchedules.id]
+  }),
+  createdByUser: one(users, {
+    fields: [reminderContentAttachments.createdBy],
+    references: [users.id]
+  }),
+}))
+
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -488,6 +523,8 @@ export type PatientVariable = typeof patientVariables.$inferSelect
 export type NewPatientVariable = typeof patientVariables.$inferInsert
 export type VerificationLog = typeof verificationLogs.$inferSelect
 export type NewVerificationLog = typeof verificationLogs.$inferInsert
+export type ReminderContentAttachment = typeof reminderContentAttachments.$inferSelect
+export type NewReminderContentAttachment = typeof reminderContentAttachments.$inferInsert
 
 // CMS Content Types
 export type CmsArticle = typeof cmsArticles.$inferSelect

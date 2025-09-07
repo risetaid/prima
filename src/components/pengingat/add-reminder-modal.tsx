@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { ContentSelector } from '@/components/reminder/ContentSelector'
 
 interface Patient {
   id: string
@@ -42,6 +43,23 @@ interface AutoFillData {
   }
 }
 
+interface ContentItem {
+  id: string
+  title: string
+  slug: string
+  description?: string
+  category: string
+  tags: string[]
+  publishedAt: Date | null
+  createdAt: Date
+  type: 'article' | 'video'
+  thumbnailUrl?: string
+  url: string
+  excerpt?: string
+  videoUrl?: string
+  durationMinutes?: string
+}
+
 interface AddReminderModalProps {
   isOpen: boolean
   onClose: () => void
@@ -74,6 +92,7 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
     message: '',
     time: getCurrentTimeWIB()
   })
+  const [selectedContent, setSelectedContent] = useState<ContentItem[]>([])
 
   useEffect(() => {
     if (isOpen && params.id) {
@@ -251,6 +270,12 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
       const requestBody = {
         message: formData.message,
         time: formData.time,
+        attachedContent: selectedContent.map(content => ({
+          id: content.id,
+          title: content.title,
+          type: content.type.toUpperCase() as 'ARTICLE' | 'VIDEO',
+          slug: content.slug
+        })),
         ...(customRecurrence.enabled ? {
           customRecurrence: {
             frequency: customRecurrence.frequency,
@@ -357,7 +382,8 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                             <button
                               type="button"
                               onClick={() => {
-                                setSelectedTemplate('')
+      setSelectedTemplate('')
+      setSelectedContent([])
                                 setFormData(prev => ({ ...prev, message: '' }))
                                 setIsTemplateDropdownOpen(false)
                               }}
@@ -520,6 +546,24 @@ export function AddReminderModal({ isOpen, onClose, onSuccess, patientName }: Ad
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Content Attachment Section */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-700 text-sm font-medium">
+                    Lampirkan Konten Edukasi <span className="text-gray-400">(opsional)</span>
+                  </label>
+                  {selectedContent.length > 0 && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                      {selectedContent.length}/5 dipilih
+                    </span>
+                  )}
+                </div>
+                <ContentSelector
+                  selectedContent={selectedContent}
+                  onContentChange={setSelectedContent}
+                />
               </div>
 
               {/* Time Field */}

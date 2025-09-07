@@ -8,6 +8,25 @@ import { formatDateWIB } from '@/lib/datetime'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { toast } from '@/components/ui/toast'
 import { ReminderListSkeleton } from '@/components/ui/dashboard-skeleton'
+import { ContentSelector } from '@/components/reminder/ContentSelector'
+
+interface ContentItem {
+  id: string
+  title: string
+  slug: string
+  description?: string
+  category: string
+  tags: string[]
+  publishedAt: Date | null
+  createdAt: Date
+  type: 'article' | 'video'
+  thumbnailUrl?: string
+  url: string
+  excerpt?: string
+  videoUrl?: string
+  durationMinutes?: string
+  order?: number
+}
 
 interface ScheduledReminder {
   id: string
@@ -15,6 +34,7 @@ interface ScheduledReminder {
   scheduledTime: string
   nextReminderDate: string
   customMessage?: string
+  attachedContent?: ContentItem[]
 }
 
 export default function ScheduledRemindersPage() {
@@ -29,6 +49,7 @@ export default function ScheduledRemindersPage() {
   const [editTime, setEditTime] = useState('')
 
   const [editMessage, setEditMessage] = useState('')
+  const [selectedContent, setSelectedContent] = useState<ContentItem[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const { confirm, ConfirmComponent } = useConfirm()
 
@@ -112,6 +133,7 @@ export default function ScheduledRemindersPage() {
     setSelectedReminder(reminder)
     setEditTime(reminder.scheduledTime)
     setEditMessage(reminder.customMessage || `Minum obat ${reminder.medicationName}`)
+    setSelectedContent(reminder.attachedContent || [])
     setIsEditModalOpen(true)
   }
 
@@ -120,6 +142,7 @@ export default function ScheduledRemindersPage() {
     setSelectedReminder(null)
     setEditTime('')
     setEditMessage('')
+    setSelectedContent([])
     setIsUpdating(false)
   }
 
@@ -145,7 +168,13 @@ export default function ScheduledRemindersPage() {
         },
         body: JSON.stringify({
           reminderTime: editTime,
-          customMessage: editMessage
+          customMessage: editMessage,
+          attachedContent: selectedContent.map(content => ({
+            id: content.id,
+            title: content.title,
+            type: content.type.toUpperCase() as 'ARTICLE' | 'VIDEO',
+            slug: content.slug
+          }))
         }),
       })
 
@@ -381,6 +410,19 @@ export default function ScheduledRemindersPage() {
                     onChange={(e) => setEditTime(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     disabled={isUpdating}
+                  />
+                </div>
+
+                {/* Content Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Lampirkan Konten (Opsional)
+                  </label>
+                  <ContentSelector
+                    selectedContent={selectedContent}
+                    onContentChange={setSelectedContent}
+                    maxSelection={5}
+                    className="mt-2"
                   />
                 </div>
               </div>

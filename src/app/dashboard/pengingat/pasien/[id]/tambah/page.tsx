@@ -8,6 +8,7 @@ import { getCurrentTimeWIB } from '@/lib/datetime'
 import { toast } from '@/components/ui/toast'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
 import { ReminderFormSkeleton } from '@/components/ui/dashboard-skeleton'
+import { ContentSelector } from '@/components/reminder/ContentSelector'
 
 interface Patient {
   id: string
@@ -50,6 +51,23 @@ interface AutoFillData {
   }
 }
 
+interface ContentItem {
+  id: string
+  title: string
+  slug: string
+  description?: string
+  category: string
+  tags: string[]
+  publishedAt: Date | null
+  createdAt: Date
+  type: 'article' | 'video'
+  thumbnailUrl?: string
+  url: string
+  excerpt?: string
+  videoUrl?: string
+  durationMinutes?: string
+}
+
 export default function AddReminderPage() {
   const router = useRouter()
   const params = useParams()
@@ -76,6 +94,7 @@ export default function AddReminderPage() {
     message: '',
     time: getCurrentTimeWIB()
   })
+  const [selectedContent, setSelectedContent] = useState<ContentItem[]>([])
 
   useEffect(() => {
     if (params.id) {
@@ -232,6 +251,12 @@ export default function AddReminderPage() {
       const requestBody = {
         message: formData.message,
         time: formData.time,
+        attachedContent: selectedContent.map(content => ({
+          id: content.id,
+          title: content.title,
+          type: content.type.toUpperCase() as 'ARTICLE' | 'VIDEO',
+          slug: content.slug
+        })),
         ...(customRecurrence.enabled ? {
           customRecurrence: {
             frequency: customRecurrence.frequency,
@@ -536,6 +561,24 @@ export default function AddReminderPage() {
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Content Attachment Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-gray-500 text-sm">
+                Lampirkan Konten Edukasi <span className="text-gray-400">(opsional)</span>
+              </label>
+              {selectedContent.length > 0 && (
+                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                  {selectedContent.length}/5 dipilih
+                </span>
+              )}
+            </div>
+            <ContentSelector
+              selectedContent={selectedContent}
+              onContentChange={setSelectedContent}
+            />
           </div>
 
           {/* Time Field */}

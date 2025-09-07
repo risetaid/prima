@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, patients } from '@/db'
-import { eq } from 'drizzle-orm'
+import { db, reminderSchedules, patients, reminderContentAttachments, cmsArticles, cmsVideos } from '@/db'
+import { eq, and, isNull } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/timezone'
 
 export async function PUT(
@@ -15,10 +15,16 @@ export async function PUT(
     }
 
     const { id } = await params
-    const { reminderTime, customMessage } = await request.json()
+    const { reminderTime, customMessage, attachedContent } = await request.json()
 
     if (!reminderTime || !customMessage) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Validate attached content if provided
+    let validatedContent: Array<{id: string, type: 'article' | 'video', title: string, url: string}> = []
+    if (attachedContent && Array.isArray(attachedContent) && attachedContent.length > 0) {
+      validatedContent = await validateContentAttachments(attachedContent)
     }
 
     // Find the reminder schedule
@@ -73,13 +79,37 @@ export async function PUT(
 
     const updatedReminder = updatedReminderResult[0]
 
+    // Handle content attachment updates
+    if (attachedContent !== undefined) {
+      // First, remove existing attachments
+      await db
+        .delete(reminderContentAttachments)
+        .where(eq(reminderContentAttachments.reminderScheduleId, id))
+
+      // Add new attachments if any
+      if (validatedContent.length > 0) {
+        const attachmentRecords = validatedContent.map((content, index) => ({
+          reminderScheduleId: id,
+          contentType: content.type,
+          contentId: content.id,
+          contentTitle: content.title,
+          contentUrl: content.url,
+          attachmentOrder: index + 1,
+          createdBy: user.id
+        }))
+
+        await db.insert(reminderContentAttachments).values(attachmentRecords)
+      }
+    }
+
     return NextResponse.json({
       message: 'Reminder updated successfully',
       reminder: {
         id: updatedReminder.id,
         scheduledTime: updatedReminder.scheduledTime,
         customMessage: updatedReminder.customMessage,
-        medicationName: updatedReminder.medicationName
+        medicationName: updatedReminder.medicationName,
+        attachedContent: validatedContent
       }
     })
   } catch (error) {
@@ -142,4 +172,65 @@ export async function DELETE(
     console.error('Error deleting reminder:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+// Content validation function
+async function validateContentAttachments(attachedContent: Array<{id: string, type: 'article' | 'video' | 'ARTICLE' | 'VIDEO', title: string}>) {
+  const validatedContent: Array<{id: string, type: 'article' | 'video', title: string, url: string}> = []
+  
+  for (const content of attachedContent) {
+    if (!content.id || !content.type || !content.title) {
+      continue // Skip invalid content
+    }
+    
+    // Normalize the content type to lowercase
+    const normalizedType = content.type.toLowerCase() as 'article' | 'video'
+    
+    try {
+      if (normalizedType === 'article') {
+        const articleResult = await db
+          .select({ slug: cmsArticles.slug, title: cmsArticles.title })
+          .from(cmsArticles)
+          .where(and(
+            eq(cmsArticles.id, content.id),
+            eq(cmsArticles.status, 'published'),
+            isNull(cmsArticles.deletedAt)
+          ))
+          .limit(1)
+        
+        if (articleResult.length > 0) {
+          validatedContent.push({
+            id: content.id,
+            type: 'article',
+            title: articleResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://prima.app'}/content/articles/${articleResult[0].slug}`
+          })
+        }
+      } else if (normalizedType === 'video') {
+        const videoResult = await db
+          .select({ slug: cmsVideos.slug, title: cmsVideos.title })
+          .from(cmsVideos)
+          .where(and(
+            eq(cmsVideos.id, content.id),
+            eq(cmsVideos.status, 'published'),
+            isNull(cmsVideos.deletedAt)
+          ))
+          .limit(1)
+        
+        if (videoResult.length > 0) {
+          validatedContent.push({
+            id: content.id,
+            type: 'video',
+            title: videoResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://prima.app'}/content/videos/${videoResult[0].slug}`
+          })
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to validate content ${content.id}:`, error)
+      continue
+    }
+  }
+  
+  return validatedContent
 }

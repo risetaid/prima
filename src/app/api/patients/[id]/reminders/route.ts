@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, reminderSchedules, reminderLogs } from '@/db'
-import { eq, desc } from 'drizzle-orm'
+import { db, patients, reminderSchedules, reminderLogs, reminderContentAttachments, cmsArticles, cmsVideos } from '@/db'
+import { eq, desc, and, isNull } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { shouldSendReminderNow, getWIBTime, getWIBTimeString, getWIBDateString } from '@/lib/timezone'
 import { whatsappRateLimiter } from '@/lib/rate-limiter'
@@ -85,7 +85,7 @@ export async function POST(
 
     const { id } = await params
     const requestBody = await request.json()
-    const { message, time, selectedDates, customRecurrence } = requestBody
+    const { message, time, selectedDates, customRecurrence, attachedContent } = requestBody
 
     if (!message || !time) {
       return NextResponse.json({ error: 'Missing required fields: message and time' }, { status: 400 })
@@ -129,6 +129,15 @@ export async function POST(
 
     const patient = patientResult[0]
 
+    // Validate attached content if provided
+    let validatedContent: Array<{id: string, type: 'article' | 'video', title: string, url: string}> = []
+    if (attachedContent && Array.isArray(attachedContent) && attachedContent.length > 0) {
+      validatedContent = await validateContentAttachments(attachedContent)
+      if (validatedContent.length === 0) {
+        return NextResponse.json({ error: 'None of the selected content items are valid or published' }, { status: 400 })
+      }
+    }
+
     // User is already available from getCurrentUser()
 
     // Generate dates based on recurrence type
@@ -169,6 +178,22 @@ export async function POST(
       const reminderSchedule = reminderScheduleResult[0]
 
       createdSchedules.push(reminderSchedule)
+      
+      // Create content attachments if provided
+      if (validatedContent.length > 0) {
+        for (let i = 0; i < validatedContent.length; i++) {
+          const content = validatedContent[i]
+          await db.insert(reminderContentAttachments).values({
+            reminderScheduleId: reminderSchedule.id,
+            contentType: content.type,
+            contentId: content.id,
+            contentTitle: content.title,
+            contentUrl: content.url,
+            attachmentOrder: i + 1,
+            createdBy: user.id
+          })
+        }
+      }
     }
 
     // Debug logging
@@ -184,10 +209,13 @@ export async function POST(
         if (!whatsappRateLimiter.isAllowed(rateLimitKey)) {
           // Don't break, just skip immediate send but still create the schedule
         } else {
+          // Generate enhanced message with content attachments
+          const enhancedMessage = generateEnhancedMessage(message, validatedContent)
+          
           // Send via Fonnte
           const result = await sendWhatsAppMessage({
             to: formatWhatsAppNumber(patient.phoneNumber),
-            body: message
+            body: enhancedMessage
           })
 
           // Log the reminder
@@ -353,4 +381,86 @@ function generateRecurrenceDates(customRecurrence: any): string[] {
   }
   
   return dates
+}
+
+// Helper function to validate content attachments
+async function validateContentAttachments(attachedContent: Array<{id: string, type: 'article' | 'video' | 'ARTICLE' | 'VIDEO', title: string}>) {
+  const validatedContent: Array<{id: string, type: 'article' | 'video', title: string, url: string}> = []
+  
+  for (const content of attachedContent) {
+    if (!content.id || !content.type || !content.title) {
+      continue // Skip invalid content
+    }
+    
+    // Normalize the content type to lowercase
+    const normalizedType = content.type.toLowerCase() as 'article' | 'video'
+    
+    try {
+      if (normalizedType === 'article') {
+        const articleResult = await db
+          .select({ slug: cmsArticles.slug, title: cmsArticles.title })
+          .from(cmsArticles)
+          .where(and(
+            eq(cmsArticles.id, content.id),
+            eq(cmsArticles.status, 'published'),
+            isNull(cmsArticles.deletedAt)
+          ))
+          .limit(1)
+        
+        if (articleResult.length > 0) {
+          validatedContent.push({
+            id: content.id,
+            type: 'article',
+            title: articleResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://prima.app'}/content/articles/${articleResult[0].slug}`
+          })
+        }
+      } else if (normalizedType === 'video') {
+        const videoResult = await db
+          .select({ slug: cmsVideos.slug, title: cmsVideos.title })
+          .from(cmsVideos)
+          .where(and(
+            eq(cmsVideos.id, content.id),
+            eq(cmsVideos.status, 'published'),
+            isNull(cmsVideos.deletedAt)
+          ))
+          .limit(1)
+        
+        if (videoResult.length > 0) {
+          validatedContent.push({
+            id: content.id,
+            type: 'video',
+            title: videoResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://prima.app'}/content/videos/${videoResult[0].slug}`
+          })
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to validate content ${content.id}:`, error)
+      continue
+    }
+  }
+  
+  return validatedContent
+}
+
+// Helper function to generate enhanced WhatsApp message with content links
+function generateEnhancedMessage(originalMessage: string, contentAttachments: Array<{id: string, type: 'article' | 'video', title: string, url: string}>) {
+  if (contentAttachments.length === 0) {
+    return originalMessage
+  }
+  
+  let enhancedMessage = originalMessage
+  
+  // Add content section
+  enhancedMessage += '\n\n📚 Baca juga:'
+  
+  contentAttachments.forEach(content => {
+    const icon = content.type === 'article' ? '📄' : '🎥'
+    enhancedMessage += `\n${icon} ${content.title}: ${content.url}`
+  })
+  
+  enhancedMessage += '\n\n💙 Tim PRIMA'
+  
+  return enhancedMessage
 }
