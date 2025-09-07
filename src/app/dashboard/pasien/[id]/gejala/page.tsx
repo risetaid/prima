@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Trash2, Calendar, Activity } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { DesktopHeader } from '@/components/ui/desktop-header'
+import { Header } from '@/components/ui/header'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 import { HealthNotesSkeleton } from '@/components/ui/dashboard-skeleton'
@@ -141,7 +141,7 @@ export default function PatientSymptomsPage() {
 
         {/* Desktop Header */}
         <div className="hidden lg:block relative z-10">
-          <DesktopHeader showNavigation={true} />
+          <Header showNavigation={true} />
         </div>
 
         {/* Mobile Header */}
@@ -189,7 +189,7 @@ export default function PatientSymptomsPage() {
 
       {/* Desktop Header */}
       <div className="hidden lg:block">
-        <DesktopHeader showNavigation={true} />
+        <Header showNavigation={true} />
       </div>
 
       {/* Main Content */}

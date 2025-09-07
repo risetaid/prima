@@ -7,7 +7,7 @@ export const CACHE_TTL = {
   TEMPLATES: 600,      // 10 minutes
   AUTOFILL: 180,       // 3 minutes
   USER_PROFILE: 300,   // 5 minutes
-  USER_SESSION: 180,   // 3 minutes - aggressive caching for performance
+  USER_SESSION: 300,   // 5 minutes - reduce database hits during multi-tab usage
   REMINDERS_ALL: 120,  // 2 minutes
 } as const
 

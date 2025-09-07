@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { DesktopHeader } from '@/components/ui/desktop-header'
+import { Header } from '@/components/ui/header'
 import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
 import Image from 'next/image'
 
@@ -155,7 +155,7 @@ export default function ReminderPage() {
 
       {/* Desktop: Header */}
       <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
+        <Header showNavigation={true} />
       </div>
 
       {/* Mobile: Header */}

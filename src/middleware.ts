@@ -1,5 +1,4 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
 
 const isProtectedRoute = createRouteMatcher([
   '/dashboard(.*)',
@@ -7,49 +6,23 @@ const isProtectedRoute = createRouteMatcher([
   '/api/admin(.*)',
   '/api/reminders(.*)',
   '/api/user(.*)',
-  '/api/upload(.*)'
-])
-
-const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
-  '/sign-up(.*)',
-  '/api/webhooks(.*)',
-  '/api/cron(.*)',
-  '/pending-approval',
-  '/unauthorized'
+  '/api/upload(.*)',
+  '/api/content(.*)',
+  '/api/cms(.*)'
 ])
 
 export default clerkMiddleware(async (auth, req) => {
-  const { pathname } = req.nextUrl
-  
   // Handle legacy route redirects
-  if (pathname === '/pengingat') {
+  if (req.nextUrl.pathname === '/pengingat') {
     const url = req.nextUrl.clone()
     url.pathname = '/dashboard/pengingat'
-    return NextResponse.redirect(url)
+    return Response.redirect(url)
   }
   
-  // Allow public routes
-  if (isPublicRoute(req)) {
-    return NextResponse.next()
-  }
-
-  // Protect dashboard and API routes
+  // Protect routes using Clerk's built-in protection
   if (isProtectedRoute(req)) {
-    try {
-      await auth.protect()
-    } catch (error) {
-      // Only log non-redirect errors to reduce noise
-      if (!(error && typeof error === 'object' && 'digest' in error && typeof (error as { digest?: string }).digest === 'string' && (error as { digest: string }).digest.includes('REDIRECT'))) {
-        console.error('❌ Middleware: Auth protect failed for', pathname, error)
-      }
-      
-      // Re-throw the error to let Clerk handle it properly
-      throw error
-    }
+    await auth.protect()
   }
-
-  return NextResponse.next()
 })
 
 export const config = {

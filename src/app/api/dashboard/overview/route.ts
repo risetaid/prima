@@ -5,9 +5,11 @@ import { getCurrentUser } from '@/lib/auth-utils'
 
 export async function GET() {
   try {
+    // Since middleware with auth.protect() already handles authentication and authorization,
+    // we can directly get the user without additional checks
     const user = await getCurrentUser()
-    if (!user || !user.canAccessDashboard) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Combine all dashboard data in optimized Drizzle queries

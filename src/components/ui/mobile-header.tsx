@@ -3,7 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { MobileAdminActions, MobileCMSActions, MobileReminderActions, MobileBeritaActions, MobileVideoActions, MobilePasienActions } from "./mobile-admin-actions";
+import { MobileAdminActions, MobileCMSActions, MobilePasienActions } from "./mobile-admin-actions";
 import { useRoleCache } from "@/lib/role-cache";
 import { Home } from "lucide-react";
 
@@ -24,18 +24,18 @@ function MobileNavigationActions() {
         {/* Dashboard Button */}
         <button
           onClick={() => router.push("/dashboard")}
-          className="p-2 rounded-full bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white transition-colors"
+          className="p-1.5 rounded-full bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white transition-colors touch-manipulation"
           title="Dashboard"
         >
-          <Home className="w-5 h-5" />
+          <Home className="w-4 h-4" />
         </button>
         
-        {/* CMS for ADMIN/SUPERADMIN */}
+        {/* Management actions for ADMIN/SUPERADMIN */}
         {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
           <MobileCMSActions />
         )}
         
-        {/* Superadmin Panel for SUPERADMIN */}
+        {/* Superadmin Panel for SUPERADMIN only */}
         {userRole === 'SUPERADMIN' && (
           <MobileAdminActions />
         )}
@@ -47,32 +47,46 @@ function MobileNavigationActions() {
     );
   }
   
-  // For other pages, show full navigation
+  // For other pages, show role-specific navigation
   if (userRole === 'MEMBER') {
-    // MEMBER users see: Pasien (view-only), Pengingat, Berita, Video Edukasi
+    // MEMBER users see: Only Pasien (view-only) - other features available in blue nav
     return (
-      <div className="flex items-center space-x-2">
-        <MobilePasienActions />  
-        <MobileReminderActions />
-        <MobileBeritaActions />
-        <MobileVideoActions />
-        <div className="ml-2">
+      <div className="flex items-center">
+        <MobilePasienActions />
+        {/* Fixed User Button */}
+        <div className="ml-2 flex-shrink-0">
           <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </div>
     );
   }
   
-  // ADMIN and SUPERADMIN see all navigation options
+  if (userRole === 'ADMIN') {
+    // ADMIN users see: Pasien + CMS (management functions only)
+    return (
+      <div className="flex items-center">
+        <div className="flex items-center space-x-1">
+          <MobilePasienActions />
+          <MobileCMSActions />
+        </div>
+        {/* Fixed User Button */}
+        <div className="ml-2 flex-shrink-0">
+          <UserButton afterSignOutUrl="/sign-in" />
+        </div>
+      </div>
+    );
+  }
+  
+  // SUPERADMIN users see: Pasien + CMS + Superadmin Panel (management functions only)
   return (
-    <div className="flex items-center space-x-2">
-      <MobilePasienActions />
-      <MobileReminderActions />
-      <MobileBeritaActions />
-      <MobileVideoActions />
-      <MobileCMSActions />
-      <MobileAdminActions />
-      <div className="ml-2">
+    <div className="flex items-center">
+      <div className="flex items-center space-x-1">
+        <MobilePasienActions />
+        <MobileCMSActions />
+        <MobileAdminActions />
+      </div>
+      {/* Fixed User Button */}
+      <div className="ml-2 flex-shrink-0">
         <UserButton afterSignOutUrl="/sign-in" />
       </div>
     </div>

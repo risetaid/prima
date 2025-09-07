@@ -6,9 +6,9 @@ import * as schema from './schema'
 // This uses pgbouncer connection pooling which is more efficient for serverless
 const client = postgres(process.env.DATABASE_URL!, { 
   prepare: false,              // Required for pgbouncer compatibility
-  max: 10,                     // Increase max connections for pooled setup
-  idle_timeout: 20,            // Longer idle timeout for pooled connections
-  connect_timeout: 10,         // Connect timeout
+  max: 15,                     // Increased max connections for better concurrency
+  idle_timeout: 30,            // Longer idle timeout for pooled connections
+  connect_timeout: 5,          // Reduced connect timeout for faster failures
   transform: {
     undefined: null,          // Transform undefined to null
   },

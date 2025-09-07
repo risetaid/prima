@@ -27,9 +27,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null
     }
 
-    // Get user from database using Clerk ID with retry logic
+    // Get user from database using Clerk ID with optimized retry logic
     let dbUserResult
-    let retries = 3
+    let retries = 2  // Reduced from 3 to 2
     
     while (retries > 0) {
       try {
@@ -42,15 +42,15 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       } catch (dbError: unknown) {
         retries--
         const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
-        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, errorMessage)
+        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, {
+          error: errorMessage,
+          userId,
+          attempt: 3 - retries
+        })
         
-        // Retry on various database errors
-        if (((dbError && typeof dbError === 'object' && 'code' in dbError && (
-             (dbError as {code: string}).code === 'CONNECT_TIMEOUT' || 
-             (dbError as {code: string}).code === 'CONNECTION_REFUSED')) || 
-             errorMessage.includes('connection') ||
-             errorMessage.includes('timeout')) && retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+        // Only retry on connection issues with shorter delay
+        if (retries > 0 && (errorMessage.includes('connection') || errorMessage.includes('timeout'))) {
+          await new Promise(resolve => setTimeout(resolve, 300)) // Reduced from 1000ms to 300ms
           continue
         }
         

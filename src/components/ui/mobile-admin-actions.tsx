@@ -15,8 +15,8 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
 
   if (loading) {
     return (
-      <div className={`p-2 rounded-full bg-gray-100 animate-pulse ${className}`}>
-        <Shield className="w-5 h-5 text-gray-400" />
+      <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
+        <Shield className="w-4 h-4 text-gray-400" />
       </div>
     );
   }
@@ -32,7 +32,7 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
     <button
       onClick={() => router.push("/dashboard/admin")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-purple-100 text-purple-600"
@@ -42,7 +42,7 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
       `}
       title="Superadmin Panel"
     >
-      <Shield className="w-5 h-5" />
+      <Shield className="w-4 h-4" />
     </button>
   );
 }
@@ -54,8 +54,8 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
 
   if (loading) {
     return (
-      <div className={`p-2 rounded-full bg-gray-100 animate-pulse ${className}`}>
-        <FileText className="w-5 h-5 text-gray-400" />
+      <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
+        <FileText className="w-4 h-4 text-gray-400" />
       </div>
     );
   }
@@ -71,7 +71,7 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
     <button
       onClick={() => router.push("/dashboard/cms")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-blue-100 text-blue-600"
@@ -81,7 +81,7 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
       `}
       title="CMS - Content Management"
     >
-      <FileText className="w-5 h-5" />
+      <FileText className="w-4 h-4" />
     </button>
   );
 }
@@ -96,7 +96,7 @@ export function MobileReminderActions({ className = "" }: MobileAdminActionsProp
     <button
       onClick={() => router.push("/dashboard/pengingat")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-blue-600 text-white"
@@ -106,7 +106,7 @@ export function MobileReminderActions({ className = "" }: MobileAdminActionsProp
       `}
       title="Pengingat Obat"
     >
-      <Calendar className="w-5 h-5" />
+      <Calendar className="w-4 h-4" />
     </button>
   );
 }
@@ -121,7 +121,7 @@ export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps)
     <button
       onClick={() => router.push("/dashboard/berita")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-green-600 text-white"
@@ -131,7 +131,7 @@ export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps)
       `}
       title="Berita & Artikel Kesehatan"
     >
-      <Newspaper className="w-5 h-5" />
+      <Newspaper className="w-4 h-4" />
     </button>
   );
 }
@@ -146,7 +146,7 @@ export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) 
     <button
       onClick={() => router.push("/dashboard/video")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-red-600 text-white"
@@ -156,7 +156,7 @@ export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) 
       `}
       title="Video Edukasi Kesehatan"
     >
-      <Video className="w-5 h-5" />
+      <Video className="w-4 h-4" />
     </button>
   );
 }
@@ -171,7 +171,7 @@ export function MobilePasienActions({ className = "" }: MobileAdminActionsProps)
     <button
       onClick={() => router.push("/dashboard")}
       className={`
-        p-2 rounded-full transition-colors
+        p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
             ? "bg-blue-600 text-white"
@@ -181,7 +181,7 @@ export function MobilePasienActions({ className = "" }: MobileAdminActionsProps)
       `}
       title="Daftar Pasien"
     >
-      <UserCheck className="w-5 h-5" />
+      <UserCheck className="w-4 h-4" />
     </button>
   );
 }

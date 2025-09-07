@@ -6,11 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Video, Calendar, User, Play, ExternalLink, ArrowLeft, Search, Filter, Grid, List, Clock } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { UserButton } from '@clerk/nextjs'
+import { Video, Calendar, User, Play, ExternalLink, Search, Filter, Grid, List, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
+import { Header } from '@/components/ui/header'
 
 interface VideoContent {
   id: string
@@ -27,7 +26,6 @@ interface VideoContent {
 }
 
 export default function VideoPage() {
-  const router = useRouter()
   const [videos, setVideos] = useState<VideoContent[]>([])
   const [filteredVideos, setFilteredVideos] = useState<VideoContent[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +33,11 @@ export default function VideoPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     fetchPublishedVideos()
@@ -72,38 +75,44 @@ export default function VideoPage() {
     try {
       console.log('🎥 Video: Fetching published videos...')
       
-      const response = await fetch('/api/cms/content?type=videos&status=published&limit=20')
+      const response = await fetch('/api/content/public?type=videos&limit=20')
       
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Silakan login untuk mengakses video edukasi')
+        }
         throw new Error(`HTTP ${response.status}: Failed to fetch videos`)
       }
 
       const data = await response.json()
       
       if (data.success && data.data) {
-        // Filter only published videos for Members
-        const publishedVideos = data.data.filter((item: any) => 
-          item.type === 'video' && item.status === 'published'
-        )
+        // Videos are already filtered to published only by the API
+        const publishedVideos = data.data.filter((item: any) => item.type === 'video')
         setVideos(publishedVideos)
         console.log(`✅ Video: Loaded ${publishedVideos.length} published videos`)
       } else {
-        throw new Error('Invalid response format')
+        throw new Error(data.error || 'Invalid response format')
       }
     } catch (error) {
       console.error('❌ Video: Failed to load videos:', error)
-      setError(error instanceof Error ? error.message : 'Failed to load videos')
+      setError(error instanceof Error ? error.message : 'Gagal memuat video edukasi')
     } finally {
       setLoading(false)
     }
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    })
+    try {
+      return new Date(dateString).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'Asia/Jakarta'
+      })
+    } catch {
+      return new Date(dateString).toLocaleDateString()
+    }
   }
 
   const getCategoryColor = (category: string) => {
@@ -144,23 +153,16 @@ export default function VideoPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm">
-          <div className="flex justify-between items-center px-4 py-4">
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
-              >
-                <ArrowLeft className="w-6 h-6 text-blue-600" />
-              </button>
-              <div className="h-6 w-32 bg-gray-300 rounded animate-pulse"></div>
-            </div>
-            <UserButton afterSignOutUrl="/sign-in" />
+        <Header showNavigation={true} />
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Memuat video edukasi...</p>
           </div>
-        </header>
-
-        <main className="px-4 py-6">
-          <CMSContentListSkeleton />
+          <div className="mt-8">
+            <CMSContentListSkeleton />
+          </div>
         </main>
       </div>
     )
@@ -169,27 +171,16 @@ export default function VideoPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm">
-          <div className="flex justify-between items-center px-4 py-4">
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
-              >
-                <ArrowLeft className="w-6 h-6 text-blue-600" />
-              </button>
-              <h1 className="text-2xl font-bold text-blue-600">Video Edukasi</h1>
-            </div>
-            <UserButton afterSignOutUrl="/sign-in" />
-          </div>
-        </header>
+        <Header showNavigation={true} />
+        
 
-        <main className="px-4 py-6">
+
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
             <Video className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Gagal Memuat Video</h1>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">
+            <Button onClick={() => fetchPublishedVideos()} className="mt-4">
               Coba Lagi
             </Button>
           </div>
@@ -200,29 +191,8 @@ export default function VideoPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Modern Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <ArrowLeft className="w-6 h-6 text-blue-600" />
-              </button>
-              <div className="flex items-center space-x-2">
-                <Video className="w-7 h-7 text-red-600" />
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Video Edukasi</h1>
-                  <p className="text-sm text-gray-600 hidden sm:block">Motivasi dan pembelajaran kesehatan</p>
-                </div>
-              </div>
-            </div>
-            <UserButton afterSignOutUrl="/sign-in" />
-          </div>
-        </div>
-      </header>
+      {/* Responsive Header */}
+      <Header showNavigation={true} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {videos.length === 0 && !loading ? (
@@ -283,28 +253,30 @@ export default function VideoPage() {
                     </SelectContent>
                   </Select>
                   
-                  <div className="flex border rounded-lg bg-gray-50">
-                    <button
-                      onClick={() => setViewMode('grid')}
-                      className={`p-2 rounded-l-lg transition-colors ${
-                        viewMode === 'grid' 
-                          ? 'bg-red-100 text-red-600' 
-                          : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                    >
-                      <Grid className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => setViewMode('list')}
-                      className={`p-2 rounded-r-lg transition-colors ${
-                        viewMode === 'list' 
-                          ? 'bg-red-100 text-red-600' 
-                          : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                    >
-                      <List className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {isMounted && (
+                    <div className="flex border rounded-lg bg-gray-50">
+                      <button
+                        onClick={() => setViewMode('grid')}
+                        className={`p-2 rounded-l-lg transition-colors ${
+                          viewMode === 'grid' 
+                            ? 'bg-red-100 text-red-600' 
+                            : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        <Grid className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setViewMode('list')}
+                        className={`p-2 rounded-r-lg transition-colors ${
+                          viewMode === 'list' 
+                            ? 'bg-red-100 text-red-600' 
+                            : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                      >
+                        <List className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -332,7 +304,9 @@ export default function VideoPage() {
                             alt={video.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             onError={(e) => {
-                              e.currentTarget.src = '/placeholder-video.jpg'
+                              if (typeof window !== 'undefined') {
+                                e.currentTarget.src = '/placeholder-video.jpg'
+                              }
                             }}
                           />
                           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
@@ -406,7 +380,9 @@ export default function VideoPage() {
                                 alt={video.title}
                                 className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
                                 onError={(e) => {
-                                  e.currentTarget.src = '/placeholder-video.jpg'
+                                  if (typeof window !== 'undefined') {
+                                    e.currentTarget.src = '/placeholder-video.jpg'
+                                  }
                                 }}
                               />
                               <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">

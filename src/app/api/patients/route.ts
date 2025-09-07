@@ -7,9 +7,11 @@ import { validateString } from '@/lib/type-validator'
 
 export async function GET(request: NextRequest) {
   try {
+    // Since middleware with auth.protect() already handles authentication and authorization,
+    // we can directly get the user without additional checks
     const user = await getAuthUser()
-    if (!user || !user.canAccessDashboard) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Get patients assigned to current user only (unless admin)

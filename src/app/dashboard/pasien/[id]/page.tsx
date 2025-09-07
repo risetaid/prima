@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Edit, Trash2, User, ChevronRight, Camera, Upload, X, Plus, ChevronLeft, Calendar, MessageSquare, Clock, Repeat, ChevronDown, Zap } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { DesktopHeader } from '@/components/ui/desktop-header'
+import { Header } from '@/components/ui/header'
 import { formatDateWIB, formatDateTimeWIB } from '@/lib/datetime'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -84,6 +84,7 @@ export default function PatientDetailPage() {
   const router = useRouter()
   const params = useParams()
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [patient, setPatient] = useState<Patient | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editData, setEditData] = useState({ name: '', phoneNumber: '', photoUrl: '' })
@@ -121,11 +122,12 @@ export default function PatientDetailPage() {
         const data = await response.json()
         setPatient(data)
         setEditData({ name: data.name, phoneNumber: data.phoneNumber, photoUrl: data.photoUrl || '' })
+        setError(null)
       } else {
-        router.push('/dashboard/pasien')
+        setError('Gagal memuat data pasien')
       }
-    } catch (error) {
-      router.push('/dashboard/pasien')
+    } catch (err) {
+      setError('Terjadi kesalahan saat memuat data pasien')
     } finally {
       setLoading(false)
     }
@@ -602,50 +604,60 @@ export default function PatientDetailPage() {
 
         {/* Desktop Header */}
         <div className="hidden lg:block relative z-10">
-          <DesktopHeader showNavigation={true} />
+          <Header showNavigation={true} />
         </div>
-
-        {/* Mobile Header */}
-        <div className="lg:hidden relative z-10">
-          <header className="bg-white shadow-sm">
-            <div className="flex items-center justify-between p-4">
-              <button
-                onClick={() => router.back()}
-                className="flex items-center text-gray-600 hover:text-gray-900"
-              >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Kembali
-              </button>
-              <h1 className="text-lg font-semibold text-gray-900">Detail Pasien</h1>
-              <UserButton />
-            </div>
-          </header>
-        </div>
-
-        {/* Main Content with Skeleton */}
-        <main className="relative z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <PatientDetailSkeleton />
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Memuat data pasien...</p>
           </div>
         </main>
       </div>
     )
   }
 
-  if (!patient) {
+  if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Patient not found</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <Header showNavigation={true} />
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">Terjadi kesalahan memuat data pasien</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        </main>
       </div>
     )
   }
 
-  // Using WIB timezone utilities
+  // Return loading if patient data is still null but not in error state
+  if (!patient && !error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header showNavigation={true} />
+        
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Memuat data pasien...</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
+  // Main return for successful patient data load - patient is guaranteed to be non-null here
+  if (!patient) return null; // This should never happen but satisfies TypeScript
+  
   return (
-    <div className="min-h-screen bg-gray-50 relative">
+    <div className="min-h-screen bg-gray-50">
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
@@ -655,31 +667,9 @@ export default function PatientDetailPage() {
           }}
         />
       </div>
-      {/* Mobile Header */}
-      <header className="lg:hidden bg-white relative z-10">
-        <div className="flex justify-between items-center px-4 py-4">
-          <button 
-            onClick={() => router.back()}
-            className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
-          >
-            <ArrowLeft className="w-6 h-6 text-blue-600" />
-          </button>
-          <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-          <UserButton afterSignOutUrl="/sign-in" />
-        </div>
-      </header>
 
-      {/* Desktop Header */}
-      <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
-      </div>
-
-      {/* Desktop: Blue Header Section */}
-      <div className="hidden lg:block bg-blue-500 py-6 relative z-10">
-        <div className="max-w-7xl mx-auto px-8 text-center">
-          <h1 className="text-white text-3xl font-bold">Informasi Pasien</h1>
-        </div>
-      </div>
+      {/* Responsive Header */}
+      <Header showNavigation={true} />
 
       {/* Mobile Title */}
       <div className="lg:hidden flex items-center space-x-2 mb-6 px-4">

@@ -1,7 +1,7 @@
 "use client";
 
 import UserManagement from "@/components/admin/user-management";
-import { DesktopHeader } from "@/components/ui/desktop-header";
+import { Header } from "@/components/ui/header";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { BackButton } from '@/components/ui/back-button';
@@ -23,7 +23,7 @@ export default function AdminUsersPage() {
 
       {/* Desktop Header */}
       <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
+        <Header showNavigation={true} />
       </div>
 
       {/* Mobile Header */}

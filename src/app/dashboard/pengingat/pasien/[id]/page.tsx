@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { DesktopHeader } from '@/components/ui/desktop-header'
+import { Header } from '@/components/ui/header'
 import { PatientReminderDashboard } from '@/components/pengingat/patient-reminder-dashboard'
 
 interface ReminderStats {
@@ -106,7 +106,7 @@ export default function PatientReminderPage() {
 
       {/* Desktop: Header */}
       <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
+        <Header showNavigation={true} />
       </div>
 
       {/* Mobile: Header */}

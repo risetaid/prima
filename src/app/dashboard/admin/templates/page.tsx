@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import TemplateManagement from "@/components/admin/template-management";
 import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
-import { DesktopHeader } from "@/components/ui/desktop-header";
+import { Header } from "@/components/ui/header";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
 
@@ -58,7 +58,7 @@ export default function AdminTemplatesPage() {
 
         {/* Desktop Header */}
         <div className="hidden lg:block relative z-10">
-          <DesktopHeader showNavigation={true} />
+          <Header showNavigation={true} />
         </div>
 
         {/* Mobile Header */}
@@ -106,7 +106,7 @@ export default function AdminTemplatesPage() {
 
       {/* Desktop Header */}
       <div className="hidden lg:block relative z-10">
-        <DesktopHeader showNavigation={true} />
+        <Header showNavigation={true} />
       </div>
 
       {/* Mobile Header */}

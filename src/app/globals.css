@@ -236,3 +236,21 @@
     margin-bottom: 1rem !important;
   }
 }
+
+/* Mobile Navigation Scrollbar Utilities */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;     /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;             /* Safari and Chrome */
+  }
+  
+  .scroll-snap-x {
+    scroll-snap-type: x mandatory;
+  }
+  .scroll-snap-start {
+    scroll-snap-align: start;
+  }
+}
