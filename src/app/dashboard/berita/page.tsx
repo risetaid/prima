@@ -145,13 +145,7 @@ export default function BeritaPage() {
         <Header showNavigation={true} />
         
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Memuat artikel kesehatan...</p>
-          </div>
-          <div className="mt-8">
-            <CMSContentListSkeleton />
-          </div>
+          <CMSContentListSkeleton />
         </main>
       </div>
     )

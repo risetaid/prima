@@ -610,3 +610,192 @@ export function HealthNotesSkeleton() {
     </div>
   )
 }
+
+// Patient List Mobile Skeleton - for mobile patient cards with search/filters
+export function PatientListMobileSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Skeleton */}
+      <div className="bg-white shadow-sm">
+        <div className="flex justify-between items-center px-4 py-4">
+          <div className="flex items-center space-x-3">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            <Skeleton className="h-6 w-16" />
+          </div>
+          <Skeleton className="h-8 w-8 rounded-full" />
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="px-4 py-6 space-y-4">
+        {/* Search Bar Skeleton */}
+        <div className="relative">
+          <Skeleton className="h-12 w-full rounded-lg" />
+        </div>
+
+        {/* Filter Buttons Skeleton */}
+        <div className="flex gap-3 overflow-x-auto">
+          <Skeleton className="h-10 w-32 rounded-lg flex-shrink-0" />
+          <Skeleton className="h-10 w-40 rounded-lg flex-shrink-0" />
+        </div>
+
+        {/* Results Count */}
+        <Skeleton className="h-4 w-48" />
+
+        {/* Patient Cards */}
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <div className="space-y-1">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <div className="flex flex-col items-end space-y-1">
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-6 w-20 rounded-full" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Reminder Page Skeleton - for reminder page with search + patient cards  
+export function ReminderPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern Skeleton */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <Skeleton className="absolute inset-0" />
+      </div>
+
+      {/* Desktop Header Skeleton */}
+      <div className="hidden lg:block relative z-10">
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-3">
+                <Skeleton className="h-8 w-8 rounded" />
+                <Skeleton className="h-6 w-24" />
+              </div>
+              <div className="hidden md:flex space-x-6">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-5 w-20" />
+                ))}
+              </div>
+              <Skeleton className="h-8 w-8 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Header Skeleton */}
+      <div className="lg:hidden relative z-10">
+        <div className="bg-white">
+          <div className="flex justify-between items-center px-4 py-4">
+            <Skeleton className="h-6 w-6 rounded-full" />
+            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Blue Header Section */}
+      <div className="hidden lg:block relative z-10">
+        <div className="bg-blue-600 text-white py-6">
+          <div className="max-w-7xl mx-auto px-8">
+            <div className="flex items-center justify-between">
+              {/* Search Bar Skeleton */}
+              <div className="bg-white rounded-lg">
+                <Skeleton className="h-12 w-80" />
+              </div>
+              {/* Title Skeleton */}
+              <Skeleton className="h-8 w-64 bg-blue-500" />
+              {/* Filter Buttons Skeleton */}
+              <div className="flex space-x-3">
+                <Skeleton className="h-12 w-16 bg-blue-500 rounded-lg" />
+                <Skeleton className="h-12 w-20 bg-blue-500 rounded-lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop Table Skeleton */}
+      <div className="hidden lg:block max-w-7xl mx-auto px-4 lg:px-8 py-8 relative z-10">
+        <Card className="bg-white">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Table Header */}
+              <div className="grid grid-cols-5 gap-4 py-3 border-b">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-18" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              {/* Table Rows */}
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="grid grid-cols-5 gap-4 py-3 border-b last:border-0">
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-6 w-16 rounded-full" />
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-8 w-20 rounded" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Mobile Patient Cards Skeleton */}
+      <div className="lg:hidden relative z-10">
+        <div className="px-4 py-6">
+          {/* Mobile Controls */}
+          <div className="flex justify-between items-center mb-4">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-8 w-32" />
+          </div>
+
+          {/* Filter Buttons */}
+          <div className="flex space-x-2 mb-4">
+            <Skeleton className="h-8 w-16 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-full" />
+          </div>
+
+          {/* Patient Cards */}
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end space-y-1">
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
