@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Plus, Settings } from "lucide-react";
+import { Plus, Send } from "lucide-react";
 import { useCallback, memo, useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import { PatientListTable } from "@/components/dashboard/patient-list-table";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Patient {
   id: string;
@@ -33,6 +35,9 @@ function DashboardClient() {
     activePatients: 0,
     inactivePatients: 0,
   });
+  const [showInstantSendDialog, setShowInstantSendDialog] = useState(false);
+  const [isInstantSending, setIsInstantSending] = useState(false);
+  const [instantSendResult, setInstantSendResult] = useState<any>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -133,6 +138,40 @@ function DashboardClient() {
   const handleAddPatientSuccess = useCallback(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  const handleInstantSendAll = useCallback(async () => {
+    setIsInstantSending(true);
+    setInstantSendResult(null);
+    
+    try {
+      const response = await fetch('/api/reminders/instant-send-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const result = await response.json();
+      setInstantSendResult(result);
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send reminders');
+      }
+    } catch (error) {
+      console.error('Error sending instant reminders:', error);
+      setInstantSendResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    } finally {
+      setIsInstantSending(false);
+    }
+  }, []);
+
+  const handleInstantSendClose = useCallback(() => {
+    setShowInstantSendDialog(false);
+    setInstantSendResult(null);
+  }, []);
 
   const toggleFilter = useCallback((filterType: string) => {
     setActiveFilters((prev) => {
@@ -326,6 +365,51 @@ function DashboardClient() {
         </span>
       </div>
 
+      {/* Instant Send Section - Admin Only */}
+      {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-4">
+          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-400">
+            {/* Desktop Layout */}
+            <div className="hidden lg:flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Kirim Semua Pengingat</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Kirim pesan pengingat ke semua pasien yang Anda kelola secara instan
+                </p>
+              </div>
+              <Button
+                onClick={() => setShowInstantSendDialog(true)}
+                variant="destructive"
+                size="lg"
+                className="flex items-center gap-2"
+              >
+                <Send className="w-4 h-4" />
+                Kirim Semua
+              </Button>
+            </div>
+            
+            {/* Mobile Layout */}
+            <div className="lg:hidden">
+              <div className="text-center">
+                <h3 className="text-base font-medium text-gray-900">Kirim Semua Pengingat</h3>
+                <p className="text-sm text-gray-600 mt-1 mb-3">
+                  Kirim pesan ke semua pasien Anda secara instan
+                </p>
+                <Button
+                  onClick={() => setShowInstantSendDialog(true)}
+                  variant="destructive"
+                  size="default"
+                  className="flex items-center gap-2 w-full justify-center"
+                >
+                  <Send className="w-4 h-4" />
+                  Kirim Semua Pengingat
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Patient List Section */}
       <div className="max-w-7xl mx-auto px-4 lg:px-8 my-6">
         {/* Mobile: Title and Controls */}
@@ -495,6 +579,75 @@ function DashboardClient() {
         onClose={() => setShowAddPatientModal(false)}
         onSuccess={handleAddPatientSuccess}
       />
+
+      {/* Instant Send Dialog */}
+      <Dialog open={showInstantSendDialog} onOpenChange={setShowInstantSendDialog}>
+        <DialogContent className="max-w-md mx-4 sm:mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Konfirmasi Kirim Semua Pengingat</DialogTitle>
+            <DialogDescription className="text-sm">
+              {!instantSendResult ? (
+                "Apakah Anda yakin ingin mengirim pesan pengingat ke SEMUA pasien yang Anda kelola sekarang? Tindakan ini tidak dapat dibatalkan."
+              ) : (
+                "Hasil pengiriman pesan:"
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {instantSendResult && (
+            <div className={`p-3 sm:p-4 rounded-lg ${instantSendResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+              <div className={`font-medium text-sm sm:text-base ${instantSendResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                {instantSendResult.message || instantSendResult.error}
+              </div>
+              {instantSendResult.results && (
+                <div className="mt-2 text-xs sm:text-sm text-gray-600 space-y-1">
+                  <div>📊 Pengingat ditemukan: <span className="font-medium">{instantSendResult.results.remindersFound}</span></div>
+                  <div>✅ Berhasil dikirim: <span className="font-medium">{instantSendResult.results.messagesSent}</span></div>
+                  <div>❌ Error: <span className="font-medium">{instantSendResult.results.errors}</span></div>
+                  <div>📈 Tingkat keberhasilan: <span className="font-medium">{instantSendResult.results.successRate}</span></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            {!instantSendResult ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowInstantSendDialog(false)}
+                  className="w-full sm:w-auto order-2 sm:order-1"
+                >
+                  Batal
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleInstantSendAll}
+                  disabled={isInstantSending}
+                  className="w-full sm:w-auto order-1 sm:order-2"
+                >
+                  {isInstantSending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span className="hidden sm:inline">Mengirim...</span>
+                      <span className="sm:hidden">Kirim...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="hidden sm:inline">Ya, Kirim Semua</span>
+                      <span className="sm:hidden">Kirim Semua</span>
+                    </>
+                  )}
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleInstantSendClose} className="w-full sm:w-auto">
+                Tutup
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
