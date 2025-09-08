@@ -139,7 +139,7 @@ export function createApiHandler<TInput = any, TOutput = any>(
   config: ApiConfig<TInput>,
   handler: ApiHandler<TInput, TOutput>
 ) {
-  return async (request: NextRequest, context?: { params?: Promise<Record<string, string>> }) => {
+  return async (request: NextRequest, context: { params: Promise<Record<string, string>> }) => {
     const startTime = Date.now()
     let apiContext: ApiContext | undefined
     
