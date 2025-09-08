@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Client } from 'minio'
 
-// Initialize MinIO client
-const minioClient = new Client({
-  endPoint: process.env.MINIO_PUBLIC_ENDPOINT!.replace('https://', '').replace('http://', ''),
-  port: 443,
-  useSSL: true,
-  accessKey: process.env.MINIO_ROOT_USER!,
-  secretKey: process.env.MINIO_ROOT_PASSWORD!,
-})
-
 export async function POST(request: NextRequest) {
   try {
+    // Initialize MinIO client with error handling
+    const minioEndpoint = process.env.MINIO_PUBLIC_ENDPOINT
+    const minioUser = process.env.MINIO_ROOT_USER
+    const minioPassword = process.env.MINIO_ROOT_PASSWORD
+
+    if (!minioEndpoint || !minioUser || !minioPassword) {
+      console.error('Missing MinIO environment variables:', {
+        endpoint: !!minioEndpoint,
+        user: !!minioUser,
+        password: !!minioPassword
+      })
+      return NextResponse.json({ error: 'MinIO configuration missing' }, { status: 500 })
+    }
+
+    const minioClient = new Client({
+      endPoint: minioEndpoint.replace('https://', '').replace('http://', ''),
+      port: 443,
+      useSSL: true,
+      accessKey: minioUser,
+      secretKey: minioPassword,
+    })
+
     const data = await request.formData()
     const file: File | null = data.get('photo') as unknown as File
 
