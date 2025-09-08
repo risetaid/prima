@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const minioClient = new Client({
-      endPoint: minioEndpoint.replace('https://', '').replace('http://', ''),
+      endPoint: minioEndpoint.replace('https://', '').replace('http://', '').replace(':443', ''),
       port: 443,
       useSSL: true,
       accessKey: minioUser,
