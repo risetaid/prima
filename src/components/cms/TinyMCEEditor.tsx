@@ -127,6 +127,10 @@ export function TinyMCEEditor({
           images_reuse_filename: true,
           images_upload_base_path: '',
           images_upload_credentials: false,
+
+          // Additional image settings
+          image_default_align: 'none',
+          image_default_caption: false,
           image_class_list: [
             { title: 'Responsive', value: 'img-responsive' },
             { title: 'Bordered', value: 'img-bordered' },

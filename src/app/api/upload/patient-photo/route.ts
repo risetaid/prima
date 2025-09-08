@@ -79,9 +79,49 @@ export async function POST(request: NextRequest) {
 
     // Ensure bucket exists
     const bucketName = process.env.MINIO_BUCKET_NAME!
-    const bucketExists = await minioClient.bucketExists(bucketName)
-    if (!bucketExists) {
-      await minioClient.makeBucket(bucketName, 'us-east-1')
+    console.log('MinIO Debug:', {
+      bucketName,
+      minioEndpoint,
+      minioUser: minioUser ? '***' : 'undefined',
+      minioPassword: minioPassword ? '***' : 'undefined'
+    })
+
+    try {
+      const bucketExists = await minioClient.bucketExists(bucketName)
+      console.log('Bucket exists check:', { bucketName, exists: bucketExists })
+
+      if (!bucketExists) {
+        console.log('Creating bucket:', bucketName)
+        await minioClient.makeBucket(bucketName, 'us-east-1')
+        console.log('Bucket created successfully')
+
+        // Set bucket policy to allow public read access
+        const policy = {
+          Version: '2012-10-17',
+          Statement: [
+            {
+              Effect: 'Allow',
+              Principal: { AWS: '*' },
+              Action: ['s3:GetObject'],
+              Resource: [`arn:aws:s3:::${bucketName}/*`]
+            }
+          ]
+        }
+
+        try {
+          await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy))
+          console.log('Bucket policy set successfully')
+        } catch (policyError) {
+          console.warn('Failed to set bucket policy:', policyError)
+          // Don't fail the upload if policy setting fails
+        }
+      }
+    } catch (bucketError) {
+      console.error('Bucket operation error:', bucketError)
+      return NextResponse.json({
+        error: 'Failed to access MinIO bucket',
+        details: bucketError instanceof Error ? bucketError.message : 'Unknown error'
+      }, { status: 500 })
     }
 
     // Upload file to MinIO with retry logic
@@ -91,14 +131,23 @@ export async function POST(request: NextRequest) {
 
     while (attempts < maxAttempts) {
       try {
+        console.log('Attempting to upload file:', { bucketName, finalFilename, size: buffer.length })
         await minioClient.putObject(bucketName, finalFilename, buffer, buffer.length, {
           'Content-Type': file.type || 'application/octet-stream',
         })
+        console.log('File uploaded successfully:', finalFilename)
         break // Success, exit retry loop
       } catch (error: any) {
+        console.error('Upload attempt failed:', {
+          attempt: attempts + 1,
+          error: error.message,
+          code: error.code,
+          finalFilename
+        })
         attempts++
         if (error.code === 'NoSuchBucket' && attempts < maxAttempts) {
           // Bucket might have been deleted, recreate it
+          console.log('Recreating bucket due to NoSuchBucket error')
           await minioClient.makeBucket(bucketName, 'us-east-1')
           continue
         }
@@ -112,6 +161,7 @@ export async function POST(request: NextRequest) {
 
     // Generate public URL (remove port for HTTPS)
     const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT?.replace(':443', '')}/${bucketName}/${finalFilename}`
+    console.log('Generated public URL:', publicUrl)
 
     return NextResponse.json({
       success: true,
