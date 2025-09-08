@@ -25,10 +25,9 @@ export async function GET(
     // Build where conditions with proper logic
     const whereConditions = [
       eq(reminderLogs.patientId, id),
-      // Include both DELIVERED (needs confirmation) AND FAILED (needs retry)
-      // REMOVED: eq(reminderLogs.status, 'DELIVERED'), - this was too restrictive
-      // For DELIVERED: needs manual confirmation
-      // For FAILED: needs retry/attention
+      // Only show DELIVERED reminders that haven't been confirmed yet
+      eq(reminderLogs.status, 'DELIVERED'),
+      // Must not have manual confirmation
       notExists(
         db.select()
           .from(manualConfirmations)

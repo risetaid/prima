@@ -13,7 +13,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { medicationTaken, reminderLogId } = await request.json()
+    let requestBody
+    try {
+      requestBody = await request.json()
+    } catch (error) {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+    }
+
+    const { medicationTaken, reminderLogId } = requestBody
 
     if (typeof medicationTaken !== 'boolean') {
       return NextResponse.json({ error: 'medicationTaken must be boolean' }, { status: 400 })
@@ -23,6 +30,8 @@ export async function PUT(
     
     // Use reminderLogId from request body if provided, otherwise use reminderId from URL
     const logId = reminderLogId || reminderId
+
+    console.log('Confirming reminder:', { patientId: id, reminderId, logId, medicationTaken })
 
     // Get the reminder log using separate queries
     const reminderLog = await db
@@ -86,7 +95,7 @@ export async function PUT(
         visitDate: new Date(),
         visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
         medicationsTaken: medicationTaken,
-        medicationsMissed: medicationTaken ? [] : [reminderSchedule.length > 0 ? reminderSchedule[0].medicationName : 'Obat'],
+        medicationsMissed: medicationTaken ? [] : [reminderSchedule && reminderSchedule.length > 0 ? reminderSchedule[0].medicationName : 'Obat'],
         patientCondition: 'FAIR', // Default, could be made dynamic
         symptomsReported: [],
         notes: `Manual confirmation for reminder: ${logData.message}`,

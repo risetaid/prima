@@ -22,10 +22,9 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = (page - 1) * limit
 
-    // Optimized single query with proper joins
-    const completedReminders = await db
+    // Get manual confirmations for this patient
+    const confirmations = await db
       .select({
-        // Confirmation fields
         id: manualConfirmations.id,
         patientId: manualConfirmations.patientId,
         reminderLogId: manualConfirmations.reminderLogId,
@@ -34,47 +33,94 @@ export async function GET(
         medicationsTaken: manualConfirmations.medicationsTaken,
         medicationsMissed: manualConfirmations.medicationsMissed,
         confirmedAt: manualConfirmations.confirmedAt,
-        notes: manualConfirmations.notes,
-        // Schedule fields (joined)
-        medicationName: reminderSchedules.medicationName,
-        customMessage: reminderSchedules.customMessage,
-        // Log fields (joined)
-        sentAt: reminderLogs.sentAt
+        notes: manualConfirmations.notes
       })
       .from(manualConfirmations)
-      .leftJoin(reminderLogs, 
-        eq(manualConfirmations.reminderLogId, reminderLogs.id)
-      )
-      .leftJoin(reminderSchedules, 
-        and(
-          eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-          isNull(reminderSchedules.deletedAt) // Soft delete filter
-        )
-      )
       .where(eq(manualConfirmations.patientId, id))
       .orderBy(desc(manualConfirmations.confirmedAt))
       .offset(offset)
       .limit(limit)
 
-    // Transform to match frontend interface
-    const formattedReminders = completedReminders.map(reminder => {
-      const medicationName = reminder.medicationName || 
-                            (reminder.medicationsMissed && reminder.medicationsMissed.length > 0 
-                              ? reminder.medicationsMissed[0] 
-                              : 'Obat')
-      
-      return {
-        id: reminder.id,
-        medicationName,
-        scheduledTime: reminder.visitTime,
-        completedDate: reminder.visitDate.toISOString().split('T')[0],
-        customMessage: reminder.customMessage || `Minum obat ${medicationName}`,
-        medicationTaken: reminder.medicationsTaken,
-        confirmedAt: convertUTCToWIBString(reminder.confirmedAt),
-        sentAt: reminder.sentAt ? reminder.sentAt.toISOString() : null,
-        notes: reminder.notes
+    // Get associated data for each confirmation
+    const completedReminders = []
+    for (const confirmation of confirmations) {
+      let medicationName = 'Obat'
+      let customMessage = `Minum obat ${medicationName}`
+      let sentAt = null
+
+      // Get reminder log details if available
+      if (confirmation.reminderLogId) {
+        const logResult = await db
+          .select({
+            sentAt: reminderLogs.sentAt,
+            reminderScheduleId: reminderLogs.reminderScheduleId
+          })
+          .from(reminderLogs)
+          .where(eq(reminderLogs.id, confirmation.reminderLogId))
+          .limit(1)
+
+        if (logResult.length > 0) {
+          sentAt = logResult[0].sentAt
+
+          // Get schedule details if available
+          if (logResult[0].reminderScheduleId) {
+            const scheduleResult = await db
+              .select({
+                medicationName: reminderSchedules.medicationName,
+                customMessage: reminderSchedules.customMessage
+              })
+              .from(reminderSchedules)
+              .where(
+                and(
+                  eq(reminderSchedules.id, logResult[0].reminderScheduleId),
+                  isNull(reminderSchedules.deletedAt)
+                )
+              )
+              .limit(1)
+
+            if (scheduleResult.length > 0) {
+              medicationName = scheduleResult[0].medicationName || medicationName
+              customMessage = scheduleResult[0].customMessage || customMessage
+            }
+          }
+        }
       }
-    })
+
+      // Use medications data from confirmation if available
+      if (confirmation.medicationsTaken && Array.isArray(confirmation.medicationsTaken) && confirmation.medicationsTaken.length > 0) {
+        medicationName = confirmation.medicationsTaken[0]
+      } else if (confirmation.medicationsMissed && Array.isArray(confirmation.medicationsMissed) && confirmation.medicationsMissed.length > 0) {
+        medicationName = confirmation.medicationsMissed[0]
+      }
+
+      completedReminders.push({
+        id: confirmation.id,
+        patientId: confirmation.patientId,
+        reminderLogId: confirmation.reminderLogId,
+        visitDate: confirmation.visitDate,
+        visitTime: confirmation.visitTime,
+        medicationsTaken: confirmation.medicationsTaken,
+        medicationsMissed: confirmation.medicationsMissed,
+        confirmedAt: confirmation.confirmedAt,
+        notes: confirmation.notes,
+        medicationName,
+        customMessage,
+        sentAt
+      })
+    }
+
+    // Transform to match frontend interface
+    const formattedReminders = completedReminders.map(reminder => ({
+      id: reminder.id,
+      medicationName: reminder.medicationName,
+      scheduledTime: reminder.visitTime,
+      completedDate: reminder.visitDate.toISOString().split('T')[0],
+      customMessage: reminder.customMessage,
+      medicationTaken: reminder.medicationsTaken,
+      confirmedAt: convertUTCToWIBString(reminder.confirmedAt),
+      sentAt: reminder.sentAt ? reminder.sentAt.toISOString() : null,
+      notes: reminder.notes
+    }))
 
     return NextResponse.json(formattedReminders)
   } catch (error) {
