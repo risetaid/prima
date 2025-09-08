@@ -110,8 +110,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Generate public URL
-    const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT}/${bucketName}/${finalFilename}`
+    // Generate public URL (remove port for HTTPS)
+    const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT?.replace(':443', '')}/${bucketName}/${finalFilename}`
 
     return NextResponse.json({
       success: true,

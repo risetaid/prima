@@ -76,7 +76,7 @@ const nextConfig: NextConfig = {
         },
         {
           protocol: 'https',
-          hostname: process.env.MINIO_PUBLIC_ENDPOINT?.replace('https://', '') || '*.minio.railway.app',
+          hostname: process.env.MINIO_PUBLIC_ENDPOINT?.replace('https://', '').replace(':443', '') || 'bucket-production-eb73.up.railway.app',
           port: '',
           pathname: '/**',
         },
