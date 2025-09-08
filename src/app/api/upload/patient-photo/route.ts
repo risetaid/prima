@@ -96,25 +96,25 @@ export async function POST(request: NextRequest) {
       const bucketExists = await minioClient.bucketExists(bucketName)
       if (!bucketExists) {
         await minioClient.makeBucket(bucketName, 'us-east-1')
+      }
 
-        // Set bucket policy to allow public read access
-        const policy = {
-          Version: '2012-10-17',
-          Statement: [
-            {
-              Effect: 'Allow',
-              Principal: '*',
-              Action: ['s3:GetObject'],
-              Resource: [`arn:aws:s3:::${bucketName}/*`]
-            }
-          ]
-        }
+      // Always ensure bucket policy is set correctly
+      const policy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: { AWS: ['*'] },
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${bucketName}/*`]
+          }
+        ]
+      }
 
-        try {
-          await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy))
-        } catch (policyError) {
-          console.warn('Failed to set bucket policy:', policyError)
-        }
+      try {
+        await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy))
+      } catch (policyError) {
+        console.warn('Failed to set bucket policy:', policyError)
       }
     } catch (bucketError) {
       console.error('Bucket operation error:', bucketError)
