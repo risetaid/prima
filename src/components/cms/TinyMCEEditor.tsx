@@ -59,7 +59,7 @@ export function TinyMCEEditor({
             // Safe premium features
             'checklist', 'mediaembed', 'casechange', 'formatpainter', 'pageembed', 'advtable', 'advcode',
             // Essential plugins
-            'image', 'paste', 'help', 'fullscreen', 'preview', 'code'
+            'image', 'help', 'fullscreen', 'preview', 'code'
           ],
           toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | link image media table | align lineheight | checklist numlist bullist indent outdent | emoticons charmap | removeformat | fullscreen preview help',
           
@@ -89,23 +89,31 @@ export function TinyMCEEditor({
               const formData = new FormData()
               formData.append('photo', blobInfo.blob(), blobInfo.filename())
 
-               // Upload to Minio via API
-               fetch('/api/upload/tinymce-image', {
-                 method: 'POST',
-                 body: formData,
-               })
-                .then(response => response.json())
-                .then(data => {
-                  if (data.success && data.url) {
-                    resolve(data.url)
-                  } else {
-                    reject(data.error || 'Upload failed')
-                  }
+                // Upload to Minio via API
+                fetch('/api/upload/tinymce-image', {
+                  method: 'POST',
+                  body: formData,
                 })
-                .catch(error => {
-                  console.error('Image upload error:', error)
-                  reject('Terjadi kesalahan saat mengupload gambar.')
-                })
+                 .then(response => {
+                   if (!response.ok) {
+                     throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+                   }
+                   return response.json()
+                 })
+                 .then(data => {
+                   console.log('TinyMCE upload response:', data)
+                   if (data.success && data.url) {
+                     console.log('Image uploaded successfully:', data.url)
+                     resolve(data.url)
+                   } else {
+                     console.error('Upload failed:', data)
+                     reject(data.error || 'Upload failed')
+                   }
+                 })
+                 .catch(error => {
+                   console.error('Image upload error:', error)
+                   reject('Terjadi kesalahan saat mengupload gambar: ' + error.message)
+                 })
             } catch (error) {
               console.error('Image upload error:', error)
               reject('Terjadi kesalahan saat mengupload gambar.')
@@ -117,6 +125,8 @@ export function TinyMCEEditor({
           image_uploadtab: true,
           automatic_uploads: true,
           images_reuse_filename: true,
+          images_upload_base_path: '',
+          images_upload_credentials: false,
           image_class_list: [
             { title: 'Responsive', value: 'img-responsive' },
             { title: 'Bordered', value: 'img-bordered' },
@@ -235,6 +245,12 @@ export function TinyMCEEditor({
           convert_urls: false,
           relative_urls: false,
           remove_script_host: false,
+
+          // Image handling improvements
+          image_prepend_url: '',
+          image_title: true,
+          image_caption: true,
+          image_dimensions: false,
           
           // Setup
           setup: (editor) => {
