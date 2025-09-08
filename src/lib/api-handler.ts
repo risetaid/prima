@@ -238,11 +238,18 @@ export function createApiHandler<TInput = any, TOutput = any>(
       let validatedQuery: any
       let validatedParams: any
       
-      // Validate request body
-      if (config.body && (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH')) {
+      // Parse and validate request body
+      if (request.method === 'POST' || request.method === 'PUT' || request.method === 'PATCH') {
         try {
           const body = await request.json()
-          validatedData = config.body.parse(body)
+          
+          if (config.body) {
+            // If body schema is provided, validate it
+            validatedData = config.body.parse(body)
+          } else {
+            // If no schema provided, pass raw body
+            validatedData = body as TInput
+          }
         } catch (error) {
           if (error instanceof z.ZodError) {
             return NextResponse.json(
@@ -255,6 +262,20 @@ export function createApiHandler<TInput = any, TOutput = any>(
               { status: 400 }
             )
           }
+          
+          // Handle JSON parsing errors
+          if (error instanceof SyntaxError) {
+            return NextResponse.json(
+              createMedicalError(
+                MedicalErrors.INVALID_REQUEST,
+                'INVALID_JSON',
+                { message: 'Request body must be valid JSON' },
+                user?.id
+              ),
+              { status: 400 }
+            )
+          }
+          
           throw error
         }
       }

@@ -5,8 +5,8 @@ export default {
   out: './drizzle/migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    // Use DIRECT_URL for migrations to avoid pgbouncer issues
-    url: process.env.DIRECT_URL || process.env.DATABASE_URL!,
+    // Railway PostgreSQL - use DATABASE_URL (no pooling issues like Supabase)
+    url: process.env.DATABASE_URL!,
   },
   verbose: true,
   strict: true,

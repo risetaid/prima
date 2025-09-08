@@ -38,7 +38,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerStatus> {
 
     try {
       console.log('🔧 PWA: Registering service worker...')
-      
+
       const registration = await navigator.serviceWorker.register('/sw.js', {
         scope: '/'
       })
@@ -48,13 +48,13 @@ export async function registerServiceWorker(): Promise<ServiceWorkerStatus> {
       // Listen for updates
       registration.addEventListener('updatefound', () => {
         console.log('🔄 PWA: Service worker update found')
-        
+
         const newWorker = registration.installing
         if (newWorker) {
           newWorker.addEventListener('statechange', () => {
             if (newWorker.state === 'installed') {
               status.installed = true
-              
+
               if (navigator.serviceWorker.controller) {
                 // New service worker available
                 console.log('✅ PWA: New service worker installed, reload recommended')
@@ -103,16 +103,16 @@ function handleServiceWorkerMessage(event: MessageEvent) {
     case 'CACHE_UPDATED':
       console.log('💾 PWA: Cache updated for:', payload.url)
       break
-      
+
     case 'OFFLINE_FALLBACK':
       console.log('📱 PWA: Serving offline fallback for:', payload.url)
       showOfflineToast()
       break
-      
+
     case 'BACKGROUND_SYNC':
       console.log('🔄 PWA: Background sync completed:', payload.tag)
       break
-      
+
     default:
       console.log('📨 PWA: Message from service worker:', event.data)
   }
@@ -128,13 +128,13 @@ export function setupPWAInstallPrompt(): Promise<boolean> {
     // Listen for the beforeinstallprompt event
     window.addEventListener('beforeinstallprompt', (e) => {
       console.log('📲 PWA: Install prompt available')
-      
+
       // Prevent the mini-infobar from appearing
       e.preventDefault()
-      
+
       // Store the event for later use
       deferredPrompt = e as PWAInstallPrompt
-      
+
       // Show install button
       showInstallButton(deferredPrompt)
       resolve(true)
@@ -173,7 +173,7 @@ export async function triggerPWAInstall(deferredPrompt: PWAInstallPrompt): Promi
     const { outcome } = await deferredPrompt.userChoice
 
     console.log(`📲 PWA: User ${outcome} the install prompt`)
-    
+
     return outcome === 'accepted'
 
   } catch (error) {
@@ -190,10 +190,10 @@ export function isPWAInstalled(): boolean {
 
   // Check for PWA display mode
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-  
+
   // Check for iOS PWA
   const isIOSPWA = 'standalone' in window.navigator && (window.navigator as {standalone?: boolean}).standalone
-  
+
   // Check for Android PWA
   const isAndroidPWA = document.referrer.includes('android-app://')
 
@@ -217,7 +217,7 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
   try {
     console.log('🔔 PWA: Requesting notification permission...')
     const permission = await Notification.requestPermission()
-    
+
     if (permission === 'granted') {
       console.log('✅ PWA: Notification permission granted')
     } else {
@@ -261,13 +261,13 @@ export async function initializePWA() {
   try {
     // Register service worker
     const swStatus = await registerServiceWorker()
-    
+
     // Setup install prompt
     const canInstall = await setupPWAInstallPrompt()
-    
+
     // Request notification permission if not already granted
     await requestNotificationPermission()
-    
+
     // Log PWA status
     console.log('📊 PWA Status:', {
       serviceWorker: swStatus,
@@ -292,9 +292,9 @@ export async function initializePWA() {
 function showUpdateAvailableToast() {
   // Implementation depends on your toast system (sonner, react-hot-toast, etc.)
   console.log('🔄 PWA: Update available - showing toast to user')
-  
+
   // You can implement this with your existing toast system
-  // toast.info('Update tersedia', { 
+  // toast.info('Update tersedia', {
   //   description: 'Versi baru aplikasi tersedia. Refresh untuk memperbarui.',
   //   action: { label: 'Refresh', onClick: () => window.location.reload() }
   // })
@@ -302,7 +302,7 @@ function showUpdateAvailableToast() {
 
 function showOfflineToast() {
   console.log('📱 PWA: Showing offline mode notification')
-  
+
   // toast.warning('Mode Offline', {
   //   description: 'Anda sedang offline. Beberapa fitur mungkin terbatas.'
   // })
@@ -310,14 +310,14 @@ function showOfflineToast() {
 
 function showInstallButton(_deferredPrompt: PWAInstallPrompt) {
   console.log('📲 PWA: Showing install button')
-  
+
   // You can show an install button in your UI
   // This would typically involve updating some state to show an install prompt
 }
 
 function hideInstallButton() {
   console.log('📲 PWA: Hiding install button')
-  
+
   // Hide the install button after successful installation
 }
 

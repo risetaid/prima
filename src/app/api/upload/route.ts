@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
+import { Client } from 'minio'
 import { getCurrentUser } from '@/lib/auth-utils'
+
+// Initialize MinIO client
+const minioClient = new Client({
+  endPoint: process.env.MINIO_ENDPOINT!.replace('https://', '').replace('http://', ''),
+  port: 443,
+  useSSL: true,
+  accessKey: process.env.MINIO_ACCESS_KEY!,
+  secretKey: process.env.MINIO_SECRET_KEY!,
+})
 
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -18,16 +27,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.blob()
-    
-    const blob = await put(filename, body, {
-      access: 'public',
+    const buffer = Buffer.from(await body.arrayBuffer())
+
+    // Ensure bucket exists
+    const bucketName = process.env.MINIO_BUCKET_NAME!
+    const bucketExists = await minioClient.bucketExists(bucketName)
+    if (!bucketExists) {
+      await minioClient.makeBucket(bucketName, 'us-east-1')
+    }
+
+    // Upload file to MinIO
+    await minioClient.putObject(bucketName, filename, buffer, buffer.length, {
+      'Content-Type': body.type || 'application/octet-stream',
     })
 
-    return NextResponse.json({ url: blob.url })
+    // Generate public URL
+    const url = `${process.env.MINIO_ENDPOINT}/${bucketName}/${filename}`
+
+    return NextResponse.json({ url })
   } catch (error) {
     console.error('Upload error:', error)
     return NextResponse.json(
-      { error: 'Upload failed' }, 
+      { error: 'Upload failed' },
       { status: 500 }
     )
   }
@@ -36,17 +57,27 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Implementation for delete functionality
+    const { searchParams } = new URL(request.url)
+    const filename = searchParams.get('filename')
+
+    if (!filename) {
+      return NextResponse.json({ error: 'Filename required' }, { status: 400 })
+    }
+
+    // Delete file from MinIO
+    const bucketName = process.env.MINIO_BUCKET_NAME!
+    await minioClient.removeObject(bucketName, filename)
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Delete error:', error)
     return NextResponse.json(
-      { error: 'Delete failed' }, 
+      { error: 'Delete failed' },
       { status: 500 }
     )
   }

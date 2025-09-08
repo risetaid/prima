@@ -13,8 +13,8 @@
  * - Indonesian medical system optimizations
  */
 
-import { db, patients, users, reminderLogs, manualConfirmations, healthNotes, reminderSchedules, patientVariables } from '@/db'
-import { eq, and, isNull, desc, asc, inArray, gte, lte, count, sql } from 'drizzle-orm'
+import { db, patients, users, reminderLogs, manualConfirmations, reminderSchedules } from '@/db'
+import { eq, and, isNull, count, sql, inArray, desc, asc } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_TTL } from '@/lib/cache'
 import type { Patient, User, ReminderLog, ManualConfirmation, ReminderSchedule } from '@/db/schema'
 
@@ -480,51 +480,7 @@ export class MedicalQueryService {
     }))
   }
   
-  // ===== HEALTH NOTES QUERIES =====
-  
-  /**
-   * Get patient health notes with user info
-   * Single optimized query with join
-   */
-  async getPatientHealthNotes(patientId: string, limit = 50) {
-    const notes = await db
-      .select({
-        id: healthNotes.id,
-        patientId: healthNotes.patientId,
-        note: healthNotes.note,
-        noteDate: healthNotes.noteDate,
-        createdAt: healthNotes.createdAt,
-        updatedAt: healthNotes.updatedAt,
-        // User info
-        recordedBy: users.id,
-        recordedByFirstName: users.firstName,
-        recordedByLastName: users.lastName,
-        recordedByEmail: users.email
-      })
-      .from(healthNotes)
-      .leftJoin(users, eq(healthNotes.recordedBy, users.id))
-      .where(and(
-        eq(healthNotes.patientId, patientId),
-        isNull(healthNotes.deletedAt)
-      ))
-      .orderBy(desc(healthNotes.noteDate))
-      .limit(limit)
-      
-    return notes.map(note => ({
-      id: note.id,
-      patientId: note.patientId,
-      note: note.note,
-      noteDate: note.noteDate,
-      createdAt: note.createdAt,
-      updatedAt: note.updatedAt,
-      recordedByUser: note.recordedBy ? {
-        id: note.recordedBy,
-        firstName: note.recordedByFirstName || undefined,
-        lastName: note.recordedByLastName || undefined,
-        email: note.recordedByEmail
-      } : null
-    }))
-  }
+
   
   // ===== USER QUERIES =====
   

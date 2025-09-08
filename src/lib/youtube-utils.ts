@@ -14,13 +14,13 @@ export async function fetchYouTubeVideoData(videoId: string) {
   try {
     const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
     const response = await fetch(oembedUrl)
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch video data')
     }
-    
+
     const data = await response.json()
-    
+
     return {
       title: data.title || '',
       description: '', // oEmbed doesn't provide description

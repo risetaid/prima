@@ -7,13 +7,13 @@ export const TIMEZONE_WIB = 'Asia/Jakarta'
  */
 export const formatDateWIB = (dateString?: string | Date) => {
   if (!dateString) return ''
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
   return date.toLocaleDateString('id-ID', {
     timeZone: TIMEZONE_WIB,
     day: '2-digit',
-    month: '2-digit', 
+    month: '2-digit',
     year: 'numeric'
   })
 }
@@ -23,9 +23,9 @@ export const formatDateWIB = (dateString?: string | Date) => {
  */
 export const formatDateTimeWIB = (dateString?: string | Date) => {
   if (!dateString) return ''
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
   return date.toLocaleString('id-ID', {
     timeZone: TIMEZONE_WIB,
     day: '2-digit',
@@ -42,9 +42,9 @@ export const formatDateTimeWIB = (dateString?: string | Date) => {
  */
 export const formatTimeWIB = (dateString?: string | Date) => {
   if (!dateString) return ''
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
-  
+
   return date.toLocaleTimeString('id-ID', {
     timeZone: TIMEZONE_WIB,
     hour: '2-digit',
@@ -76,7 +76,7 @@ export const toWIB = (date: Date | string) => {
  */
 export const formatRelativeTimeWIB = (dateString?: string | Date) => {
   if (!dateString) return ''
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
   const now = nowWIB()
   const diffMs = now.getTime() - date.getTime()
@@ -88,7 +88,7 @@ export const formatRelativeTimeWIB = (dateString?: string | Date) => {
   if (diffMinutes < 60) return `${diffMinutes} menit yang lalu`
   if (diffHours < 24) return `${diffHours} jam yang lalu`
   if (diffDays < 7) return `${diffDays} hari yang lalu`
-  
+
   return formatDateWIB(date)
 }
 
@@ -118,7 +118,7 @@ export const getCurrentTimeWIB = () => {
  */
 export const formatDateInputWIB = (dateString?: string | Date) => {
   if (!dateString) return getCurrentDateWIB()
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
   return date.toISOString().split('T')[0]
 }
@@ -128,7 +128,7 @@ export const formatDateInputWIB = (dateString?: string | Date) => {
  */
 export const formatTimeInputWIB = (dateString?: string | Date) => {
   if (!dateString) return getCurrentTimeWIB()
-  
+
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
   return date.toTimeString().slice(0, 5)
 }

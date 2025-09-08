@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
+import { Client } from 'minio'
+
+// Initialize MinIO client
+const minioClient = new Client({
+  endPoint: process.env.MINIO_ENDPOINT!.replace('https://', '').replace('http://', ''),
+  port: 443,
+  useSSL: true,
+  accessKey: process.env.MINIO_ACCESS_KEY!,
+  secretKey: process.env.MINIO_SECRET_KEY!,
+})
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,14 +28,14 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const signature = buffer.subarray(0, 4).toString('hex')
-    
+
     const validSignatures = [
       'ffd8ff', // JPEG
       '89504e47', // PNG
       '47494638', // GIF87a/GIF89a
       '52494646', // WebP (RIFF)
     ]
-    
+
     const isValidImage = validSignatures.some(sig => signature.startsWith(sig))
     if (!isValidImage) {
       return NextResponse.json({ error: 'Invalid image file. File signature does not match image format.' }, { status: 400 })
@@ -47,52 +54,56 @@ export async function POST(request: NextRequest) {
       .replace(/\.+/g, '.') // Replace multiple dots with single dot
       .replace(/^\.+|\.+$/g, '') // Remove leading/trailing dots
       .toLowerCase()
-    
+
     // Extract and validate file extension
     const ext = sanitizedName.split('.').pop() || ''
     const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
     if (!allowedExtensions.includes(ext)) {
       return NextResponse.json({ error: 'Invalid file extension. Only jpg, jpeg, png, gif, webp allowed' }, { status: 400 })
     }
-    
+
     const filename = `${timestamp}-${sanitizedName}`
-    
-    // Define upload directory
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'patients')
-    
-    // Atomic directory creation and file write to prevent race conditions
-    const filePath = join(uploadDir, filename)
-    
-    try {
-      // mkdir with recursive: true is atomic and won't fail if directory exists
-      await mkdir(uploadDir, { recursive: true })
-      
-      // Atomic file write with unique filename prevents collisions
-      await writeFile(filePath, buffer, { flag: 'wx' }) // 'wx' fails if file exists
-    } catch (error: any) {
-      if (error.code === 'EEXIST') {
-        // File already exists, generate new unique filename
-        const newTimestamp = Date.now()
-        const newFilename = `${newTimestamp}-${sanitizedName}`
-        const newFilePath = join(uploadDir, newFilename)
-        await writeFile(newFilePath, buffer, { flag: 'wx' })
-        
-        return NextResponse.json({ 
-          success: true, 
-          url: `/uploads/patients/${newFilename}`,
-          filename: newFilename
-        })
-      }
-      throw error // Re-throw other errors
+
+    // Ensure bucket exists
+    const bucketName = process.env.MINIO_BUCKET_NAME!
+    const bucketExists = await minioClient.bucketExists(bucketName)
+    if (!bucketExists) {
+      await minioClient.makeBucket(bucketName, 'us-east-1')
     }
 
-    // Return public URL
-    const publicUrl = `/uploads/patients/${filename}`
+    // Upload file to MinIO with retry logic
+    let attempts = 0
+    const maxAttempts = 3
+    let finalFilename = filename
 
-    return NextResponse.json({ 
-      success: true, 
+    while (attempts < maxAttempts) {
+      try {
+        await minioClient.putObject(bucketName, finalFilename, buffer, buffer.length, {
+          'Content-Type': file.type || 'application/octet-stream',
+        })
+        break // Success, exit retry loop
+      } catch (error: any) {
+        attempts++
+        if (error.code === 'NoSuchBucket' && attempts < maxAttempts) {
+          // Bucket might have been deleted, recreate it
+          await minioClient.makeBucket(bucketName, 'us-east-1')
+          continue
+        }
+        if (attempts >= maxAttempts) {
+          throw error
+        }
+        // Generate new filename for retry
+        finalFilename = `${Date.now()}-${sanitizedName}`
+      }
+    }
+
+    // Generate public URL
+    const publicUrl = `${process.env.MINIO_ENDPOINT}/${bucketName}/${finalFilename}`
+
+    return NextResponse.json({
+      success: true,
       url: publicUrl,
-      filename: filename
+      filename: finalFilename
     })
 
   } catch (error) {
