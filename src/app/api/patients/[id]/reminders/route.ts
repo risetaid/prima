@@ -512,10 +512,7 @@ async function validateContentAttachments(
             id: content.id,
             type: "article",
             title: articleResult[0].title,
-            url: `${
-              process.env.NEXT_PUBLIC_BASE_URL ||
-              "https://palliative-monitor.vercel.app"
-            }/content/articles/${articleResult[0].slug}`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${articleResult[0].slug}`,
           });
         }
       } else if (normalizedType === "video") {
@@ -536,10 +533,7 @@ async function validateContentAttachments(
             id: content.id,
             type: "video",
             title: videoResult[0].title,
-            url: `${
-              process.env.NEXT_PUBLIC_BASE_URL ||
-              "https://palliative-monitor.vercel.app"
-            }/content/videos/${videoResult[0].slug}`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${videoResult[0].slug}`,
           });
         }
       }

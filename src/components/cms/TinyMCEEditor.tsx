@@ -69,7 +69,7 @@ export function TinyMCEEditor({
           // ai_request: (request, respondWith) => 
           //   respondWith.string(() => Promise.reject('AI Assistant belum dikonfigurasi. Hubungi admin untuk mengaktifkan fitur ini.')),
           
-          // Image handling - improved configuration
+          // Image handling - Minio upload configuration
           images_upload_handler: (blobInfo: any, _progress: any) => new Promise<string>((resolve, reject) => {
             try {
               // Validate file size (max 5MB)
@@ -77,35 +77,35 @@ export function TinyMCEEditor({
                 reject('Ukuran gambar terlalu besar. Maksimal 5MB.')
                 return
               }
-              
+
               // Validate file type
               const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
               if (!allowedTypes.includes(blobInfo.blob().type)) {
                 reject('Format gambar tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.')
                 return
               }
-              
-              // Convert to base64 for now - can be upgraded to proper upload later
-              const reader = new FileReader()
-              
-              reader.onload = (e) => {
-                const result = e.target?.result
-                if (result && typeof result === 'string') {
-                  resolve(result)
-                } else {
-                  reject('Gagal memproses gambar. Format tidak didukung.')
-                }
-              }
-              
-              reader.onerror = () => {
-                reject('Gagal membaca file gambar. Coba lagi.')
-              }
-              
-              reader.onabort = () => {
-                reject('Upload gambar dibatalkan.')
-              }
-              
-              reader.readAsDataURL(blobInfo.blob())
+
+              // Create FormData for upload
+              const formData = new FormData()
+              formData.append('photo', blobInfo.blob(), blobInfo.filename())
+
+              // Upload to Minio via API
+              fetch('/api/upload/patient-photo', {
+                method: 'POST',
+                body: formData,
+              })
+                .then(response => response.json())
+                .then(data => {
+                  if (data.success && data.url) {
+                    resolve(data.url)
+                  } else {
+                    reject(data.error || 'Upload failed')
+                  }
+                })
+                .catch(error => {
+                  console.error('Image upload error:', error)
+                  reject('Terjadi kesalahan saat mengupload gambar.')
+                })
             } catch (error) {
               console.error('Image upload error:', error)
               reject('Terjadi kesalahan saat mengupload gambar.')

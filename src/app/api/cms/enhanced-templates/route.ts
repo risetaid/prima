@@ -83,12 +83,12 @@ export async function GET(_request: NextRequest) {
         enhancedTemplates,
         availableArticles: articles.map(article => ({
           ...article,
-          url: `https://palliative-monitor.vercel.app/content/articles/${article.slug}`,
+          url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${article.slug}`,
           type: 'article'
         })),
         availableVideos: videos.map(video => ({
           ...video,
-          url: `https://palliative-monitor.vercel.app/content/videos/${video.slug}`,
+          url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${video.slug}`,
           type: 'video'
         }))
       }
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
           .limit(1)
         
         if (article.length > 0) {
-          contentUrl = `https://palliative-monitor.vercel.app/content/articles/${article[0].slug}`
+          contentUrl = `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${article[0].slug}`
         }
       } else if (contentType === 'video') {
         const video = await db
@@ -153,9 +153,9 @@ export async function POST(request: NextRequest) {
           .from(cmsVideos)
           .where(eq(cmsVideos.id, contentId))
           .limit(1)
-        
+
         if (video.length > 0) {
-          contentUrl = `https://palliative-monitor.vercel.app/content/videos/${video[0].slug}`
+          contentUrl = `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${video[0].slug}`
         }
       }
     }
