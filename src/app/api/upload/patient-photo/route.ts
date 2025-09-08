@@ -3,11 +3,11 @@ import { Client } from 'minio'
 
 // Initialize MinIO client
 const minioClient = new Client({
-  endPoint: process.env.MINIO_ENDPOINT!.replace('https://', '').replace('http://', ''),
+  endPoint: process.env.MINIO_PUBLIC_ENDPOINT!.replace('https://', '').replace('http://', ''),
   port: 443,
   useSSL: true,
-  accessKey: process.env.MINIO_ACCESS_KEY!,
-  secretKey: process.env.MINIO_SECRET_KEY!,
+  accessKey: process.env.MINIO_ROOT_USER!,
+  secretKey: process.env.MINIO_ROOT_PASSWORD!,
 })
 
 export async function POST(request: NextRequest) {
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate public URL
-    const publicUrl = `${process.env.MINIO_ENDPOINT}/${bucketName}/${finalFilename}`
+    const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT}/${bucketName}/${finalFilename}`
 
     return NextResponse.json({
       success: true,
