@@ -89,11 +89,11 @@ export function TinyMCEEditor({
               const formData = new FormData()
               formData.append('photo', blobInfo.blob(), blobInfo.filename())
 
-              // Upload to Minio via API
-              fetch('/api/upload/patient-photo', {
-                method: 'POST',
-                body: formData,
-              })
+               // Upload to Minio via API
+               fetch('/api/upload/tinymce-image', {
+                 method: 'POST',
+                 body: formData,
+               })
                 .then(response => response.json())
                 .then(data => {
                   if (data.success && data.url) {
