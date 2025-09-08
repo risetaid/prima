@@ -1,8 +1,20 @@
 'use client'
 
-import { SignUp } from '@clerk/nextjs'
+import { SignUp, useAuth } from '@clerk/nextjs'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 export default function SignUpPage() {
+  const { isSignedIn, isLoaded } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      // If user is already signed in, redirect to dashboard
+      router.push('/dashboard')
+    }
+  }, [isLoaded, isSignedIn, router])
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md mx-auto">
@@ -21,9 +33,12 @@ export default function SignUpPage() {
 
         {/* Sign Up Form */}
         <div className="flex justify-center">
-          <SignUp 
+          <SignUp
             afterSignInUrl="/dashboard"
             afterSignUpUrl="/dashboard"
+            redirectUrl="/dashboard"
+            routing="path"
+            path="/sign-up"
             appearance={{
               elements: {
                 rootBox: "w-full",

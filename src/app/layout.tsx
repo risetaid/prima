@@ -58,7 +58,24 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <ClerkProvider>
+        <ClerkProvider
+          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+          appearance={{
+            baseTheme: undefined,
+            variables: {
+              colorPrimary: '#3b82f6',
+              colorBackground: '#ffffff',
+              colorInputBackground: '#ffffff',
+              colorInputText: '#000000',
+            },
+            elements: {
+              formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white',
+              card: 'shadow-lg border-0',
+              headerTitle: 'text-gray-900',
+              headerSubtitle: 'text-gray-600',
+            }
+          }}
+        >
           {children}
           <Toaster
             position="top-center"

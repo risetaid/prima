@@ -42,7 +42,7 @@ export function TinyMCEEditor({
   return (
     <div className="tinymce-wrapper">
       <Editor
-        apiKey="yclqbdg6wdb61kx0u2ap5d05s62stnkbj1wpdrtkushmn7ns"
+        apiKey={process.env.NEXT_PUBLIC_TINYMCE_API_KEY}
         onInit={(_evt, editor) => {
           editorRef.current = editor
           console.log('TinyMCE initialized successfully')
