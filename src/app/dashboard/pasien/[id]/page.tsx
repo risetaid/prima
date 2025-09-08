@@ -612,6 +612,14 @@ export default function PatientDetailPage() {
         body: JSON.stringify({
           name: editData.name,
           phoneNumber: editData.phoneNumber,
+          address: patient.address,
+          birthDate: patient.birthDate,
+          diagnosisDate: patient.diagnosisDate,
+          cancerStage: patient.cancerStage,
+          emergencyContactName: patient.emergencyContactName,
+          emergencyContactPhone: patient.emergencyContactPhone,
+          notes: patient.notes,
+          isActive: patient.isActive,
           photoUrl: selectedPhoto
             ? photoUrl
             : editData.photoUrl === ""

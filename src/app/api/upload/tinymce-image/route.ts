@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Client } from 'minio'
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Initialize MinIO client with error handling
+    // Initialize MinIO client with service account credentials
     const minioEndpoint = process.env.MINIO_PUBLIC_ENDPOINT
-    const minioUser = process.env.MINIO_ROOT_USER
-    const minioPassword = process.env.MINIO_ROOT_PASSWORD
+    const minioAccessKey = process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER
+    const minioSecretKey = process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD
 
-    if (!minioEndpoint || !minioUser || !minioPassword) {
+    if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
       console.error('Missing MinIO environment variables:', {
         endpoint: !!minioEndpoint,
-        user: !!minioUser,
-        password: !!minioPassword
+        accessKey: !!minioAccessKey,
+        secretKey: !!minioSecretKey
       })
       return NextResponse.json({ error: 'MinIO configuration missing' }, { status: 500 })
     }
@@ -21,12 +32,12 @@ export async function POST(request: NextRequest) {
       endPoint: minioEndpoint.replace('https://', '').replace('http://', '').replace(':443', ''),
       port: 443,
       useSSL: true,
-      accessKey: minioUser,
-      secretKey: minioPassword,
+      accessKey: minioAccessKey,
+      secretKey: minioSecretKey,
     })
 
     const data = await request.formData()
-    const file: File | null = data.get('photo') as unknown as File
+    const file: File | null = data.get('file') as unknown as File
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -82,6 +93,26 @@ export async function POST(request: NextRequest) {
     const bucketExists = await minioClient.bucketExists(bucketName)
     if (!bucketExists) {
       await minioClient.makeBucket(bucketName, 'us-east-1')
+      
+      // Set bucket policy to allow public read access
+      const policy = {
+        Version: '2012-10-17',
+        Statement: [
+          {
+            Effect: 'Allow',
+            Principal: '*',
+            Action: ['s3:GetObject'],
+            Resource: [`arn:aws:s3:::${bucketName}/*`]
+          }
+        ]
+      }
+
+      try {
+        await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy))
+
+      } catch (policyError) {
+        console.warn('Failed to set TinyMCE bucket policy:', policyError)
+      }
     }
 
     // Upload file to MinIO
@@ -93,9 +124,7 @@ export async function POST(request: NextRequest) {
     const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT?.replace(':443', '')}/${bucketName}/${filename}`
 
     return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      filename: filename
+      location: publicUrl
     }, {
       headers: {
         'Access-Control-Allow-Origin': '*',

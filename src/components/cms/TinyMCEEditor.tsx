@@ -69,55 +69,45 @@ export function TinyMCEEditor({
           // ai_request: (request, respondWith) => 
           //   respondWith.string(() => Promise.reject('AI Assistant belum dikonfigurasi. Hubungi admin untuk mengaktifkan fitur ini.')),
           
-          // Image handling - Minio upload configuration
-          images_upload_handler: (blobInfo: any, _progress: any) => new Promise<string>((resolve, reject) => {
-            try {
-              // Validate file size (max 5MB)
-              if (blobInfo.blob().size > 5 * 1024 * 1024) {
-                reject('Ukuran gambar terlalu besar. Maksimal 5MB.')
-                return
-              }
+          // Custom image upload handler following TinyMCE official docs
+          images_upload_handler: (blobInfo: any, progress: (percent: number) => void) => new Promise<string>((resolve, reject) => {
+            const xhr = new XMLHttpRequest()
+            xhr.withCredentials = false
+            xhr.open('POST', '/api/upload/tinymce-image')
 
-              // Validate file type
-              const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-              if (!allowedTypes.includes(blobInfo.blob().type)) {
-                reject('Format gambar tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.')
-                return
-              }
-
-              // Create FormData for upload
-              const formData = new FormData()
-              formData.append('photo', blobInfo.blob(), blobInfo.filename())
-
-                // Upload to Minio via API
-                fetch('/api/upload/tinymce-image', {
-                  method: 'POST',
-                  body: formData,
-                })
-                 .then(response => {
-                   if (!response.ok) {
-                     throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-                   }
-                   return response.json()
-                 })
-                 .then(data => {
-                   console.log('TinyMCE upload response:', data)
-                   if (data.success && data.url) {
-                     console.log('Image uploaded successfully:', data.url)
-                     resolve(data.url)
-                   } else {
-                     console.error('Upload failed:', data)
-                     reject(data.error || 'Upload failed')
-                   }
-                 })
-                 .catch(error => {
-                   console.error('Image upload error:', error)
-                   reject('Terjadi kesalahan saat mengupload gambar: ' + error.message)
-                 })
-            } catch (error) {
-              console.error('Image upload error:', error)
-              reject('Terjadi kesalahan saat mengupload gambar.')
+            xhr.upload.onprogress = (e) => {
+              progress(e.loaded / e.total * 100)
             }
+
+            xhr.onload = () => {
+              if (xhr.status === 403) {
+                reject({ message: 'HTTP Error: ' + xhr.status, remove: true })
+                return
+              }
+
+              if (xhr.status < 200 || xhr.status >= 300) {
+                reject('HTTP Error: ' + xhr.status)
+                return
+              }
+
+              const json = JSON.parse(xhr.responseText)
+
+              if (!json || typeof json.location != 'string') {
+                reject('Invalid JSON: ' + xhr.responseText)
+                return
+              }
+
+              resolve(json.location)
+            }
+
+            xhr.onerror = () => {
+              reject('Image upload failed due to a XHR Transport error. Code: ' + xhr.status)
+            }
+
+            const formData = new FormData()
+            formData.append('file', blobInfo.blob(), blobInfo.filename())
+
+            xhr.send(formData)
           }),
           
           // Image options
@@ -137,60 +127,48 @@ export function TinyMCEEditor({
             { title: 'Rounded', value: 'img-rounded' }
           ],
           
-          // File picker for images (optional)
+          // File picker for images following TinyMCE best practices
           file_picker_types: 'image',
           file_picker_callback: (callback, _value, meta) => {
             if (meta.filetype === 'image') {
-              try {
-                const input = document.createElement('input')
-                input.type = 'file'
-                input.accept = 'image/jpeg,image/jpg,image/png,image/gif,image/webp'
+              const input = document.createElement('input')
+              input.setAttribute('type', 'file')
+              input.setAttribute('accept', 'image/*')
+
+              input.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement
+                const file = target.files?.[0]
                 
-                input.onchange = (e) => {
-                  const target = e.target as HTMLInputElement
-                  const file = target.files?.[0]
-                  
-                  if (!file) {
-                    return
-                  }
-                  
-                  // Validate file size (max 5MB)
-                  if (file.size > 5 * 1024 * 1024) {
-                    alert('Ukuran gambar terlalu besar. Maksimal 5MB.')
-                    return
-                  }
-                  
-                  // Validate file type
-                  const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-                  if (!allowedTypes.includes(file.type)) {
-                    alert('Format gambar tidak didukung. Gunakan JPG, PNG, GIF, atau WebP.')
-                    return
-                  }
-                  
-                  const reader = new FileReader()
-                  
-                  reader.onload = (event) => {
-                    const result = event.target?.result
-                    if (result && typeof result === 'string') {
-                      callback(result, {
-                        alt: file.name.replace(/\\.[^/.]+$/, ''), // Remove extension for alt text
-                        title: file.name
-                      })
-                    }
-                  }
-                  
-                  reader.onerror = () => {
-                    alert('Gagal membaca file gambar. Coba lagi.')
-                  }
-                  
-                  reader.readAsDataURL(file)
+                if (!file) {
+                  return
                 }
                 
-                input.click()
-              } catch (error) {
-                console.error('File picker error:', error)
-                alert('Terjadi kesalahan saat memilih gambar.')
-              }
+                // Validate file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                  alert('Ukuran gambar terlalu besar. Maksimal 5MB.')
+                  return
+                }
+
+                const reader = new FileReader()
+                reader.addEventListener('load', () => {
+                  const id = 'blobid' + (new Date()).getTime()
+                  const blobCache = (editorRef.current as any)?.editorUpload?.blobCache
+                  if (blobCache && reader.result && typeof reader.result === 'string') {
+                    const base64 = reader.result.split(',')[1]
+                    const blobInfo = blobCache.create(id, file, base64)
+                    blobCache.add(blobInfo)
+
+                    // Call the callback with the blob URI and metadata
+                    callback(blobInfo.blobUri(), { 
+                      title: file.name,
+                      alt: file.name.replace(/\.[^/.]+$/, '') // Remove extension for alt text
+                    })
+                  }
+                })
+                reader.readAsDataURL(file)
+              })
+
+              input.click()
             }
           },
           

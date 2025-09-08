@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Client } from 'minio'
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // Initialize MinIO client with error handling
+    // Initialize MinIO client with service account credentials
     const minioEndpoint = process.env.MINIO_PUBLIC_ENDPOINT
-    const minioUser = process.env.MINIO_ROOT_USER
-    const minioPassword = process.env.MINIO_ROOT_PASSWORD
+    const minioAccessKey = process.env.MINIO_ACCESS_KEY || process.env.MINIO_ROOT_USER
+    const minioSecretKey = process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD
 
-    if (!minioEndpoint || !minioUser || !minioPassword) {
+    if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
       console.error('Missing MinIO environment variables:', {
         endpoint: !!minioEndpoint,
-        user: !!minioUser,
-        password: !!minioPassword
+        accessKey: !!minioAccessKey,
+        secretKey: !!minioSecretKey
       })
       return NextResponse.json({ error: 'MinIO configuration missing' }, { status: 500 })
     }
@@ -21,8 +32,8 @@ export async function POST(request: NextRequest) {
       endPoint: minioEndpoint.replace('https://', '').replace('http://', '').replace(':443', ''),
       port: 443,
       useSSL: true,
-      accessKey: minioUser,
-      secretKey: minioPassword,
+      accessKey: minioAccessKey,
+      secretKey: minioSecretKey,
     })
 
     const data = await request.formData()
@@ -79,21 +90,12 @@ export async function POST(request: NextRequest) {
 
     // Ensure bucket exists
     const bucketName = process.env.MINIO_BUCKET_NAME!
-    console.log('MinIO Debug:', {
-      bucketName,
-      minioEndpoint,
-      minioUser: minioUser ? '***' : 'undefined',
-      minioPassword: minioPassword ? '***' : 'undefined'
-    })
+
 
     try {
       const bucketExists = await minioClient.bucketExists(bucketName)
-      console.log('Bucket exists check:', { bucketName, exists: bucketExists })
-
       if (!bucketExists) {
-        console.log('Creating bucket:', bucketName)
         await minioClient.makeBucket(bucketName, 'us-east-1')
-        console.log('Bucket created successfully')
 
         // Set bucket policy to allow public read access
         const policy = {
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest) {
           Statement: [
             {
               Effect: 'Allow',
-              Principal: { AWS: '*' },
+              Principal: '*',
               Action: ['s3:GetObject'],
               Resource: [`arn:aws:s3:::${bucketName}/*`]
             }
@@ -110,10 +112,8 @@ export async function POST(request: NextRequest) {
 
         try {
           await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy))
-          console.log('Bucket policy set successfully')
         } catch (policyError) {
           console.warn('Failed to set bucket policy:', policyError)
-          // Don't fail the upload if policy setting fails
         }
       }
     } catch (bucketError) {
@@ -131,11 +131,9 @@ export async function POST(request: NextRequest) {
 
     while (attempts < maxAttempts) {
       try {
-        console.log('Attempting to upload file:', { bucketName, finalFilename, size: buffer.length })
         await minioClient.putObject(bucketName, finalFilename, buffer, buffer.length, {
           'Content-Type': file.type || 'application/octet-stream',
         })
-        console.log('File uploaded successfully:', finalFilename)
         break // Success, exit retry loop
       } catch (error: any) {
         console.error('Upload attempt failed:', {
@@ -146,8 +144,6 @@ export async function POST(request: NextRequest) {
         })
         attempts++
         if (error.code === 'NoSuchBucket' && attempts < maxAttempts) {
-          // Bucket might have been deleted, recreate it
-          console.log('Recreating bucket due to NoSuchBucket error')
           await minioClient.makeBucket(bucketName, 'us-east-1')
           continue
         }
@@ -161,7 +157,6 @@ export async function POST(request: NextRequest) {
 
     // Generate public URL (remove port for HTTPS)
     const publicUrl = `${process.env.MINIO_PUBLIC_ENDPOINT?.replace(':443', '')}/${bucketName}/${finalFilename}`
-    console.log('Generated public URL:', publicUrl)
 
     return NextResponse.json({
       success: true,
