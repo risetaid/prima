@@ -843,8 +843,8 @@ export default function PatientDetailPage() {
         </h2>
       </div>
 
-      {/* Main Content */}
-      <main className="px-4 lg:px-8 pb-6 relative z-10 space-y-6">
+       {/* Main Content */}
+       <main className="px-4 lg:px-8 pt-6 pb-6 relative z-10 space-y-6">
         {/* Patient Profile Section - Full Width */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Profile Header */}
@@ -1094,22 +1094,22 @@ export default function PatientDetailPage() {
                     </>
                   ) : (
                     <>
-                      <button
-                        onClick={handleEdit}
-                        className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg transform hover:scale-105"
-                      >
+                       <button
+                         onClick={handleEdit}
+                         className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg"
+                       >
                         <Edit className="w-5 h-5" />
                         <span>Edit Profil</span>
                       </button>
 
-                      <button
-                        onClick={handleToggleStatus}
-                        className={`cursor-pointer w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg transform hover:scale-105 ${
-                          patient.isActive
-                            ? "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700"
-                            : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
-                        }`}
-                      >
+                       <button
+                         onClick={handleToggleStatus}
+                         className={`cursor-pointer w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg ${
+                           patient.isActive
+                             ? "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700"
+                             : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
+                         }`}
+                       >
                         {patient.isActive ? (
                           <>
                             <User className="w-5 h-5" />
@@ -1139,19 +1139,19 @@ export default function PatientDetailPage() {
                       <span>Aksi Cepat</span>
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <button
-                        onClick={handleAddReminder}
-                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                      >
+                       <button
+                         onClick={handleAddReminder}
+                         className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                       >
                         <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
                           Buat Pengingat
                         </span>
                       </button>
-                      <button
-                        onClick={handleViewReminders}
-                        className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                      >
+                       <button
+                         onClick={handleViewReminders}
+                         className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                       >
                         <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
                           Lihat Jadwal
@@ -1444,38 +1444,38 @@ export default function PatientDetailPage() {
           {/* Health Notes Footer */}
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <button
-                onClick={() => {
-                  setIsAddNoteModalOpen(true);
-                  setNewNoteText("");
-                  setSelectedDate(new Date().toISOString().split("T")[0]);
-                  setCurrentMonth(new Date());
-                  setShowCalendar(false);
-                }}
-                className="flex-1 bg-white text-purple-600 px-4 sm:px-6 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
+               <button
+                 onClick={() => {
+                   setIsAddNoteModalOpen(true);
+                   setNewNoteText("");
+                   setSelectedDate(new Date().toISOString().split("T")[0]);
+                   setCurrentMonth(new Date());
+                   setShowCalendar(false);
+                 }}
+                 className="flex-1 bg-white text-purple-600 px-4 sm:px-6 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+               >
                 <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">
                   Tambah Catatan Kesehatan
                 </span>
               </button>
-              <button
-                onClick={() => {
-                  if (isDeleteMode && selectedNotes.length > 0) {
-                    handleDeleteSelectedNotes();
-                  } else {
-                    setIsDeleteMode(!isDeleteMode);
-                    setSelectedNotes([]);
-                  }
-                }}
-                className={`px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105 ${
-                  isDeleteMode && selectedNotes.length > 0
-                    ? "bg-red-600 text-white hover:bg-red-700"
-                    : isDeleteMode
-                    ? "bg-gray-600 text-white hover:bg-gray-700"
-                    : "bg-red-500 text-white hover:bg-red-600"
-                }`}
-              >
+               <button
+                 onClick={() => {
+                   if (isDeleteMode && selectedNotes.length > 0) {
+                     handleDeleteSelectedNotes();
+                   } else {
+                     setIsDeleteMode(!isDeleteMode);
+                     setSelectedNotes([]);
+                   }
+                 }}
+                 className={`px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl ${
+                   isDeleteMode && selectedNotes.length > 0
+                     ? "bg-red-600 text-white hover:bg-red-700"
+                     : isDeleteMode
+                     ? "bg-gray-600 text-white hover:bg-gray-700"
+                     : "bg-red-500 text-white hover:bg-red-600"
+                 }`}
+               >
                 <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">
                   {isDeleteMode && selectedNotes.length > 0
