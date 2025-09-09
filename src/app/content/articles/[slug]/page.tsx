@@ -36,7 +36,22 @@ export async function generateStaticParams() {
 
 async function getArticle(slug: string) {
   const article = await db
-    .select()
+    .select({
+      id: cmsArticles.id,
+      title: cmsArticles.title,
+      slug: cmsArticles.slug,
+      content: cmsArticles.content,
+      excerpt: cmsArticles.excerpt,
+      featuredImageUrl: cmsArticles.featuredImageUrl,
+      category: cmsArticles.category,
+      tags: cmsArticles.tags,
+      seoTitle: cmsArticles.seoTitle,
+      seoDescription: cmsArticles.seoDescription,
+      status: cmsArticles.status,
+      publishedAt: cmsArticles.publishedAt,
+      createdAt: cmsArticles.createdAt,
+      updatedAt: cmsArticles.updatedAt
+    })
     .from(cmsArticles)
     .where(and(
       eq(cmsArticles.slug, slug),
@@ -48,6 +63,12 @@ async function getArticle(slug: string) {
   if (article.length === 0) {
     return null
   }
+
+  console.log('🖼️ Article data:', {
+    slug,
+    featuredImageUrl: article[0].featuredImageUrl,
+    hasImage: !!article[0].featuredImageUrl
+  })
 
   return article[0]
 }
@@ -191,7 +212,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
         </Card>
 
         {/* Featured image */}
-        {article.featuredImageUrl && (
+        {article.featuredImageUrl && article.featuredImageUrl.trim() !== '' && !article.featuredImageUrl.startsWith('blob:') && (
           <Card>
             <CardContent className="p-0">
               <div className="relative aspect-video w-full overflow-hidden rounded-lg">

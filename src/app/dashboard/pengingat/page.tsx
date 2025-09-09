@@ -186,29 +186,29 @@ export default function ReminderPage() {
                 </h1>
               </div>
 
-              {/* Right: Filter Buttons */}
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => toggleFilter('active')}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer ${
-                    activeFilters.includes('active')
-                      ? 'bg-white text-blue-600'
-                      : 'bg-blue-700 text-white hover:bg-blue-800'
-                  }`}
-                >
-                  Aktif
-                </button>
-                <button
-                  onClick={() => toggleFilter('inactive')}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors cursor-pointer ${
-                    activeFilters.includes('inactive')
-                      ? 'bg-white text-blue-600'
-                      : 'bg-blue-700 text-white hover:bg-blue-800'
-                  }`}
-                >
-                  Nonaktif
-                </button>
-              </div>
+               {/* Right: Filter Buttons */}
+               <div className="flex space-x-3">
+                 <button
+                   onClick={() => toggleFilter('active')}
+                   className={`px-6 py-3 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                     activeFilters.includes('active')
+                       ? 'bg-white text-blue-500 shadow-md'
+                       : 'bg-blue-400 text-white hover:bg-blue-300'
+                   }`}
+                 >
+                   Aktif
+                 </button>
+                 <button
+                   onClick={() => toggleFilter('inactive')}
+                   className={`px-6 py-3 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                     activeFilters.includes('inactive')
+                       ? 'bg-white text-blue-500 shadow-md'
+                       : 'bg-blue-400 text-white hover:bg-blue-300'
+                   }`}
+                 >
+                   Nonaktif
+                 </button>
+               </div>
             </div>
           </div>
         </div>

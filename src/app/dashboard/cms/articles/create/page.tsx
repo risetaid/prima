@@ -34,7 +34,7 @@ interface FormData {
   slug: string;
   content: string;
   excerpt: string;
-  thumbnailUrl: string;
+  featuredImageUrl: string;
   category: string;
   status: "draft" | "published" | "archived";
 }
@@ -47,7 +47,7 @@ export default function CreateArticlePage() {
     slug: generateRandomString(8), // Generate random slug by default
     content: "",
     excerpt: "",
-    thumbnailUrl: "",
+    featuredImageUrl: "",
     category: "",
     status: "draft",
   });
@@ -139,51 +139,54 @@ export default function CreateArticlePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <BackButton text="Kembali ke CMS" />
-          <div className="h-6 w-px bg-gray-300" />
-          <div className="flex items-center gap-2">
-            <FileText className="h-6 w-6 text-blue-500" />
-            <h1 className="text-2xl font-bold text-gray-900">Artikel Baru</h1>
+      {/* Action Buttons Card */}
+      <Card>
+        <CardContent className="py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <BackButton text="Kembali ke CMS" />
+              <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <FileText className="h-6 w-6 text-blue-500" />
+                <h1 className="text-2xl font-bold text-gray-900">Artikel Baru</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/dashboard/cms")}
+                disabled={saving}
+              >
+                Batal
+              </Button>
+              <Button
+                onClick={() => handleSave("draft")}
+                disabled={saving || !formData.title.trim()}
+                variant="outline"
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Simpan Draft
+              </Button>
+              <Button
+                onClick={() => handleSave("published")}
+                disabled={saving || !formData.title.trim()}
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Eye className="h-4 w-4 mr-2" />
+                )}
+                Publikasikan
+              </Button>
+            </div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.push("/dashboard/cms")}
-            disabled={saving}
-          >
-            Batal
-          </Button>
-          <Button
-            onClick={() => handleSave("draft")}
-            disabled={saving || !formData.title.trim()}
-            variant="outline"
-          >
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Simpan Draft
-          </Button>
-          <Button
-            onClick={() => handleSave("published")}
-            disabled={saving || !formData.title.trim()}
-          >
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-            ) : (
-              <Eye className="h-4 w-4 mr-2" />
-            )}
-            Publikasikan
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
@@ -356,32 +359,56 @@ export default function CreateArticlePage() {
                     id="thumbnail-upload"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        // Simple validation
-                        if (!file.type.startsWith('image/')) {
-                          alert('File harus berupa gambar');
-                          return;
-                        }
-                        if (file.size > 2 * 1024 * 1024) {
-                          alert('File harus kurang dari 2MB');
-                          return;
-                        }
-                        // Create preview
-                        const previewUrl = URL.createObjectURL(file);
-                        setFormData(prev => ({ ...prev, thumbnailUrl: previewUrl }));
-                      }
-                    }}
+                     onChange={async (e) => {
+                       const file = e.target.files?.[0];
+                       if (file) {
+                         // Simple validation
+                         if (!file.type.startsWith('image/')) {
+                           alert('File harus berupa gambar');
+                           return;
+                         }
+                         if (file.size > 2 * 1024 * 1024) {
+                           alert('File harus kurang dari 2MB');
+                           return;
+                         }
+
+                         try {
+                           // Upload file to get permanent URL
+                           const formDataUpload = new FormData();
+                           formDataUpload.append('thumbnail', file);
+
+                           const uploadResponse = await fetch('/api/upload?type=article-thumbnail', {
+                             method: 'POST',
+                             body: formDataUpload,
+                           });
+
+                           if (!uploadResponse.ok) {
+                             throw new Error('Upload failed');
+                           }
+
+                           const uploadResult = await uploadResponse.json();
+
+                           if (uploadResult.success && uploadResult.url) {
+                             setFormData(prev => ({ ...prev, featuredImageUrl: uploadResult.url }));
+                             toast.success('Gambar berhasil diupload');
+                           } else {
+                             throw new Error(uploadResult.error || 'Upload failed');
+                           }
+                         } catch (error) {
+                           console.error('Upload error:', error);
+                           toast.error('Gagal mengupload gambar');
+                         }
+                       }
+                     }}
                   />
                   
-                  {formData.thumbnailUrl ? (
-                    <div className="space-y-3">
-                      <img 
-                        src={formData.thumbnailUrl} 
-                        alt="Thumbnail preview" 
-                        className="mx-auto max-h-32 rounded-lg border"
-                      />
+                   {formData.featuredImageUrl ? (
+                     <div className="space-y-3">
+                       <img
+                         src={formData.featuredImageUrl}
+                         alt="Thumbnail preview"
+                         className="mx-auto max-h-32 rounded-lg border"
+                       />
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"
@@ -395,11 +422,11 @@ export default function CreateArticlePage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, thumbnailUrl: '' }));
-                            const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
-                            if (input) input.value = '';
-                          }}
+                           onClick={() => {
+                             setFormData(prev => ({ ...prev, featuredImageUrl: '' }));
+                             const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
+                             if (input) input.value = '';
+                           }}
                         >
                           Hapus
                         </Button>

@@ -49,8 +49,10 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // Log error for monitoring
     console.error('🚨 Error Boundary Caught:', {
-      error: error.message,
-      stack: error.stack,
+      error: error?.message || 'No error message',
+      stack: error?.stack || 'No stack trace',
+      errorType: typeof error,
+      errorKeys: Object.keys(error || {}),
       context: this.props.context,
       componentStack: errorInfo.componentStack
     })

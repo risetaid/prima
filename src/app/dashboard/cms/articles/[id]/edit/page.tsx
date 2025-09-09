@@ -45,7 +45,7 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
     slug: '',
     content: '',
     excerpt: '',
-    thumbnailUrl: '',
+    featuredImageUrl: '',
     category: 'general',
     status: 'draft' as 'draft' | 'published' | 'archived'
   })
@@ -77,15 +77,15 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
         
         if (data.success) {
           const article = data.data
-          setFormData({
-            title: article.title || '',
-            slug: article.slug || '',
-            content: article.content || '',
-            excerpt: article.excerpt || '',
-            thumbnailUrl: article.thumbnailUrl || article.featuredImageUrl || '',
-            category: article.category || 'general',
-            status: article.status || 'draft'
-          })
+           setFormData({
+             title: article.title || '',
+             slug: article.slug || '',
+             content: article.content || '',
+             excerpt: article.excerpt || '',
+             featuredImageUrl: article.featuredImageUrl || '',
+             category: article.category || 'general',
+             status: article.status || 'draft'
+           })
         }
       } catch (error) {
         console.error('❌ Edit Article: Network error:', error)
@@ -365,32 +365,56 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
                     id="thumbnail-upload"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        // Simple validation
-                        if (!file.type.startsWith('image/')) {
-                          alert('File harus berupa gambar');
-                          return;
-                        }
-                        if (file.size > 2 * 1024 * 1024) {
-                          alert('File harus kurang dari 2MB');
-                          return;
-                        }
-                        // Create preview
-                        const previewUrl = URL.createObjectURL(file);
-                        setFormData(prev => ({ ...prev, thumbnailUrl: previewUrl }));
-                      }
-                    }}
+                     onChange={async (e) => {
+                       const file = e.target.files?.[0];
+                       if (file) {
+                         // Simple validation
+                         if (!file.type.startsWith('image/')) {
+                           alert('File harus berupa gambar');
+                           return;
+                         }
+                         if (file.size > 2 * 1024 * 1024) {
+                           alert('File harus kurang dari 2MB');
+                           return;
+                         }
+
+                         try {
+                           // Upload file to get permanent URL
+                           const formDataUpload = new FormData();
+                           formDataUpload.append('thumbnail', file);
+
+                           const uploadResponse = await fetch('/api/upload?type=article-thumbnail', {
+                             method: 'POST',
+                             body: formDataUpload,
+                           });
+
+                           if (!uploadResponse.ok) {
+                             throw new Error('Upload failed');
+                           }
+
+                           const uploadResult = await uploadResponse.json();
+
+                           if (uploadResult.success && uploadResult.url) {
+                             setFormData(prev => ({ ...prev, featuredImageUrl: uploadResult.url }));
+                             toast.success('Gambar berhasil diupload');
+                           } else {
+                             throw new Error(uploadResult.error || 'Upload failed');
+                           }
+                         } catch (error) {
+                           console.error('Upload error:', error);
+                           toast.error('Gagal mengupload gambar');
+                         }
+                       }
+                     }}
                   />
                   
-                  {formData.thumbnailUrl ? (
-                    <div className="space-y-3">
-                      <img 
-                        src={formData.thumbnailUrl} 
-                        alt="Thumbnail preview" 
-                        className="mx-auto max-h-32 rounded-lg border"
-                      />
+                   {formData.featuredImageUrl ? (
+                     <div className="space-y-3">
+                       <img
+                         src={formData.featuredImageUrl}
+                         alt="Thumbnail preview"
+                         className="mx-auto max-h-32 rounded-lg border"
+                       />
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"
@@ -404,11 +428,11 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setFormData(prev => ({ ...prev, thumbnailUrl: '' }));
-                            const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
-                            if (input) input.value = '';
-                          }}
+                           onClick={() => {
+                             setFormData(prev => ({ ...prev, featuredImageUrl: '' }));
+                             const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
+                             if (input) input.value = '';
+                           }}
                         >
                           Hapus
                         </Button>

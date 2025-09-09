@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
 
     // Get articles (exclude deleted)
-    let articles: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; type: 'article'}> = []
+    let articles: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; featuredImageUrl: string | null; type: 'article'}> = []
     if (type === 'all' || type === 'articles') {
       const articleConditions = [
         // Exclude soft-deleted articles
@@ -29,17 +29,18 @@ export async function GET(request: NextRequest) {
         articleConditions.push(eq(cmsArticles.status, status as 'draft' | 'published' | 'archived'))
       }
 
-      const articleResults = await db
-        .select({
-          id: cmsArticles.id,
-          title: cmsArticles.title,
-          slug: cmsArticles.slug,
-          category: cmsArticles.category,
-          status: cmsArticles.status,
-          publishedAt: cmsArticles.publishedAt,
-          createdAt: cmsArticles.createdAt,
-          updatedAt: cmsArticles.updatedAt
-        })
+       const articleResults = await db
+         .select({
+           id: cmsArticles.id,
+           title: cmsArticles.title,
+           slug: cmsArticles.slug,
+           category: cmsArticles.category,
+           status: cmsArticles.status,
+           publishedAt: cmsArticles.publishedAt,
+           createdAt: cmsArticles.createdAt,
+           updatedAt: cmsArticles.updatedAt,
+           featuredImageUrl: cmsArticles.featuredImageUrl
+         })
         .from(cmsArticles)
         .where(and(...articleConditions))
         .orderBy(desc(cmsArticles.updatedAt))
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get videos (exclude deleted)
-    let videos: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; type: 'video'}> = []
+    let videos: Array<{id: string; title: string; slug: string; category: string; status: string; publishedAt: Date | null; createdAt: Date; updatedAt: Date; thumbnailUrl: string | null; type: 'video'}> = []
     if (type === 'all' || type === 'videos') {
       const videoConditions = [
         // Exclude soft-deleted videos
@@ -61,17 +62,18 @@ export async function GET(request: NextRequest) {
         videoConditions.push(eq(cmsVideos.status, status as 'draft' | 'published' | 'archived'))
       }
 
-      const videoResults = await db
-        .select({
-          id: cmsVideos.id,
-          title: cmsVideos.title,
-          slug: cmsVideos.slug,
-          category: cmsVideos.category,
-          status: cmsVideos.status,
-          publishedAt: cmsVideos.publishedAt,
-          createdAt: cmsVideos.createdAt,
-          updatedAt: cmsVideos.updatedAt
-        })
+       const videoResults = await db
+         .select({
+           id: cmsVideos.id,
+           title: cmsVideos.title,
+           slug: cmsVideos.slug,
+           category: cmsVideos.category,
+           status: cmsVideos.status,
+           publishedAt: cmsVideos.publishedAt,
+           createdAt: cmsVideos.createdAt,
+           updatedAt: cmsVideos.updatedAt,
+           thumbnailUrl: cmsVideos.thumbnailUrl
+         })
         .from(cmsVideos)
         .where(and(...videoConditions))
         .orderBy(desc(cmsVideos.updatedAt))

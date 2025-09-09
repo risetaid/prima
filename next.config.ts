@@ -110,6 +110,12 @@ const nextConfig: NextConfig = {
           port: '',
           pathname: '/**',
         },
+        {
+          protocol: 'https',
+          hostname: 'i.ytimg.com',
+          port: '',
+          pathname: '/**',
+        },
       ],
     },
   // Disable ESLint during build to avoid configuration issues
