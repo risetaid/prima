@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { shouldSendReminderNow } from "@/lib/timezone";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import {
   db,
   patients,
@@ -279,6 +280,9 @@ export async function POST(
         };
 
         await db.insert(reminderLogs).values(logData);
+
+        // Invalidate cache after creating reminder log
+        await invalidateCache(CACHE_KEYS.reminderStats(id));
 
         break; // Only send one immediate reminder
       }

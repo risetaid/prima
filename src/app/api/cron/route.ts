@@ -220,6 +220,13 @@ async function processReminders() {
         const scheduleDate = schedule.startDate.toISOString().split('T')[0]
         const shouldSend = shouldSendReminderNow(scheduleDate, schedule.scheduledTime)
 
+        // Debug logging for manual cron troubleshooting
+        if (shouldSend) {
+          debugLogs.push(`✅ Reminder ${schedule.patientName} (${schedule.scheduledTime}) should be sent - current: ${getWIBTimeString()}, scheduled: ${schedule.scheduledTime}`)
+        } else {
+          debugLogs.push(`❌ Reminder ${schedule.patientName} (${schedule.scheduledTime}) not ready - current: ${getWIBTimeString()}, scheduled: ${schedule.scheduledTime}`)
+        }
+
         if (shouldSend) {
           // Validate phone number exists
           if (!schedule.patientPhoneNumber) {

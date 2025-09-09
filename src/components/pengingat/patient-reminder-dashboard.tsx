@@ -222,10 +222,10 @@ export function PatientReminderDashboard({
     try {
       
       const deletePromises = selectedReminders.map(async (reminderId) => {
-        // Extract real UUID from formatted ID (remove status prefix)
-        const realId = reminderId.includes('-') ? 
-          reminderId.split('-').slice(1).join('-') : 
-          reminderId;
+        // Extract actual UUID from prefixed format (e.g., "pending-uuid" or "completed-uuid")
+        const realId = reminderId.includes('-') && reminderId.split('-').length > 4
+          ? reminderId.split('-').slice(1).join('-')
+          : reminderId;
         
         const response = await fetch(`/api/reminders/scheduled/${realId}`, { 
           method: "DELETE" 
@@ -273,11 +273,11 @@ export function PatientReminderDashboard({
     action: "ya" | "tidak"
   ) => {
     try {
-      // Extract actual ReminderLog ID from prefixed format
+      // Extract actual UUID from prefixed format (e.g., "pending-uuid" or "completed-uuid")
       // Desktop /all endpoint returns IDs like "pending-732829dc-1b65-4c5b-91c9-0749cd287e95"
       // But API expects just the UUID: "732829dc-1b65-4c5b-91c9-0749cd287e95"
-      const actualReminderId = reminderId.startsWith("pending-")
-        ? reminderId.replace("pending-", "")
+      const actualReminderId = reminderId.includes('-') && reminderId.split('-').length > 4
+        ? reminderId.split('-').slice(1).join('-')
         : reminderId;
 
       const response = await fetch(

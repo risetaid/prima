@@ -118,15 +118,19 @@ export default function ScheduledRemindersPage() {
             body: JSON.stringify({ reminderIds: selectedReminders })
           })
 
-          if (response.ok) {
-            // Remove from local state after successful API call
-            setReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)))
-            setSelectedReminders([])
-            setIsDeleteMode(false)
-            toast.success('Pengingat berhasil dihapus', {
-              description: `${selectedReminders.length} pengingat telah dihapus`
-            })
-          } else {
+           if (response.ok) {
+             // Remove from local state after successful API call
+             setReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)))
+             setSelectedReminders([])
+             setIsDeleteMode(false)
+
+             // Invalidate cache and refresh parent stats
+             await fetch(`/api/patients/${params.id}/reminders/stats?invalidate=true`)
+
+             toast.success('Pengingat berhasil dihapus', {
+               description: `${selectedReminders.length} pengingat telah dihapus`
+             })
+           } else {
             const error = await response.json()
             toast.error('Gagal menghapus pengingat', {
               description: error.error || 'Terjadi kesalahan pada server'

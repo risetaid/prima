@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
 import { eq, and, desc, asc, gte, lte, inArray, isNull } from 'drizzle-orm'
 import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
+import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
 
 export async function GET(
   request: NextRequest,
@@ -214,7 +215,10 @@ export async function DELETE(
         medicationName: reminderSchedules.medicationName
       })
 
-    return NextResponse.json({ 
+    // Invalidate cache after bulk deletion
+    await invalidateCache(CACHE_KEYS.reminderStats(id))
+
+    return NextResponse.json({
       success: true,
       message: 'Reminders berhasil dihapus',
       deletedCount: deleteResult.length

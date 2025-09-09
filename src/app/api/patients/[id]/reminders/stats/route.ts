@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
 import { getWIBTodayStart } from '@/lib/timezone'
-import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
+import { getCachedData, setCachedData, invalidateCache, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 export async function GET(
   request: NextRequest,
@@ -16,13 +16,21 @@ export async function GET(
     }
 
     const { id } = await params
-    
-    // Try to get from cache first
+
+    // Check for cache invalidation request
+    const { searchParams } = new URL(request.url)
+    const invalidate = searchParams.get('invalidate') === 'true'
+
+    // Try to get from cache first (unless invalidating)
     const cacheKey = CACHE_KEYS.reminderStats(id)
-    const cachedStats = await getCachedData(cacheKey)
-    
-    if (cachedStats) {
-      return NextResponse.json(cachedStats)
+    if (!invalidate) {
+      const cachedStats = await getCachedData(cacheKey)
+      if (cachedStats) {
+        return NextResponse.json(cachedStats)
+      }
+    } else {
+      // Invalidate cache when requested
+      await invalidateCache(cacheKey)
     }
     
     // DEBUG: Log the filter criteria

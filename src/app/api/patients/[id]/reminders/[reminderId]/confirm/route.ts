@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderLogs, reminderSchedules, manualConfirmations } from '@/db'
 import { eq, and } from 'drizzle-orm'
+import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
 
 export async function PUT(
   request: NextRequest,
@@ -26,12 +27,21 @@ export async function PUT(
       return NextResponse.json({ error: 'medicationTaken must be boolean' }, { status: 400 })
     }
 
-    const { id, reminderId } = await params
-    
-    // Use reminderLogId from request body if provided, otherwise use reminderId from URL
-    const logId = reminderLogId || reminderId
+    const { id, reminderId: rawReminderId } = await params
 
-    console.log('Confirming reminder:', { patientId: id, reminderId, logId, medicationTaken })
+    // Extract actual UUID if reminderId has a prefix (e.g., "pending-uuid" or "completed-uuid")
+    const reminderId = rawReminderId.includes('-') && rawReminderId.split('-').length > 4
+      ? rawReminderId.split('-').slice(1).join('-')
+      : rawReminderId
+
+    // Extract UUID from reminderLogId if it has a prefix, otherwise use the extracted reminderId
+    const extractedLogId = reminderLogId && reminderLogId.includes('-') && reminderLogId.split('-').length > 4
+      ? reminderLogId.split('-').slice(1).join('-')
+      : (reminderLogId || reminderId)
+
+    const logId = extractedLogId
+
+    console.log('Confirming reminder:', { patientId: id, rawReminderId, reminderId, logId, medicationTaken })
 
     // Get the reminder log using separate queries
     const reminderLog = await db
@@ -102,23 +112,26 @@ export async function PUT(
         followUpNeeded: !medicationTaken,
         followUpNotes: medicationTaken ? null : 'Patient did not take medication as scheduled'
       })
-      .returning({
-        id: manualConfirmations.id,
-        patientId: manualConfirmations.patientId,
-        volunteerId: manualConfirmations.volunteerId,
-        reminderScheduleId: manualConfirmations.reminderScheduleId,
-        reminderLogId: manualConfirmations.reminderLogId,
-        visitDate: manualConfirmations.visitDate,
-        visitTime: manualConfirmations.visitTime,
-        medicationsTaken: manualConfirmations.medicationsTaken,
-        medicationsMissed: manualConfirmations.medicationsMissed,
-        patientCondition: manualConfirmations.patientCondition,
-        symptomsReported: manualConfirmations.symptomsReported,
-        notes: manualConfirmations.notes,
-        followUpNeeded: manualConfirmations.followUpNeeded,
-        followUpNotes: manualConfirmations.followUpNotes,
-        confirmedAt: manualConfirmations.confirmedAt
-      })
+       .returning({
+         id: manualConfirmations.id,
+         patientId: manualConfirmations.patientId,
+         volunteerId: manualConfirmations.volunteerId,
+         reminderScheduleId: manualConfirmations.reminderScheduleId,
+         reminderLogId: manualConfirmations.reminderLogId,
+         visitDate: manualConfirmations.visitDate,
+         visitTime: manualConfirmations.visitTime,
+         medicationsTaken: manualConfirmations.medicationsTaken,
+         medicationsMissed: manualConfirmations.medicationsMissed,
+         patientCondition: manualConfirmations.patientCondition,
+         symptomsReported: manualConfirmations.symptomsReported,
+         notes: manualConfirmations.notes,
+         followUpNeeded: manualConfirmations.followUpNeeded,
+         followUpNotes: manualConfirmations.followUpNotes,
+         confirmedAt: manualConfirmations.confirmedAt
+       })
+
+    // Invalidate cache after confirmation
+    await invalidateCache(CACHE_KEYS.reminderStats(id))
 
     return NextResponse.json(newManualConfirmation[0])
   } catch (error) {

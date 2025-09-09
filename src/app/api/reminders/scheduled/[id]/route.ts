@@ -10,6 +10,7 @@ import {
 } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
 export async function PUT(
   request: NextRequest,
@@ -67,16 +68,18 @@ export async function PUT(
       );
     }
 
+    const patientId = reminderScheduleResult[0].patientId;
+
     const reminderSchedule = reminderScheduleResult[0];
 
     // Improved medication name extraction from custom message
     function extractMedicationName(message: string, currentMedicationName?: string): string {
       const words = message.toLowerCase().split(/[\s,\.]+/); // Split by space, comma, period
-      
+
       // Common medication patterns
       const medicationKeywords = [
         // Common medications
-        "candesartan", "paracetamol", "amoxicillin", "metformin", "ibuprofen", 
+        "candesartan", "paracetamol", "amoxicillin", "metformin", "ibuprofen",
         "aspirin", "omeprazole", "simvastatin", "atorvastatin", "amlodipine",
         "lisinopril", "hydrochlorothiazide", "furosemide", "spironolactone",
         // Indonesian terms
@@ -88,7 +91,7 @@ export async function PUT(
       // Look for medication names (usually after "obat" or before "mg/ml")
       for (let i = 0; i < words.length; i++) {
         const word = words[i];
-        
+
         // If word contains medication keyword, get the context
         if (medicationKeywords.some(keyword => word.includes(keyword))) {
           // If it's "obat", look for the next word as medication name
@@ -147,6 +150,9 @@ export async function PUT(
         await db.insert(reminderContentAttachments).values(attachmentRecords);
       }
     }
+
+    // Invalidate cache after update
+    await invalidateCache(CACHE_KEYS.reminderStats(patientId));
 
     return NextResponse.json({
       message: "Reminder updated successfully",
@@ -209,6 +215,9 @@ export async function DELETE(
         updatedAt: getWIBTime(),
       })
       .where(eq(reminderSchedules.id, id));
+
+    // Invalidate cache after deletion
+    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
 
     return NextResponse.json({
       success: true,
