@@ -16,7 +16,7 @@ export async function PUT(
     let requestBody
     try {
       requestBody = await request.json()
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
     }
 
@@ -58,7 +58,7 @@ export async function PUT(
     const logData = reminderLog[0]
 
     // Get reminder schedule details (if reminderScheduleId exists)
-    let reminderSchedule: any[] = []
+    let reminderSchedule: { id: string; medicationName: string; dosage: string | null }[] = []
     if (logData.reminderScheduleId) {
       reminderSchedule = await db
         .select({

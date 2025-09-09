@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
+import { WebVitalsReporter } from "@/components/performance/web-vitals";
 import "./globals.css";
 
 const inter = Inter({

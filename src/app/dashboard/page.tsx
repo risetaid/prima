@@ -1,34 +1,15 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useEffect } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
 import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
-import { postLoginCacheCleanup, clearRoleCacheOnLogout } from "@/lib/cache-utils";
-import { initializePWA } from "@/lib/pwa-utils";
+
 
 export default function DashboardPage() {
   const { isLoaded } = useUser();
 
-  useEffect(() => {
-    // Initialize post-login optimizations
-    // Since middleware handles all auth/approval checks, we can run these immediately
-    if (isLoaded) {
-      // Clear role cache to prevent stale role data
-      clearRoleCacheOnLogout();
-      
-      // Clear browser cache after successful login (non-blocking)
-      postLoginCacheCleanup().catch((error: any) => {
-        console.warn('⚠️ Dashboard: Cache cleanup failed (non-critical):', error)
-      });
-      
-      // Initialize PWA features (non-blocking)
-      initializePWA().catch((error: any) => {
-        console.warn('⚠️ Dashboard: PWA initialization failed (non-critical):', error)
-      });
-    }
-  }, [isLoaded]);
+
 
   // Show loading while Clerk loads
   if (!isLoaded) {

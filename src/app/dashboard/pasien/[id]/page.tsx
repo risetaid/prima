@@ -44,7 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
+// AddReminderModal temporarily removed
 
 interface Patient {
   id: string;
@@ -1742,13 +1742,13 @@ export default function PatientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reminder Modal */}
-      <AddReminderModal
+      {/* Reminder Modal - Temporarily disabled */}
+      {/* <AddReminderModal
         isOpen={isReminderModalOpen}
         onClose={() => setIsReminderModalOpen(false)}
         onSuccess={handleReminderSuccess}
         patientName={patient?.name || ""}
-      />
+      /> */}
     </div>
   );
 }

@@ -52,16 +52,15 @@ bun run seed:templates         # Seed WhatsApp message templates
 - `src/db/schema.ts` - Database schema with comprehensive foreign keys
 - `src/db/index.ts` - Database connection and exports
 
-### API Routes Structure (55+ endpoints)
+### API Routes Structure (50+ endpoints)
 - `src/app/api/auth/` - Authentication endpoints
 - `src/app/api/patients/[id]/` - Individual patient management APIs
 - `src/app/api/patients/[id]/reminders/` - Patient reminder management
 - `src/app/api/admin/` - Admin panel APIs (users, templates)
 - `src/app/api/cms/` - Content management APIs (articles, videos)
-- `src/app/api/user/session/` - User session management
+- `src/app/api/content/public/` - Public content access
 - `src/app/api/cron/` - Automated WhatsApp reminder system
 - `src/app/api/reminders/scheduled/[id]/` - Scheduled reminder editing
-- `src/app/api/debug/` - Development debugging tools (non-production)
 
 ### Dashboard Pages (24+ pages)
 - `src/app/dashboard/` - Main dashboard interface
@@ -164,7 +163,7 @@ bun run seed:templates         # Seed WhatsApp message templates
 - Compliance rate calculation and monitoring
 
 ### Reminder System ✅  
-- Automated WhatsApp reminders via cron jobs with debug endpoints
+- Automated WhatsApp reminders via cron jobs
 - WhatsApp API integration with delivery tracking (Fonnte)
 - **Content Attachments**: Reminders can include article and video content
 - **Edit Functionality**: Full editing support for scheduled reminders including content updates

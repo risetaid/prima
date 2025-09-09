@@ -8,29 +8,37 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
- * Fetches YouTube video data using oEmbed API (no API key required)
+ * Fetches YouTube video data using server-side API endpoint
+ * Gets full data including description and duration via HTML scraping
  */
 export async function fetchYouTubeVideoData(videoId: string) {
   try {
-    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
-    const response = await fetch(oembedUrl)
+    const response = await fetch('/api/youtube/fetch', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        url: `https://www.youtube.com/watch?v=${videoId}` 
+      })
+    })
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch video data')
+    const result = await response.json()
+
+    if (!result.success) {
+      throw new Error(result.error || 'Gagal mengambil data video')
     }
 
-    const data = await response.json()
-
     return {
-      title: data.title || '',
-      description: '', // oEmbed doesn't provide description
-      thumbnailUrl: data.thumbnail_url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      duration: '', // oEmbed doesn't provide duration
-      channelName: data.author_name || ''
+      title: result.data.title || '',
+      description: result.data.description || '',
+      thumbnailUrl: result.data.thumbnailUrl || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      duration: result.data.duration || '',
+      channelName: result.data.channelName || ''
     }
   } catch (error) {
     console.error('Error fetching YouTube data:', error)
-    throw new Error('Could not fetch video information')
+    throw new Error('Gagal mengambil data video. Pastikan URL valid dan video dapat diakses.')
   }
 }
 

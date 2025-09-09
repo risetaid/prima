@@ -73,7 +73,7 @@ export function TinyMCEEditor({
           images_upload_handler: (blobInfo: any, progress: (percent: number) => void) => new Promise<string>((resolve, reject) => {
             const xhr = new XMLHttpRequest()
             xhr.withCredentials = false
-            xhr.open('POST', '/api/upload/tinymce-image')
+            xhr.open('POST', '/api/upload?type=tinymce-image')
 
             xhr.upload.onprogress = (e) => {
               progress(e.loaded / e.total * 100)

@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Calendar, Clock, Trash2, X, Edit } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { formatDateWIB } from '@/lib/datetime'
-import { useConfirm } from '@/components/ui/confirm-dialog'
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 import { toast } from '@/components/ui/toast'
 import { ReminderListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { ContentSelector } from '@/components/reminder/ContentSelector'
@@ -51,7 +51,20 @@ export default function ScheduledRemindersPage() {
   const [editMessage, setEditMessage] = useState('')
   const [selectedContent, setSelectedContent] = useState<ContentItem[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
-  const { confirm, ConfirmComponent } = useConfirm()
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    confirmText?: string
+    cancelText?: string
+    variant?: 'default' | 'destructive'
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+  })
 
   useEffect(() => {
     if (params.id) {
@@ -88,7 +101,8 @@ export default function ScheduledRemindersPage() {
   const handleDeleteReminders = async () => {
     if (selectedReminders.length === 0) return
 
-    confirm({
+    setConfirmModal({
+      isOpen: true,
       title: 'Hapus Pengingat',
       description: `Apakah Anda yakin ingin menghapus ${selectedReminders.length} pengingat? Tindakan ini tidak dapat dibatalkan.`,
       confirmText: 'Hapus',
@@ -243,7 +257,16 @@ export default function ScheduledRemindersPage() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <ConfirmComponent />
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        description={confirmModal.description}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        variant={confirmModal.variant}
+      />
       {/* Header */}
       <header className="bg-white">
         <div className="flex justify-between items-center px-4 py-4">

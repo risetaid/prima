@@ -7,8 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { Video, Save, Eye, X, Download } from 'lucide-react'
+import { Video, Save, Eye, Download } from 'lucide-react'
 import { BackButton } from '@/components/ui/back-button'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -33,7 +32,6 @@ interface FormData {
   thumbnailUrl: string
   durationMinutes: string
   category: string
-  tags: string[]
   status: 'draft' | 'published'
 }
 
@@ -49,10 +47,8 @@ export default function CreateVideoPage() {
     thumbnailUrl: '',
     durationMinutes: '',
     category: 'motivational',
-    tags: [],
     status: 'draft'
   })
-  const [newTag, setNewTag] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -104,22 +100,7 @@ export default function CreateVideoPage() {
     }
   }
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim().toLowerCase())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim().toLowerCase()]
-      }))
-      setNewTag('')
-    }
-  }
 
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -400,40 +381,7 @@ export default function CreateVideoPage() {
             </CardContent>
           </Card>
 
-          {/* Tags */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tags</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Tambah tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                />
-                <Button type="button" size="sm" onClick={addTag}>
-                  +
-                </Button>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-red-500"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* Video Preview */}
           {formData.thumbnailUrl && (

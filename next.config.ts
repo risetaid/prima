@@ -13,8 +13,21 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['ioredis', 'postgres', 'sharp'],
   
   experimental: {
-    // Optimize package imports
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-select'],
+    // Optimize package imports for better tree shaking
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-select',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      'date-fns',
+      'zod',
+      'drizzle-orm',
+      'react-hook-form',
+      '@hookform/resolvers',
+      'sonner'
+    ],
   },
   
   // Only include webpack config when NOT using Turbopack

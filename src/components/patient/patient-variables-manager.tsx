@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Settings, Plus, Edit, Trash2, Zap, Save, X, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 interface PatientVariable {
   id: string
@@ -41,6 +42,8 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
   const [isLoading, setIsLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingValues, setEditingValues] = useState<Record<string, string>>({})
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [variableToDelete, setVariableToDelete] = useState<string | null>(null)
 
   // Load variables
   const loadVariables = async () => {
@@ -102,26 +105,35 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
 
   // Delete variable
   const deleteVariable = async (variableName: string) => {
-    if (!confirm(`Hapus variabel "${variableName}"?`)) return
+    setVariableToDelete(variableName)
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDeleteVariable = async () => {
+    if (!variableToDelete) return
 
     try {
       setIsLoading(true)
       const response = await fetch(
-        `/api/patients/${patientId}/variables?variableName=${encodeURIComponent(variableName)}`,
-        { method: 'DELETE' }
+        `/api/patients/${patientId}/variables?variableName=${encodeURIComponent(variableToDelete)}`,
+        {
+          method: 'DELETE',
+        }
       )
 
-      if (!response.ok) {
-        throw new Error('Failed to delete variable')
+      if (response.ok) {
+        toast.success(`Variabel "${variableToDelete}" berhasil dihapus`)
+        loadVariables()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Gagal menghapus variabel')
       }
-
-      await loadVariables()
-      toast.success(`Variabel "${variableName}" berhasil dihapus`)
     } catch (error) {
       console.error('Error deleting variable:', error)
-      toast.error('Gagal menghapus variabel')
+      toast.error('Terjadi kesalahan saat menghapus variabel')
     } finally {
       setIsLoading(false)
+      setVariableToDelete(null)
     }
   }
 
@@ -266,6 +278,22 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
           </div>
         )}
       </CardContent>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false)
+          setVariableToDelete(null)
+        }}
+        onConfirm={confirmDeleteVariable}
+        title="Hapus Variabel"
+        description={`Yakin ingin menghapus variabel "${variableToDelete}"?`}
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        variant="destructive"
+        loading={isLoading}
+      />
     </Card>
   )
 }

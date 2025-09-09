@@ -7,14 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { Video, Save, Eye, X, Trash2, Download } from 'lucide-react'
+import { Video, Save, Eye, Trash2, Download } from 'lucide-react'
 import { BackButton } from '@/components/ui/back-button'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { generateRandomSlug } from '@/lib/slug-utils'
 import { extractYouTubeVideoId, fetchYouTubeVideoData } from '@/lib/youtube-utils'
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 const categories = [
   { value: 'general', label: 'Umum' },
@@ -37,6 +37,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [fetchingVideoData, setFetchingVideoData] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
@@ -45,10 +46,8 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
     thumbnailUrl: '',
     durationMinutes: '',
     category: 'general',
-    tags: [] as string[],
     status: 'draft' as 'draft' | 'published' | 'archived'
   })
-  const [newTag, setNewTag] = useState('')
 
   useEffect(() => {
     const loadVideo = async () => {
@@ -85,7 +84,6 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             thumbnailUrl: video.thumbnailUrl || '',
             durationMinutes: video.durationMinutes || '',
             category: video.category || 'general',
-            tags: video.tags || [],
             status: video.status || 'draft'
           })
         }
@@ -138,22 +136,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
     }
   }
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim().toLowerCase())) {
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim().toLowerCase()]
-      }))
-      setNewTag('')
-    }
-  }
 
-  const removeTag = (tagToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }))
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -201,10 +184,10 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Yakin ingin menghapus video ini? Tindakan ini tidak dapat dibatalkan.')) {
-      return
-    }
+    setIsDeleteModalOpen(true)
+  }
 
+  const confirmDelete = async () => {
     setDeleting(true)
 
     try {
@@ -220,14 +203,15 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         return
       }
 
-      console.log('✅ Edit Video: Deleted successfully')
-      toast.success('Video berhasil dihapus!')
+      console.log('✅ Edit Video: Video deleted successfully')
+      toast.success('Video berhasil dihapus')
       router.push('/dashboard/cms')
     } catch (error) {
-      console.error('❌ Edit Video: Delete network error:', error)
+      console.error('❌ Edit Video: Unexpected error:', error)
       toast.error('Terjadi kesalahan saat menghapus video')
     } finally {
       setDeleting(false)
+      setIsDeleteModalOpen(false)
     }
   }
 
@@ -470,45 +454,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             </CardContent>
           </Card>
 
-          {/* Tags */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tags</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Tambah tag..."
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  className="flex-1"
-                />
-                <Button type="button" size="sm" onClick={addTag}>
-                  +
-                </Button>
-              </div>
-              
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="flex items-center gap-1">
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-red-500 transition-colors"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-              
-              {formData.tags.length === 0 && (
-                <p className="text-sm text-gray-500">Belum ada tag</p>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Video Preview */}
           {formData.thumbnailUrl && (
@@ -530,6 +476,19 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Hapus Video"
+        description="Yakin ingin menghapus video ini? Tindakan ini tidak dapat dibatalkan."
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        variant="destructive"
+        loading={deleting}
+      />
     </div>
   )
 }

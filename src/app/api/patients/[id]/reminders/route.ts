@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
+import { shouldSendReminderNow } from "@/lib/timezone";
 import {
   db,
   patients,
@@ -12,12 +13,9 @@ import {
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import {
-  shouldSendReminderNow,
   getWIBTime,
-  getWIBTimeString,
-  getWIBDateString,
 } from "@/lib/timezone";
-import { whatsappRateLimiter } from "@/lib/rate-limiter";
+// Rate limiter temporarily disabled
 
 export async function GET(
   request: NextRequest,
@@ -253,39 +251,34 @@ export async function POST(
       const scheduleDate = schedule.startDate.toISOString().split("T")[0];
 
       if (shouldSendReminderNow(scheduleDate, time)) {
-        // Check rate limit before sending immediate reminder
-        const rateLimitKey = `user_${user.id}`; // Per-user rate limiting
-        if (!whatsappRateLimiter.isAllowed(rateLimitKey)) {
-          // Don't break, just skip immediate send but still create the schedule
-        } else {
-          // Generate enhanced message with content attachments
-          const enhancedMessage = generateEnhancedMessage(
-            message,
-            validatedContent
-          );
+        // Rate limiting temporarily disabled - send message directly
+        // Generate enhanced message with content attachments
+        const enhancedMessage = generateEnhancedMessage(
+          message,
+          validatedContent
+        );
 
-          // Send via Fonnte
-          const result = await sendWhatsAppMessage({
-            to: formatWhatsAppNumber(patient.phoneNumber),
-            body: enhancedMessage,
-          });
+        // Send via Fonnte
+        const result = await sendWhatsAppMessage({
+          to: formatWhatsAppNumber(patient.phoneNumber),
+          body: enhancedMessage,
+        });
 
-          // Log the reminder
-          const status: "DELIVERED" | "FAILED" = result.success
-            ? "DELIVERED"
-            : "FAILED";
-          const logData = {
-            reminderScheduleId: schedule.id,
-            patientId: id,
-            sentAt: getWIBTime(),
-            status: status,
-            message: message,
-            phoneNumber: patient.phoneNumber,
-            fonnteMessageId: result.messageId,
-          };
+        // Log the reminder
+        const status: "DELIVERED" | "FAILED" = result.success
+          ? "DELIVERED"
+          : "FAILED";
+        const logData = {
+          reminderScheduleId: schedule.id,
+          patientId: id,
+          sentAt: getWIBTime(),
+          status: status,
+          message: message,
+          phoneNumber: patient.phoneNumber,
+          fonnteMessageId: result.messageId,
+        };
 
-          await db.insert(reminderLogs).values(logData);
-        }
+        await db.insert(reminderLogs).values(logData);
 
         break; // Only send one immediate reminder
       }

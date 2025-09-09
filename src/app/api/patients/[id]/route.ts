@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth-utils'
-import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules, patientMedications, medications } from '@/db'
+import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules } from '@/db'
 import { eq, and, isNull, count } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL, invalidatePatientCache } from '@/lib/cache'
 

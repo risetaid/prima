@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { Header } from '@/components/ui/header'
-import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
+
 import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
 import Image from 'next/image'
 
@@ -213,9 +213,12 @@ export default function ReminderPage() {
           </div>
         </div>
         
-        {/* Desktop: Patient Table */}
+        {/* Desktop: Patient Table - Temporarily disabled */}
         <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
-          <ReminderListTable patients={filteredPatients} loading={loading} />
+          <div className="bg-white rounded-lg p-8 text-center">
+            <p className="text-gray-600">Patient table component temporarily unavailable.</p>
+            <p className="text-sm text-gray-500 mt-2">Use mobile view for patient management.</p>
+          </div>
         </div>
       </div>
 

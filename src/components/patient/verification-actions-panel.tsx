@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 interface VerificationActionsPanelProps {
   patient: any
@@ -15,6 +16,7 @@ export default function VerificationActionsPanel({
   const [sending, setSending] = useState(false)
   const [showManualVerify, setShowManualVerify] = useState(false)
   const [reactivating, setReactivating] = useState(false)
+  const [isReactivateModalOpen, setIsReactivateModalOpen] = useState(false)
 
   const handleSendVerification = async () => {
     setSending(true)
@@ -65,18 +67,18 @@ export default function VerificationActionsPanel({
   }
 
   const handleReactivation = async () => {
-    if (!confirm('Yakin ingin mengaktifkan kembali pasien ini? Pasien akan kembali ke status "Menunggu Verifikasi".')) {
-      return
-    }
+    setIsReactivateModalOpen(true)
+  }
 
+  const confirmReactivation = async () => {
     setReactivating(true)
     try {
       const response = await fetch(`/api/patients/${patient.id}/reactivate`, {
         method: 'POST'
       })
-      
+
       const data = await response.json()
-      
+
       if (response.ok) {
         toast.success(`✅ ${data.message}`)
         toast.info(`ℹ️ ${data.nextStep}`)
@@ -85,10 +87,11 @@ export default function VerificationActionsPanel({
         toast.error(`❌ Gagal mengaktifkan kembali: ${data.error}`)
       }
     } catch (error) {
-      console.error('Reactivation error:', error)
-      toast.error('❌ Terjadi kesalahan saat mengaktifkan kembali')
+      console.error('Error reactivating patient:', error)
+      toast.error('❌ Terjadi kesalahan saat mengaktifkan kembali pasien')
+    } finally {
+      setReactivating(false)
     }
-    setReactivating(false)
   }
 
   return (
@@ -281,6 +284,18 @@ export default function VerificationActionsPanel({
           </div>
         </div>
       )}
+
+      {/* Reactivation Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isReactivateModalOpen}
+        onClose={() => setIsReactivateModalOpen(false)}
+        onConfirm={confirmReactivation}
+        title="Aktifkan Kembali Pasien"
+        description="Yakin ingin mengaktifkan kembali pasien ini? Pasien akan kembali ke status 'Menunggu Verifikasi'."
+        confirmText="Ya, Aktifkan"
+        cancelText="Batal"
+        loading={reactivating}
+      />
     </div>
   )
 }

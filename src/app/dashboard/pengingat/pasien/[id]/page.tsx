@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { Header } from '@/components/ui/header'
-import { PatientReminderDashboard } from '@/components/pengingat/patient-reminder-dashboard'
+
 
 interface ReminderStats {
   terjadwal: number
@@ -125,9 +125,12 @@ export default function PatientReminderPage() {
         </header>
       </div>
 
-      {/* Desktop: 3-Column Layout */}
+      {/* Desktop: 3-Column Layout - Temporarily disabled */}
       <div className="hidden lg:block py-8 relative z-10">
-        <PatientReminderDashboard patientName={patientName} />
+        <div className="bg-white rounded-lg p-8 text-center">
+          <p className="text-gray-600">Patient reminder dashboard temporarily unavailable.</p>
+          <p className="text-sm text-gray-500 mt-2">Use mobile view for reminder management.</p>
+        </div>
       </div>
 
       {/* Mobile: Card Layout */}

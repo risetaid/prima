@@ -4,7 +4,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
 import { nowWIB } from '@/lib/datetime'
-import { safeDbOperation, logDbPerformance } from '@/lib/db-utils'
+// DB utils temporarily inlined
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 /**
@@ -47,17 +47,18 @@ export async function POST(_request: NextRequest) {
     if (cachedSession) {
       console.log('⚡ User session cache hit - instant response')
       // Still update login timestamp in background (non-blocking)
-      setImmediate(() => {
-        safeDbOperation(async () => {
+      setImmediate(async () => {
+        try {
           await db
             .update(users)
-            .set({ 
+            .set({
               lastLoginAt: nowWIB(),
               updatedAt: nowWIB()
             })
             .where(eq(users.clerkId, userId))
-        }, { maxRetries: 1, delayMs: 300 }, 1000)
-        .catch(error => console.warn('⚠️ Background login update failed:', error))
+        } catch (error) {
+          console.warn('⚠️ Background login update failed:', error)
+        }
       })
       
       return NextResponse.json(cachedSession)
@@ -66,9 +67,7 @@ export async function POST(_request: NextRequest) {
     console.log('💾 User session cache miss - fetching from database')
 
     // Try to get existing user first with connection pool aware settings
-    let user = await safeDbOperation(async () => {
-      return await getCurrentUser()
-    }, { maxRetries: 3, delayMs: 800 }, 6000) // Increased retries and delay for connection pool contention
+    let user = await getCurrentUser()
     
     // FALLBACK: If database fails but user is authenticated in Clerk, provide minimal session
     if (!user) {
@@ -113,35 +112,29 @@ export async function POST(_request: NextRequest) {
     if (!user) {
       try {
         // Check if this is the first user (should be SUPERADMIN) - optimized query
-        const userCountResult = await safeDbOperation(async () => {
-          return await db
-            .select({ count: count(users.id) })
-            .from(users)
-            .limit(1) // Only need to know if any exist
-        }, { maxRetries: 2, delayMs: 500 }, 5000)
+        const userCountResult = await db
+          .select({ count: count(users.id) })
+          .from(users)
+          .limit(1) // Only need to know if any exist
         
         const userCount = userCountResult[0]?.count || 0
         const isFirstUser = userCount === 0
         
         // Create user in database with reasonable retry mechanism
-        await safeDbOperation(async () => {
-          return await db
-            .insert(users)
-            .values({
-              clerkId: userId,
-              email: clerkUser.primaryEmailAddress?.emailAddress || '',
-              firstName: clerkUser.firstName || '',
-              lastName: clerkUser.lastName || '',
-              role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
-              isApproved: isFirstUser,
-              approvedAt: isFirstUser ? new Date() : null,
-            })
-        }, { maxRetries: 2, delayMs: 500 }, 5000)
+        await db
+          .insert(users)
+          .values({
+            clerkId: userId,
+            email: clerkUser.primaryEmailAddress?.emailAddress || '',
+            firstName: clerkUser.firstName || '',
+            lastName: clerkUser.lastName || '',
+            role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
+            isApproved: isFirstUser,
+            approvedAt: isFirstUser ? new Date() : null,
+          })
         
         // Get user again after creation with reasonable timeout
-        user = await safeDbOperation(async () => {
-          return await getCurrentUser()
-        }, { maxRetries: 2, delayMs: 500 }, 5000)
+        user = await getCurrentUser()
       } catch (syncError) {
         console.error('❌ User Session: Failed to sync user from Clerk:', syncError)
         return NextResponse.json({
@@ -163,20 +156,19 @@ export async function POST(_request: NextRequest) {
 
     // Background login timestamp update (non-blocking) - optimized with shorter timeouts
     // This replaces the separate /api/auth/update-last-login call for performance
-    setImmediate(() => {
-      safeDbOperation(async () => {
+    setImmediate(async () => {
+      try {
         await db
           .update(users)
-          .set({ 
+          .set({
             lastLoginAt: nowWIB(),
             updatedAt: nowWIB()
           })
           .where(eq(users.clerkId, userId))
-      }, { maxRetries: 1, delayMs: 500 }, 1500) // Reduced from 3000ms to 1500ms
-      .catch(error => {
+      } catch (error) {
         console.warn('⚠️ Background login update failed:', error)
         // Don't throw - this is non-critical for user session
-      })
+      }
     })
 
     // Return complete session data combining all three endpoints
@@ -222,8 +214,7 @@ export async function POST(_request: NextRequest) {
     setCachedData(cacheKey, sessionData, CACHE_TTL.USER_SESSION)
       .catch(error => console.warn('⚠️ Failed to cache session data:', error))
 
-    logDbPerformance('consolidated-user-session', startTime)
-    
+
     return NextResponse.json(sessionData)
 
   } catch (error) {

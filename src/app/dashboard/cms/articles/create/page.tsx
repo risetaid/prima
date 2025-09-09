@@ -20,38 +20,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { TinyMCEEditor } from "@/components/cms/TinyMCEEditor";
+import dynamic from 'next/dynamic'
+const TinyMCEEditor = dynamic(() => import('@/components/cms/TinyMCEEditor').then(mod => ({ default: mod.TinyMCEEditor })), {
+  loading: () => <div className="h-64 bg-gray-100 rounded animate-pulse flex items-center justify-center">Loading editor...</div>
+})
 import { generateRandomString } from "@/lib/slug-utils";
-import { Save, Eye, Plus, X, FileText } from "lucide-react";
+import { Save, Eye, FileText } from "lucide-react";
 import { BackButton } from '@/components/ui/back-button';
 import { toast } from "sonner";
-import { CMSBreadcrumb } from "@/components/ui/breadcrumb";
 
 interface FormData {
   title: string;
   slug: string;
   content: string;
   excerpt: string;
-  featuredImageUrl: string;
+  thumbnailUrl: string;
   category: string;
-  tags: string[];
   status: "draft" | "published" | "archived";
 }
 
 export default function CreateArticlePage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  const [newTag, setNewTag] = useState("");
   const [formData, setFormData] = useState<FormData>({
     title: "",
     slug: generateRandomString(8), // Generate random slug by default
     content: "",
     excerpt: "",
-    featuredImageUrl: "",
+    thumbnailUrl: "",
     category: "",
-    tags: [],
     status: "draft",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -82,23 +79,6 @@ export default function CreateArticlePage() {
     }
   };
 
-  const addTag = () => {
-    if (newTag.trim() && !formData.tags.includes(newTag.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        tags: [...prev.tags, newTag.trim()],
-      }));
-      setNewTag("");
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      tags: prev.tags.filter((tag) => tag !== tagToRemove),
-    }));
-  };
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -107,22 +87,11 @@ export default function CreateArticlePage() {
     if (!formData.content.trim()) newErrors.content = "Konten wajib diisi";
     if (!formData.category) newErrors.category = "Kategori wajib dipilih";
 
-    if (formData.featuredImageUrl && !isValidUrl(formData.featuredImageUrl)) {
-      newErrors.featuredImageUrl = "URL gambar tidak valid";
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const isValidUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  };
+
 
   const handleSave = async (status: "draft" | "published") => {
     const dataToSave = { ...formData, status };
@@ -371,74 +340,89 @@ export default function CreateArticlePage() {
             </CardContent>
           </Card>
 
-          {/* Tags */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Tags</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Tambah tag..."
-                  onKeyPress={(e) =>
-                    e.key === "Enter" && (e.preventDefault(), addTag())
-                  }
-                />
-                <Button type="button" size="sm" onClick={addTag}>
-                  +
-                </Button>
-              </div>
 
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="flex items-center gap-1"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-red-500"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Featured Image */}
           <Card>
             <CardHeader>
-              <CardTitle>Gambar Unggulan</CardTitle>
+              <CardTitle>Gambar Thumbnail</CardTitle>
             </CardHeader>
             <CardContent>
-              <div>
-                <Label htmlFor="featuredImage">URL Gambar</Label>
-                <Input
-                  id="featuredImage"
-                  type="url"
-                  value={formData.featuredImageUrl}
-                  onChange={(e) =>
-                    handleInputChange("featuredImageUrl", e.target.value)
-                  }
-                  placeholder="https://example.com/image.jpg"
-                  className={
-                    errors.featuredImageUrl ? "border-red-500 mt-2" : "mt-2"
-                  }
-                />
-                {errors.featuredImageUrl && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {errors.featuredImageUrl}
-                  </p>
-                )}
-                <p className="text-sm text-gray-500 mt-1">
-                  Opsional. Gambar akan tampil di preview artikel
+              <div className="space-y-4">
+                {/* File upload area */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <input
+                    type="file"
+                    id="thumbnail-upload"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Simple validation
+                        if (!file.type.startsWith('image/')) {
+                          alert('File harus berupa gambar');
+                          return;
+                        }
+                        if (file.size > 2 * 1024 * 1024) {
+                          alert('File harus kurang dari 2MB');
+                          return;
+                        }
+                        // Create preview
+                        const previewUrl = URL.createObjectURL(file);
+                        setFormData(prev => ({ ...prev, thumbnailUrl: previewUrl }));
+                      }
+                    }}
+                  />
+                  
+                  {formData.thumbnailUrl ? (
+                    <div className="space-y-3">
+                      <img 
+                        src={formData.thumbnailUrl} 
+                        alt="Thumbnail preview" 
+                        className="mx-auto max-h-32 rounded-lg border"
+                      />
+                      <div className="flex gap-2 justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                        >
+                          Ganti Gambar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, thumbnailUrl: '' }));
+                            const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
+                            if (input) input.value = '';
+                          }}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                    >
+                      <div className="w-12 h-12 mx-auto mb-3 text-gray-400">
+                        <svg fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 4.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM11 7a1 1 0 112 0v4h4a1 1 0 110 2h-4v4a1 1 0 11-2 0v-4H7a1 1 0 110-2h4V7z"/>
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 mb-1">Klik untuk upload gambar thumbnail</p>
+                      <p className="text-sm text-gray-500">PNG, JPG, WebP - Max 2MB</p>
+                    </div>
+                  )}
+                </div>
+                
+                <p className="text-sm text-gray-500">
+                  Opsional. Gambar akan tampil sebagai thumbnail di halaman berita
                 </p>
               </div>
             </CardContent>

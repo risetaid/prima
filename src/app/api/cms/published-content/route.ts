@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       }
       
       if (category && ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'].includes(category)) {
-        articleConditions.push(eq(cmsArticles.category, category as any))
+        articleConditions.push(eq(cmsArticles.category, category as 'general' | 'nutrisi' | 'olahraga' | 'motivational' | 'medical' | 'faq' | 'testimoni'))
       }
 
       const articleResults = await db
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       }
       
       if (category && ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'].includes(category)) {
-        videoConditions.push(eq(cmsVideos.category, category as any))
+        videoConditions.push(eq(cmsVideos.category, category as 'general' | 'nutrisi' | 'olahraga' | 'motivational' | 'medical' | 'faq' | 'testimoni'))
       }
 
       const videoResults = await db

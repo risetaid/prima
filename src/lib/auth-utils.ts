@@ -1,8 +1,18 @@
-import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users, patients } from '@/db'
 import { redirect } from 'next/navigation'
 import { eq, and, isNull, desc, asc } from 'drizzle-orm'
 import type { User } from '@/db/schema'
+
+// Server-side only imports - conditionally imported to avoid client-side issues
+let auth: any = null
+let currentUser: any = null
+
+// Only import server-side Clerk functions when not in browser
+if (typeof window === 'undefined') {
+  const clerkServer = require('@clerk/nextjs/server')
+  auth = clerkServer.auth
+  currentUser = clerkServer.currentUser
+}
 
 export interface AuthUser extends User {
   canAccessDashboard: boolean

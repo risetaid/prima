@@ -4,7 +4,7 @@ import { db, cmsArticles, cmsVideos } from '@/db'
 import { eq } from 'drizzle-orm'
 
 // Enhanced reminder templates with CMS content integration
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser()
     

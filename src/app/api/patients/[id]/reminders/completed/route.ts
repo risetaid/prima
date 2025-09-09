@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
-import { eq, desc, inArray, isNull, and } from 'drizzle-orm'
+import { eq, desc, isNull, and } from 'drizzle-orm'
 import { convertUTCToWIBString } from '@/lib/timezone'
 
 export async function GET(

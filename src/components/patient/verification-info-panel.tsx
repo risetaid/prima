@@ -1,7 +1,6 @@
 'use client'
 
 import { formatDateTimeWIB } from '@/lib/datetime'
-import { getPatientDisplayStatus } from '@/lib/patient-status'
 
 interface VerificationInfoPanelProps {
   status: string
@@ -9,7 +8,23 @@ interface VerificationInfoPanelProps {
 }
 
 export default function VerificationInfoPanel({ status, patient }: VerificationInfoPanelProps) {
-  // Use centralized status logic to detect BERHENTI vs genuine declined
+  // Simple status derivation based on patient verification status
+  const getPatientDisplayStatus = (patient: any) => {
+    if (patient.verificationStatus === 'BERHENTI') {
+      return { displayStatus: 'BERHENTI' }
+    }
+    if (patient.verificationStatus === 'VERIFIED') {
+      return { displayStatus: 'Terverifikasi' }
+    }
+    if (patient.verificationStatus === 'DECLINED') {
+      return { displayStatus: 'Menolak' }
+    }
+    if (patient.verificationStatus === 'EXPIRED') {
+      return { displayStatus: 'Kedaluwarsa' }
+    }
+    return { displayStatus: 'Menunggu Verifikasi' }
+  }
+
   const patientStatus = getPatientDisplayStatus(patient)
   
   const getStatusInfo = (displayStatus: string) => {

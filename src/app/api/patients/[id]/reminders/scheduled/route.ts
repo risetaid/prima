@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
-import { eq, and, desc, asc, gte, lte, sql, inArray, isNull } from 'drizzle-orm'
+import { eq, and, desc, asc, gte, lte, inArray, isNull } from 'drizzle-orm'
 import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
-import { createEfficientPagination, createDateRangeQuery } from '@/lib/query-optimizer'
 
 export async function GET(
   request: NextRequest,

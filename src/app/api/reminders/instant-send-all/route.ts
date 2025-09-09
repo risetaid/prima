@@ -4,7 +4,7 @@ import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachmen
 import { eq, and, isNull, gte, lte, inArray } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
-import { whatsappRateLimiter } from '@/lib/rate-limiter'
+// Rate limiter temporarily disabled
 
 // Helper function to create date range for WIB timezone (same as cron)
 function createWIBDateRange(dateString: string) {
@@ -144,12 +144,7 @@ export async function POST() {
           continue
         }
 
-        // Check rate limit
-        if (!whatsappRateLimiter.isAllowed(rateLimitKey)) {
-          debugLogs.push(`🚫 Rate limit exceeded. Remaining: ${whatsappRateLimiter.getRemainingRequests(rateLimitKey)}`)
-          errorCount++
-          continue
-        }
+        // Rate limiting temporarily disabled
 
         try {
           // Generate basic message

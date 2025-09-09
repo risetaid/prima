@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Shield, Users, MessageSquareText, Settings, ChevronRight, AlertCircle } from "lucide-react";
 import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
+import { getCurrentUser } from "@/lib/auth-utils";
 
 export default function AdminPanelPage() {
   const router = useRouter();

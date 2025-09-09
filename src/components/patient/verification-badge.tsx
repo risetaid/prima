@@ -1,8 +1,60 @@
 'use client'
 
-import { getPatientDisplayStatus } from '@/lib/patient-status'
+// Patient status utilities temporarily inlined
 
 type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
+
+function getPatientDisplayStatus(input: any) {
+  const verificationStatus = input.verificationStatus || (input as any).verificationStatus
+  const isActive = input.isActive !== undefined ? input.isActive : (input as any).isActive !== undefined ? (input as any).isActive : true
+
+  if (!isActive) {
+    return {
+      badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+      badgeIcon: '⏹️',
+      displayStatus: 'BERHENTI',
+      description: 'Pasien telah berhenti dari layanan'
+    }
+  }
+
+  switch (verificationStatus) {
+    case 'verified':
+      return {
+        badgeColor: 'bg-green-100 text-green-800 border-green-300',
+        badgeIcon: '✅',
+        displayStatus: 'Terverifikasi',
+        description: 'Pasien telah diverifikasi'
+      }
+    case 'declined':
+      return {
+        badgeColor: 'bg-red-100 text-red-800 border-red-300',
+        badgeIcon: '❌',
+        displayStatus: 'Menolak',
+        description: 'Pasien menolak verifikasi'
+      }
+    case 'expired':
+      return {
+        badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        badgeIcon: '⏰',
+        displayStatus: 'Kedaluwarsa',
+        description: 'Verifikasi kedaluwarsa'
+      }
+    case 'pending_verification':
+      return {
+        badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+        badgeIcon: '⏳',
+        displayStatus: 'Menunggu Verifikasi',
+        description: 'Menunggu verifikasi'
+      }
+    default:
+      return {
+        badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+        badgeIcon: '❓',
+        displayStatus: 'Tidak Dikenal',
+        description: 'Status tidak dikenal'
+      }
+  }
+}
 
 interface VerificationBadgeProps {
   status: VerificationStatus

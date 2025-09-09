@@ -47,7 +47,12 @@ export async function POST(
     const patient = patientResult[0]
 
     // Update patient verification status
-    const updateData: any = {
+    const updateData: {
+      verificationStatus: 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
+      updatedAt: Date
+      verificationResponseAt?: Date | null
+      verificationExpiresAt?: Date | null
+    } = {
       verificationStatus: status,
       updatedAt: new Date()
     }
@@ -101,7 +106,7 @@ export async function POST(
 }
 
 // Helper function to generate confirmation message
-function generateConfirmationMessage(patient: any, status: string): string {
+function generateConfirmationMessage(patient: { name: string }, status: string): string {
   if (status === 'verified') {
     return `Terima kasih ${patient.name}! ✅
 

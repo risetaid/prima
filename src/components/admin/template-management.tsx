@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,8 +9,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Edit, Trash2, MessageSquare, Calendar, BookOpen, Eye } from 'lucide-react'
+import { Plus, Edit, Trash2, MessageSquare, Calendar, BookOpen, Eye, Database } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 interface WhatsAppTemplate {
   id: string
@@ -59,13 +60,20 @@ const commonVariables = [
   '{dokter}', '{rumahSakit}', '{volunteer}'
 ]
 
-export default function TemplateManagement() {
+interface TemplateManagementProps {
+  onSeedTemplates?: () => Promise<void>
+  seeding?: boolean
+}
+
+export default function TemplateManagement({ onSeedTemplates, seeding }: TemplateManagementProps) {
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<WhatsAppTemplate | null>(null)
   const [previewTemplate, setPreviewTemplate] = useState<WhatsAppTemplate | null>(null)
   const [filterCategory, setFilterCategory] = useState<string>('all')
@@ -210,11 +218,16 @@ export default function TemplateManagement() {
   }
 
   const handleDeactivateTemplate = async (templateId: string) => {
-    if (!confirm('Yakin ingin menonaktifkan template ini?')) return
+    setTemplateToDelete(templateId)
+    setIsDeleteModalOpen(true)
+  }
+
+  const confirmDeleteTemplate = async () => {
+    if (!templateToDelete) return
 
     try {
-      setActionLoading(templateId)
-      const response = await fetch(`/api/admin/templates/${templateId}`, {
+      setActionLoading(templateToDelete)
+      const response = await fetch(`/api/admin/templates/${templateToDelete}`, {
         method: 'DELETE'
       })
 
@@ -231,6 +244,7 @@ export default function TemplateManagement() {
       toast.error('Failed to deactivate template')
     } finally {
       setActionLoading(null)
+      setTemplateToDelete(null)
     }
   }
 
@@ -305,13 +319,35 @@ export default function TemplateManagement() {
           </div>
         </div>
 
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="cursor-pointer w-full sm:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Buat Template
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          {onSeedTemplates && (
+            <Button
+              onClick={onSeedTemplates}
+              disabled={seeding}
+              variant="outline"
+              className="cursor-pointer w-full sm:w-auto"
+            >
+              {seeding ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Menambahkan Template...
+                </>
+              ) : (
+                <>
+                  <Database className="w-4 h-4 mr-2" />
+                  Seed Template
+                </>
+              )}
             </Button>
-          </DialogTrigger>
+          )}
+
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="cursor-pointer w-full sm:w-auto">
+                <Plus className="w-4 h-4 mr-2" />
+                Buat Template
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Buat Template Baru</DialogTitle>
@@ -330,7 +366,8 @@ export default function TemplateManagement() {
               submitLabel="Buat Template"
             />
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
 
       {/* Templates Grid */}
@@ -544,6 +581,22 @@ export default function TemplateManagement() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false)
+          setTemplateToDelete(null)
+        }}
+        onConfirm={confirmDeleteTemplate}
+        title="Nonaktifkan Template"
+        description="Yakin ingin menonaktifkan template ini? Template yang dinonaktifkan tidak akan bisa digunakan lagi."
+        confirmText="Ya, Nonaktifkan"
+        cancelText="Batal"
+        variant="destructive"
+        loading={actionLoading === templateToDelete}
+      />
     </div>
   )
 }

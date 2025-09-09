@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { User, X, Camera, Upload } from 'lucide-react'
+import { User, X, Camera } from 'lucide-react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -35,7 +35,7 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         const photoFormData = new FormData()
         photoFormData.append('photo', photoFile)
         
-        const photoResponse = await fetch('/api/upload/patient-photo', {
+        const photoResponse = await fetch('/api/upload?type=patient-photo', {
           method: 'POST',
           body: photoFormData,
         })

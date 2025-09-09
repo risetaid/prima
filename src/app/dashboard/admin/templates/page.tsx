@@ -7,11 +7,14 @@ import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 export default function AdminTemplatesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
 
   useEffect(() => {
     checkAdminAccess();
@@ -22,7 +25,7 @@ export default function AdminTemplatesPage() {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
         const data = await response.json();
-        if (data.role !== "SUPERADMIN") {
+        if (data.role !== "SUPERADMIN" && data.role !== "ADMIN") {
           toast.error("Akses Ditolak", {
             description: "Anda tidak memiliki akses ke halaman admin."
           });
@@ -40,6 +43,40 @@ export default function AdminTemplatesPage() {
       return;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSeedTemplates = async () => {
+    setIsSeedModalOpen(true);
+  };
+
+  const confirmSeedTemplates = async () => {
+    setSeeding(true);
+    try {
+      const response = await fetch('/api/admin/templates/seed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(`Template berhasil ditambahkan!`, {
+          description: `Dibuat: ${data.stats.created}, Dilewati: ${data.stats.skipped}`
+        });
+
+        // Refresh the page to show new templates
+        window.location.reload();
+      } else {
+        toast.error(data.error || 'Gagal menambahkan template');
+      }
+    } catch (error) {
+      console.error('Error seeding templates:', error);
+      toast.error('Terjadi kesalahan saat menambahkan template');
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -142,8 +179,20 @@ export default function AdminTemplatesPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl my-4 lg:my-8 mx-auto relative z-10 px-4 sm:px-6 lg:px-8">
-        <TemplateManagement />
+        <TemplateManagement onSeedTemplates={handleSeedTemplates} seeding={seeding} />
       </main>
+
+      {/* Seed Templates Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isSeedModalOpen}
+        onClose={() => setIsSeedModalOpen(false)}
+        onConfirm={confirmSeedTemplates}
+        title="Tambahkan Template Default"
+        description="Apakah Anda yakin ingin menambahkan template default? Template yang sudah ada tidak akan diganti."
+        confirmText="Ya, Tambahkan"
+        cancelText="Batal"
+        loading={seeding}
+      />
     </div>
   );
 }

@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useRoleCache } from '@/lib/role-cache'
+// Using client-safe auth utilities
 import { toast } from 'sonner'
+import { useUserRole } from '@/lib/client-auth-utils'
 
 interface RoleGuardProps {
   allowedRoles: ('MEMBER' | 'ADMIN' | 'SUPERADMIN')[]
@@ -18,8 +19,24 @@ export function RoleGuard({
   redirectTo = '/dashboard',
   fallback = null 
 }: RoleGuardProps) {
-  const { role: userRole, loading } = useRoleCache()
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await getCurrentUser()
+        setUserRole(user?.role || null)
+      } catch (error) {
+        console.error('Failed to fetch user:', error)
+        setUserRole(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchUser()
+  }, [])
 
   useEffect(() => {
     if (!loading && userRole && !allowedRoles.includes(userRole as 'MEMBER' | 'ADMIN' | 'SUPERADMIN')) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
-import { eq, and, notExists, desc, isNull, inArray } from 'drizzle-orm'
+import { eq, and, desc, isNull, inArray } from 'drizzle-orm'
 import { getWIBTodayStart } from '@/lib/timezone'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 

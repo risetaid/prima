@@ -43,7 +43,7 @@ export async function GET(
       .limit(limit)
 
     // Get latest logs for each schedule (separate query for better performance)
-    const latestLogs: any[] = []
+    const latestLogs: { id: string; reminderScheduleId: string | null; status: 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED'; sentAt: Date | null }[] = []
     for (const schedule of allReminderSchedules) {
       const logs = await db
         .select({
@@ -63,7 +63,7 @@ export async function GET(
     }
 
     // Get manual confirmations for each schedule
-    const scheduleConfirmations: any[] = []
+    const scheduleConfirmations: { id: string; patientId: string; reminderLogId: string | null; visitDate: Date | null; medicationsTaken: boolean }[] = []
     for (const schedule of allReminderSchedules) {
       const confirmations = await db
         .select({
@@ -84,7 +84,7 @@ export async function GET(
     }
 
     // Get log confirmations for specific logs
-    const logConfirmations: any[] = []
+    const logConfirmations: { id: string; reminderLogId: string | null; visitDate: Date | null; medicationsTaken: boolean }[] = []
     for (const log of latestLogs) {
       const confirmations = await db
         .select({
@@ -121,18 +121,18 @@ export async function GET(
         if (logConfirmation) {
           // This specific log has been confirmed
           status = logConfirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
-          reminderDate = logConfirmation.visitDate.toISOString().split('T')[0]
+          reminderDate = logConfirmation.visitDate ? logConfirmation.visitDate.toISOString().split('T')[0] : schedule.startDate.toISOString().split('T')[0]
           id_suffix = `completed-${logConfirmation.id}`
         } else if (latestLog.status === 'DELIVERED') {
           // Log sent but not yet confirmed
           status = 'pending'
-          reminderDate = latestLog.sentAt.toISOString().split('T')[0]
+          reminderDate = latestLog.sentAt ? latestLog.sentAt.toISOString().split('T')[0] : schedule.startDate.toISOString().split('T')[0]
           id_suffix = `pending-${latestLog.id}`
         }
       } else if (scheduleConfirmation) {
         // Manual confirmation without specific log
         status = scheduleConfirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
-        reminderDate = scheduleConfirmation.visitDate.toISOString().split('T')[0]
+        reminderDate = scheduleConfirmation.visitDate ? scheduleConfirmation.visitDate.toISOString().split('T')[0] : schedule.startDate.toISOString().split('T')[0]
         id_suffix = `completed-${scheduleConfirmation.id}`
       }
 

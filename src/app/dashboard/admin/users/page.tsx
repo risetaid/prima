@@ -35,7 +35,7 @@ export default function AdminUsersPage() {
             </div>
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-purple-600" />
-              <h1 className="text-lg font-semibold text-gray-900">Superadmin Panel</h1>
+               <h1 className="text-lg font-semibold text-gray-900">Admin Panel</h1>
             </div>
           </div>
         </header>

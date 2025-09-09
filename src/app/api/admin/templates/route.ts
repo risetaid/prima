@@ -6,10 +6,10 @@ import { eq, and, asc, inArray, isNull } from 'drizzle-orm'
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
-    if (!user || user.role !== 'SUPERADMIN') {
+
+    if (!user || (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN')) {
       return NextResponse.json(
-        { error: 'Unauthorized. Superadmin access required.' },
+        { error: 'Unauthorized. Admin access required.' },
         { status: 401 }
       )
     }
@@ -94,10 +94,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
-    
-    if (!user || user.role !== 'SUPERADMIN') {
+
+    if (!user || (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN')) {
       return NextResponse.json(
-        { error: 'Unauthorized. Superadmin access required.' },
+        { error: 'Unauthorized. Admin access required.' },
         { status: 401 }
       )
     }

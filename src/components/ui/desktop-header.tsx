@@ -6,15 +6,33 @@ import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Shield, Bug, Settings } from "lucide-react";
-import { useRoleCache } from "@/lib/role-cache";
+import { getCurrentUser } from '@/lib/auth-utils'
+import { userRoleEnum } from '@/db/schema'
+// Role cache temporarily disabled
 
 interface DesktopHeaderProps {
   showNavigation?: boolean;
 }
 
 function AdminActions() {
-  const { role: userRole, loading } = useRoleCache();
+  const [userRole, setUserRole] = useState<'SUPERADMIN' | 'ADMIN' | 'MEMBER' | null>(null)
+  const [loading, setLoading] = useState(true)
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const user = await getCurrentUser()
+        setUserRole(user?.role || null)
+      } catch (error) {
+        console.error('Failed to fetch user:', error)
+        setUserRole(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchUser()
+  }, [])
   const pathname = usePathname();
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -27,7 +45,7 @@ function AdminActions() {
     return null;
   }
 
-  if (userRole !== "SUPERADMIN") {
+  if (userRole !== "SUPERADMIN" && userRole !== "ADMIN") {
     return null;
   }
 
@@ -59,7 +77,9 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const { user } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const { role: userRole, loading: roleLoading } = useRoleCache();
+  // Temporarily simplified - role cache disabled
+  const userRole = 'MEMBER'
+  const roleLoading = false
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Prevent hydration mismatch by only rendering dynamic content after hydration
@@ -125,7 +145,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   // Add CMS navigation only for ADMIN and SUPERADMIN
   const navItems = [
     ...roleBasedNavItems,
-    ...(userRole === 'ADMIN' || userRole === 'SUPERADMIN' ? [{
+    ...(userRole && ['ADMIN', 'SUPERADMIN'].includes(userRole) ? [{
       label: "CMS",
       href: "/dashboard/cms",
       active: pathname.startsWith("/dashboard/cms"),
