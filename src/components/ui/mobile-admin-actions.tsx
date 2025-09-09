@@ -2,8 +2,8 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { Shield, FileText, Calendar, Newspaper, Video, UserCheck } from "lucide-react";
-import { useState, useEffect } from "react";
-import { getCurrentUser } from '@/lib/auth-utils'
+
+import { useUserRole } from '@/lib/client-auth-utils'
 // Role cache temporarily disabled
 
 interface MobileAdminActionsProps {
@@ -13,27 +13,11 @@ interface MobileAdminActionsProps {
 type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
 
 export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) {
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter();
-  const pathname = usePathname();
+  const userRole = useUserRole()
+  const router = useRouter()
+  const pathname = usePathname()
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setUserRole(user?.role as UserRole || null)
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-        setUserRole(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchUser()
-  }, [])
-
-  if (loading) {
+  if (!userRole) {
     return (
       <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
         <Shield className="w-4 h-4 text-gray-400" />

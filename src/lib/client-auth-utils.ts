@@ -4,8 +4,6 @@
  */
 
 import { useUser } from '@clerk/nextjs'
-import { db, users } from '@/db'
-import { eq } from 'drizzle-orm'
 import type { User } from '@/db/schema'
 
 export interface ClientAuthUser extends User {
@@ -30,19 +28,19 @@ export function useCurrentUser(): ClientAuthUser | null {
   const basicUser: ClientAuthUser = {
     id: clerkUser.id,
     email: clerkUser.primaryEmailAddress?.emailAddress || '',
-    firstName: clerkUser.firstName || undefined,
-    lastName: clerkUser.lastName || undefined,
-    hospitalName: undefined,
+    firstName: clerkUser.firstName || null,
+    lastName: clerkUser.lastName || null,
+    hospitalName: null,
     role: 'MEMBER', // Default role - will be updated via API if needed
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-    lastLoginAt: undefined,
-    approvedAt: undefined,
-    approvedBy: undefined,
+    lastLoginAt: null,
+    approvedAt: null,
+    approvedBy: null,
     isApproved: false,
     clerkId: clerkUser.id,
-    deletedAt: undefined,
+    deletedAt: null,
     canAccessDashboard: false,
     needsApproval: true
   }

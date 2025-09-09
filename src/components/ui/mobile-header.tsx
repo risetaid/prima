@@ -4,8 +4,8 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { MobileAdminActions, MobileCMSActions, MobilePasienActions } from "./mobile-admin-actions";
-import { useState, useEffect } from "react";
-import { getCurrentUser } from '@/lib/auth-utils'
+
+import { useUserRole } from '@/lib/client-auth-utils'
 // Role cache temporarily disabled
 import { Home } from "lucide-react";
 
@@ -17,22 +17,9 @@ type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
 
 // Role-based mobile navigation component
 function MobileNavigationActions() {
-  const [userRole, setUserRole] = useState<UserRole | null>(null)
-  const pathname = usePathname();
-  const router = useRouter();
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setUserRole(user?.role as UserRole)
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-        setUserRole(null)
-      }
-    }
-    fetchUser()
-  }, [])
+  const userRole = useUserRole()
+  const pathname = usePathname()
+  const router = useRouter()
   
   // If on homepage, show simplified navigation
   if (pathname === "/") {

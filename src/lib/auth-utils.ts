@@ -9,6 +9,7 @@ let currentUser: any = null
 
 // Only import server-side Clerk functions when not in browser
 if (typeof window === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const clerkServer = require('@clerk/nextjs/server')
   auth = clerkServer.auth
   currentUser = clerkServer.currentUser

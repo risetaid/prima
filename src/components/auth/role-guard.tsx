@@ -19,23 +19,12 @@ export function RoleGuard({
   redirectTo = '/dashboard',
   fallback = null 
 }: RoleGuardProps) {
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const userRole = useUserRole()
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setUserRole(user?.role || null)
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-        setUserRole(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchUser()
+    setLoading(false)
   }, [])
 
   useEffect(() => {

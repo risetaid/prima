@@ -3,11 +3,9 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { toast } from "sonner";
 import { useState, useEffect } from "react";
-import { Shield, Bug, Settings } from "lucide-react";
-import { getCurrentUser } from '@/lib/auth-utils'
-import { userRoleEnum } from '@/db/schema'
+import { Shield } from "lucide-react";
+import { useUserRole } from '@/lib/client-auth-utils'
 // Role cache temporarily disabled
 
 interface DesktopHeaderProps {
@@ -15,30 +13,14 @@ interface DesktopHeaderProps {
 }
 
 function AdminActions() {
-  const [userRole, setUserRole] = useState<'SUPERADMIN' | 'ADMIN' | 'MEMBER' | null>(null)
-  const [loading, setLoading] = useState(true)
-  const router = useRouter();
+  const userRole = useUserRole()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const user = await getCurrentUser()
-        setUserRole(user?.role || null)
-      } catch (error) {
-        console.error('Failed to fetch user:', error)
-        setUserRole(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchUser()
+    setIsHydrated(true)
   }, [])
-  const pathname = usePathname();
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   // Don't render anything during SSR to prevent hydration mismatch
   if (!isHydrated) {
