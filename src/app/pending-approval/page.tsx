@@ -1,12 +1,13 @@
 'use client'
 
-import { useUser } from '@clerk/nextjs'
+import { useAuthContext } from '@/lib/auth-context'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { UserButton } from '@clerk/nextjs'
+import { AuthLoading } from '@/components/auth/auth-loading'
 
 export default function PendingApprovalPage() {
-  const { user } = useUser()
+  const { user } = useAuthContext()
   const router = useRouter()
   const [userData, setUserData] = useState<{firstName?: string; lastName?: string; email?: string; role?: string; canAccessDashboard?: boolean} | null>(null)
   const [superadminContact, setSuperadminContact] = useState<{name?: string; email?: string; hospitalName?: string} | null>(null)
@@ -55,8 +56,9 @@ export default function PendingApprovalPage() {
   if (!userData) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md mx-auto">
+    <AuthLoading requireAuth={true}>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md mx-auto">
         {/* Header with Logo */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
@@ -172,5 +174,6 @@ export default function PendingApprovalPage() {
         </div>
       </div>
     </div>
+    </AuthLoading>
   )
 }

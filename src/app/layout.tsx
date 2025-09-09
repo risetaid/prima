@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
-import { WebVitalsReporter } from "@/components/performance/web-vitals";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 const inter = Inter({
@@ -77,32 +77,36 @@ export default function RootLayout({
             }
           }}
         >
-          {children}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                background: "white",
-                color: "black",
-                border: "1px solid #e5e7eb",
-              },
-            }}
-          />
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                if ('serviceWorker' in navigator) {
-                  window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('/sw.js')
-                      .then((registration) => {
-                      })
-                      .catch((registrationError) => {
-                      });
-                  });
-                }
-              `,
-            }}
-          />
+          <AuthProvider>
+            {children}
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                style: {
+                  background: "white",
+                  color: "black",
+                  border: "1px solid #e5e7eb",
+                },
+              }}
+            />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                      navigator.serviceWorker.register('/sw.js')
+                        .then((registration) => {
+                          console.log('SW registered successfully');
+                        })
+                        .catch((registrationError) => {
+                          console.log('SW registration failed:', registrationError);
+                        });
+                    });
+                  }
+                `,
+              }}
+            />
+          </AuthProvider>
         </ClerkProvider>
       </body>
     </html>

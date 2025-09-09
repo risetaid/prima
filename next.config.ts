@@ -4,9 +4,14 @@ const nextConfig: NextConfig = {
   // Standalone output for faster deployments
   output: 'standalone',
   
-  // Turbopack is now stable
+  // Turbopack configuration for faster builds
   turbopack: {
-    // Basic Turbopack config for faster builds
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
   },
   
   // External packages for server components (medical libs)

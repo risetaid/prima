@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-// Using client-safe auth utilities
 import { toast } from 'sonner'
-import { useUserRole } from '@/lib/client-auth-utils'
+import { useAuthContext } from '@/lib/auth-context'
 
 interface RoleGuardProps {
   allowedRoles: ('MEMBER' | 'ADMIN' | 'SUPERADMIN')[]
@@ -19,16 +18,11 @@ export function RoleGuard({
   redirectTo = '/dashboard',
   fallback = null 
 }: RoleGuardProps) {
-  const userRole = useUserRole()
-  const [loading, setLoading] = useState(true)
+  const { role: userRole, isLoaded } = useAuthContext()
   const router = useRouter()
 
   useEffect(() => {
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    if (!loading && userRole && !allowedRoles.includes(userRole as 'MEMBER' | 'ADMIN' | 'SUPERADMIN')) {
+    if (isLoaded && userRole && !allowedRoles.includes(userRole as 'MEMBER' | 'ADMIN' | 'SUPERADMIN')) {
       // Show appropriate error message
       if (allowedRoles.includes('ADMIN') || allowedRoles.includes('SUPERADMIN')) {
         toast.error('Akses Ditolak', {
@@ -45,10 +39,10 @@ export function RoleGuard({
         router.push(redirectTo)
       }, 1000)
     }
-  }, [userRole, loading, allowedRoles, router, redirectTo])
+  }, [userRole, isLoaded, allowedRoles, router, redirectTo])
 
   // Show loading state
-  if (loading) {
+  if (!isLoaded) {
     return fallback || (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

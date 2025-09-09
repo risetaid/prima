@@ -104,12 +104,20 @@ self.addEventListener('fetch', event => {
 async function handleHealthcareAPI(request) {
   const url = new URL(request.url)
   
+  // NEVER cache auth-related requests to prevent stale auth state
+  const isAuthRequest = url.pathname.includes('/auth') || 
+                        url.pathname.includes('/user/session') ||
+                        url.pathname.includes('/user/profile') ||
+                        url.pathname.includes('/api/user')
+  
   try {
     // Always try network first for API requests
     const networkResponse = await fetch(request.clone())
     
-    // Cache successful healthcare API responses
-    if (networkResponse.ok && HEALTHCARE_API_PATTERNS.some(pattern => pattern.test(url.pathname))) {
+    // Only cache non-auth healthcare API responses
+    if (networkResponse.ok && 
+        !isAuthRequest && 
+        HEALTHCARE_API_PATTERNS.some(pattern => pattern.test(url.pathname))) {
       const cache = await caches.open(CACHE_NAME)
       cache.put(request.clone(), networkResponse.clone())
       console.log('💾 PRIMA SW: Cached API response:', url.pathname)
@@ -120,24 +128,16 @@ async function handleHealthcareAPI(request) {
   } catch (error) {
     console.warn('⚠️ PRIMA SW: Network failed for API:', url.pathname)
     
-    // Try to serve from cache
+    // Never serve cached auth responses
+    if (isAuthRequest) {
+      throw error
+    }
+    
+    // Try to serve from cache for non-auth requests
     const cachedResponse = await caches.match(request)
     if (cachedResponse) {
       console.log('📱 PRIMA SW: Serving cached API response:', url.pathname)
       return cachedResponse
-    }
-    
-    // For critical healthcare endpoints, return meaningful offline response
-    if (url.pathname.includes('/user/session') || url.pathname.includes('/user/profile')) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Offline - Tidak dapat terhubung ke server',
-        offline: true,
-        needsSync: true
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
     }
     
     throw error

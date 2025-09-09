@@ -1,4 +1,5 @@
 import { DashboardErrorBoundary } from '@/components/ui/error-boundary'
+import { AuthLoading } from '@/components/auth/auth-loading'
 
 export default function DashboardLayout({
   children,
@@ -6,12 +7,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
-    <DashboardErrorBoundary>
-      <div className="min-h-screen bg-gray-50">
-        <main className="min-h-screen">
-          {children}
-        </main>
-      </div>
-    </DashboardErrorBoundary>
+    <AuthLoading requireAuth={true} requireApproval={true}>
+      <DashboardErrorBoundary>
+        <div className="min-h-screen bg-gray-50">
+          <main className="min-h-screen">
+            {children}
+          </main>
+        </div>
+      </DashboardErrorBoundary>
+    </AuthLoading>
   )
 }

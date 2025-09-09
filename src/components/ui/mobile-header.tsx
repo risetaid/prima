@@ -1,11 +1,9 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { MobileAdminActions, MobileCMSActions, MobilePasienActions } from "./mobile-admin-actions";
-
-import { useUserRole } from '@/lib/client-auth-utils'
+import { useAuthContext } from '@/lib/auth-context'
 // Role cache temporarily disabled
 import { Home } from "lucide-react";
 
@@ -17,7 +15,7 @@ type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
 
 // Role-based mobile navigation component
 function MobileNavigationActions() {
-  const userRole = useUserRole()
+  const { role: userRole } = useAuthContext()
   const pathname = usePathname()
   const router = useRouter()
   
@@ -98,7 +96,7 @@ function MobileNavigationActions() {
 }
 
 export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
-  const { user } = useUser();
+  const { user } = useAuthContext();
   const router = useRouter();
 
   return (

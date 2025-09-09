@@ -2,22 +2,21 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { Shield, FileText, Calendar, Newspaper, Video, UserCheck } from "lucide-react";
-
-import { useUserRole } from '@/lib/client-auth-utils'
+import { useAuthContext } from '@/lib/auth-context'
 // Role cache temporarily disabled
 
 interface MobileAdminActionsProps {
   className?: string;
 }
 
-type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
+
 
 export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) {
-  const userRole = useUserRole()
+  const { role: userRole, isLoaded } = useAuthContext()
   const router = useRouter()
   const pathname = usePathname()
 
-  if (!userRole) {
+  if (!isLoaded || !userRole) {
     return (
       <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
         <Shield className="w-4 h-4 text-gray-400" />
@@ -52,13 +51,11 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
 }
 
 export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
-  // Temporarily simplified - role cache disabled
-  const userRole = 'SUPERADMIN'
-  const loading = false
+  const { role: userRole, isLoaded } = useAuthContext()
   const router = useRouter();
   const pathname = usePathname();
 
-  if (loading) {
+  if (!isLoaded) {
     return (
       <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
         <FileText className="w-4 h-4 text-gray-400" />

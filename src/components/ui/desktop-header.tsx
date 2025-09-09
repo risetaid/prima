@@ -1,11 +1,10 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { Shield } from "lucide-react";
-import { useUserRole } from '@/lib/client-auth-utils'
+import { useAuthContext } from '@/lib/auth-context'
 // Role cache temporarily disabled
 
 interface DesktopHeaderProps {
@@ -13,7 +12,7 @@ interface DesktopHeaderProps {
 }
 
 function AdminActions() {
-  const userRole = useUserRole()
+  const { role: userRole, isLoaded } = useAuthContext()
   const router = useRouter()
   const pathname = usePathname()
   const [isHydrated, setIsHydrated] = useState(false)
@@ -23,7 +22,7 @@ function AdminActions() {
   }, [])
 
   // Don't render anything during SSR to prevent hydration mismatch
-  if (!isHydrated) {
+  if (!isHydrated || !isLoaded) {
     return null;
   }
 
@@ -56,12 +55,9 @@ function AdminActions() {
 }
 
 export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
-  const { user } = useUser();
+  const { user, role: userRole, isLoaded } = useAuthContext();
   const router = useRouter();
   const pathname = usePathname();
-  // Temporarily simplified - role cache disabled
-  const userRole = 'MEMBER'
-  const roleLoading = false
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Prevent hydration mismatch by only rendering dynamic content after hydration

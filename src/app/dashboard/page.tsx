@@ -1,13 +1,13 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useAuthContext } from '@/lib/auth-context';
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
 import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
 
 
 export default function DashboardPage() {
-  const { isLoaded } = useUser();
+  const { isLoaded } = useAuthContext();
 
 
 
