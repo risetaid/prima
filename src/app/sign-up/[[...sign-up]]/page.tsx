@@ -1,12 +1,10 @@
 'use client'
 
 import { SignUp } from '@clerk/nextjs'
-import { AuthLoading } from '@/components/auth/auth-loading'
 
 export default function SignUpPage() {
   return (
-    <AuthLoading>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md mx-auto">
           {/* Header */}
           <div className="text-center mb-6 sm:mb-8">
@@ -48,6 +46,5 @@ export default function SignUpPage() {
           </div>
         </div>
       </div>
-    </AuthLoading>
   )
 }

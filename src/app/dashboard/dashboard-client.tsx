@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
-
+import { PatientListTable } from "@/components/dashboard/patient-list-table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -455,12 +455,9 @@ function DashboardClient() {
           </button>
         </div>
 
-        {/* Desktop: Table View - Temporarily disabled */}
+        {/* Desktop: Table View */}
         <div className="hidden lg:block">
-          <div className="bg-white rounded-lg p-8 text-center">
-            <p className="text-gray-600">Patient table component temporarily unavailable.</p>
-            <p className="text-sm text-gray-500 mt-2">Use mobile view for patient management.</p>
-          </div>
+          <PatientListTable patients={filteredPatients} loading={loading} />
         </div>
 
         {/* Mobile: Card View */}

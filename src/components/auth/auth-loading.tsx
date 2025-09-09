@@ -42,8 +42,18 @@ export function AuthLoading({
       return
     }
 
-    // Redirect signed-in users away from auth pages
+    // Redirect signed-in users away from auth pages - only if they can access dashboard
     if (isSignedIn && (pathname === '/sign-in' || pathname === '/sign-up')) {
+      if (canAccessDashboard) {
+        router.replace('/dashboard')
+      } else {
+        router.replace('/pending-approval')
+      }
+      return
+    }
+
+    // If we're on pending-approval but user can access dashboard, redirect
+    if (isSignedIn && pathname === '/pending-approval' && canAccessDashboard) {
       router.replace('/dashboard')
       return
     }

@@ -21,30 +21,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<'SUPERADMIN' | 'ADMIN' | 'MEMBER' | null>(null)
   const [canAccessDashboard, setCanAccessDashboard] = useState(false)
   const [needsApproval, setNeedsApproval] = useState(true)
+  const [dbUserLoaded, setDbUserLoaded] = useState(false)
 
-  const isLoaded = userLoaded && authLoaded
+  const isLoaded = userLoaded && authLoaded && dbUserLoaded
 
   useEffect(() => {
-    if (!isLoaded || !user) {
+    if (!userLoaded || !authLoaded || !user) {
       setRole(null)
       setCanAccessDashboard(false)
       setNeedsApproval(true)
+      setDbUserLoaded(false)
       return
     }
 
-    // Get role from Clerk public metadata
-    const userRole = user.publicMetadata?.role as string
-    const approved = user.publicMetadata?.approved as boolean
-
-    if (userRole === 'SUPERADMIN' || userRole === 'ADMIN' || userRole === 'MEMBER') {
-      setRole(userRole)
-    } else {
-      setRole('MEMBER') // Default role
-    }
-
-    setCanAccessDashboard(approved === true)
-    setNeedsApproval(approved !== true)
-  }, [user, isLoaded])
+    // Fetch user status from database to ensure consistency
+    fetch('/api/user/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) {
+          console.error('Error fetching user status:', data.error)
+          setRole('MEMBER')
+          setCanAccessDashboard(false)
+          setNeedsApproval(true)
+        } else {
+          setRole(data.role || 'MEMBER')
+          setCanAccessDashboard(data.canAccessDashboard || false)
+          setNeedsApproval(data.needsApproval !== false)
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching user status:', error)
+        setRole('MEMBER')
+        setCanAccessDashboard(false)
+        setNeedsApproval(true)
+      })
+      .finally(() => {
+        setDbUserLoaded(true)
+      })
+  }, [user, userLoaded, authLoaded])
 
   const value: AuthContextState = {
     user: user ?? null,

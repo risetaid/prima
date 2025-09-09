@@ -25,13 +25,9 @@ export default function PendingApprovalPage() {
       fetch('/api/admin/superadmin-contact').then(res => res.json())
     ])
       .then(([userData, superadminData]) => {
-        if (userData.canAccessDashboard) {
-          router.push('/dashboard')
-        } else {
-          setUserData(userData)
-          setSuperadminContact(superadminData)
-          setLoading(false)
-        }
+        setUserData(userData)
+        setSuperadminContact(superadminData)
+        setLoading(false)
       })
       .catch(err => {
         console.error('Error fetching user data:', err)
@@ -160,7 +156,7 @@ export default function PendingApprovalPage() {
                 <span className="text-sm text-gray-500">
                   Keluar untuk ganti akun
                 </span>
-                <UserButton afterSignOutUrl="/sign-in" />
+                <UserButton />
               </div>
             </div>
           </div>

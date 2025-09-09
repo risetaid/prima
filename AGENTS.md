@@ -27,6 +27,8 @@ A medical-grade WhatsApp-based patient management system for Indonesian healthca
 
 ## 🛠️ Development Commands
 
+**⚠️ IMPORTANT**: Do not run bun commands without explicit user permission. Always ask the user to run commands and provide the results.
+
 ```bash
 # Core Development
 bun run dev                    # Start development server
@@ -42,6 +44,12 @@ bun run db:studio              # Open Drizzle Studio GUI
 # Content Management
 bun run seed:templates         # Seed WhatsApp message templates
 ```
+
+### Command Usage Policy
+- **Never execute bun/npm commands automatically**
+- **Always inform user** what command needs to be run
+- **Ask for permission** before suggesting command execution
+- **Request command output** from user for further analysis
 
 ## 📂 Key Architecture & File Locations
 
@@ -333,7 +341,31 @@ CRON_SECRET="..."
 - Maintained zero functionality impact while significantly improving maintainability
 - **Current State**: Clean, optimized codebase with 55+ API routes and 45+ components
 
+### ✅ Recent UI/UX Improvements (September 2025)
+- **Table Component Restoration**: Restored original table designs from previous commits
+  - Restored `PatientListTable` component for `/dashboard` with blue headers and grid layout
+  - Restored `ReminderListTable` component for `/dashboard/pengingat` with original styling
+  - Restored `PatientReminderDashboard` with 3-column layout for patient reminder management
+  - Restored `AddReminderModal` component for creating new reminders
+
+- **Navigation Behavior Optimization**: 
+  - **`/dashboard`**: Only "Lihat Detail Pasien" button is clickable (prevents accidental navigation)
+  - **`/dashboard/pengingat`**: Only "Lihat Detail Pengingat" button is clickable (consistent with dashboard)
+  - Removed whole-row clicking from pengingat table for better UX consistency
+
+- **Table Content Alignment**: 
+  - Centered all table content in both dashboard tables for better visual balance
+  - Applied `text-center` to all column headers and content cells
+  - Centered compliance indicators, status badges, and action buttons
+  - Maintained profile photo centering with improved visual consistency
+
+- **Component Architecture**: Successfully restored from commit `d335b5b` including:
+  - Grid-based layouts with proper blue headers (`bg-blue-600`)
+  - Color-coded compliance indicators (green/yellow/red)
+  - Proper button styling and text ("Lihat Detail Pasien" / "Lihat Detail Pengingat")
+  - Responsive design with mobile card views intact
+
 ---
 
 *Built with ❤️ for Indonesian healthcare workers*
-*Last Updated: January 2025 - Complete Development Guide with Recent Fixes*
+*Last Updated: September 2025 - UI Improvements & Table Restoration*

@@ -1,15 +1,21 @@
 "use client";
 
-import { useAuthContext } from '@/lib/auth-context';
+import { useUser } from "@clerk/nextjs";
+import { useEffect } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
 import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
 
-
 export default function DashboardPage() {
-  const { isLoaded } = useAuthContext();
+  const { isLoaded } = useUser();
 
-
+  useEffect(() => {
+    // Initialize post-login optimizations
+    // Since middleware handles all auth/approval checks, we can run these immediately
+    if (isLoaded) {
+      // Initialize any post-login operations here if needed
+    }
+  }, [isLoaded]);
 
   // Show loading while Clerk loads
   if (!isLoaded) {
