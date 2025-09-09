@@ -10,8 +10,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { DashboardStatsCardsSkeleton, CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { RoleGuard } from '@/components/auth/role-guard'
-import { Breadcrumb } from '@/components/ui/breadcrumb'
-import { Home } from 'lucide-react'
+
 
 interface ContentItem {
   id: string
@@ -54,32 +53,16 @@ function CMSPageContent() {
   // Progressive loading: Statistics first, then content
   const fetchContent = async () => {
     try {
-      console.log('🔍 CMS: Starting progressive content fetch, activeTab:', activeTab)
-      
-      // Phase 1: Load statistics quickly (priority data)
-      setStatsLoading(true)
-      const response = await fetch(`/api/cms/content?type=${activeTab}&limit=0&stats_only=true`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.statistics) {
-          setStatistics(data.statistics)
-          console.log('✅ CMS: Statistics loaded first (progressive)', data.statistics)
-        }
-      }
-      setStatsLoading(false)
-      
-      // Small delay for better perceived performance
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Phase 2: Load actual content
+      console.log('🔍 CMS: Starting content fetch, activeTab:', activeTab)
+
+      // Only fetch content, not statistics (statistics should remain static)
       setContentLoading(true)
       const contentResponse = await fetch(`/api/cms/content?type=${activeTab}`)
       console.log('🔍 CMS: Content response status:', contentResponse.status)
-      
+
       if (!contentResponse.ok) {
         console.error('❌ CMS: Content API request failed:', contentResponse.status, contentResponse.statusText)
-        
+
         if (contentResponse.status === 401) {
           toast.error('Tidak memiliki akses ke CMS. Hubungi administrator.')
         } else if (contentResponse.status === 403) {
@@ -93,24 +76,20 @@ function CMSPageContent() {
       }
 
       const contentData = await contentResponse.json()
-      console.log('✅ CMS: Content data received (progressive):', {
+      console.log('✅ CMS: Content data received:', {
         success: contentData.success,
         contentCount: contentData.data?.length
       })
 
       if (contentData.success) {
         setContent(contentData.data || [])
-        // Update statistics with latest data if available
-        if (contentData.statistics) {
-          setStatistics(contentData.statistics)
-        }
       } else {
         console.error('❌ CMS: Content API returned error:', contentData.error)
         toast.error(contentData.error || 'Gagal memuat konten')
       }
     } catch (error) {
-      console.error('❌ CMS: Progressive loading error:', error)
-      
+      console.error('❌ CMS: Content loading error:', error)
+
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Koneksi bermasalah. Periksa internet Anda.')
       } else {
@@ -122,9 +101,37 @@ function CMSPageContent() {
     }
   }
 
+  // Load statistics only once on mount
   useEffect(() => {
-    fetchContent()
-  }, [activeTab])
+    const fetchStatistics = async () => {
+      try {
+        console.log('🔍 CMS: Loading statistics (one-time)')
+        setStatsLoading(true)
+        const response = await fetch('/api/cms/content?type=all&limit=0&stats_only=true')
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.statistics) {
+            setStatistics(data.statistics)
+            console.log('✅ CMS: Statistics loaded (one-time)', data.statistics)
+          }
+        }
+      } catch (error) {
+        console.error('❌ CMS: Statistics loading error:', error)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+
+    fetchStatistics()
+  }, []) // Empty dependency array - only run once on mount
+
+  // Load content when tab changes
+  useEffect(() => {
+    if (statistics) { // Only fetch content after statistics are loaded
+      fetchContent()
+    }
+  }, [activeTab, statistics])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -204,103 +211,110 @@ function CMSPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb Navigation */}
-      <Breadcrumb items={[
-        { label: 'Dashboard', href: '/dashboard', icon: Home },
-        { label: 'Manajemen Konten', href: '/dashboard/cms' }
-      ]} />
+
       
-      {/* Header - Mobile Responsive */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            Manajemen Konten
-          </h1>
-          <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">
-            Kelola artikel dan video edukasi untuk pasien kanker paliatif
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <Button asChild className="flex-1 sm:flex-none">
-            <Link href="/dashboard/cms/articles/create" className="flex items-center justify-center">
-              <Plus className="h-4 w-4 mr-2" />
-              Artikel Baru
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="flex-1 sm:flex-none">
-            <Link href="/dashboard/cms/videos/create" className="flex items-center justify-center">
-              <Video className="h-4 w-4 mr-2" />
-              Video Baru
-            </Link>
-          </Button>
-        </div>
-      </div>
+       {/* Combined Layout: 2x3 Grid with Cards and Buttons */}
+       {statsLoading ? (
+         <DashboardStatsCardsSkeleton />
+       ) : statistics ? (
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+           {/* Row 1 */}
+           <Card className="h-auto">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+               <CardTitle className="text-base font-semibold">
+                 Total Konten
+               </CardTitle>
+               <FileText className="h-5 w-5 text-muted-foreground" />
+             </CardHeader>
+             <CardContent className="pt-2">
+               <div className="text-3xl font-bold">{statistics.total.content}</div>
+               <p className="text-sm text-muted-foreground">
+                 {statistics.articles.total} artikel, {statistics.videos.total} video
+               </p>
+             </CardContent>
+           </Card>
 
-      {/* Statistics Cards - Progressive Loading */}
-      {statsLoading ? (
-        <DashboardStatsCardsSkeleton />
-      ) : statistics ? (
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Konten
-              </CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.total.content}</div>
-              <p className="text-xs text-muted-foreground">
-                {statistics.articles.total} artikel, {statistics.videos.total} video
-              </p>
-            </CardContent>
-          </Card>
+           <Card className="h-auto">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+               <CardTitle className="text-base font-semibold">
+                 Terpublish
+               </CardTitle>
+               <Eye className="h-5 w-5 text-muted-foreground" />
+             </CardHeader>
+             <CardContent className="pt-2">
+               <div className="text-3xl font-bold text-green-600">{statistics.total.published}</div>
+               <p className="text-sm text-muted-foreground">
+                 Dapat dilihat publik
+               </p>
+             </CardContent>
+           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Konten Published
-              </CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{statistics.total.published}</div>
-              <p className="text-xs text-muted-foreground">
-                Dapat dilihat publik
-              </p>
-            </CardContent>
-          </Card>
+           <Card className="h-auto">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+               <CardTitle className="text-base font-semibold">
+                 Draft
+               </CardTitle>
+               <Clock className="h-5 w-5 text-muted-foreground" />
+             </CardHeader>
+             <CardContent className="pt-2">
+               <div className="text-3xl font-bold text-yellow-600">{statistics.total.draft}</div>
+               <p className="text-sm text-muted-foreground">
+                 Belum dipublikasikan
+               </p>
+             </CardContent>
+           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Draft
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{statistics.total.draft}</div>
-              <p className="text-xs text-muted-foreground">
-                Belum dipublikasikan
-              </p>
-            </CardContent>
-          </Card>
+           {/* Row 2 */}
+           <Card className="h-auto">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+               <CardTitle className="text-base font-semibold">
+                 Artikel
+               </CardTitle>
+               <TrendingUp className="h-5 w-5 text-muted-foreground" />
+             </CardHeader>
+             <CardContent className="pt-2">
+               <div className="text-3xl font-bold">{statistics.articles.total}</div>
+               <p className="text-sm text-muted-foreground">
+                 {statistics.articles.published} published
+               </p>
+             </CardContent>
+           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Artikel
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{statistics.articles.total}</div>
-              <p className="text-xs text-muted-foreground">
-                {statistics.articles.published} published
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+           <Card className="h-auto">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+               <CardTitle className="text-base font-semibold">
+                 Video
+               </CardTitle>
+               <Video className="h-5 w-5 text-muted-foreground" />
+             </CardHeader>
+             <CardContent className="pt-2">
+               <div className="text-3xl font-bold">{statistics.videos.total}</div>
+               <p className="text-sm text-muted-foreground">
+                 {statistics.videos.published} published
+               </p>
+             </CardContent>
+           </Card>
+
+           {/* Action Buttons Card */}
+           <Card className="h-auto flex flex-col justify-center">
+             <CardContent className="pt-6 pb-6">
+               <div className="flex flex-col gap-4">
+                 <Button asChild className="w-full h-12">
+                   <Link href="/dashboard/cms/articles/create" className="flex items-center justify-center text-base">
+                     <Plus className="h-5 w-5 mr-2" />
+                     Artikel Baru
+                   </Link>
+                 </Button>
+                 <Button asChild variant="outline" className="w-full h-12">
+                   <Link href="/dashboard/cms/videos/create" className="flex items-center justify-center text-base">
+                     <Video className="h-5 w-5 mr-2" />
+                     Video Baru
+                   </Link>
+                 </Button>
+               </div>
+             </CardContent>
+           </Card>
+         </div>
       ) : null}
 
       {/* Content Tabs */}
@@ -312,14 +326,19 @@ function CMSPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 h-auto">
-              <TabsTrigger value="all" className="text-xs sm:text-sm py-2">Semua</TabsTrigger>
-              <TabsTrigger value="articles" className="text-xs sm:text-sm py-2">Artikel</TabsTrigger>
-              <TabsTrigger value="videos" className="text-xs sm:text-sm py-2">Video</TabsTrigger>
-            </TabsList>
+           <Tabs value={activeTab} onValueChange={(value) => {
+             console.log('🔄 CMS: Tab changed to:', value, '(current:', activeTab, ')');
+             if (value !== activeTab) {
+               setActiveTab(value);
+             }
+           }}>
+             <TabsList className="grid w-full grid-cols-3 h-auto">
+               <TabsTrigger value="all" className="text-xs sm:text-sm py-2">Semua</TabsTrigger>
+               <TabsTrigger value="articles" className="text-xs sm:text-sm py-2">Artikel</TabsTrigger>
+               <TabsTrigger value="videos" className="text-xs sm:text-sm py-2">Video</TabsTrigger>
+             </TabsList>
 
-            <TabsContent value={activeTab} className="mt-6">
+             <TabsContent value={activeTab} className="mt-6">
               {contentLoading ? (
                 <div className="py-6">
                   <CMSContentListSkeleton />
