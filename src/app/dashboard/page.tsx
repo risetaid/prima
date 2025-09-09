@@ -38,7 +38,7 @@ export default function DashboardPage() {
 
         {/* Loading Content */}
         <main className="relative z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="px-4 sm:px-6 lg:px-8 py-8">
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-6 py-4 rounded-lg shadow-sm">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>

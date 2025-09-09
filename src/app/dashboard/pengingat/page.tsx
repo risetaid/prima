@@ -165,7 +165,7 @@ export default function ReminderPage() {
       {/* Desktop: Header Section with Dashboard Style */}
       <div className="hidden lg:block relative z-10">
         <div className="bg-blue-600 text-white py-6">
-          <div className="max-w-7xl mx-auto px-8">
+          <div className="px-8">
             <div className="flex items-center justify-between">
               {/* Left: Search Bar */}
               <div className="relative bg-white rounded-lg">
@@ -214,7 +214,7 @@ export default function ReminderPage() {
         </div>
         
         {/* Desktop: Patient Table */}
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8">
+        <div className="px-4 lg:px-8 py-8">
           <ReminderListTable patients={filteredPatients} loading={loading} />
         </div>
       </div>

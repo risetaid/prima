@@ -117,7 +117,7 @@ export default function AdminTemplatesPage() {
 
         {/* Main Content with Skeleton */}
         <main className="relative z-10">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="px-4 sm:px-6 lg:px-8 py-8">
             <TemplateManagementSkeleton />
           </div>
         </main>
@@ -166,7 +166,7 @@ export default function AdminTemplatesPage() {
 
       {/* Page Title - Desktop Only */}
       <div className="hidden lg:block relative z-10 bg-blue-600 text-white py-6">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="px-8">
           <div className="flex items-center space-x-3">
             <MessageSquareText className="w-8 h-8" />
             <h1 className="text-3xl font-bold">Template WhatsApp</h1>

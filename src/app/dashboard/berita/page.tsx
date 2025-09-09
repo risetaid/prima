@@ -144,7 +144,7 @@ export default function BeritaPage() {
       <div className="min-h-screen bg-gray-50">
         <Header showNavigation={true} />
         
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <CMSContentListSkeleton />
         </main>
       </div>
@@ -156,7 +156,7 @@ export default function BeritaPage() {
       <div className="min-h-screen bg-gray-50">
         <Header showNavigation={true} />
         
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
             <FileText className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Gagal Memuat Berita</h1>
@@ -175,7 +175,7 @@ export default function BeritaPage() {
       {/* Responsive Header */}
       <Header showNavigation={true} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="px-4 sm:px-6 lg:px-8 py-6">
         {articles.length === 0 && !loading ? (
           // Empty State
           <div className="text-center py-16">

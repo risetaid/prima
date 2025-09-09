@@ -769,7 +769,7 @@ export default function PatientDetailPage() {
           <Header showNavigation={true} />
         </div>
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Memuat data pasien...</p>
@@ -784,7 +784,7 @@ export default function PatientDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <Header showNavigation={true} />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <p className="text-red-600 mb-4">
               Terjadi kesalahan memuat data pasien
@@ -807,9 +807,9 @@ export default function PatientDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <Header showNavigation={true} />
 
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Memuat data pasien...</p>
           </div>
         </main>
@@ -844,7 +844,7 @@ export default function PatientDetailPage() {
       </div>
 
       {/* Main Content */}
-      <main className="px-4 lg:px-8 pb-6 max-w-7xl mx-auto relative z-10 space-y-6">
+      <main className="px-4 lg:px-8 pb-6 relative z-10 space-y-6">
         {/* Patient Profile Section - Full Width */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Profile Header */}
@@ -1367,7 +1367,7 @@ export default function PatientDetailPage() {
 
           {/* Health Notes Content */}
           <div className="p-4 sm:p-6">
-            <div className="max-w-5xl mx-auto">
+            <div className="">
               {healthNotes.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 text-gray-500">
                   <Edit className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 opacity-30 text-purple-300" />
@@ -1443,7 +1443,7 @@ export default function PatientDetailPage() {
 
           {/* Health Notes Footer */}
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 sm:p-6">
-            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 onClick={() => {
                   setIsAddNoteModalOpen(true);

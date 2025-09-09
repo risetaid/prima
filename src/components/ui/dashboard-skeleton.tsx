@@ -151,7 +151,7 @@ export function MobilePatientCardSkeleton() {
 export function HeaderSkeleton() {
   return (
     <div className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <div className="flex items-center space-x-3">
@@ -679,7 +679,7 @@ export function ReminderPageSkeleton() {
       {/* Desktop Header Skeleton */}
       <div className="hidden lg:block relative z-10">
         <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
               <div className="flex items-center space-x-3">
                 <Skeleton className="h-8 w-8 rounded" />
@@ -710,7 +710,7 @@ export function ReminderPageSkeleton() {
       {/* Desktop Blue Header Section */}
       <div className="hidden lg:block relative z-10">
         <div className="bg-blue-600 text-white py-6">
-          <div className="max-w-7xl mx-auto px-8">
+          <div className="px-8">
             <div className="flex items-center justify-between">
               {/* Search Bar Skeleton */}
               <div className="bg-white rounded-lg">
@@ -729,7 +729,7 @@ export function ReminderPageSkeleton() {
       </div>
 
       {/* Desktop Table Skeleton */}
-      <div className="hidden lg:block max-w-7xl mx-auto px-4 lg:px-8 py-8 relative z-10">
+      <div className="hidden lg:block px-4 lg:px-8 py-8 relative z-10">
         <Card className="bg-white">
           <CardContent className="p-6">
             <div className="space-y-4">

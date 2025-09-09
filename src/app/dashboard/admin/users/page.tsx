@@ -43,7 +43,7 @@ export default function AdminUsersPage() {
 
       {/* Page Title - Desktop Only */}
       <div className="hidden lg:block relative z-10 bg-purple-600 text-white py-6">
-        <div className="max-w-7xl mx-auto px-8">
+        <div className="px-8">
           <div className="flex items-center space-x-3">
             <Users className="w-8 h-8" />
             <h1 className="text-3xl font-bold">Admin Panel</h1>

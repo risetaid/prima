@@ -293,7 +293,7 @@ function DashboardClient() {
       {/* Desktop: Header Section */}
       <div className="hidden lg:block ">
         <div className="bg-blue-600 text-white py-6">
-          <div className="max-w-7xl mx-auto px-8">
+          <div className="px-8">
             <div className="flex items-center justify-between">
               {/* Left: Search Bar */}
               <div className="relative bg-white rounded-lg">
@@ -361,7 +361,7 @@ function DashboardClient() {
 
       {/* Instant Send Section - Admin Only */}
       {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 mb-6">
+        <div className="px-4 lg:px-8 mb-6">
           <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-400">
             {/* Desktop Layout */}
             <div className="hidden lg:flex items-center justify-between">
@@ -405,7 +405,7 @@ function DashboardClient() {
       )}
 
       {/* Patient List Section */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
+      <div className="px-4 lg:px-8 py-6">
         {/* Mobile: Title and Controls */}
         <div className="lg:hidden flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>

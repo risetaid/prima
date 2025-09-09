@@ -99,8 +99,8 @@ export default function AdminPanelPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header showNavigation={true} />
-        
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <main className="px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
             <p className="text-gray-600">Memuat panel admin...</p>
@@ -114,7 +114,7 @@ export default function AdminPanelPage() {
     <div className="min-h-screen bg-gray-50">
       <Header showNavigation={true} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="px-4 sm:px-6 lg:px-8 py-8">
         {/* Admin Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
