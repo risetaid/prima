@@ -44,7 +44,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-// AddReminderModal temporarily removed
+import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 
 interface Patient {
   id: string;
@@ -791,7 +791,7 @@ export default function PatientDetailPage() {
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
+              className="cursor-pointer bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md"
             >
               Coba Lagi
             </button>
@@ -1081,13 +1081,13 @@ export default function PatientDetailPage() {
                     <>
                       <button
                         onClick={handleCancel}
-                        className="w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200 shadow-sm border border-gray-200"
+                        className="cursor-pointer w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200 shadow-sm border border-gray-200"
                       >
                         Batal
                       </button>
                       <button
                         onClick={handleEdit}
-                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg"
+                        className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg"
                       >
                         Simpan Perubahan
                       </button>
@@ -1096,7 +1096,7 @@ export default function PatientDetailPage() {
                     <>
                       <button
                         onClick={handleEdit}
-                        className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg transform hover:scale-105"
+                        className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg transform hover:scale-105"
                       >
                         <Edit className="w-5 h-5" />
                         <span>Edit Profil</span>
@@ -1104,7 +1104,7 @@ export default function PatientDetailPage() {
 
                       <button
                         onClick={handleToggleStatus}
-                        className={`w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg transform hover:scale-105 ${
+                        className={`cursor-pointer w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg transform hover:scale-105 ${
                           patient.isActive
                             ? "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700"
                             : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
@@ -1141,7 +1141,7 @@ export default function PatientDetailPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <button
                         onClick={handleAddReminder}
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                       >
                         <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
@@ -1150,7 +1150,7 @@ export default function PatientDetailPage() {
                       </button>
                       <button
                         onClick={handleViewReminders}
-                        className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                        className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
                       >
                         <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
@@ -1425,7 +1425,7 @@ export default function PatientDetailPage() {
                             {!isDeleteMode && (
                               <button
                                 onClick={() => handleEditNote(note)}
-                                className="flex-shrink-0 p-2 text-purple-600 hover:bg-purple-200 rounded-lg transition-colors opacity-0 group-hover:opacity-100 sm:opacity-100"
+                                className="cursor-pointer flex-shrink-0 p-2 text-purple-600 hover:bg-purple-200 rounded-lg transition-colors opacity-0 group-hover:opacity-100 sm:opacity-100"
                                 title="Edit catatan"
                               >
                                 <Edit className="w-4 h-4" />
@@ -1530,7 +1530,7 @@ export default function PatientDetailPage() {
                   <div className="flex items-center justify-between mb-4">
                     <button
                       onClick={() => navigateMonth("prev")}
-                      className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      className="cursor-pointer p-1 hover:bg-gray-100 rounded"
                     >
                       <ChevronLeft className="w-5 h-5 text-gray-600" />
                     </button>
@@ -1542,7 +1542,7 @@ export default function PatientDetailPage() {
                     </h4>
                     <button
                       onClick={() => navigateMonth("next")}
-                      className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      className="cursor-pointer p-1 hover:bg-gray-100 rounded"
                     >
                       <ChevronRight className="w-5 h-5 text-gray-600" />
                     </button>
@@ -1661,7 +1661,7 @@ export default function PatientDetailPage() {
                   <div className="flex items-center justify-between mb-4">
                     <button
                       onClick={() => navigateEditMonth("prev")}
-                      className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      className="cursor-pointer p-1 hover:bg-gray-100 rounded"
                     >
                       <ChevronLeft className="w-5 h-5 text-gray-600" />
                     </button>
@@ -1673,7 +1673,7 @@ export default function PatientDetailPage() {
                     </h4>
                     <button
                       onClick={() => navigateEditMonth("next")}
-                      className="p-1 hover:bg-gray-100 rounded cursor-pointer"
+                      className="cursor-pointer p-1 hover:bg-gray-100 rounded"
                     >
                       <ChevronRight className="w-5 h-5 text-gray-600" />
                     </button>
@@ -1742,13 +1742,13 @@ export default function PatientDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reminder Modal - Temporarily disabled */}
-      {/* <AddReminderModal
+      {/* Reminder Modal */}
+      <AddReminderModal
         isOpen={isReminderModalOpen}
         onClose={() => setIsReminderModalOpen(false)}
         onSuccess={handleReminderSuccess}
         patientName={patient?.name || ""}
-      /> */}
+      />
     </div>
   );
 }

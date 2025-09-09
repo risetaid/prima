@@ -250,7 +250,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers()
-    // Auto-sync when Superadmin Panel opens
+    // Auto-sync when Admin Panel opens
     const autoSync = setTimeout(() => {
       handleClerkSync()
     }, 1000) // Delay 1 second after initial load

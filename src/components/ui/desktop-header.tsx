@@ -32,7 +32,7 @@ function AdminActions() {
 
   return (
     <>
-      {/* Superadmin Panel - Main Entry Point */}
+      {/* Admin Panel - Main Entry Point */}
       <button
         onClick={() => router.push("/dashboard/admin")}
         className={`
@@ -43,10 +43,10 @@ function AdminActions() {
               : "text-gray-600 hover:text-purple-600 hover:bg-gray-50"
           }
         `}
-        title="Superadmin Panel"
+        title="Admin Panel"
       >
         <Shield className="w-4 h-4" />
-        <span>Superadmin Panel</span>
+        <span>Admin Panel</span>
       </button>
 
 

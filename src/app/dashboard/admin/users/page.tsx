@@ -46,10 +46,10 @@ export default function AdminUsersPage() {
         <div className="max-w-7xl mx-auto px-8">
           <div className="flex items-center space-x-3">
             <Users className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">Superadmin Panel</h1>
+            <h1 className="text-3xl font-bold">Admin Panel</h1>
           </div>
           <p className="text-purple-100 mt-2">
-            Kelola persetujuan, status, dan role pengguna sistem (hanya Superadmin)
+            Kelola persetujuan, status, dan role pengguna sistem (hanya Admin)
           </p>
         </div>
       </div>

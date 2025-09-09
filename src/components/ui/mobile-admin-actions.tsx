@@ -43,7 +43,7 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
         }
         ${className}
       `}
-      title="Superadmin Panel"
+      title="Admin Panel"
     >
       <Shield className="w-4 h-4" />
     </button>

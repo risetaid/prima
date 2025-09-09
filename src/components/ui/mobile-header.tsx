@@ -37,7 +37,7 @@ function MobileNavigationActions() {
           <MobileCMSActions />
         )}
         
-        {/* Superadmin Panel for SUPERADMIN only */}
+        {/* Admin Panel for SUPERADMIN only */}
         {userRole === 'SUPERADMIN' && (
           <MobileAdminActions />
         )}
@@ -79,7 +79,7 @@ function MobileNavigationActions() {
     );
   }
   
-  // SUPERADMIN users see: Pasien + CMS + Superadmin Panel (management functions only)
+  // SUPERADMIN users see: Pasien + CMS + Admin Panel (management functions only)
   return (
     <div className="flex items-center">
       <div className="flex items-center space-x-1">
