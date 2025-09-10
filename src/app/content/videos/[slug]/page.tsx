@@ -134,15 +134,27 @@ export default async function VideoPage({ params }: VideoPageProps) {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
+
       {/* Mobile-optimized header */}
-      <ContentHeader 
-        title={video.title}
-        text={video.description || 'Video edukasi kesehatan dari PRIMA'}
-      />
+      <div className="relative z-10">
+        <ContentHeader
+          title={video.title}
+          text={video.description || 'Video edukasi kesehatan dari PRIMA'}
+        />
+      </div>
 
       {/* Video content */}
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Video header */}
         <Card>
           <CardContent className="p-6 space-y-4">

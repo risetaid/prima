@@ -24,7 +24,7 @@ export default function DashboardPage() {
         {/* Background Pattern */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
             style={{
               backgroundImage: "url(/bg_desktop.png)",
             }}
@@ -58,14 +58,14 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
       {/* Background Pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-          style={{
-            backgroundImage: "url(/bg_desktop.png)",
-          }}
-        />
-      </div>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            style={{
+              backgroundImage: "url(/bg_desktop.png)",
+            }}
+          />
+        </div>
 
       {/* Responsive Header */}
       <Header showNavigation={true} className="relative z-10" />

@@ -86,7 +86,7 @@ export default function AdminTemplatesPage() {
         {/* Background Pattern */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
             style={{
               backgroundImage: "url(/bg_desktop.png)",
             }}
@@ -134,7 +134,7 @@ export default function AdminTemplatesPage() {
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
           style={{
             backgroundImage: "url(/bg_desktop.png)",
           }}

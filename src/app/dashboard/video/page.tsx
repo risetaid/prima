@@ -152,10 +152,20 @@ export default function VideoPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header showNavigation={true} />
-        
-        <main className="px-4 sm:px-6 lg:px-8 py-8">
+      <div className="min-h-screen bg-gray-50 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            style={{
+              backgroundImage: "url(/bg_desktop.png)",
+            }}
+          />
+        </div>
+
+        <Header showNavigation={true} className="relative z-10" />
+
+        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
           <CMSContentListSkeleton />
         </main>
       </div>
@@ -164,12 +174,20 @@ export default function VideoPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Header showNavigation={true} />
-        
+      <div className="min-h-screen bg-gray-50 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+            style={{
+              backgroundImage: "url(/bg_desktop.png)",
+            }}
+          />
+        </div>
 
+        <Header showNavigation={true} className="relative z-10" />
 
-        <main className="px-4 sm:px-6 lg:px-8 py-8">
+        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
             <Video className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h1 className="text-xl font-semibold text-gray-900 mb-2">Gagal Memuat Video</h1>
@@ -184,11 +202,21 @@ export default function VideoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Responsive Header */}
-      <Header showNavigation={true} />
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
 
-      <main className="px-4 sm:px-6 lg:px-8 py-6">
+      {/* Responsive Header */}
+      <Header showNavigation={true} className="relative z-10" />
+
+      <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-6">
         {videos.length === 0 && !loading ? (
           // Empty State
           <div className="text-center py-16">

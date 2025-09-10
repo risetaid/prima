@@ -158,15 +158,27 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
+      </div>
+
       {/* Mobile-optimized header */}
-      <ContentHeader 
-        title={article.title}
-        text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
-      />
+      <div className="relative z-10">
+        <ContentHeader
+          title={article.title}
+          text={article.excerpt || 'Artikel edukasi kesehatan dari PRIMA'}
+        />
+      </div>
 
       {/* Article content */}
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <main className="relative z-10 max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Article header */}
         <Card>
           <CardContent className="p-6 space-y-4">

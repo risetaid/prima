@@ -41,7 +41,7 @@ export default function NotFound() {
       {/* Healthcare Pattern Background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
           style={{
             backgroundImage: "url(/bg_desktop.png)",
           }}
