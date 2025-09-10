@@ -15,8 +15,6 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "seed": "bun run scripts/seed-all.ts",
-    "seed:templates": "bun run scripts/seed-templates.ts",
     "nuke-db": "bun run scripts/nuke-database.ts"
   },
   "dependencies": {
