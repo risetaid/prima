@@ -3,6 +3,8 @@ import { getAuthUser } from '@/lib/auth-utils'
 import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules } from '@/db'
 import { eq, and, isNull, count, sql } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL, invalidatePatientCache } from '@/lib/cache'
+import { unauthorizedError, validationError, notFoundError, internalError } from '@/lib/api-error'
+
 
 export async function GET(
   request: NextRequest,
@@ -11,14 +13,14 @@ export async function GET(
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return unauthorizedError()
     }
 
     const { id } = await params
 
     // Validate patient ID
     if (!id || typeof id !== 'string') {
-      return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 })
+      return validationError('Invalid patient ID')
     }
     
     // Try to get from cache first
@@ -69,14 +71,14 @@ export async function GET(
       .limit(1)
 
     if (!patientResult || patientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return notFoundError('Patient not found')
     }
 
     const patientData = patientResult[0]
 
     // Additional null check for patientData
     if (!patientData) {
-      return NextResponse.json({ error: 'Patient data not found' }, { status: 404 })
+      return notFoundError('Patient data not found')
     }
     
     // Get manual confirmations count (for display only, not used in compliance calculation)
@@ -174,10 +176,7 @@ export async function GET(
     return NextResponse.json(patient)
   } catch (error) {
     console.error('Error fetching patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return internalError(error)
   }
 }
 
@@ -188,7 +187,7 @@ export async function PUT(
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return unauthorizedError()
     }
 
     const { id } = await params
@@ -215,7 +214,7 @@ export async function PUT(
       .limit(1)
 
     if (existingPatientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return notFoundError('Patient not found')
     }
 
     // Update patient (simplified response for now)
@@ -252,10 +251,7 @@ export async function PUT(
     return NextResponse.json(patient)
   } catch (error) {
     console.error('Error updating patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return internalError(error)
   }
 }
 
@@ -266,7 +262,7 @@ export async function DELETE(
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return unauthorizedError()
     }
 
     const { id } = await params
@@ -279,7 +275,7 @@ export async function DELETE(
       .limit(1)
 
     if (existingPatientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return notFoundError('Patient not found')
     }
 
     const deleteTime = new Date()
@@ -306,15 +302,12 @@ export async function DELETE(
     // Invalidate patient cache after deletion
     await invalidatePatientCache(id)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Patient deleted successfully',
       deletedAt: deleteTime
     })
   } catch (error) {
     console.error('Error deleting patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return internalError(error)
   }
 }

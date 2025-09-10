@@ -71,6 +71,13 @@
       "when": 1757259414770,
       "tag": "0009_blushing_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1757535872720,
+      "tag": "0010_confused_veda",
+      "breakpoints": true
     }
   ]
 }
