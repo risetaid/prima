@@ -151,12 +151,29 @@ function DashboardClient() {
         },
       });
       
-      const result = await response.json();
-      setInstantSendResult(result);
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to send reminders');
-      }
+       const result = await response.json();
+       setInstantSendResult(result);
+
+       if (!response.ok) {
+         // Handle specific error types
+         if (result.error?.includes('Database query failed')) {
+           throw new Error('Database error occurred. Please try again.');
+         } else if (result.error?.includes('Unauthorized')) {
+           throw new Error('Authentication failed. Please refresh the page.');
+         } else {
+           throw new Error(result.error || result.details || 'Failed to send reminders');
+         }
+       }
+
+       // Handle successful response but no reminders sent
+       if (result.success && result.results && result.results.messagesSent === 0) {
+         setInstantSendResult({
+           success: true,
+           message: result.message || 'No active reminders found to send',
+           results: result.results
+         });
+         return;
+       }
     } catch (error) {
       console.error('Error sending instant reminders:', error);
       setInstantSendResult({

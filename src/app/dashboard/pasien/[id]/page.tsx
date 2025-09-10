@@ -1147,7 +1147,7 @@ export default function PatientDetailPage() {
                        >
                         <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
-                          Lihat Jadwal
+                          Lihat Reminder
                         </span>
                       </button>
                     </div>
