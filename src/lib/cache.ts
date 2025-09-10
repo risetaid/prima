@@ -2,8 +2,8 @@ import { redis } from './redis'
 
 // Cache TTL values (in seconds)
 export const CACHE_TTL = {
-  PATIENT: 300,        // 5 minutes
-  REMINDER_STATS: 120, // 2 minutes  
+  PATIENT: 30,         // 30 seconds (VERY FAST for verification updates)
+  REMINDER_STATS: 120, // 2 minutes
   TEMPLATES: 600,      // 10 minutes
   AUTOFILL: 180,       // 3 minutes
   USER_PROFILE: 300,   // 5 minutes
@@ -76,6 +76,55 @@ export async function invalidateMultipleCache(keys: string[]): Promise<void> {
 }
 
 /**
+ * Safe cache invalidation with error handling and result reporting
+ */
+export async function safeInvalidateCache(key: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const result = await redis.del(key)
+    return { success: result }
+  } catch (error) {
+    console.error(`Cache invalidation failed for key ${key}:`, error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+/**
+ * Safe patient cache invalidation with comprehensive error handling
+ */
+export async function safeInvalidatePatientCache(patientId: string): Promise<{ success: boolean; errors: string[] }> {
+  const keysToInvalidate = [
+    CACHE_KEYS.patient(patientId),
+    CACHE_KEYS.reminderStats(patientId),
+    CACHE_KEYS.autoFill(patientId),
+    CACHE_KEYS.remindersAll(patientId),
+    CACHE_KEYS.healthNotes(patientId),
+  ]
+
+  const results = await Promise.allSettled(
+    keysToInvalidate.map(key => safeInvalidateCache(key))
+  )
+
+  const errors: string[] = []
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      errors.push(`Failed to invalidate ${keysToInvalidate[index]}: ${result.reason}`)
+    } else if (!result.value.success) {
+      errors.push(`Cache invalidation failed for ${keysToInvalidate[index]}: ${result.value.error}`)
+    }
+  })
+
+  const success = errors.length === 0
+  if (!success) {
+    console.warn(`Patient cache invalidation partially failed for patient ${patientId}:`, errors)
+  }
+
+  return {
+    success,
+    errors
+  }
+}
+
+/**
  * Check if cache key exists
  */
 export async function cacheExists(key: string): Promise<boolean> {
@@ -136,5 +185,59 @@ export function getRedisHealthStatus(): { connected: boolean; message: string } 
   return {
     connected,
     message: connected ? 'Redis connected' : 'Redis not available - using direct database queries'
+  }
+}
+
+/**
+ * Comprehensive cache health check
+ */
+export async function getCacheHealthStatus(): Promise<{
+  redis: boolean
+  message: string
+  lastError?: string
+  cacheOperations: {
+    set: boolean
+    get: boolean
+    del: boolean
+  }
+}> {
+  try {
+    // Test Redis connection and operations
+    const testKey = `health-check-${Date.now()}`
+    const testValue = 'cache-health-test'
+
+    // Test SET operation
+    const setResult = await redis.set(testKey, testValue, 60) // 1 minute TTL
+
+    // Test GET operation
+    const getResult = await redis.get(testKey)
+
+    // Test DEL operation
+    const delResult = await redis.del(testKey)
+
+    const cacheOperations = {
+      set: setResult,
+      get: getResult === testValue,
+      del: delResult
+    }
+
+    const allOperationsSuccessful = Object.values(cacheOperations).every(op => op)
+
+    return {
+      redis: allOperationsSuccessful,
+      message: allOperationsSuccessful ? 'Cache fully operational' : 'Cache operations partially failed',
+      cacheOperations
+    }
+  } catch (error) {
+    return {
+      redis: false,
+      message: 'Cache unavailable - falling back to database',
+      lastError: error instanceof Error ? error.message : 'Unknown error',
+      cacheOperations: {
+        set: false,
+        get: false,
+        del: false
+      }
+    }
   }
 }

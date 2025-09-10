@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db, patients, verificationLogs, reminderSchedules } from '@/db'
 import { eq, and, or } from 'drizzle-orm'
-import { invalidatePatientCache } from '@/lib/cache'
+import { safeInvalidatePatientCache } from '@/lib/cache'
 
 // Process WhatsApp verification responses from patients
 export async function POST(request: NextRequest) {
@@ -127,13 +127,18 @@ export async function POST(request: NextRequest) {
       .set(updateData)
       .where(eq(patients.id, patient.id))
     
-    // Invalidate patient cache after verification update
-    await invalidatePatientCache(patient.id)
-    
-    console.log('Patient status updated:', { 
-      name: patient.name, 
-      from: patient.verificationStatus, 
-      to: updateData.verificationStatus 
+    // Invalidate patient cache after verification update with error handling
+    const cacheResult = await safeInvalidatePatientCache(patient.id)
+    if (!cacheResult.success) {
+      console.warn('Cache invalidation partially failed:', cacheResult.errors)
+      // Continue anyway - don't fail the webhook
+    }
+
+    console.log('Patient status updated:', {
+      name: patient.name,
+      from: patient.verificationStatus,
+      to: updateData.verificationStatus,
+      cacheInvalidation: cacheResult.success ? 'success' : 'partial_failure'
     })
 
     // If unsubscribed, also deactivate all related reminders

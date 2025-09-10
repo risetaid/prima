@@ -89,23 +89,7 @@ export default function RootLayout({
                 },
               }}
             />
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `
-                  if ('serviceWorker' in navigator) {
-                    window.addEventListener('load', () => {
-                      navigator.serviceWorker.register('/sw.js')
-                        .then((registration) => {
-                          console.log('SW registered successfully');
-                        })
-                        .catch((registrationError) => {
-                          console.log('SW registration failed:', registrationError);
-                        });
-                    });
-                  }
-                `,
-              }}
-            />
+
           </AuthProvider>
         </ClerkProvider>
       </body>

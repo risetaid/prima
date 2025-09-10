@@ -3,7 +3,7 @@
   "short_name": "PRIMA",
   "description": "Comprehensive healthcare platform for palliative care monitoring and patient assistance",
   "start_url": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
   "orientation": "portrait-primary",
