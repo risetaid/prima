@@ -86,34 +86,30 @@ export async function GET(
     let perluDiperbarui = 0
     let selesai = 0
 
-    // Process each schedule to determine its status
-    for (const schedule of allSchedules) {
-      // Get logs for this schedule
-      const scheduleLogs = allLogs.filter(log => log.reminderScheduleId === schedule.id)
-
-      if (scheduleLogs.length === 0) {
-        // No logs yet - this is scheduled
-        terjadwal++
-        continue
-      }
-
-      // Get the latest log
-      const latestLog = scheduleLogs[0]
-
-      // Check if this log has been confirmed
-      const logConfirmation = allConfirmations.find(conf => conf.reminderLogId === latestLog.id)
+    // Process each individual log to determine its status
+    for (const log of allLogs) {
+      // Check if this specific log has been confirmed
+      const logConfirmation = allConfirmations.find(conf => conf.reminderLogId === log.id)
 
       if (logConfirmation) {
         // Log has been confirmed - completed
         selesai++
-      } else if (latestLog.status === 'DELIVERED') {
+      } else if (log.status === 'DELIVERED') {
         // Log sent but not confirmed - needs update
         perluDiperbarui++
-      } else if (latestLog.status === 'FAILED') {
+      } else if (log.status === 'FAILED') {
         // Log failed - still scheduled (will be retried)
         terjadwal++
       } else {
         // Unknown status - treat as scheduled
+        terjadwal++
+      }
+    }
+
+    // Add schedules that have no logs yet
+    for (const schedule of allSchedules) {
+      const hasLogs = allLogs.some(log => log.reminderScheduleId === schedule.id)
+      if (!hasLogs) {
         terjadwal++
       }
     }

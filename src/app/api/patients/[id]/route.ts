@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth-utils'
 import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules } from '@/db'
-import { eq, and, isNull, count } from 'drizzle-orm'
+import { eq, and, isNull, count, sql } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL, invalidatePatientCache } from '@/lib/cache'
 
 export async function GET(
@@ -15,6 +15,11 @@ export async function GET(
     }
 
     const { id } = await params
+
+    // Validate patient ID
+    if (!id || typeof id !== 'string') {
+      return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 })
+    }
     
     // Try to get from cache first
     const cacheKey = CACHE_KEYS.patient(id)
@@ -63,36 +68,59 @@ export async function GET(
       .where(eq(patients.id, id))
       .limit(1)
 
-    if (patientResult.length === 0) {
+    if (!patientResult || patientResult.length === 0) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
     const patientData = patientResult[0]
+
+    // Additional null check for patientData
+    if (!patientData) {
+      return NextResponse.json({ error: 'Patient data not found' }, { status: 404 })
+    }
     
-    // Get manual confirmations count
-    const confirmationsResult = await db
+    // Get manual confirmations count (for display only, not used in compliance calculation)
+    const oldConfirmationsResult = await db
       .select({ count: count() })
       .from(manualConfirmations)
       .where(eq(manualConfirmations.patientId, id))
-    
-    const totalConfirmations = confirmationsResult[0]?.count || 0
 
-    // Get delivered reminders count (simplified for now)
-    const deliveredLogsResult = await db
-      .select({ count: count() })
-      .from(reminderLogs)
-      .where(
-        and(
-          eq(reminderLogs.patientId, id),
-          eq(reminderLogs.status, 'DELIVERED')
+    const totalConfirmations = oldConfirmationsResult[0]?.count || 0
+
+    // Get delivered reminders count (basic calculation without reactivation filtering for now)
+    let totalDeliveredReminders = 0
+    try {
+      const deliveredResult = await db
+        .select({ count: count() })
+        .from(reminderLogs)
+        .where(
+          and(
+            eq(reminderLogs.patientId, id),
+            eq(reminderLogs.status, 'DELIVERED')
+          )
         )
-      )
+      totalDeliveredReminders = deliveredResult?.[0]?.count ? Number(deliveredResult[0].count) : 0
+    } catch (error) {
+      console.error('Error fetching delivered reminders count:', error)
+      totalDeliveredReminders = 0
+    }
 
-    const totalDeliveredReminders = deliveredLogsResult[0]?.count || 0
-    
+    // Get confirmations count
+    let totalConfirmationsFiltered = 0
+    try {
+      const confirmationsResult = await db
+        .select({ count: count() })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.patientId, id))
+      totalConfirmationsFiltered = confirmationsResult?.[0]?.count ? Number(confirmationsResult[0].count) : 0
+    } catch (error) {
+      console.error('Error fetching confirmations count:', error)
+      totalConfirmationsFiltered = 0
+    }
+
     // Calculate compliance rate
-    const complianceRate = totalDeliveredReminders > 0 
-      ? Math.round((totalConfirmations / totalDeliveredReminders) * 100)
+    const complianceRate = totalDeliveredReminders > 0
+      ? Math.round((totalConfirmationsFiltered / totalDeliveredReminders) * 100)
       : 0
 
     // Structure the response to match Prisma format

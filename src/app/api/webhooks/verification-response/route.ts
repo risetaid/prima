@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const { device, sender, message, name } = parsedBody
     
     // Log incoming webhook for debugging
-    console.log('Verification webhook received:', { device, sender, message, name })
+    console.log('Patient response webhook received:', { device, sender, message, name })
 
     if (!sender || !message) {
       console.log('Missing required fields:', { sender, message })
@@ -90,6 +90,78 @@ export async function POST(request: NextRequest) {
     const patient = patientResult[0]
     console.log('Patient found:', { name: patient.name, currentStatus: patient.verificationStatus, newResult: verificationResult })
 
+    // Check if patient is already verified - if so, only log the message but don't change status
+    if (patient.verificationStatus === 'verified') {
+      console.log('Patient already verified, logging message but not changing status:', {
+        name: patient.name,
+        message: message,
+        currentStatus: patient.verificationStatus
+      })
+
+      // Log the message for reference but don't change verification status
+      await db
+        .insert(verificationLogs)
+        .values({
+          patientId: patient.id,
+          action: 'message_received',
+          patientResponse: message,
+          verificationResult: 'verified' // Keep current status
+        })
+
+      return NextResponse.json(
+        { message: 'Message logged for verified patient' },
+        { status: 200 }
+      )
+    }
+
+    // Check if patient has unsubscribed - if so, only log the message but don't change status
+    if (patient.verificationStatus === 'unsubscribed') {
+      console.log('Patient has unsubscribed, logging message but not changing status:', {
+        name: patient.name,
+        message: message,
+        currentStatus: patient.verificationStatus
+      })
+
+      // Log the message for reference but don't change verification status
+      await db
+        .insert(verificationLogs)
+        .values({
+          patientId: patient.id,
+          action: 'message_received',
+          patientResponse: message,
+          verificationResult: 'unsubscribed' // Keep current status
+        })
+
+      return NextResponse.json(
+        { message: 'Message logged for unsubscribed patient' },
+        { status: 200 }
+      )
+    }
+
+    // Only process verification responses if patient is in pending_verification status
+    if (patient.verificationStatus !== 'pending_verification') {
+      console.log('Patient not in pending verification status, ignoring verification response:', {
+        name: patient.name,
+        currentStatus: patient.verificationStatus,
+        message: message
+      })
+
+      // Log the message for reference
+      await db
+        .insert(verificationLogs)
+        .values({
+          patientId: patient.id,
+          action: 'message_received',
+          patientResponse: message,
+          verificationResult: patient.verificationStatus as 'verified' | 'declined' | 'pending_verification'
+        })
+
+      return NextResponse.json(
+        { message: 'Patient not waiting for verification' },
+        { status: 200 }
+      )
+    }
+
     if (!verificationResult) {
       // Unknown response - log it but don't change status
       await db
@@ -126,7 +198,7 @@ export async function POST(request: NextRequest) {
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patient.id))
-    
+
     // Invalidate patient cache after verification update with error handling
     const cacheResult = await safeInvalidatePatientCache(patient.id)
     if (!cacheResult.success) {
@@ -173,7 +245,7 @@ export async function POST(request: NextRequest) {
       await sendConfirmationMessage(phone, confirmationMessage)
     }
 
-    console.log(`Verification processed: ${patient.name} -> ${verificationResult}`)
+    console.log(`Patient response processed: ${patient.name} -> ${verificationResult}`)
 
     return NextResponse.json({
       success: true,
@@ -183,7 +255,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Verification webhook error:', error)
+    console.error('Patient response webhook error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

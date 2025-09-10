@@ -84,7 +84,7 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
             </svg>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 text-sm">Riwayat Verifikasi</h4>
+            <h4 className="font-medium text-gray-900 text-sm">Riwayat Respon Pasien</h4>
             {history.length > 0 && (
               <span className="text-xs text-gray-500">{history.length} entri</span>
             )}
@@ -101,7 +101,7 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-              <span className="ml-2 text-gray-500">Loading riwayat...</span>
+              <span className="ml-2 text-gray-500">Loading riwayat respon...</span>
             </div>
           ) : error ? (
             <div className="text-center py-8">
@@ -114,12 +114,12 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
               </button>
             </div>
           ) : history.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500 text-sm">📝 Belum ada riwayat verifikasi</p>
-              <p className="text-gray-400 text-xs mt-1">
-                Riwayat akan muncul setelah mengirim verifikasi pertama
-              </p>
-            </div>
+             <div className="text-center py-8">
+               <p className="text-gray-500 text-sm">📝 Belum ada riwayat respon pasien</p>
+               <p className="text-gray-400 text-xs mt-1">
+                 Riwayat akan muncul setelah pasien mengirim pesan pertama
+               </p>
+             </div>
           ) : (
             <div className="space-y-4">
               {history.map((entry, index) => (

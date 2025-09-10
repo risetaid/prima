@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, verificationLogs } from '@/db'
+import { db, patients, verificationLogs, reminderSchedules } from '@/db'
 import { eq } from 'drizzle-orm'
 
 // Reactivate patient after BERHENTI (unsubscribe)
@@ -64,6 +64,15 @@ export async function POST(
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patientId))
+
+    // Reactivate all reminder schedules for this patient
+    await db
+      .update(reminderSchedules)
+      .set({
+        isActive: true,
+        updatedAt: new Date()
+      })
+      .where(eq(reminderSchedules.patientId, patientId))
 
     // Log reactivation event
     await db

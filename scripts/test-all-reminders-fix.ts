@@ -1,27 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
+import { db, reminderLogs, reminderSchedules, manualConfirmations } from '../src/db'
 import { eq, and, desc, inArray } from 'drizzle-orm'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+async function testAllRemindersFix() {
+  const patientId = '9831df16-f7e1-4f8a-82ed-dd201ace984d'
+
   try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    console.log('🧪 Testing All Reminders Fix')
+    console.log('=' .repeat(40))
 
-    const { id } = await params
-    
-    // Extract pagination parameters from request
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = (page - 1) * limit
-
-    // Get all reminder logs for this patient (show all individual logs, not just latest per schedule)
+    // Simulate the NEW logic from the fixed API
     const allReminderLogs = await db
       .select({
         id: reminderLogs.id,
@@ -42,12 +29,10 @@ export async function GET(
           eq(reminderSchedules.isActive, true)
         )
       )
-      .where(eq(reminderLogs.patientId, id))
+      .where(eq(reminderLogs.patientId, patientId))
       .orderBy(desc(reminderLogs.sentAt))
-      .offset(offset)
-      .limit(limit)
 
-    // Get all manual confirmations for the logs we retrieved
+    // Get confirmations
     const logIds = allReminderLogs.map(log => log.id)
     const allConfirmations = logIds.length > 0 ? await db
       .select({
@@ -59,29 +44,46 @@ export async function GET(
       .from(manualConfirmations)
       .where(inArray(manualConfirmations.reminderLogId, logIds)) : []
 
-    // Transform results to unified format (show all individual logs)
+    console.log(`\n📊 Processing ${allReminderLogs.length} individual logs:`)
+
+    let pendingCount = 0
+    let completedTakenCount = 0
+    let completedNotTakenCount = 0
+    let scheduledCount = 0
+
+    // Transform results (same logic as the fixed API)
     const allReminders = allReminderLogs.map(log => {
-      // Find confirmation for this specific log
       const confirmation = allConfirmations.find(conf => conf.reminderLogId === log.id)
 
-      // Determine status based on log and confirmation
       let status = 'scheduled'
       let reminderDate = log.sentAt ? log.sentAt.toISOString().split('T')[0] : (log.startDate ? log.startDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
       let id_suffix = log.id
 
       if (confirmation) {
-        // This specific log has been confirmed
         status = confirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
         reminderDate = confirmation.visitDate ? confirmation.visitDate.toISOString().split('T')[0] : reminderDate
         id_suffix = `completed-${confirmation.id}`
+
+        if (confirmation.medicationsTaken) {
+          completedTakenCount++
+          console.log(`✅ Log ${log.id.slice(0,8)}... : COMPLETED_TAKEN`)
+        } else {
+          completedNotTakenCount++
+          console.log(`❌ Log ${log.id.slice(0,8)}... : COMPLETED_NOT_TAKEN`)
+        }
       } else if (log.status === 'DELIVERED') {
-        // Log sent but not yet confirmed
         status = 'pending'
         id_suffix = `pending-${log.id}`
+        pendingCount++
+        console.log(`⏳ Log ${log.id.slice(0,8)}... : PENDING`)
       } else if (log.status === 'FAILED') {
-        // Log failed
         status = 'scheduled'
         id_suffix = `failed-${log.id}`
+        scheduledCount++
+        console.log(`📅 Log ${log.id.slice(0,8)}... : SCHEDULED (failed)`)
+      } else {
+        scheduledCount++
+        console.log(`❓ Log ${log.id.slice(0,8)}... : SCHEDULED (unknown)`)
       }
 
       return {
@@ -94,9 +96,25 @@ export async function GET(
       }
     })
 
-    return NextResponse.json(allReminders)
+    console.log('\n📈 FINAL RESULTS:')
+    console.log(`Total reminders: ${allReminders.length}`)
+    console.log(`Pending: ${pendingCount}`)
+    console.log(`Completed Taken: ${completedTakenCount}`)
+    console.log(`Completed Not Taken: ${completedNotTakenCount}`)
+    console.log(`Scheduled: ${scheduledCount}`)
+
+    console.log('\n✅ EXPECTED: Should now show all 9 reminders!')
+    console.log(`   Before: Only latest per schedule (6 total)`)
+    console.log(`   After: All individual logs (9 total)`)
+
+    console.log('\n🎯 Status Breakdown:')
+    console.log(`   - 7 Pending (delivered but not confirmed)`)
+    console.log(`   - 2 Completed (1 taken + 1 not taken)`)
+    console.log(`   - 0 Scheduled (no failed/unknown status logs)`)
+
   } catch (error) {
-    console.error('Error fetching all reminders:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('❌ Error testing all reminders:', error)
   }
 }
+
+testAllRemindersFix()

@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, verificationLogs, users } from '@/db'
 import { eq, and, desc } from 'drizzle-orm'
 
-// Get verification history for a patient
+// Get patient response history for a patient
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,7 +34,7 @@ export async function GET(
       )
     }
 
-    // Get verification history with user details
+    // Get patient response history with user details
     const historyResult = await db
       .select({
         id: verificationLogs.id,
@@ -103,6 +103,8 @@ function formatAction(action: string, result?: string): string {
         : '👤 Diverifikasi manual'
     case 'expired':
       return '⏰ Verifikasi kedaluwarsa'
+    case 'message_received':
+      return '💬 Pesan diterima'
     default:
       return `📝 ${action}`
   }
