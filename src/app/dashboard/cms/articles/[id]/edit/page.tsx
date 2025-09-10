@@ -182,63 +182,67 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <BackButton text="Kembali ke CMS" />
-          <div className="h-6 w-px bg-gray-300" />
-          <div className="flex items-center gap-2">
-            <FileText className="h-6 w-6 text-blue-500" />
-            <h1 className="text-2xl font-bold text-gray-900">Edit Artikel</h1>
-          </div>
-        </div>
+      {/* Action Buttons Card */}
+      <Card>
+        <CardContent className="py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <BackButton text="Kembali ke CMS" />
+              <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <FileText className="h-6 w-6 text-blue-500" />
+                <h1 className="text-2xl font-bold text-gray-900">Edit Artikel</h1>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3">
-          {formData.status === 'published' && (
-            <Button 
-              asChild
-              variant="outline"
-              size="sm"
-            >
-              <Link 
-                href={`/content/articles/${formData.slug}`}
-                target="_blank"
-                className="flex items-center gap-2"
+            <div className="flex items-center gap-3">
+              {formData.status === 'published' && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                >
+                  <Link
+                    href={`/content/articles/${formData.slug}`}
+                    target="_blank"
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Lihat
+                  </Link>
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                <Eye className="h-4 w-4" />
-                Lihat
-              </Link>
-            </Button>
-          )}
-          
-          <Button 
-            type="button"
-            variant="outline"
-            onClick={handleDelete}
-            disabled={saving || deleting}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-          >
-            {deleting ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
-            Hapus
-          </Button>
-          
-          <Button 
-            form="edit-article-form"
-            disabled={saving || !formData.title.trim()}
-          >
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Simpan
-          </Button>
-        </div>
-      </div>
+                {deleting ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Hapus
+              </Button>
+
+              <Button
+                form="edit-article-form"
+                disabled={saving || !formData.title.trim()}
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Simpan
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}

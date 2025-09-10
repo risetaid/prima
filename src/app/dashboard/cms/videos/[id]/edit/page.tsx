@@ -225,65 +225,69 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BackButton text="Kembali ke CMS" />
-          <div className="hidden sm:block h-6 w-px bg-gray-300" />
-          <div className="flex items-center gap-2">
-            <Video className="h-6 w-6 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">Edit Video</h1>
-          </div>
-        </div>
+      {/* Action Buttons Card */}
+      <Card>
+        <CardContent className="py-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <BackButton text="Kembali ke CMS" />
+              <div className="hidden sm:block h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <Video className="h-6 w-6 text-red-500" />
+                <h1 className="text-2xl font-bold text-gray-900">Edit Video</h1>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          {formData.status === 'published' && (
-            <Button 
-              asChild
-              variant="outline"
-              size="sm"
-              className="flex-1 sm:flex-none"
-            >
-              <Link 
-                href={`/content/videos/${formData.slug}`}
-                target="_blank"
-                className="flex items-center justify-center gap-2"
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {formData.status === 'published' && (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 sm:flex-none"
+                >
+                  <Link
+                    href={`/content/videos/${formData.slug}`}
+                    target="_blank"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Lihat
+                  </Link>
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
               >
-                <Eye className="h-4 w-4" />
-                Lihat
-              </Link>
-            </Button>
-          )}
-          
-          <Button 
-            type="button"
-            variant="outline"
-            onClick={handleDelete}
-            disabled={saving || deleting}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 sm:flex-none"
-          >
-            {deleting ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
-            Hapus
-          </Button>
-          
-          <Button 
-            form="edit-video-form"
-            disabled={saving || !formData.title.trim()}
-            className="flex-1 sm:flex-none"
-          >
-            {saving ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Simpan
-          </Button>
-        </div>
-      </div>
+                {deleting ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                Hapus
+              </Button>
+
+              <Button
+                form="edit-video-form"
+                disabled={saving || !formData.title.trim()}
+                className="flex-1 sm:flex-none"
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Simpan
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
