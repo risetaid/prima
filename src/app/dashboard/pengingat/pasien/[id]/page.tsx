@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare, X, Clock } from 'lucide-react'
+import { ArrowLeft, Plus, Calendar, Download, CheckSquare, MessageSquare } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { Header } from '@/components/ui/header'
 import { PatientReminderDashboard } from '@/components/pengingat/patient-reminder-dashboard'
+import { AddReminderModal } from '@/components/pengingat/add-reminder-modal'
 
 
 
@@ -160,98 +161,12 @@ export default function PatientReminderPage() {
           </button>
 
           {/* Add Reminder Modal */}
-          {isAddModalOpen && (
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-              <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-                {/* Modal Header */}
-                <div className="flex items-center justify-between p-6 border-b">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Tambah Pengingat Baru
-                  </h3>
-                  <button
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
-                  >
-                    <X className="w-5 h-5 text-gray-500" />
-                  </button>
-                </div>
-
-                {/* Modal Content */}
-                <div className="overflow-y-auto flex-1 p-6">
-                  <form className="space-y-6">
-                    {/* Patient Info */}
-                    {patientName && (
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <p className="text-sm text-gray-700">
-                          <strong>Pasien:</strong> {patientName}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Message Field */}
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2">
-                        Isi Pesan
-                      </label>
-                      <textarea
-                        placeholder="Tulis pesan pengingat..."
-                        className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors resize-none"
-                        rows={4}
-                        required
-                      />
-                    </div>
-
-                    {/* Time Field */}
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2">
-                        Jam Pengingat
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="time"
-                          defaultValue="08:00"
-                          className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
-                          required
-                        />
-                        <Clock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-blue-500 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* Date Selection Field */}
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-2">
-                        Pilih Tanggal Pengingat
-                      </label>
-                      <div className="border-2 border-blue-200 rounded-xl p-4">
-                        <input
-                          type="date"
-                          min={new Date().toISOString().split('T')[0]}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  </form>
-                </div>
-
-                {/* Modal Footer */}
-                <div className="flex space-x-4 p-6 border-t">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
-                  >
-                    Batal
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 bg-red-500 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-600 transition-colors cursor-pointer"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          <AddReminderModal
+            isOpen={isAddModalOpen}
+            onClose={() => setIsAddModalOpen(false)}
+            onSuccess={handleModalSuccess}
+            patientName={patientName}
+          />
 
           {/* Status Cards Grid */}
           <div className="grid grid-cols-2 gap-4 mb-8">

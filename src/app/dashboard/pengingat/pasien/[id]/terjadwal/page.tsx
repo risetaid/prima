@@ -321,7 +321,7 @@ export default function ScheduledRemindersPage() {
                     {!isDeleteMode && (
                       <p className="text-blue-200 text-xs mt-2 flex items-center space-x-1">
                         <Edit className="w-3 h-3" />
-                        <span>Tap untuk edit waktu</span>
+                        <span>Ketuk untuk mengedit reminder</span>
                       </p>
                     )}
                   </div>

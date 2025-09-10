@@ -434,7 +434,7 @@ export class MedicalQueryService {
     patientId: string,
     filters: { status?: 'pending' | 'completed' | 'scheduled' | 'all', limit?: number } = {}
   ) {
-    let whereConditions = [eq(reminderSchedules.patientId, patientId)]
+    const whereConditions = [eq(reminderSchedules.patientId, patientId)]
     
     if (!filters.status || filters.status !== 'all') {
       whereConditions.push(isNull(reminderSchedules.deletedAt))
@@ -489,7 +489,7 @@ export class MedicalQueryService {
    * Optimized join query for admin panel
    */
   async getUsersWithApprovalInfo(includeInactive = false) {
-    let whereConditions = []
+    const whereConditions = []
     
     if (!includeInactive) {
       whereConditions.push(eq(users.isActive, true))
@@ -557,7 +557,7 @@ export class MedicalQueryService {
     }
     
     // Build where conditions based on user role
-    let patientWhereConditions = [isNull(patients.deletedAt)]
+    const patientWhereConditions = [isNull(patients.deletedAt)]
     if (userId) {
       patientWhereConditions.push(eq(patients.assignedVolunteerId, userId))
     }
@@ -572,7 +572,7 @@ export class MedicalQueryService {
       .where(and(...patientWhereConditions))
       
     // Get reminder statistics
-    let reminderWhereConditions = []
+    const reminderWhereConditions = []
     if (userId) {
       reminderWhereConditions.push(eq(patients.assignedVolunteerId, userId))
     }
@@ -660,7 +660,7 @@ export function calculateIndonesianCompliance(
   const baseRate = delivered > 0 ? Math.round((confirmed / delivered) * 100) : 0
   
   // Adjust for Indonesian healthcare context
-  let adjustedRate = baseRate
+  const adjustedRate = baseRate
   const culturalFactors: string[] = []
   
   // Rural area patients may have lower baseline expectations

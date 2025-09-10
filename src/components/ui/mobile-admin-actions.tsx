@@ -38,8 +38,8 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
-            ? "bg-purple-100 text-purple-600"
-            : "bg-gray-100 hover:bg-purple-50 text-gray-600 hover:text-purple-600"
+            ? "bg-purple-100 text-purple-700"
+            : "text-gray-600 hover:text-purple-600 hover:bg-gray-50"
         }
         ${className}
       `}
@@ -77,8 +77,8 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
-            ? "bg-blue-100 text-blue-600"
-            : "bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600"
+            ? "bg-blue-100 text-blue-700"
+            : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
         }
         ${className}
       `}
@@ -102,8 +102,8 @@ export function MobileReminderActions({ className = "" }: MobileAdminActionsProp
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
-            ? "bg-blue-600 text-white"
-            : "bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white"
+            ? "bg-blue-700 text-white"
+            : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
         }
         ${className}
       `}
@@ -128,7 +128,7 @@ export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps)
         ${
           isActive
             ? "bg-green-600 text-white"
-            : "bg-green-100 hover:bg-green-600 text-green-600 hover:text-white"
+            : "text-gray-600 hover:text-green-600 hover:bg-gray-50"
         }
         ${className}
       `}
@@ -153,7 +153,7 @@ export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) 
         ${
           isActive
             ? "bg-red-600 text-white"
-            : "bg-red-100 hover:bg-red-600 text-red-600 hover:text-white"
+            : "text-gray-600 hover:text-red-600 hover:bg-gray-50"
         }
         ${className}
       `}
@@ -177,8 +177,8 @@ export function MobilePasienActions({ className = "" }: MobileAdminActionsProps)
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
           isActive
-            ? "bg-blue-600 text-white"
-            : "bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white"
+            ? "bg-blue-700 text-white"
+            : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
         }
         ${className}
       `}

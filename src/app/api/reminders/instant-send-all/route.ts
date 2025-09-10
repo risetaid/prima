@@ -49,12 +49,7 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user has permission to send all reminders (admin level)
-    if (user.role !== 'SUPERADMIN' && user.role !== 'ADMIN') {
-      return NextResponse.json({ 
-        error: 'Access denied. Only administrators can send instant reminders to all patients.' 
-      }, { status: 403 })
-    }
+    // All authenticated users can send instant reminders to their assigned patients
 
     const startTime = Date.now()
     let processedCount = 0
@@ -64,8 +59,8 @@ export async function POST() {
 
     // Build patient filter based on role
     const patientConditions = [isNull(patients.deletedAt)]
-    if (user.role === 'ADMIN') {
-      // Admins can only send to patients they manage
+    if (user.role === 'ADMIN' || user.role === 'MEMBER') {
+      // Both ADMIN and MEMBER can only send to patients they manage
       patientConditions.push(eq(patients.assignedVolunteerId, user.id))
     }
     const patientFilter = patientConditions.length > 1 ? and(...patientConditions) : patientConditions[0]
@@ -175,7 +170,7 @@ export async function POST() {
             message: messageBody,
             phoneNumber: reminder.patientPhoneNumber,
             fonnteMessageId: result.messageId,
-            notes: 'Instant send by admin'
+            notes: `Instant send by ${user.role}`
           }
 
           await db.insert(reminderLogs).values(logData)

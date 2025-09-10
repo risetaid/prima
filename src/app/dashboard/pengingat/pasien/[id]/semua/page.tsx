@@ -136,8 +136,8 @@ export default function AllRemindersPage() {
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  {scheduledReminders.map((reminder) => (
-                    <div key={reminder.id} className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+                   {scheduledReminders.map((reminder, index) => (
+                     <div key={`${reminder.id}-${reminder.status}-${index}`} className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h3 className="font-semibold mb-1">
@@ -171,8 +171,8 @@ export default function AllRemindersPage() {
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  {pendingReminders.map((reminder) => (
-                    <div key={reminder.id} className="space-y-2">
+                   {pendingReminders.map((reminder, index) => (
+                     <div key={`${reminder.id}-${reminder.status}-${index}`} className="space-y-2">
                       <div className="flex justify-start">
                         <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                           Perlu Update
@@ -213,10 +213,10 @@ export default function AllRemindersPage() {
                   </h3>
                 </div>
                 <div className="space-y-3">
-                  {completedReminders.map((reminder) => {
-                    const statusBadge = getStatusBadge(reminder.status)
-                    return (
-                      <div key={reminder.id} className="space-y-2">
+                   {completedReminders.map((reminder, index) => {
+                     const statusBadge = getStatusBadge(reminder.status)
+                     return (
+                       <div key={`${reminder.id}-${reminder.status}-${index}`} className="space-y-2">
                         <div className="flex justify-start">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
                             {statusBadge.text}

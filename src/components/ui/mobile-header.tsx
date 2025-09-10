@@ -5,7 +5,7 @@ import { UserButton } from "@clerk/nextjs";
 import { MobileAdminActions, MobileCMSActions, MobilePasienActions } from "./mobile-admin-actions";
 import { useAuthContext } from '@/lib/auth-context'
 // Role cache temporarily disabled
-import { Home } from "lucide-react";
+import { UserCheck } from "lucide-react";
 
 interface MobileHeaderProps {
   showNavigation?: boolean;
@@ -26,10 +26,10 @@ function MobileNavigationActions() {
         {/* Dashboard Button */}
         <button
           onClick={() => router.push("/dashboard")}
-          className="p-1.5 rounded-full bg-blue-100 hover:bg-blue-600 text-blue-600 hover:text-white transition-colors touch-manipulation"
+          className="p-1.5 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors touch-manipulation"
           title="Dashboard"
         >
-          <Home className="w-4 h-4" />
+          <UserCheck className="w-4 h-4" />
         </button>
         
         {/* Management actions for ADMIN/SUPERADMIN */}

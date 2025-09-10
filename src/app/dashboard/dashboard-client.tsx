@@ -359,8 +359,8 @@ function DashboardClient() {
         </span>
       </div>
 
-       {/* Instant Send Section - Admin Only */}
-       {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
+        {/* Instant Send Section - All Authenticated Users */}
+        {userRole && (
          <div className="px-4 lg:px-8 mt-6 mb-6">
            <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-400">
             {/* Desktop Layout */}
@@ -406,33 +406,35 @@ function DashboardClient() {
 
        {/* Patient List Section */}
        <div className="px-4 lg:px-8 pb-6">
-        {/* Mobile: Title and Controls */}
-        <div className="lg:hidden flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Daftar Pasien</h2>
-          <div className="flex items-center space-x-3">
-            {/* Search Bar */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="cari"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            {/* Add Patient Button */}
-            <div
-              onClick={handleAddPatientClick}
-              className="bg-blue-500 rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors"
-            >
-              <Plus className="w-6 h-6 text-white" />
-            </div>
+        {/* Mobile: Title Row */}
+        <div className="lg:hidden mb-4">
+          <h2 className="text-xl font-bold text-gray-900 text-center">Daftar Pasien</h2>
+        </div>
+
+        {/* Mobile: Controls Row */}
+        <div className="lg:hidden flex items-center space-x-4 mb-6">
+          {/* Search Bar - Flexible Width */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="cari"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          {/* Add Patient Button */}
+          <div
+            onClick={handleAddPatientClick}
+            className="bg-blue-500 rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors flex-shrink-0"
+          >
+            <Plus className="w-6 h-6 text-white" />
           </div>
         </div>
 
         {/* Mobile: Filter Buttons */}
-        <div className="lg:hidden flex space-x-3 mb-6">
+        <div className="lg:hidden flex space-x-4 mb-6">
           <button
             onClick={() => toggleFilter("active")}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${

@@ -49,6 +49,13 @@ export function DatePickerCalendar({ selectedDates, onDateChange, className = ''
     return `${year}-${month}-${day}`
   }
 
+  const formatDisplayDate = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const year = date.getFullYear()
+    return `${day}/${month}/${year}` // Indonesian format: dd/mm/yyyy
+  }
+
   const isDateSelected = (date: Date) => {
     return selectedDates.includes(formatDate(date))
   }
@@ -168,7 +175,7 @@ export function DatePickerCalendar({ selectedDates, onDateChange, className = ''
               const dateObj = new Date(date + 'T00:00:00')
               return (
                 <span key={date} className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
-                  {dateObj.getDate()}/{dateObj.getMonth() + 1}
+                  {formatDisplayDate(dateObj)}
                 </span>
               )
             })}

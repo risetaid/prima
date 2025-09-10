@@ -407,7 +407,7 @@ function generateRecurrenceDates(customRecurrence: any): string[] {
     endDate.setDate(endDate.getDate() + 30);
   }
 
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
   let occurrenceCount = 0;
   // Safe type coercion to prevent string/invalid numbers
   const maxOccurrences =

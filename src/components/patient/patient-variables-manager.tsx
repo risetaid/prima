@@ -7,17 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Plus, Edit, Trash2, Zap, Save, X, AlertCircle } from 'lucide-react'
+import { Settings, Trash2, Zap, Save, X, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
-
-interface PatientVariable {
-  id: string
-  variableName: string
-  variableValue: string
-  createdAt: string
-  updatedAt: string
-}
 
 interface PatientVariablesManagerProps {
   patientId: string
@@ -38,7 +30,6 @@ const COMMON_VARIABLES = [
 
 export function PatientVariablesManager({ patientId, patientName }: PatientVariablesManagerProps) {
   const [variables, setVariables] = useState<Record<string, string>>({})
-  const [variablesList, setVariablesList] = useState<PatientVariable[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingValues, setEditingValues] = useState<Record<string, string>>({})
@@ -51,13 +42,12 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
       setIsLoading(true)
       const response = await fetch(`/api/patients/${patientId}/variables`)
       
-      if (!response.ok) {
-        throw new Error('Failed to load variables')
-      }
+       if (!response.ok) {
+         throw new Error('Failed to load variables')
+       }
 
-      const data = await response.json()
-      setVariables(data.variables || {})
-      setVariablesList(data.variablesList || [])
+       const data = await response.json()
+       setVariables(data.variables || {})
     } catch (error) {
       console.error('Error loading variables:', error)
       toast.error('Gagal memuat variabel pasien')
@@ -90,10 +80,9 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
         throw new Error('Failed to save variables')
       }
 
-      const data = await response.json()
-      setVariables(data.variables || {})
-      setVariablesList(data.variablesList || [])
-      setIsDialogOpen(false)
+       const data = await response.json()
+       setVariables(data.variables || {})
+       setIsDialogOpen(false)
       toast.success('Variabel pasien berhasil disimpan')
     } catch (error) {
       console.error('Error saving variables:', error)
@@ -163,7 +152,7 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base font-medium flex items-center gap-2">
           <Zap className="h-4 w-4" />
-          Variabel Template
+          Data Pasien
           {variablesCount > 0 && (
             <Badge variant="secondary" className="ml-1">
               {variablesCount}
@@ -179,7 +168,7 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Kelola Variabel Template - {patientName}</DialogTitle>
+              <DialogTitle>Kelola Data Pasien - {patientName}</DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4">
@@ -187,35 +176,35 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
                   <div className="text-sm text-blue-800">
-                    <strong>Variabel custom akan diprioritaskan</strong> saat menggunakan template WhatsApp. 
-                    Kosongkan field untuk menggunakan data otomatis dari sistem.
+                    <strong>Data pasien akan diprioritaskan</strong> saat menggunakan template WhatsApp. 
+                    Kosongkan kolom untuk menggunakan data otomatis dari sistem.
                   </div>
                 </div>
               </div>
 
-              <div className="grid gap-4">
-                {COMMON_VARIABLES.map(({ name, label, placeholder }) => (
-                  <div key={name} className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor={name} className="text-right font-medium">
-                      {label}
-                      <span className="text-xs text-muted-foreground block">
-                        {`{${name}}`}
-                      </span>
-                    </Label>
-                    <div className="col-span-3">
-                      <Input
-                        id={name}
-                        placeholder={placeholder}
-                        value={editingValues[name] || ''}
-                        onChange={(e) => setEditingValues(prev => ({
-                          ...prev,
-                          [name]: e.target.value
-                        }))}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-                ))}
+               <div className="grid gap-4">
+                 {COMMON_VARIABLES.map(({ name, label, placeholder }) => (
+                   <div key={name} className="grid grid-cols-1 md:grid-cols-4 items-start md:items-center gap-2 md:gap-4">
+                     <Label htmlFor={name} className="text-left md:text-right font-medium">
+                       {label}
+                       <span className="text-xs text-muted-foreground block">
+                         {`{${name}}`}
+                       </span>
+                     </Label>
+                     <div className="col-span-1">
+                       <Input
+                         id={name}
+                         placeholder={placeholder}
+                         value={editingValues[name] || ''}
+                         onChange={(e) => setEditingValues(prev => ({
+                           ...prev,
+                           [name]: e.target.value
+                         }))}
+                         className="w-full"
+                       />
+                     </div>
+                   </div>
+                 ))}
               </div>
 
               <div className="flex justify-end gap-2 pt-4 border-t">
@@ -244,8 +233,8 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
         {variablesCount === 0 ? (
           <div className="text-center py-4 text-muted-foreground">
             <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">Belum ada variabel custom</p>
-            <p className="text-xs">Klik "Kelola" untuk mengatur variabel template</p>
+            <p className="text-sm">Belum ada data pasien</p>
+            <p className="text-xs">Klik "Kelola" untuk mengatur data pasien</p>
           </div>
         ) : (
           <div className="space-y-2">

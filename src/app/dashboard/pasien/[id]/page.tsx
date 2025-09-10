@@ -747,7 +747,6 @@ export default function PatientDetailPage() {
   };
 
   const handleReminderSuccess = () => {
-    toast.success("Pengingat berhasil dibuat!");
     // Could add any additional refresh logic here if needed
   };
 
@@ -835,16 +834,10 @@ export default function PatientDetailPage() {
       {/* Responsive Header */}
       <Header showNavigation={true} />
 
-      {/* Mobile Title */}
-      <div className="lg:hidden flex items-center space-x-2 my-6 px-4">
-        <User className="w-5 h-5 text-gray-700" />
-        <h2 className="text-lg font-semibold text-gray-900">
-          Informasi Pasien
-        </h2>
-      </div>
+
 
        {/* Main Content */}
-       <main className="px-4 lg:px-8 pt-6 pb-6 relative z-10 space-y-6">
+       <main className="px-4 lg:px-8 py-4 relative z-10 space-y-6">
         {/* Patient Profile Section - Full Width */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Profile Header */}
@@ -869,10 +862,10 @@ export default function PatientDetailPage() {
             {patient.assignedVolunteer && (
               <div className="mt-4 pt-4 border-t border-white/20">
                 <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                  <div className="flex items-center space-x-2 text-blue-100 mb-1">
-                    <User className="w-4 h-4" />
-                    <span className="text-sm font-medium">Managed by</span>
-                  </div>
+                   <div className="flex items-center space-x-2 text-blue-100 mb-1">
+                     <User className="w-4 h-4" />
+                     <span className="text-sm font-medium">Dikelola oleh</span>
+                   </div>
                   <div className="text-white">
                     <div className="font-semibold">
                       {patient.volunteerFirstName} {patient.volunteerLastName}

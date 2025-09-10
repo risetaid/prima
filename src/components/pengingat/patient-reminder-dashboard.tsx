@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   Plus,
   Trash2,
@@ -39,7 +39,6 @@ interface PatientReminderDashboardProps {
 export function PatientReminderDashboard({
   patientName,
 }: PatientReminderDashboardProps) {
-  const router = useRouter();
   const params = useParams();
   const [terjadwalReminders, setTerjadwalReminders] = useState<Reminder[]>([]);
   const [perluDiperbaruiReminders, setPerluDiperbaruiReminders] = useState<
@@ -232,15 +231,14 @@ export function PatientReminderDashboard({
         });
         
         if (!response.ok) {
-          const errorData = await response.json();
           throw new Error(`Delete failed for ${realId}`);
         }
-        
+
         const result = await response.json();
         return result;
       });
 
-      const results = await Promise.all(deletePromises);
+      await Promise.all(deletePromises);
       
       // Update local state immediately (like mobile does)
       setTerjadwalReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
@@ -430,8 +428,8 @@ export function PatientReminderDashboard({
     </div>
   );
 
-  const renderSelesaiCard = (reminder: Reminder) => (
-    <div key={reminder.id} className="bg-white border rounded-lg p-4">
+  const renderSelesaiCard = (reminder: Reminder, index: number) => (
+    <div key={`${reminder.id}-${reminder.status}-${index}`} className="bg-white border rounded-lg p-4">
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-semibold text-gray-900">
@@ -594,7 +592,7 @@ export function PatientReminderDashboard({
                 Tidak ada pengingat selesai
               </p>
             ) : (
-              selesaiReminders.map((reminder) => renderSelesaiCard(reminder))
+               selesaiReminders.map((reminder, index) => renderSelesaiCard(reminder, index))
             )}
           </div>
         </div>

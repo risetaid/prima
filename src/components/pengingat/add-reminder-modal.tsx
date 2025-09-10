@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button'
 import { ContentSelector } from '@/components/reminder/ContentSelector'
 import { DatePickerCalendar } from '@/components/ui/date-picker-calendar'
+import { IndonesianDateInput } from '@/components/ui/indonesian-date-input'
 import { getCurrentTimeWIB } from '@/lib/datetime'
 
 interface Patient {
@@ -242,24 +243,44 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
     return result
   }
 
+  // Convert daysOfWeek numbers to day name strings for API compatibility
+  const convertNumbersToDayNames = (numbers: number[]): string[] => {
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+    return numbers.map(num => dayNames[num]);
+  }
+
+  // Custom date change handler that disables recurrence when dates are selected
+  const handleDateChange = (dates: string[]) => {
+    setSelectedDates(dates)
+    // If dates are selected, disable custom recurrence
+    if (dates.length > 0 && customRecurrence.enabled) {
+      setCustomRecurrence(prev => ({ ...prev, enabled: false }))
+      toast.info('Mode pengulangan kustom dinonaktifkan karena tanggal dipilih')
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate input based on recurrence type
-    if (!customRecurrence.enabled) {
-      // Regular date selection validation
-      if (selectedDates.length === 0) {
-        toast.error('Pilih minimal satu tanggal')
-        return
-      }
-    } else {
+    // Strict validation: ensure only one scheduling mode is active
+    if (customRecurrence.enabled && selectedDates.length > 0) {
+      toast.error('Pilih salah satu: tanggal spesifik atau pengulangan kustom')
+      return
+    }
+
+    if (!customRecurrence.enabled && selectedDates.length === 0) {
+      toast.error('Pilih minimal satu tanggal atau aktifkan pengulangan kustom')
+      return
+    }
+
+    if (customRecurrence.enabled) {
       // Custom recurrence validation
       if (customRecurrence.frequency === 'week' && customRecurrence.daysOfWeek.length === 0) {
-        toast.error('Pilih minimal satu hari')
+        toast.error('Pilih minimal satu hari untuk pengulangan mingguan')
         return
       }
       if (customRecurrence.endType === 'on' && !customRecurrence.endDate) {
-        toast.error('Pilih tanggal berakhir')
+        toast.error('Pilih tanggal berakhir untuk pengulangan')
         return
       }
     }
@@ -280,7 +301,7 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
           customRecurrence: {
             frequency: customRecurrence.frequency,
             interval: customRecurrence.interval,
-            daysOfWeek: customRecurrence.daysOfWeek,
+            daysOfWeek: convertNumbersToDayNames(customRecurrence.daysOfWeek),
             endType: customRecurrence.endType,
             endDate: customRecurrence.endDate || null,
             occurrences: customRecurrence.occurrences
@@ -584,16 +605,53 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
               </div>
 
               {/* Date Selection Field */}
-              <div>
-                <label className="block text-gray-700 text-sm font-medium mb-2">
-                  Pilih Tanggal Pengingat
-                </label>
+              <div className={`p-4 rounded-lg border-2 transition-colors ${
+                selectedDates.length > 0 && !customRecurrence.enabled
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-700 text-sm font-medium">
+                    Pilih Tanggal Pengingat
+                  </label>
+                  {selectedDates.length > 0 && !customRecurrence.enabled && (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                      Mode: Pilih Tanggal
+                    </span>
+                  )}
+                  {customRecurrence.enabled && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                      Tidak aktif
+                    </span>
+                  )}
+                </div>
                 <DatePickerCalendar
                   selectedDates={selectedDates}
-                  onDateChange={setSelectedDates}
+                  onDateChange={handleDateChange}
                 />
+              </div>
 
-                {/* Custom Recurrence Option */}
+              {/* Custom Recurrence Option */}
+              <div className={`p-4 rounded-lg border-2 transition-colors ${
+                customRecurrence.enabled
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-700 text-sm font-medium">
+                    Pengulangan Kustom
+                  </label>
+                  {customRecurrence.enabled && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                      Mode: Pengulangan Kustom
+                    </span>
+                  )}
+                  {selectedDates.length > 0 && !customRecurrence.enabled && (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
+                      Tidak aktif
+                    </span>
+                  )}
+                </div>
                 <div className="mt-4">
                   <button
                     type="button"
@@ -696,10 +754,10 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
               {customRecurrence.frequency === 'week' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ulangi pada
+                    Ulangi pada hari
                   </label>
                   <div className="flex space-x-1">
-                    {['M', 'S', 'S', 'R', 'K', 'J', 'S'].map((day, index) => (
+                    {['S', 'S', 'R', 'K', 'J', 'S', 'M'].map((day, index) => (
                       <button
                         key={index}
                         type="button"
@@ -752,14 +810,14 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
                       className="text-blue-500"
                     />
                     <span className="text-sm text-gray-700">Pada tanggal</span>
-                    <input
-                      type="date"
-                      value={customRecurrence.endDate}
-                      onChange={(e) => setCustomRecurrence(prev => ({ ...prev, endDate: e.target.value }))}
-                      disabled={customRecurrence.endType !== 'on'}
-                      className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                    />
-                  </label>
+                     <IndonesianDateInput
+                       value={customRecurrence.endDate}
+                       onChange={(value) => setCustomRecurrence(prev => ({ ...prev, endDate: value }))}
+                       disabled={customRecurrence.endType !== 'on'}
+                       className="px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                       placeholder="hh/bb/tttt"
+                     />
+                   </label>
 
                   <label className="flex items-center space-x-2">
                     <input
@@ -780,7 +838,7 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
                       disabled={customRecurrence.endType !== 'after'}
                       className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
                     />
-                    <span className="text-sm text-gray-700">kejadian</span>
+                    <span className="text-sm text-gray-700">pengingat</span>
                   </label>
                 </div>
               </div>
@@ -794,15 +852,17 @@ export function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModa
               >
                 Batal
               </button>
-              <button
-                onClick={() => {
-                  setCustomRecurrence(prev => ({ ...prev, enabled: true }))
-                  setIsCustomRecurrenceOpen(false)
-                }}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer"
-              >
-                Selesai
-              </button>
+               <button
+                 onClick={() => {
+                   setCustomRecurrence(prev => ({ ...prev, enabled: true }))
+                   setSelectedDates([]) // Clear all selected dates when enabling recurrence
+                   setIsCustomRecurrenceOpen(false)
+                   toast.info('Mode pilih tanggal dinonaktifkan karena pengulangan kustom diaktifkan')
+                 }}
+                 className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer"
+               >
+                 Selesai
+               </button>
             </div>
           </DialogContent>
         </Dialog>

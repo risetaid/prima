@@ -132,3 +132,63 @@ export const formatTimeInputWIB = (dateString?: string | Date) => {
   const date = typeof dateString === 'string' ? new Date(dateString) : dateString
   return date.toTimeString().slice(0, 5)
 }
+
+/**
+ * Convert Indonesian date format (dd/mm/yyyy) to ISO format (yyyy-mm-dd)
+ */
+export const indonesianToISO = (indonesianDate: string): string => {
+  if (!indonesianDate) return ''
+
+  // Handle both dd/mm/yyyy and dd/mm formats
+  const parts = indonesianDate.split('/')
+  if (parts.length !== 3 && parts.length !== 2) return ''
+
+  const day = parts[0].padStart(2, '0')
+  const month = parts[1].padStart(2, '0')
+  const year = parts.length === 3 ? parts[2] : new Date().getFullYear().toString()
+
+  // Validate date
+  const date = new Date(`${year}-${month}-${day}`)
+  if (isNaN(date.getTime())) return ''
+
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Convert ISO date format (yyyy-mm-dd) to Indonesian format (dd/mm/yyyy)
+ */
+export const isoToIndonesian = (isoDate: string): string => {
+  if (!isoDate) return ''
+
+  const date = new Date(isoDate + 'T00:00:00')
+  if (isNaN(date.getTime())) return ''
+
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+
+  return `${day}/${month}/${year}`
+}
+
+/**
+ * Validate Indonesian date format (dd/mm/yyyy)
+ */
+export const isValidIndonesianDate = (dateString: string): boolean => {
+  if (!dateString) return false
+
+  const parts = dateString.split('/')
+  if (parts.length !== 3) return false
+
+  const day = parseInt(parts[0], 10)
+  const month = parseInt(parts[1], 10)
+  const year = parseInt(parts[2], 10)
+
+  // Basic validation
+  if (day < 1 || day > 31 || month < 1 || month > 12 || year < 1900 || year > 2100) {
+    return false
+  }
+
+  // Check if date is valid
+  const date = new Date(year, month - 1, day)
+  return date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year
+}
