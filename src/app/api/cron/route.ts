@@ -73,7 +73,7 @@ async function processReminders() {
     const batchSize = 50 // Process in batches to prevent memory issues
 
     // First, get count to determine if we need batch processing
-    const { startOfDay, endOfDay } = createWIBDateRange(todayWIB)
+    const { endOfDay } = createWIBDateRange(todayWIB)
     const todayStart = getWIBTodayStart()
     
     // Count reminder schedules that haven't been delivered today yet
@@ -83,8 +83,7 @@ async function processReminders() {
       .where(
         and(
           eq(reminderSchedules.isActive, true),
-          gte(reminderSchedules.startDate, startOfDay),
-          lte(reminderSchedules.startDate, endOfDay),
+          lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
           // Haven't been delivered today yet (using notExists for efficiency)
           notExists(
             db.select()
@@ -124,8 +123,7 @@ async function processReminders() {
           .where(
             and(
               eq(reminderSchedules.isActive, true),
-              gte(reminderSchedules.startDate, startOfDay),
-              lte(reminderSchedules.startDate, endOfDay),
+              lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
               notExists(
                 db.select()
                   .from(reminderLogs)
@@ -182,8 +180,7 @@ async function processReminders() {
         .where(
           and(
             eq(reminderSchedules.isActive, true),
-            gte(reminderSchedules.startDate, startOfDay),
-            lte(reminderSchedules.startDate, endOfDay),
+            lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
             notExists(
               db.select()
                 .from(reminderLogs)

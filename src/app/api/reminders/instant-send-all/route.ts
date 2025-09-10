@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
 import { eq, and, isNull, gte, lte, inArray } from 'drizzle-orm'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
-import { getWIBTime, getWIBDateString, getWIBTimeString } from '@/lib/timezone'
+import { getWIBTime, getWIBDateString, getWIBTimeString, shouldSendReminderNow, getWIBTodayStart } from '@/lib/timezone'
 // Rate limiter temporarily disabled
 
 // Helper function to create date range for WIB timezone (same as cron)
@@ -65,10 +65,11 @@ export async function POST() {
     }
     const patientFilter = patientConditions.length > 1 ? and(...patientConditions) : patientConditions[0]
 
-    // Get TODAY's reminder schedules only (same logic as cron job)
+    // Get reminder schedules for today and past dates (aligned with cron job logic)
     const todayWIB = getWIBDateString()
-    const { startOfDay, endOfDay } = createWIBDateRange(todayWIB)
-    
+    const { endOfDay } = createWIBDateRange(todayWIB)
+    const todayStart = getWIBTodayStart()
+
     const activeReminders = await db
       .select({
         // Schedule fields
@@ -76,6 +77,7 @@ export async function POST() {
         patientId: reminderSchedules.patientId,
         medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
+        startDate: reminderSchedules.startDate,
         customMessage: reminderSchedules.customMessage,
         // Patient fields
         patientName: patients.name,
@@ -86,10 +88,21 @@ export async function POST() {
       .where(
         and(
           eq(reminderSchedules.isActive, true),
-          gte(reminderSchedules.startDate, startOfDay),
-          lte(reminderSchedules.startDate, endOfDay),
+          lte(reminderSchedules.startDate, endOfDay), // Include today and past dates
           patientFilter,
-          isNull(reminderSchedules.deletedAt)
+          isNull(reminderSchedules.deletedAt),
+          // Exclude reminders already sent today (prevent duplicates)
+          isNull(
+            db.select()
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                  eq(reminderLogs.status, 'DELIVERED'),
+                  gte(reminderLogs.sentAt, todayStart)
+                )
+              )
+          )
         )
       )
 
@@ -125,17 +138,27 @@ export async function POST() {
     const logMessage = `🚀 Starting instant send for ${activeReminders.length} reminders at ${getWIBDateString()} ${getWIBTimeString()}`
     debugLogs.push(logMessage)
 
-    // Process reminders with rate limiting
-    const rateLimitKey = `instant_send_${user.id}`
-    
+    // Process reminders with time-based filtering and duplicate prevention
     for (const reminder of activeReminders) {
       processedCount++
-      
+
       try {
         // Validate phone number exists
         if (!reminder.patientPhoneNumber || !reminder.patientName) {
           errorCount++
           debugLogs.push(`❌ Skipped reminder ${reminder.id}: Missing patient data`)
+          continue
+        }
+
+        // Check if it's time to send this reminder (time-based filtering)
+        const scheduleDate = reminder.startDate.toISOString().split('T')[0]
+        const shouldSend = shouldSendReminderNow(scheduleDate, reminder.scheduledTime)
+
+        debugLogs.push(`📅 Processing ${reminder.patientName} (${reminder.scheduledTime}) - Date: ${scheduleDate}`)
+        debugLogs.push(`⏰ Current time: ${getWIBTimeString()}, Scheduled: ${reminder.scheduledTime}, Should send: ${shouldSend}`)
+
+        if (!shouldSend) {
+          debugLogs.push(`⏰ Reminder ${reminder.patientName} not due yet - skipping`)
           continue
         }
 
@@ -160,18 +183,18 @@ export async function POST() {
 
           debugLogs.push(`📱 WhatsApp result for ${reminder.patientName}: success=${result.success}, messageId=${result.messageId}`)
 
-          // Create reminder log
-          const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
-          const logData = {
-            reminderScheduleId: reminder.id,
-            patientId: reminder.patientId,
-            sentAt: getWIBTime(),
-            status: status,
-            message: messageBody,
-            phoneNumber: reminder.patientPhoneNumber,
-            fonnteMessageId: result.messageId,
-            notes: `Instant send by ${user.role}`
-          }
+           // Create reminder log
+           const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
+           const logData = {
+             reminderScheduleId: reminder.id,
+             patientId: reminder.patientId,
+             sentAt: getWIBTime(),
+             status: status,
+             message: messageBody,
+             phoneNumber: reminder.patientPhoneNumber,
+             fonnteMessageId: result.messageId,
+             notes: `Instant send by ${user.role} - ${getWIBDateString()} ${getWIBTimeString()}`
+           }
 
           await db.insert(reminderLogs).values(logData)
 
