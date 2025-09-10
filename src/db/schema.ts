@@ -83,6 +83,7 @@ export const patients = pgTable('patients', {
   verificationMessage: text('verification_message'),
   verificationAttempts: text('verification_attempts').default('0'),
   verificationExpiresAt: timestamp('verification_expires_at', { withTimezone: true }),
+  lastReactivatedAt: timestamp('last_reactivated_at', { withTimezone: true }),
 }, (table) => ({
   isActiveIdx: index('patients_is_active_idx').on(table.isActive),
   assignedVolunteerIdx: index('patients_assigned_volunteer_idx').on(table.assignedVolunteerId),
