@@ -1,6 +1,6 @@
 import { db, users, patients } from '@/db'
 import { redirect } from 'next/navigation'
-import { eq, and, isNull, desc, asc } from 'drizzle-orm'
+import { eq, and, isNull, desc, asc, count } from 'drizzle-orm'
 import type { User } from '@/db/schema'
 
 // Server-side only imports - conditionally imported to avoid client-side issues
@@ -73,8 +73,46 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const dbUser = dbUserResult?.[0]
 
     if (!dbUser) {
-      console.log(`🔍 Auth: No database user found for Clerk ID: ${userId}`)
-      return null
+      console.log(`🔍 Auth: No database user found for Clerk ID: ${userId}, attempting to sync...`)
+
+      // Try to sync the user automatically
+      try {
+        // Check if this is the first user (should be superadmin)
+        const userCountResult = await db
+          .select({ count: count(users.id) })
+          .from(users)
+
+        const userCount = userCountResult[0]?.count || 0
+        const isFirstUser = userCount === 0
+
+        // Create user in database
+        const newUserResult = await db
+          .insert(users)
+          .values({
+            clerkId: userId,
+            email: user.primaryEmailAddress?.emailAddress || '',
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
+            isApproved: isFirstUser, // First user auto-approved
+            approvedAt: isFirstUser ? new Date() : null,
+          })
+          .returning()
+
+        const newDbUser = newUserResult[0]
+        console.log(`✅ Auth: User synced successfully - ${newDbUser.role} role`)
+
+        const authUser: AuthUser = {
+          ...newDbUser,
+          canAccessDashboard: newDbUser.isApproved && newDbUser.isActive,
+          needsApproval: !newDbUser.isApproved
+        }
+
+        return authUser
+      } catch (syncError) {
+        console.error('❌ Auth: Failed to sync user:', syncError)
+        return null
+      }
     }
 
     const authUser: AuthUser = {
