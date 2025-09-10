@@ -14,18 +14,19 @@ import Image from 'next/image'
 
 
 interface ContentItem {
-  id: string
-  title: string
-  slug: string
-  category: string
-  status: 'draft' | 'published' | 'archived'
-  publishedAt: string | null
-  createdAt: string
-  updatedAt: string
-  type: 'article' | 'video'
-  thumbnailUrl: string | null
-  featuredImageUrl: string | null
-}
+   id: string
+   title: string
+   slug: string
+   category: string
+   status: 'draft' | 'published' | 'archived'
+   publishedAt: string | null
+   createdAt: string
+   updatedAt: string
+   type: 'article' | 'video'
+   thumbnailUrl: string | null
+   featuredImageUrl: string | null
+   authorName: string
+ }
 
 interface Statistics {
   articles: {
@@ -433,15 +434,16 @@ function CMSPageContent() {
                                 </Badge>
                               </div>
 
-                              <div className="text-xs sm:text-sm text-gray-500 space-y-1">
-                                <div>Dibuat: {formatDate(item.createdAt)}</div>
-                                {item.updatedAt !== item.createdAt && (
-                                  <div>Diubah: {formatDate(item.updatedAt)}</div>
-                                )}
-                                {item.status === 'published' && item.publishedAt && (
-                                  <div>Published: {formatDate(item.publishedAt)}</div>
-                                )}
-                              </div>
+                               <div className="text-xs sm:text-sm text-gray-500 space-y-1">
+                                 <div>Dibuat: {formatDate(item.createdAt)}</div>
+                                 {item.updatedAt !== item.createdAt && (
+                                   <div>Diubah: {formatDate(item.updatedAt)}</div>
+                                 )}
+                                 {item.status === 'published' && item.publishedAt && (
+                                   <div>Dipublish: {formatDate(item.publishedAt)}</div>
+                                 )}
+                                 <div>Penulis: {item.authorName}</div>
+                               </div>
                             </div>
                           </div>
 

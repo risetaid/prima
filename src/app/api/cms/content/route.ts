@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, cmsArticles, cmsVideos } from '@/db'
-import { eq, desc, and, count, isNull } from 'drizzle-orm'
+import { db, cmsArticles, cmsVideos, users } from '@/db'
+import { eq, desc, and, count, isNull, sql } from 'drizzle-orm'
 
 // GET - Combined content feed for dashboard overview
 export async function GET(request: NextRequest) {
@@ -29,19 +29,26 @@ export async function GET(request: NextRequest) {
         articleConditions.push(eq(cmsArticles.status, status as 'draft' | 'published' | 'archived'))
       }
 
-       const articleResults = await db
-         .select({
-           id: cmsArticles.id,
-           title: cmsArticles.title,
-           slug: cmsArticles.slug,
-           category: cmsArticles.category,
-           status: cmsArticles.status,
-           publishedAt: cmsArticles.publishedAt,
-           createdAt: cmsArticles.createdAt,
-           updatedAt: cmsArticles.updatedAt,
-           featuredImageUrl: cmsArticles.featuredImageUrl
-         })
-        .from(cmsArticles)
+        const articleResults = await db
+          .select({
+            id: cmsArticles.id,
+            title: cmsArticles.title,
+            slug: cmsArticles.slug,
+            category: cmsArticles.category,
+            status: cmsArticles.status,
+            publishedAt: cmsArticles.publishedAt,
+            createdAt: cmsArticles.createdAt,
+            updatedAt: cmsArticles.updatedAt,
+            featuredImageUrl: cmsArticles.featuredImageUrl,
+            createdBy: cmsArticles.createdBy,
+            authorName: sql<string>`COALESCE(
+              CONCAT(${users.firstName}, ' ', ${users.lastName}),
+              ${users.email},
+              ${cmsArticles.createdBy}
+            )`.as('author_name')
+          })
+         .from(cmsArticles)
+         .leftJoin(users, eq(users.clerkId, cmsArticles.createdBy))
         .where(and(...articleConditions))
         .orderBy(desc(cmsArticles.updatedAt))
         .limit(type === 'articles' ? limit : Math.ceil(limit / 2))
@@ -62,19 +69,26 @@ export async function GET(request: NextRequest) {
         videoConditions.push(eq(cmsVideos.status, status as 'draft' | 'published' | 'archived'))
       }
 
-       const videoResults = await db
-         .select({
-           id: cmsVideos.id,
-           title: cmsVideos.title,
-           slug: cmsVideos.slug,
-           category: cmsVideos.category,
-           status: cmsVideos.status,
-           publishedAt: cmsVideos.publishedAt,
-           createdAt: cmsVideos.createdAt,
-           updatedAt: cmsVideos.updatedAt,
-           thumbnailUrl: cmsVideos.thumbnailUrl
-         })
-        .from(cmsVideos)
+        const videoResults = await db
+          .select({
+            id: cmsVideos.id,
+            title: cmsVideos.title,
+            slug: cmsVideos.slug,
+            category: cmsVideos.category,
+            status: cmsVideos.status,
+            publishedAt: cmsVideos.publishedAt,
+            createdAt: cmsVideos.createdAt,
+            updatedAt: cmsVideos.updatedAt,
+            thumbnailUrl: cmsVideos.thumbnailUrl,
+            createdBy: cmsVideos.createdBy,
+            authorName: sql<string>`COALESCE(
+              CONCAT(${users.firstName}, ' ', ${users.lastName}),
+              ${users.email},
+              ${cmsVideos.createdBy}
+            )`.as('author_name')
+          })
+         .from(cmsVideos)
+         .leftJoin(users, eq(users.clerkId, cmsVideos.createdBy))
         .where(and(...videoConditions))
         .orderBy(desc(cmsVideos.updatedAt))
         .limit(type === 'videos' ? limit : Math.ceil(limit / 2))

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FileText, Calendar, User, Eye, ExternalLink, Search, Filter, Grid, List } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { Header } from '@/components/ui/header'
 
@@ -21,6 +22,7 @@ interface Article {
   publishedAt: string
   createdAt: string
   author?: string
+  featuredImageUrl?: string
 }
 
 export default function BeritaPage() {
@@ -137,6 +139,10 @@ export default function BeritaPage() {
       'testimoni': 'Testimoni'
     }
     return labels[category.toLowerCase()] || category
+  }
+
+  const isValidThumbnail = (url?: string) => {
+    return url && typeof url === 'string' && url.trim() !== '' && !url.startsWith('blob:')
   }
 
   if (loading) {
@@ -288,8 +294,32 @@ export default function BeritaPage() {
                           {article.title}
                         </CardTitle>
                       </CardHeader>
-                      
+
                       <CardContent className="pt-0">
+                        {/* Thumbnail */}
+                        {isValidThumbnail(article.featuredImageUrl) ? (
+                          <div className="mb-4">
+                            <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-gray-200">
+                              <Image
+                                src={article.featuredImageUrl!}
+                                alt={article.title}
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mb-4">
+                            <div className="aspect-video w-full bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                              <FileText className="h-12 w-12 text-gray-400" />
+                            </div>
+                          </div>
+                        )}
+
                         {article.excerpt && (
                           <p className="text-gray-600 text-sm mb-4 line-clamp-3">
                             {article.excerpt}
@@ -324,7 +354,7 @@ export default function BeritaPage() {
                     </Card>
                   ) : (
                     <Card key={article.id} className="bg-white hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
-                      <CardContent className="p-6">
+                       <CardContent className="p-6">
                         <div className="flex flex-col sm:flex-row gap-4">
                           <div className="flex-1">
                             <div className="flex items-start gap-3 mb-3">
@@ -338,6 +368,31 @@ export default function BeritaPage() {
                                     {getCategoryLabel(article.category)}
                                   </Badge>
                                 </div>
+
+                                {/* Thumbnail */}
+                                {isValidThumbnail(article.featuredImageUrl) ? (
+                                  <div className="mb-3">
+                                    <div className="w-full h-32 sm:h-24 overflow-hidden rounded-lg border border-gray-200">
+                                      <Image
+                                        src={article.featuredImageUrl!}
+                                        alt={article.title}
+                                        width={400}
+                                        height={96}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none'
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mb-3">
+                                    <div className="w-full h-32 sm:h-24 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                      <FileText className="h-8 w-8 text-gray-400" />
+                                    </div>
+                                  </div>
+                                )}
+
                                 {article.excerpt && (
                                   <p className="text-gray-600 text-sm line-clamp-2 mb-3">
                                     {article.excerpt}
@@ -360,7 +415,7 @@ export default function BeritaPage() {
                           </div>
                           <div className="flex-shrink-0">
                             <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                              <Link 
+                              <Link
                                 href={`/content/articles/${article.slug}`}
                                 target="_blank"
                                 className="flex items-center gap-2"

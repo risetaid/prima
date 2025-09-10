@@ -489,18 +489,20 @@ export function PatientReminderDashboard({
     <div className="px-4 lg:px-8">
       {/* Header Section */}
       <div className="mb-8">
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
-          <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
-            Pengingat untuk {patientName}
-          </h1>
+        <div className="bg-white rounded-2xl p-6 border-2 border-blue-200">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900">
+              Pengingat untuk {patientName}
+            </h1>
 
-          <button
-            onClick={handleAddReminder}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2 cursor-pointer"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Tambah Pengingat Baru</span>
-          </button>
+            <button
+              onClick={handleAddReminder}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Tambah Pengingat Baru</span>
+            </button>
+          </div>
         </div>
       </div>
 

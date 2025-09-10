@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, cmsArticles, cmsVideos } from '@/db'
-import { eq, desc, and, isNull } from 'drizzle-orm'
+import { db, cmsArticles, cmsVideos, users } from '@/db'
+import { eq, desc, and, isNull, sql } from 'drizzle-orm'
 
 // GET - Public content API for all authenticated users to access published content
 export async function GET(request: NextRequest) {
@@ -42,9 +42,16 @@ export async function GET(request: NextRequest) {
           status: cmsArticles.status,
           publishedAt: cmsArticles.publishedAt,
           createdAt: cmsArticles.createdAt,
-          author: cmsArticles.createdBy
+          // Join with users table to get proper names instead of Clerk IDs
+          author: sql<string>`COALESCE(
+            NULLIF(CONCAT(${users.firstName}, ' ', ${users.lastName}), ' '),
+            ${users.email},
+            ${cmsArticles.createdBy}
+          )`.as('author'),
+          featuredImageUrl: cmsArticles.featuredImageUrl
         })
         .from(cmsArticles)
+        .leftJoin(users, eq(cmsArticles.createdBy, users.clerkId))
         .where(and(
           eq(cmsArticles.status, 'published'), // Only published content
           isNull(cmsArticles.deletedAt) // Exclude deleted content
@@ -82,11 +89,17 @@ export async function GET(request: NextRequest) {
           status: cmsVideos.status,
           publishedAt: cmsVideos.publishedAt,
           createdAt: cmsVideos.createdAt,
-          author: cmsVideos.createdBy,
+          // Join with users table to get proper names instead of Clerk IDs
+          author: sql<string>`COALESCE(
+            NULLIF(CONCAT(${users.firstName}, ' ', ${users.lastName}), ' '),
+            ${users.email},
+            ${cmsVideos.createdBy}
+          )`.as('author'),
           durationMinutes: cmsVideos.durationMinutes,
           thumbnailUrl: cmsVideos.thumbnailUrl
         })
         .from(cmsVideos)
+        .leftJoin(users, eq(cmsVideos.createdBy, users.clerkId))
         .where(and(
           eq(cmsVideos.status, 'published'), // Only published content
           isNull(cmsVideos.deletedAt) // Exclude deleted content
