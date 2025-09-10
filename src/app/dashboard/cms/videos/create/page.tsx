@@ -161,51 +161,55 @@ export default function CreateVideoPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <BackButton text="Kembali ke CMS" />
-          <div className="h-6 w-px bg-gray-300" />
-          <div className="flex items-center gap-2">
-            <Video className="h-6 w-6 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">Video Baru</h1>
-          </div>
-        </div>
+      {/* Action Buttons Card */}
+      <Card>
+        <CardContent className="py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <BackButton text="Kembali ke CMS" />
+              <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-2">
+                <Video className="h-6 w-6 text-red-500" />
+                <h1 className="text-2xl font-bold text-gray-900">Video Baru</h1>
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3">
-          <Button 
-            type="button"
-            variant="outline"
-            onClick={() => router.push('/dashboard/cms')}
-            disabled={loading}
-          >
-            Batal
-          </Button>
-          <Button 
-            onClick={() => handleSave('draft')}
-            disabled={loading || !formData.title.trim()}
-            variant="outline"
-          >
-            {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
-            )}
-            Simpan Draft
-          </Button>
-          <Button 
-            onClick={() => handleSave('published')}
-            disabled={loading || !formData.title.trim()}
-          >
-            {loading ? (
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-            ) : (
-              <Eye className="h-4 w-4 mr-2" />
-            )}
-            Publikasikan
-          </Button>
-        </div>
-      </div>
+            <div className="flex items-center gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push('/dashboard/cms')}
+                disabled={loading}
+              >
+                Batal
+              </Button>
+              <Button
+                onClick={() => handleSave('draft')}
+                disabled={loading || !formData.title.trim()}
+                variant="outline"
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Simpan Draft
+              </Button>
+              <Button
+                onClick={() => handleSave('published')}
+                disabled={loading || !formData.title.trim()}
+              >
+                {loading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                ) : (
+                  <Eye className="h-4 w-4 mr-2" />
+                )}
+                Publikasikan
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Main Form */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
