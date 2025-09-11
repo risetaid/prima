@@ -177,9 +177,9 @@ async function processReminders() {
               COALESCE(
                 JSON_AGG(
                   JSON_BUILD_OBJECT(
-                    'contentType', ${reminderContentAttachments.contentType},
-                    'contentTitle', ${reminderContentAttachments.contentTitle},
-                    'contentUrl', ${reminderContentAttachments.contentUrl}
+                    'type', ${reminderContentAttachments.contentType},
+                    'title', ${reminderContentAttachments.contentTitle},
+                    'url', ${reminderContentAttachments.contentUrl}
                   ) ORDER BY ${reminderContentAttachments.attachmentOrder}
                 ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
                 '[]'::json
@@ -267,9 +267,9 @@ async function processReminders() {
             COALESCE(
               JSON_AGG(
                 JSON_BUILD_OBJECT(
-                  'contentType', ${reminderContentAttachments.contentType},
-                  'contentTitle', ${reminderContentAttachments.contentTitle},
-                  'contentUrl', ${reminderContentAttachments.contentUrl}
+                  'type', ${reminderContentAttachments.contentType},
+                  'title', ${reminderContentAttachments.contentTitle},
+                  'url', ${reminderContentAttachments.contentUrl}
                 ) ORDER BY ${reminderContentAttachments.attachmentOrder}
               ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
               '[]'::json
@@ -508,4 +508,3 @@ async function processReminders() {
     );
   }
 }
-
