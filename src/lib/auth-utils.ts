@@ -4,15 +4,19 @@ import { eq, and, isNull, desc, asc, count } from 'drizzle-orm'
 import type { User } from '@/db/schema'
 
 // Server-side only imports - conditionally imported to avoid client-side issues
-let auth: any = null
-let currentUser: any = null
+let auth: (() => Promise<{ userId: string | null }>) | null = null
+let currentUser: (() => Promise<{
+  id: string
+  firstName: string | null
+  lastName: string | null
+  primaryEmailAddress?: { emailAddress: string } | null
+} | null>) | null = null
 
 // Only import server-side Clerk functions when not in browser
 if (typeof window === 'undefined') {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const clerkServer = require('@clerk/nextjs/server')
-  auth = clerkServer.auth
-  currentUser = clerkServer.currentUser
+  const { auth: clerkAuth, currentUser: clerkCurrentUser } = await import('@clerk/nextjs/server')
+  auth = clerkAuth
+  currentUser = clerkCurrentUser
 }
 
 export interface AuthUser extends User {
@@ -27,9 +31,19 @@ export interface AdminUser extends AuthUser {
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
+    if (!auth) {
+      console.error('🔍 Auth: Clerk auth function not available')
+      return null
+    }
+
     const { userId } = await auth()
-    
+
     if (!userId) {
+      return null
+    }
+
+    if (!currentUser) {
+      console.error('🔍 Auth: Clerk currentUser function not available')
       return null
     }
 

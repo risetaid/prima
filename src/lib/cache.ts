@@ -1,5 +1,39 @@
 import { redis } from './redis'
 
+// Redis operation result types
+export interface CacheOperationResult {
+  success: boolean
+  error?: string
+}
+
+export interface CacheHealthStatus {
+  redis: boolean
+  message: string
+  lastError?: string
+  cacheOperations: {
+    set: boolean
+    get: boolean
+    del: boolean
+  }
+}
+
+export interface RedisHealthStatus {
+  connected: boolean
+  message: string
+}
+
+// Cache configuration types
+export interface CacheConfig {
+  ttl: number
+  key: string
+}
+
+export interface CacheEntry<T = any> {
+  data: T
+  timestamp: number
+  ttl: number
+}
+
 // Cache TTL values (in seconds)
 export const CACHE_TTL = {
   PATIENT: 30,         // 30 seconds (VERY FAST for verification updates)
@@ -78,7 +112,7 @@ export async function invalidateMultipleCache(keys: string[]): Promise<void> {
 /**
  * Safe cache invalidation with error handling and result reporting
  */
-export async function safeInvalidateCache(key: string): Promise<{ success: boolean; error?: string }> {
+export async function safeInvalidateCache(key: string): Promise<CacheOperationResult> {
   try {
     const result = await redis.del(key)
     return { success: result }
@@ -180,7 +214,7 @@ export async function invalidatePatientCache(patientId: string): Promise<void> {
 /**
  * Health check for Redis
  */
-export function getRedisHealthStatus(): { connected: boolean; message: string } {
+export function getRedisHealthStatus(): RedisHealthStatus {
   const connected = redis.isConnected()
   return {
     connected,
@@ -191,16 +225,7 @@ export function getRedisHealthStatus(): { connected: boolean; message: string } 
 /**
  * Comprehensive cache health check
  */
-export async function getCacheHealthStatus(): Promise<{
-  redis: boolean
-  message: string
-  lastError?: string
-  cacheOperations: {
-    set: boolean
-    get: boolean
-    del: boolean
-  }
-}> {
+export async function getCacheHealthStatus(): Promise<CacheHealthStatus> {
   try {
     // Test Redis connection and operations
     const testKey = `health-check-${Date.now()}`

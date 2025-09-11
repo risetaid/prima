@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
-import { eq, count } from 'drizzle-orm'
+import { count } from 'drizzle-orm'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log('🔍 Profile API: Getting current user...')
     
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
         console.log(`🔍 Profile API: User count: ${userCount}, isFirstUser: ${isFirstUser}`)
         
         // Create user in database
-        const newUserResult = await db
+        await db
           .insert(users)
           .values({
             clerkId: userId,
@@ -50,7 +50,6 @@ export async function GET(request: NextRequest) {
             isApproved: isFirstUser,
             approvedAt: isFirstUser ? new Date() : null,
           })
-          .returning()
         
         console.log('✅ Profile API: User created successfully')
         
@@ -74,9 +73,10 @@ export async function GET(request: NextRequest) {
             { status: 500 }
           )
         }
-      } catch (dbError: any) {
+      } catch (dbError: unknown) {
         // If user already exists (race condition), try to get them again
-        if (dbError.code === '23505' || dbError.message?.includes('unique constraint')) {
+        const error = dbError as { code?: string; message?: string }
+        if (error.code === '23505' || error.message?.includes('unique constraint')) {
           console.log('🔄 Profile API: User already exists, fetching...')
           user = await getCurrentUser()
         } else {

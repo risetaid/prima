@@ -4,9 +4,21 @@
 
 type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
 
-function getPatientDisplayStatus(input: any) {
-  const verificationStatus = input.verificationStatus || (input as any).verificationStatus
-  const isActive = input.isActive !== undefined ? input.isActive : (input as any).isActive !== undefined ? (input as any).isActive : true
+interface PatientStatusInput {
+  verificationStatus?: string
+  isActive?: boolean
+}
+
+interface PatientDisplayStatus {
+  badgeColor: string
+  badgeIcon: string
+  displayStatus: string
+  description: string
+}
+
+function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatus {
+  const verificationStatus = input.verificationStatus
+  const isActive = input.isActive ?? true
 
   if (!isActive) {
     return {
@@ -56,13 +68,19 @@ function getPatientDisplayStatus(input: any) {
   }
 }
 
+interface PatientObject {
+  verificationStatus?: string
+  isActive?: boolean
+  [key: string]: any
+}
+
 interface VerificationBadgeProps {
-  status: VerificationStatus
+  status: string
   size?: 'small' | 'large'
   className?: string
   // For BERHENTI detection
   isActive?: boolean
-  patient?: any // Full patient object for better status detection
+  patient?: PatientObject // Full patient object for better status detection
 }
 
 export default function VerificationBadge({ 

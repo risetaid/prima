@@ -195,6 +195,9 @@ export const reminderLogs = pgTable('reminder_logs', {
   deliveredStatusPatientIdx: index('reminder_logs_delivered_patient_idx').on(table.status, table.patientId),
   // For today's reminder tracking in cron job
   scheduleStatusSentIdx: index('reminder_logs_schedule_status_sent_idx').on(table.reminderScheduleId, table.status, table.sentAt),
+  // Additional performance indexes
+  sentAtPatientIdx: index('reminder_logs_sent_at_patient_idx').on(table.sentAt, table.patientId),
+  statusSentAtIdx: index('reminder_logs_status_sent_at_idx').on(table.status, table.sentAt),
 }))
 
 export const manualConfirmations = pgTable('manual_confirmations', {
@@ -221,6 +224,10 @@ export const manualConfirmations = pgTable('manual_confirmations', {
   visitDateIdx: index('manual_confirmations_visit_date_idx').on(table.visitDate),
   patientIdVisitDateIdx: index('manual_confirmations_patient_visit_date_idx').on(table.patientId, table.visitDate),
   confirmedAtPatientIdIdx: index('manual_confirmations_confirmed_patient_idx').on(table.confirmedAt, table.patientId),
+  // Additional performance indexes for common queries
+  confirmedAtIdx: index('manual_confirmations_confirmed_at_idx').on(table.confirmedAt),
+  medicationsTakenIdx: index('manual_confirmations_medications_taken_idx').on(table.medicationsTaken),
+  patientConfirmedAtIdx: index('manual_confirmations_patient_confirmed_at_idx').on(table.patientId, table.confirmedAt),
 }))
 
 export const whatsappTemplates = pgTable('whatsapp_templates', {

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Client } from 'minio'
 import { getCurrentUser } from '@/lib/auth-utils'
 
+interface MinIOError {
+  message: string
+  code?: string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -176,15 +181,16 @@ export async function POST(request: NextRequest) {
             'Content-Type': contentType,
           })
           break // Success
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const minioError = error as MinIOError
           console.error('Upload attempt failed:', {
             attempt: attempts + 1,
-            error: error.message,
-            code: error.code,
+            error: minioError.message,
+            code: minioError.code,
             filename: currentFilename
           })
           attempts++
-          if (error.code === 'NoSuchBucket' && attempts < maxAttempts) {
+          if (minioError.code === 'NoSuchBucket' && attempts < maxAttempts) {
             await minioClient.makeBucket(bucketName, 'us-east-1')
             continue
           }

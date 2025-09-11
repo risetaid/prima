@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser } from '@/lib/auth-utils'
-import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules } from '@/db'
-import { eq, and, isNull, count, sql } from 'drizzle-orm'
+import { db, patients, users, manualConfirmations, reminderLogs, reminderSchedules, patientMedications, medications } from '@/db'
+import { eq, and, isNull, count, desc } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL, invalidatePatientCache } from '@/lib/cache'
+import { createErrorResponse, handleApiError } from '@/lib/api-utils'
+import { ComplianceService } from '@/lib/compliance-service'
+import { withRateLimit } from '@/middleware/rate-limit'
 
-export async function GET(
+export const GET = withRateLimit(async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse('Unauthorized', 401, undefined, 'AUTHENTICATION_ERROR')
     }
 
     const { id } = await params
 
     // Validate patient ID
     if (!id || typeof id !== 'string') {
-      return NextResponse.json({ error: 'Invalid patient ID' }, { status: 400 })
+      return createErrorResponse('Invalid patient ID', 400, undefined, 'VALIDATION_ERROR')
     }
     
     // Try to get from cache first
@@ -69,59 +72,80 @@ export async function GET(
       .limit(1)
 
     if (!patientResult || patientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return createErrorResponse('Patient not found', 404, undefined, 'NOT_FOUND_ERROR')
     }
 
     const patientData = patientResult[0]
 
     // Additional null check for patientData
     if (!patientData) {
-      return NextResponse.json({ error: 'Patient data not found' }, { status: 404 })
+      return createErrorResponse('Patient data not found', 404, undefined, 'NOT_FOUND_ERROR')
     }
     
-    // Get manual confirmations count (for display only, not used in compliance calculation)
-    const oldConfirmationsResult = await db
-      .select({ count: count() })
+    // Manual confirmations are now fetched with full data below
+
+    // Use optimized compliance service
+    const complianceData = await ComplianceService.calculatePatientCompliance(id)
+    const complianceRate = complianceData.complianceRate
+
+    // Fetch manual confirmations (limit to recent 10 for performance)
+    const manualConfirmationsData = await db
+      .select({
+        id: manualConfirmations.id,
+        visitDate: manualConfirmations.visitDate,
+        visitTime: manualConfirmations.visitTime,
+        medicationsTaken: manualConfirmations.medicationsTaken,
+        patientCondition: manualConfirmations.patientCondition,
+        notes: manualConfirmations.notes,
+        confirmedAt: manualConfirmations.confirmedAt,
+        volunteerId: manualConfirmations.volunteerId,
+        volunteerFirstName: users.firstName,
+        volunteerLastName: users.lastName
+      })
       .from(manualConfirmations)
+      .leftJoin(users, eq(manualConfirmations.volunteerId, users.id))
       .where(eq(manualConfirmations.patientId, id))
+      .orderBy(desc(manualConfirmations.confirmedAt))
+      .limit(10)
 
-    const totalConfirmations = oldConfirmationsResult[0]?.count || 0
+    // Fetch recent reminder logs (limit to recent 10 for performance)
+    const reminderLogsData = await db
+      .select({
+        id: reminderLogs.id,
+        message: reminderLogs.message,
+        sentAt: reminderLogs.sentAt,
+        status: reminderLogs.status,
+        medicationName: reminderSchedules.medicationName,
+        dosage: reminderSchedules.dosage
+      })
+      .from(reminderLogs)
+      .leftJoin(reminderSchedules, eq(reminderLogs.reminderScheduleId, reminderSchedules.id))
+      .where(eq(reminderLogs.patientId, id))
+      .orderBy(desc(reminderLogs.sentAt))
+      .limit(10)
 
-    // Get delivered reminders count (basic calculation without reactivation filtering for now)
-    let totalDeliveredReminders = 0
-    try {
-      const deliveredResult = await db
-        .select({ count: count() })
-        .from(reminderLogs)
-        .where(
-          and(
-            eq(reminderLogs.patientId, id),
-            eq(reminderLogs.status, 'DELIVERED')
-          )
+    // Fetch patient medications
+    const patientMedicationsData = await db
+      .select({
+        id: patientMedications.id,
+        medicationName: medications.name,
+        dosage: patientMedications.dosage,
+        frequency: patientMedications.frequency,
+        instructions: patientMedications.instructions,
+        startDate: patientMedications.startDate,
+        endDate: patientMedications.endDate,
+        isActive: patientMedications.isActive,
+        createdAt: patientMedications.createdAt
+      })
+      .from(patientMedications)
+      .leftJoin(medications, eq(patientMedications.medicationId, medications.id))
+      .where(
+        and(
+          eq(patientMedications.patientId, id),
+          eq(patientMedications.isActive, true)
         )
-      totalDeliveredReminders = deliveredResult?.[0]?.count ? Number(deliveredResult[0].count) : 0
-    } catch (error) {
-      console.error('Error fetching delivered reminders count:', error)
-      totalDeliveredReminders = 0
-    }
-
-    // Get confirmations count
-    let totalConfirmationsFiltered = 0
-    try {
-      const confirmationsResult = await db
-        .select({ count: count() })
-        .from(manualConfirmations)
-        .where(eq(manualConfirmations.patientId, id))
-      totalConfirmationsFiltered = confirmationsResult?.[0]?.count ? Number(confirmationsResult[0].count) : 0
-    } catch (error) {
-      console.error('Error fetching confirmations count:', error)
-      totalConfirmationsFiltered = 0
-    }
-
-    // Calculate compliance rate
-    const complianceRate = totalDeliveredReminders > 0
-      ? Math.round((totalConfirmationsFiltered / totalDeliveredReminders) * 100)
-      : 0
+      )
+      .orderBy(desc(patientMedications.createdAt))
 
     // Structure the response to match Prisma format
     const patient = {
@@ -162,9 +186,39 @@ export async function GET(
         email: patientData.volunteerEmail,
         role: patientData.volunteerRole
       } : null,
-      manualConfirmations: [], // Simplified for now
-      reminderLogs: [], // Simplified for now
-      patientMedications: [], // Simplified for now
+      manualConfirmations: manualConfirmationsData.map(confirmation => ({
+        id: confirmation.id,
+        visitDate: confirmation.visitDate,
+        visitTime: confirmation.visitTime,
+        medicationsTaken: confirmation.medicationsTaken,
+        patientCondition: confirmation.patientCondition,
+        notes: confirmation.notes,
+        confirmedAt: confirmation.confirmedAt,
+        volunteer: confirmation.volunteerId ? {
+          id: confirmation.volunteerId,
+          firstName: confirmation.volunteerFirstName,
+          lastName: confirmation.volunteerLastName
+        } : null
+      })),
+      reminderLogs: reminderLogsData.map(log => ({
+        id: log.id,
+        message: log.message,
+        sentAt: log.sentAt,
+        status: log.status,
+        medicationName: log.medicationName,
+        dosage: log.dosage
+      })),
+      patientMedications: patientMedicationsData.map(medication => ({
+        id: medication.id,
+        medicationName: medication.medicationName,
+        dosage: medication.dosage,
+        frequency: medication.frequency,
+        instructions: medication.instructions,
+        startDate: medication.startDate,
+        endDate: medication.endDate,
+        isActive: medication.isActive,
+        createdAt: medication.createdAt
+      })),
       complianceRate
     }
 
@@ -173,22 +227,18 @@ export async function GET(
 
     return NextResponse.json(patient)
   } catch (error) {
-    console.error('Error fetching patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'fetching patient')
   }
-}
+}, 'GENERAL')
 
-export async function PUT(
+export const PUT = withRateLimit(async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse('Unauthorized', 401, undefined, 'AUTHENTICATION_ERROR')
     }
 
     const { id } = await params
@@ -215,7 +265,7 @@ export async function PUT(
       .limit(1)
 
     if (existingPatientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return createErrorResponse('Patient not found', 404, undefined, 'NOT_FOUND_ERROR')
     }
 
     // Update patient (simplified response for now)
@@ -251,22 +301,18 @@ export async function PUT(
 
     return NextResponse.json(patient)
   } catch (error) {
-    console.error('Error updating patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'updating patient')
   }
-}
+}, 'GENERAL')
 
-export async function DELETE(
+export const DELETE = withRateLimit(async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getAuthUser()
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse('Unauthorized', 401, undefined, 'AUTHENTICATION_ERROR')
     }
 
     const { id } = await params
@@ -279,7 +325,7 @@ export async function DELETE(
       .limit(1)
 
     if (existingPatientResult.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return createErrorResponse('Patient not found', 404, undefined, 'NOT_FOUND_ERROR')
     }
 
     const deleteTime = new Date()
@@ -311,10 +357,6 @@ export async function DELETE(
       deletedAt: deleteTime
     })
   } catch (error) {
-    console.error('Error deleting patient:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'deleting patient')
   }
-}
+}, 'GENERAL')

@@ -33,7 +33,23 @@ export async function GET() {
   }
 }
 
-function getHealthRecommendations(cacheHealth: any, redisHealth: any): string[] {
+interface CacheHealthStatus {
+  redis: boolean
+  message: string
+  lastError?: string
+  cacheOperations: {
+    set: boolean
+    get: boolean
+    del: boolean
+  }
+}
+
+interface RedisHealthStatus {
+  connected: boolean
+  message: string
+}
+
+function getHealthRecommendations(cacheHealth: CacheHealthStatus, redisHealth: RedisHealthStatus): string[] {
   const recommendations: string[] = []
 
   if (!redisHealth.connected) {

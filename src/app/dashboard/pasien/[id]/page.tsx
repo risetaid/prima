@@ -15,25 +15,19 @@ import {
   Calendar,
   MessageSquare,
   Clock,
-  Repeat,
-  ChevronDown,
   Zap,
 } from "lucide-react";
-import { UserButton } from "@clerk/nextjs";
 import { Header } from "@/components/ui/header";
-import { formatDateWIB, formatDateTimeWIB } from "@/lib/datetime";
+import { formatDateTimeWIB } from "@/lib/datetime";
 import Image from "next/image";
 import { toast } from "sonner";
-import { getCurrentTimeWIB } from "@/lib/datetime";
 import { DatePickerCalendar } from "@/components/ui/date-picker-calendar";
 import { PatientVariablesManager } from "@/components/patient/patient-variables-manager";
-import { PatientDetailSkeleton } from "@/components/ui/dashboard-skeleton";
 import VerificationBadge, {
   getVerificationStatusTitle,
   getVerificationStatusDescription,
 } from "@/components/patient/verification-badge";
 import VerificationActionsPanel from "@/components/patient/verification-actions-panel";
-import VerificationInfoPanel from "@/components/patient/verification-info-panel";
 import VerificationHistory from "@/components/patient/verification-history";
 import VerificationStatusIcon from "@/components/patient/verification-status-icon";
 import {
@@ -93,32 +87,6 @@ interface HealthNote {
   createdAt: string;
 }
 
-interface WhatsAppTemplate {
-  id: string;
-  templateName: string;
-  templateText: string;
-  variables: string[];
-  category: "REMINDER" | "APPOINTMENT" | "EDUCATIONAL";
-}
-
-interface AutoFillData {
-  nama: string;
-  nomor: string;
-  obat?: string;
-  dosis?: string;
-  dokter?: string;
-  rumahSakit?: string;
-  volunteer: string;
-  waktu?: string;
-  tanggal?: string;
-  dataContext?: {
-    hasActiveMedications: boolean;
-    hasRecentReminders: boolean;
-    hasMedicalRecords: boolean;
-    assignedVolunteerName?: string;
-    currentUserName?: string;
-  };
-}
 
 export default function PatientDetailPage() {
   const router = useRouter();
@@ -670,9 +638,6 @@ export default function PatientDetailPage() {
     setEditData({ ...editData, photoUrl: "" });
   };
 
-  const handleSymptomsClick = () => {
-    router.push(`/dashboard/pasien/${params.id}/gejala`);
-  };
 
   const handleToggleStatus = async () => {
     if (!patient) return;
@@ -1154,7 +1119,7 @@ export default function PatientDetailPage() {
                     {/* Tips */}
                     <div className="mt-4 pt-4 border-t border-blue-200">
                       <p className="text-xs sm:text-sm text-gray-600 text-center">
-                        💡 <strong>Tips:</strong> Gunakan "Buat Pengingat" untuk
+                        💡 <strong>Tips:</strong> Gunakan &ldquo;Buat Pengingat&rdquo; untuk
                         sistem auto-fill dengan template WhatsApp
                       </p>
                     </div>
@@ -1368,7 +1333,7 @@ export default function PatientDetailPage() {
                     Belum ada catatan kesehatan
                   </h3>
                   <p className="text-xs sm:text-sm">
-                    Klik "Tambah Catatan" untuk menambah catatan pertama
+                    Klik &ldquo;Tambah Catatan&rdquo; untuk menambah catatan pertama
                   </p>
                 </div>
               ) : (

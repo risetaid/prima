@@ -19,6 +19,20 @@ import { medicalQueries } from '@/lib/medical-queries'
 // Date and type validators temporarily inlined
 import type { PatientFilters } from '@/lib/medical-queries'
 
+interface CreatePatientBody {
+  name?: string
+  phoneNumber?: string
+  address?: string
+  birthDate?: string
+  diagnosisDate?: string
+  cancerStage?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  notes?: string
+  photoUrl?: string
+  assignedVolunteerId?: string
+}
+
 // GET /api/patients - List patients with compliance rates
 export const GET = createApiHandler(
   { 
@@ -51,7 +65,7 @@ export const POST = createApiHandler(
   { 
     auth: 'required'
   },
-  async (body: any, { user }) => {
+  async (body: CreatePatientBody, { user }) => {
     // Medical-grade validation for patient data
     const name = body.name || ''
     const phoneNumber = body.phoneNumber || ''

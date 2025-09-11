@@ -7,6 +7,34 @@ import { nowWIB } from '@/lib/datetime'
 // DB utils temporarily inlined
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
+interface UserSessionData {
+  success: boolean
+  user: {
+    id: string
+    clerkId: string
+    email: string
+    firstName: string | null
+    lastName: string | null
+    role: string
+    isApproved: boolean
+    isActive: boolean
+    canAccessDashboard: boolean
+    needsApproval: boolean
+    createdAt: Date
+    lastLoginAt: Date | null
+  }
+  session: {
+    authenticated: boolean
+    loginTime: string
+    accessLevel: string
+    dashboardAccess: boolean
+  }
+  error?: string
+  needsApproval?: boolean
+  redirectTo?: string
+  fallbackMode?: boolean
+}
+
 /**
  * Consolidated User Session API
  * Combines: /api/user/profile + /api/user/status + /api/auth/update-last-login
@@ -38,7 +66,7 @@ export async function POST(_request: NextRequest) {
     let cachedSession = null
     
     try {
-      cachedSession = await getCachedData<any>(cacheKey)
+      cachedSession = await getCachedData<UserSessionData>(cacheKey)
     } catch (cacheError) {
       console.warn('⚠️ Cache unavailable, proceeding without cache:', cacheError)
       // Continue without cache - don't fail the entire request

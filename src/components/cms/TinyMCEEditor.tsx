@@ -3,6 +3,21 @@
 import dynamic from 'next/dynamic'
 import { useRef } from 'react'
 
+// TinyMCE type definitions
+interface TinyMCEBlobInfo {
+  blob(): Blob
+  filename(): string
+}
+
+interface TinyMCEEditorInstance {
+  editorUpload?: {
+    blobCache: {
+      create(id: string, file: File, base64: string): any
+      add(blobInfo: any): void
+    }
+  }
+}
+
 // Lazy load TinyMCE to reduce initial bundle size
 const Editor = dynamic(
   () => import('@tinymce/tinymce-react').then((mod) => ({ default: mod.Editor })),
@@ -29,7 +44,7 @@ export function TinyMCEEditor({
   placeholder = "Tulis konten artikel...",
   height = 500 
 }: TinyMCEEditorProps) {
-  const editorRef = useRef<any>(null)
+  const editorRef = useRef<TinyMCEEditorInstance | null>(null)
 
   const handleEditorChange = (content: string) => {
     try {
@@ -70,7 +85,7 @@ export function TinyMCEEditor({
           //   respondWith.string(() => Promise.reject('AI Assistant belum dikonfigurasi. Hubungi admin untuk mengaktifkan fitur ini.')),
           
           // Custom image upload handler following TinyMCE official docs
-          images_upload_handler: (blobInfo: any, progress: (percent: number) => void) => new Promise<string>((resolve, reject) => {
+          images_upload_handler: (blobInfo: TinyMCEBlobInfo, progress: (percent: number) => void) => new Promise<string>((resolve, reject) => {
             const xhr = new XMLHttpRequest()
             xhr.withCredentials = false
             xhr.open('POST', '/api/upload?type=tinymce-image')
@@ -152,7 +167,7 @@ export function TinyMCEEditor({
                 const reader = new FileReader()
                 reader.addEventListener('load', () => {
                   const id = 'blobid' + (new Date()).getTime()
-                  const blobCache = (editorRef.current as any)?.editorUpload?.blobCache
+                  const blobCache = editorRef.current?.editorUpload?.blobCache
                   if (blobCache && reader.result && typeof reader.result === 'string') {
                     const base64 = reader.result.split(',')[1]
                     const blobInfo = blobCache.create(id, file, base64)
@@ -289,7 +304,7 @@ export function TinyMCEEditor({
                     }
                   }
                 ]
-                callback(items as any)
+                callback(items)
               }
             })
           }

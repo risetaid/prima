@@ -71,6 +71,13 @@
       "when": 1757259414770,
       "tag": "0009_blushing_xavin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1757566226802,
+      "tag": "0010_foamy_sabretooth",
+      "breakpoints": true
     }
   ]
 }

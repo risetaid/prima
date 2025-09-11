@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import TemplateManagement from "@/components/admin/template-management";
 import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
@@ -16,11 +16,7 @@ export default function AdminTemplatesPage() {
   const [seeding, setSeeding] = useState(false);
   const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
 
-  useEffect(() => {
-    checkAdminAccess();
-  }, []);
-
-  const checkAdminAccess = async () => {
+  const checkAdminAccess = useCallback(async () => {
     try {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
@@ -44,7 +40,11 @@ export default function AdminTemplatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    checkAdminAccess();
+  }, [checkAdminAccess]);
 
   const handleSeedTemplates = async () => {
     setIsSeedModalOpen(true);
