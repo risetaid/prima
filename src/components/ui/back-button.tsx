@@ -19,31 +19,38 @@ export function BackButton({
 
   const handleBack = () => {
     // First try to go back if there's meaningful history
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const referrer = document.referrer;
       const currentOrigin = window.location.origin;
-      
+
       // If we came from within the same site and have history, go back
-      if (referrer && referrer.startsWith(currentOrigin) && window.history.length > 1) {
+      if (
+        referrer &&
+        referrer.startsWith(currentOrigin) &&
+        window.history.length > 1
+      ) {
         router.back();
         return;
       }
-      
+
       // Fallback: navigate to appropriate parent page based on current path
       const currentPath = window.location.pathname;
-      
-      if (currentPath.startsWith('/content/videos/')) {
+
+      if (currentPath.startsWith("/content/videos/")) {
         // For video pages, go to home (since we don't have a videos listing page)
-        router.push('/');
-      } else if (currentPath.startsWith('/content/articles/')) {
+        router.push("/");
+      } else if (currentPath.startsWith("/content/articles/")) {
         // For article pages, go to home (since we don't have an articles listing page)
-        router.push('/');
-      } else if (currentPath.startsWith('/dashboard/')) {
-        // For dashboard pages, go to dashboard home
-        router.push('/dashboard');
+        router.push("/");
+      } else if (currentPath.startsWith("/dashboard/cms/")) {
+        // For CMS pages, go to CMS dashboard
+        router.push("/dashboard/cms");
+      } else if (currentPath.startsWith("/dashboard/")) {
+        // For other dashboard pages, go to dashboard home
+        router.push("/dashboard");
       } else {
         // Default fallback to home
-        router.push('/');
+        router.push("/");
       }
     }
   };

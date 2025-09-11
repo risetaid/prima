@@ -20,13 +20,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import dynamic from 'next/dynamic'
-const TinyMCEEditor = dynamic(() => import('@/components/cms/TinyMCEEditor').then(mod => ({ default: mod.TinyMCEEditor })), {
-  loading: () => <div className="h-64 bg-gray-100 rounded animate-pulse flex items-center justify-center">Loading editor...</div>
-})
+import dynamic from "next/dynamic";
+const TinyMCEEditor = dynamic(
+  () =>
+    import("@/components/cms/TinyMCEEditor").then((mod) => ({
+      default: mod.TinyMCEEditor,
+    })),
+  {
+    loading: () => (
+      <div className="h-64 bg-gray-100 rounded animate-pulse flex items-center justify-center">
+        Loading editor...
+      </div>
+    ),
+  }
+);
 import { generateRandomString } from "@/lib/slug-utils";
 import { Save, Eye, FileText } from "lucide-react";
-import { BackButton } from '@/components/ui/back-button';
+import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
 
 interface FormData {
@@ -91,8 +101,6 @@ export default function CreateArticlePage() {
     return Object.keys(newErrors).length === 0;
   };
 
-
-
   const handleSave = async (status: "draft" | "published") => {
     const dataToSave = { ...formData, status };
 
@@ -141,22 +149,26 @@ export default function CreateArticlePage() {
     <div className="space-y-6">
       {/* Action Buttons Card */}
       <Card>
-        <CardContent className="py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <CardContent className="py-2 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 sm:flex-none">
               <BackButton text="Kembali ke CMS" />
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex items-center gap-2">
-                <FileText className="h-6 w-6 text-blue-500" />
-                <h1 className="text-2xl font-bold text-gray-900">Artikel Baru</h1>
+              <div className="hidden sm:block h-6 w-px bg-gray-300 flex-shrink-0" />
+              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-none">
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 flex-shrink-0" />
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+                  Artikel Baru
+                </h1>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/dashboard/cms")}
                 disabled={saving}
+                className="w-full sm:w-auto sm:flex-none order-3 sm:order-1"
+                size="sm"
               >
                 Batal
               </Button>
@@ -164,24 +176,30 @@ export default function CreateArticlePage() {
                 onClick={() => handleSave("draft")}
                 disabled={saving || !formData.title.trim()}
                 variant="outline"
+                className="w-full sm:w-auto sm:flex-none order-2"
+                size="sm"
               >
                 {saving ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
                 ) : (
                   <Save className="h-4 w-4 mr-2" />
                 )}
-                Simpan Draft
+                <span className="hidden xs:inline">Simpan Draft</span>
+                <span className="xs:hidden">Draft</span>
               </Button>
               <Button
                 onClick={() => handleSave("published")}
                 disabled={saving || !formData.title.trim()}
+                className="w-full sm:w-auto sm:flex-none order-1 sm:order-3"
+                size="sm"
               >
                 {saving ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                 ) : (
                   <Eye className="h-4 w-4 mr-2" />
                 )}
-                Publikasikan
+                <span className="hidden xs:inline">Publikasikan</span>
+                <span className="xs:hidden">Publish</span>
               </Button>
             </div>
           </div>
@@ -343,8 +361,6 @@ export default function CreateArticlePage() {
             </CardContent>
           </Card>
 
-
-
           {/* Featured Image */}
           <Card>
             <CardHeader>
@@ -359,62 +375,72 @@ export default function CreateArticlePage() {
                     id="thumbnail-upload"
                     accept="image/*"
                     className="hidden"
-                     onChange={async (e) => {
-                       const file = e.target.files?.[0];
-                       if (file) {
-                         // Simple validation
-                         if (!file.type.startsWith('image/')) {
-                           alert('File harus berupa gambar');
-                           return;
-                         }
-                         if (file.size > 2 * 1024 * 1024) {
-                           alert('File harus kurang dari 2MB');
-                           return;
-                         }
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Simple validation
+                        if (!file.type.startsWith("image/")) {
+                          alert("File harus berupa gambar");
+                          return;
+                        }
+                        if (file.size > 2 * 1024 * 1024) {
+                          alert("File harus kurang dari 2MB");
+                          return;
+                        }
 
-                         try {
-                           // Upload file to get permanent URL
-                           const formDataUpload = new FormData();
-                           formDataUpload.append('thumbnail', file);
+                        try {
+                          // Upload file to get permanent URL
+                          const formDataUpload = new FormData();
+                          formDataUpload.append("thumbnail", file);
 
-                           const uploadResponse = await fetch('/api/upload?type=article-thumbnail', {
-                             method: 'POST',
-                             body: formDataUpload,
-                           });
+                          const uploadResponse = await fetch(
+                            "/api/upload?type=article-thumbnail",
+                            {
+                              method: "POST",
+                              body: formDataUpload,
+                            }
+                          );
 
-                           if (!uploadResponse.ok) {
-                             throw new Error('Upload failed');
-                           }
+                          if (!uploadResponse.ok) {
+                            throw new Error("Upload failed");
+                          }
 
-                           const uploadResult = await uploadResponse.json();
+                          const uploadResult = await uploadResponse.json();
 
-                           if (uploadResult.success && uploadResult.url) {
-                             setFormData(prev => ({ ...prev, featuredImageUrl: uploadResult.url }));
-                             toast.success('Gambar berhasil diupload');
-                           } else {
-                             throw new Error(uploadResult.error || 'Upload failed');
-                           }
-                         } catch (error) {
-                           console.error('Upload error:', error);
-                           toast.error('Gagal mengupload gambar');
-                         }
-                       }
-                     }}
+                          if (uploadResult.success && uploadResult.url) {
+                            setFormData((prev) => ({
+                              ...prev,
+                              featuredImageUrl: uploadResult.url,
+                            }));
+                            toast.success("Gambar berhasil diupload");
+                          } else {
+                            throw new Error(
+                              uploadResult.error || "Upload failed"
+                            );
+                          }
+                        } catch (error) {
+                          console.error("Upload error:", error);
+                          toast.error("Gagal mengupload gambar");
+                        }
+                      }
+                    }}
                   />
-                  
-                   {formData.featuredImageUrl ? (
-                     <div className="space-y-3">
-                       <img
-                         src={formData.featuredImageUrl}
-                         alt="Thumbnail preview"
-                         className="mx-auto max-h-32 rounded-lg border"
-                       />
+
+                  {formData.featuredImageUrl ? (
+                    <div className="space-y-3">
+                      <img
+                        src={formData.featuredImageUrl}
+                        alt="Thumbnail preview"
+                        className="mx-auto max-h-32 rounded-lg border"
+                      />
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                          onClick={() =>
+                            document.getElementById("thumbnail-upload")?.click()
+                          }
                         >
                           Ganti Gambar
                         </Button>
@@ -422,34 +448,46 @@ export default function CreateArticlePage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                           onClick={() => {
-                             setFormData(prev => ({ ...prev, featuredImageUrl: '' }));
-                             const input = document.getElementById('thumbnail-upload') as HTMLInputElement;
-                             if (input) input.value = '';
-                           }}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              featuredImageUrl: "",
+                            }));
+                            const input = document.getElementById(
+                              "thumbnail-upload"
+                            ) as HTMLInputElement;
+                            if (input) input.value = "";
+                          }}
                         >
                           Hapus
                         </Button>
                       </div>
                     </div>
                   ) : (
-                    <div 
+                    <div
                       className="cursor-pointer"
-                      onClick={() => document.getElementById('thumbnail-upload')?.click()}
+                      onClick={() =>
+                        document.getElementById("thumbnail-upload")?.click()
+                      }
                     >
                       <div className="w-12 h-12 mx-auto mb-3 text-gray-400">
                         <svg fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 4.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM11 7a1 1 0 112 0v4h4a1 1 0 110 2h-4v4a1 1 0 11-2 0v-4H7a1 1 0 110-2h4V7z"/>
+                          <path d="M12 4.5a7.5 7.5 0 100 15 7.5 7.5 0 000-15zM11 7a1 1 0 112 0v4h4a1 1 0 110 2h-4v4a1 1 0 11-2 0v-4H7a1 1 0 110-2h4V7z" />
                         </svg>
                       </div>
-                      <p className="text-gray-600 mb-1">Klik untuk upload gambar thumbnail</p>
-                      <p className="text-sm text-gray-500">PNG, JPG, WebP - Max 2MB</p>
+                      <p className="text-gray-600 mb-1">
+                        Klik untuk upload gambar thumbnail
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        PNG, JPG, WebP - Max 2MB
+                      </p>
                     </div>
                   )}
                 </div>
-                
+
                 <p className="text-sm text-gray-500">
-                  Opsional. Gambar akan tampil sebagai thumbnail di halaman berita
+                  Opsional. Gambar akan tampil sebagai thumbnail di halaman
+                  berita
                 </p>
               </div>
             </CardContent>
