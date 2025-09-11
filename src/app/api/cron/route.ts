@@ -82,6 +82,14 @@ async function processReminders() {
   const debugLogs: string[] = [];
 
   try {
+    logger.info("🔄 Starting reminder cron job", {
+      api: true,
+      cron: true,
+      wibDate: getWIBDateString(),
+      wibTime: getWIBTimeString(),
+      timestamp: new Date().toISOString(),
+    });
+
     const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`;
     debugLogs.push(logMessage);
 
@@ -96,6 +104,14 @@ async function processReminders() {
     const todayStart = getWIBTodayStart();
 
     // Count reminder schedules that haven't been delivered today yet
+    logger.info("Executing database count query for reminder schedules", {
+      api: true,
+      cron: true,
+      todayWIB,
+      endOfDay: endOfDay.toISOString(),
+      todayStart: todayStart.toISOString(),
+    });
+
     const totalCountResult = await db
       .select({ count: count() })
       .from(reminderSchedules)
@@ -120,6 +136,13 @@ async function processReminders() {
       );
 
     const totalCount = totalCountResult[0]?.count || 0;
+
+    logger.info("Database count query completed", {
+      api: true,
+      cron: true,
+      totalCount,
+      batchSize,
+    });
 
     let reminderSchedulesToProcess: Array<{
       id: string;
@@ -152,11 +175,11 @@ async function processReminders() {
               COALESCE(
                 JSON_AGG(
                   JSON_BUILD_OBJECT(
-                    'contentType', rca.content_type,
-                    'contentTitle', rca.content_title,
-                    'contentUrl', rca.content_url
-                  ) ORDER BY rca.attachment_order
-                ) FILTER (WHERE rca.id IS NOT NULL),
+                    'contentType', ${reminderContentAttachments.contentType},
+                    'contentTitle', ${reminderContentAttachments.contentTitle},
+                    'contentUrl', ${reminderContentAttachments.contentUrl}
+                  ) ORDER BY ${reminderContentAttachments.attachmentOrder}
+                ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
                 '[]'::json
               ) as content_attachments
             `,
@@ -219,6 +242,12 @@ async function processReminders() {
       }
     } else {
       // Small dataset, process all at once
+      logger.info("Executing main reminder schedules query", {
+        api: true,
+        cron: true,
+        queryType: "single_batch",
+      });
+
       const allSchedules = await db
         .select({
           // Schedule fields
@@ -236,11 +265,11 @@ async function processReminders() {
             COALESCE(
               JSON_AGG(
                 JSON_BUILD_OBJECT(
-                  'contentType', rca.content_type,
-                  'contentTitle', rca.content_title,
-                  'contentUrl', rca.content_url
-                ) ORDER BY rca.attachment_order
-              ) FILTER (WHERE rca.id IS NOT NULL),
+                  'contentType', ${reminderContentAttachments.contentType},
+                  'contentTitle', ${reminderContentAttachments.contentTitle},
+                  'contentUrl', ${reminderContentAttachments.contentUrl}
+                ) ORDER BY ${reminderContentAttachments.attachmentOrder}
+              ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
               '[]'::json
             ) as content_attachments
           `,
@@ -274,6 +303,12 @@ async function processReminders() {
         )
         .orderBy(reminderSchedules.scheduledTime)
         .groupBy(reminderSchedules.id, patients.id); // Add GROUP BY for JSON_AGG
+
+      logger.info("Main query completed successfully", {
+        api: true,
+        cron: true,
+        schedulesFound: allSchedules.length,
+      });
 
       // Transform to match expected structure with null checks
       reminderSchedulesToProcess = allSchedules
@@ -339,19 +374,22 @@ async function processReminders() {
               `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
 
             // Generate enhanced message with content attachments
-            const messageBody = generateEnhancedMessage(baseMessage, schedule.contentAttachments);
+            const messageBody = generateEnhancedMessage(
+              baseMessage,
+              schedule.contentAttachments
+            );
 
             const formattedNumber = formatWhatsAppNumber(
               schedule.patientPhoneNumber
             );
 
-            logger.info('Sending WhatsApp reminder with content attachments', {
+            logger.info("Sending WhatsApp reminder with content attachments", {
               api: true,
               cron: true,
               patientId: schedule.patientId,
               reminderId: schedule.id,
               contentCount: schedule.contentAttachments?.length || 0,
-              messageLength: messageBody.length
+              messageLength: messageBody.length,
             });
 
             const result = await sendWhatsAppMessage({
@@ -433,11 +471,33 @@ async function processReminders() {
     };
 
     return NextResponse.json(summary);
-  } catch {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    logger.error(
+      "Cron job failed with critical error",
+      error instanceof Error ? error : new Error(errorMessage),
+      {
+        api: true,
+        cron: true,
+        processedCount,
+        sentCount,
+        errorCount,
+        errorMessage,
+        errorStack: errorStack?.substring(0, 500), // Limit stack trace length
+      }
+    );
+
     return NextResponse.json(
       {
         success: false,
         error: "Internal server error",
+        details:
+          process.env.NODE_ENV === "development"
+            ? errorMessage
+            : "Check server logs for details",
         timestamp: new Date().toISOString(),
         wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
         stats: {

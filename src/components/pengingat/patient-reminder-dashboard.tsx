@@ -13,6 +13,25 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
+import { ContentSelector } from "@/components/reminder/ContentSelector";
+
+interface ContentItem {
+  id: string;
+  title: string;
+  slug: string;
+  description?: string;
+  category: string;
+  tags: string[];
+  publishedAt: Date | null;
+  createdAt: Date;
+  type: "article" | "video";
+  thumbnailUrl?: string;
+  url: string;
+  excerpt?: string;
+  videoUrl?: string;
+  durationMinutes?: string;
+  order?: number;
+}
 
 interface Reminder {
   id: string;
@@ -24,6 +43,7 @@ interface Reminder {
   medicationTaken?: boolean;
   sentAt?: string;
   confirmedAt?: string;
+  attachedContent?: ContentItem[];
 }
 
 interface ReminderStats {
@@ -57,6 +77,14 @@ export function PatientReminderDashboard({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
   const [editFormData, setEditFormData] = useState({ message: "", time: "" });
+  const [selectedContent, setSelectedContent] = useState<ContentItem[]>([]);
+
+  const closeEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingReminder(null);
+    setEditFormData({ message: "", time: "" });
+    setSelectedContent([]);
+  };
 
   useEffect(() => {
     if (params.id) {
@@ -94,6 +122,7 @@ export function PatientReminderDashboard({
             item.nextReminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "scheduled",
+          attachedContent: item.attachedContent || [],
         }));
         setTerjadwalReminders(mappedData);
       }
@@ -180,6 +209,7 @@ export function PatientReminderDashboard({
       message: reminder.customMessage || reminder.medicationName || "",
       time: reminder.scheduledTime || "",
     });
+    setSelectedContent(reminder.attachedContent || []);
     setIsEditModalOpen(true);
   };
 
@@ -194,7 +224,12 @@ export function PatientReminderDashboard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             customMessage: editFormData.message,
-            scheduledTime: editFormData.time,
+            reminderTime: editFormData.time,
+            attachedContent: selectedContent.map((content) => ({
+              id: content.id,
+              title: content.title,
+              type: content.type.toUpperCase() as "ARTICLE" | "VIDEO",
+            })),
           }),
         }
       );
@@ -202,10 +237,10 @@ export function PatientReminderDashboard({
       if (response.ok) {
         toast.success("Pengingat berhasil diperbarui");
         await fetchStats();
-        await fetchStats();
         await fetchAllReminders();
         setIsEditModalOpen(false);
         setEditingReminder(null);
+        setSelectedContent([]);
       } else {
         const error = await response.json();
         toast.error(error.error || "Gagal memperbarui pengingat");
@@ -648,10 +683,7 @@ export function PatientReminderDashboard({
                 Edit Pengingat
               </h3>
               <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingReminder(null);
-                }}
+                onClick={closeEditModal}
                 className="p-1 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5 text-gray-500" />
@@ -697,16 +729,26 @@ export function PatientReminderDashboard({
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
+
+                {/* Content Selector */}
+                <div>
+                  <label className="block text-gray-700 text-sm font-medium mb-2">
+                    Lampirkan Konten (Opsional)
+                  </label>
+                  <ContentSelector
+                    selectedContent={selectedContent}
+                    onContentChange={setSelectedContent}
+                    maxSelection={5}
+                    className="mt-2"
+                  />
+                </div>
               </div>
             </div>
 
             {/* Modal Footer */}
             <div className="flex space-x-4 p-6 border-t">
               <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingReminder(null);
-                }}
+                onClick={closeEditModal}
                 className="flex-1 bg-gray-200 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-300 transition-colors cursor-pointer"
               >
                 Batal
