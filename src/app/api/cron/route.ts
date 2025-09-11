@@ -1,81 +1,100 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db, reminderSchedules, patients, reminderLogs } from '@/db'
-import { eq, and, gte, lte, notExists, count } from 'drizzle-orm'
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
-import { shouldSendReminderNow, getWIBTime, getWIBDateString, getWIBTimeString, getWIBTodayStart } from '@/lib/timezone'
+import { NextRequest, NextResponse } from "next/server";
+import {
+  db,
+  reminderSchedules,
+  patients,
+  reminderLogs,
+  reminderContentAttachments,
+} from "@/db";
+import { eq, and, gte, lte, notExists, count, sql } from "drizzle-orm";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
+import {
+  shouldSendReminderNow,
+  getWIBTime,
+  getWIBDateString,
+  getWIBTimeString,
+  getWIBTodayStart,
+} from "@/lib/timezone";
+import { logger } from "@/lib/logger";
 // Rate limiter temporarily disabled
 
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
-  const date = new Date(dateString)
+  const date = new Date(dateString);
   // Start of day in WIB (00:00:00)
-  const startOfDay = new Date(date)
-  startOfDay.setUTCHours(17, 0, 0, 0) // 17:00 UTC = 00:00 WIB (UTC+7)
-  
+  const startOfDay = new Date(date);
+  startOfDay.setUTCHours(17, 0, 0, 0); // 17:00 UTC = 00:00 WIB (UTC+7)
+
   // End of day in WIB (23:59:59.999)
-  const endOfDay = new Date(date)
-  endOfDay.setUTCHours(16, 59, 59, 999) // 16:59 UTC next day = 23:59 WIB (UTC+7)
-  endOfDay.setDate(endOfDay.getDate() + 1)
-  
-  return { startOfDay, endOfDay }
+  const endOfDay = new Date(date);
+  endOfDay.setUTCHours(16, 59, 59, 999); // 16:59 UTC next day = 23:59 WIB (UTC+7)
+  endOfDay.setDate(endOfDay.getDate() + 1);
+
+  return { startOfDay, endOfDay };
 }
 
 // GET endpoint for Vercel Cron Functions
 export async function GET(request: NextRequest) {
   // Verify this is called by Vercel Cron with secret
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error('CRON_SECRET environment variable is not set')
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
-  }
-  
-  const authHeader = request.headers.get('Authorization')
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    console.error("CRON_SECRET environment variable is not set");
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
   }
 
-  return await processReminders()
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return await processReminders();
 }
 
 // POST endpoint for manual trigger during development/testing
 export async function POST(request: NextRequest) {
   // Always require auth in production
-  if (process.env.NODE_ENV === 'production') {
-    const cronSecret = process.env.CRON_SECRET
+  if (process.env.NODE_ENV === "production") {
+    const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
     }
-    
-    const authHeader = request.headers.get('Authorization')
+
+    const authHeader = request.headers.get("Authorization");
     if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
 
-  return await processReminders()
+  return await processReminders();
 }
 
 async function processReminders() {
-  const startTime = Date.now()
-  let processedCount = 0
-  let sentCount = 0
-  let errorCount = 0
-  const debugLogs: string[] = []
+  const startTime = Date.now();
+  let processedCount = 0;
+  let sentCount = 0;
+  let errorCount = 0;
+  const debugLogs: string[] = [];
 
   try {
-    const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`
-    debugLogs.push(logMessage)
+    const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`;
+    debugLogs.push(logMessage);
 
     // Get all active reminder schedules for today
-    const todayWIB = getWIBDateString()
+    const todayWIB = getWIBDateString();
 
     // Use batch processing for better memory management
-    const batchSize = 50 // Process in batches to prevent memory issues
+    const batchSize = 50; // Process in batches to prevent memory issues
 
     // First, get count to determine if we need batch processing
-    const { endOfDay } = createWIBDateRange(todayWIB)
-    const todayStart = getWIBTodayStart()
-    
+    const { endOfDay } = createWIBDateRange(todayWIB);
+    const todayStart = getWIBTodayStart();
+
     // Count reminder schedules that haven't been delivered today yet
     const totalCountResult = await db
       .select({ count: count() })
@@ -86,22 +105,33 @@ async function processReminders() {
           lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
           // Haven't been delivered today yet (using notExists for efficiency)
           notExists(
-            db.select()
+            db
+              .select()
               .from(reminderLogs)
               .where(
                 and(
                   eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                  eq(reminderLogs.status, 'DELIVERED'),
+                  eq(reminderLogs.status, "DELIVERED"),
                   gte(reminderLogs.sentAt, todayStart)
                 )
               )
           )
         )
-      )
-    
-    const totalCount = totalCountResult[0]?.count || 0
+      );
 
-    let reminderSchedulesToProcess: Array<{id: string; patientId: string; medicationName: string; scheduledTime: string; startDate: Date; customMessage: string | null; patientName: string | null; patientPhoneNumber: string | null}> = []
+    const totalCount = totalCountResult[0]?.count || 0;
+
+    let reminderSchedulesToProcess: Array<{
+      id: string;
+      patientId: string;
+      medicationName: string;
+      scheduledTime: string;
+      startDate: Date;
+      customMessage: string | null;
+      patientName: string | null;
+      patientPhoneNumber: string | null;
+      contentAttachments: any[];
+    }> = [];
     if (totalCount > batchSize) {
       // Process in batches to prevent memory overload
       for (let skip = 0; skip < totalCount; skip += batchSize) {
@@ -116,21 +146,42 @@ async function processReminders() {
             customMessage: reminderSchedules.customMessage,
             // Patient fields
             patientName: patients.name,
-            patientPhoneNumber: patients.phoneNumber
+            patientPhoneNumber: patients.phoneNumber,
+            // Content attachments as JSON
+            contentAttachments: sql`
+              COALESCE(
+                JSON_AGG(
+                  JSON_BUILD_OBJECT(
+                    'contentType', rca.content_type,
+                    'contentTitle', rca.content_title,
+                    'contentUrl', rca.content_url
+                  ) ORDER BY rca.attachment_order
+                ) FILTER (WHERE rca.id IS NOT NULL),
+                '[]'::json
+              ) as content_attachments
+            `,
           })
           .from(reminderSchedules)
           .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+          .leftJoin(
+            reminderContentAttachments,
+            eq(
+              reminderSchedules.id,
+              reminderContentAttachments.reminderScheduleId
+            )
+          )
           .where(
             and(
               eq(reminderSchedules.isActive, true),
               lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
               notExists(
-                db.select()
+                db
+                  .select()
                   .from(reminderLogs)
                   .where(
                     and(
                       eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                      eq(reminderLogs.status, 'DELIVERED'),
+                      eq(reminderLogs.status, "DELIVERED"),
                       gte(reminderLogs.sentAt, todayStart)
                     )
                   )
@@ -139,25 +190,31 @@ async function processReminders() {
           )
           .offset(skip)
           .limit(batchSize)
-          .orderBy(reminderSchedules.scheduledTime) // Process by time order
+          .orderBy(reminderSchedules.scheduledTime)
+          .groupBy(reminderSchedules.id, patients.id); // Add GROUP BY for JSON_AGG
 
         // Transform to match expected structure with null checks
-        const formattedBatch = batch.map(item => ({
-          id: item.id,
-          patientId: item.patientId,
-          medicationName: item.medicationName,
-          scheduledTime: item.scheduledTime,
-          startDate: item.startDate,
-          customMessage: item.customMessage,
-          patientName: item.patientName,
-          patientPhoneNumber: item.patientPhoneNumber
-        })).filter(item => item.patientName && item.patientPhoneNumber)
-        
-        reminderSchedulesToProcess.push(...formattedBatch)
-        
+        const formattedBatch = batch
+          .map((item) => ({
+            id: item.id,
+            patientId: item.patientId,
+            medicationName: item.medicationName,
+            scheduledTime: item.scheduledTime,
+            startDate: item.startDate,
+            customMessage: item.customMessage,
+            patientName: item.patientName,
+            patientPhoneNumber: item.patientPhoneNumber,
+            contentAttachments: Array.isArray(item.contentAttachments)
+              ? item.contentAttachments
+              : [],
+          }))
+          .filter((item) => item.patientName && item.patientPhoneNumber);
+
+        reminderSchedulesToProcess.push(...formattedBatch);
+
         // Small delay between batches to prevent database overload
         if (skip + batchSize < totalCount) {
-          await new Promise(resolve => setTimeout(resolve, 50))
+          await new Promise((resolve) => setTimeout(resolve, 50));
         }
       }
     } else {
@@ -173,21 +230,42 @@ async function processReminders() {
           customMessage: reminderSchedules.customMessage,
           // Patient fields
           patientName: patients.name,
-          patientPhoneNumber: patients.phoneNumber
+          patientPhoneNumber: patients.phoneNumber,
+          // Content attachments as JSON
+          contentAttachments: sql`
+            COALESCE(
+              JSON_AGG(
+                JSON_BUILD_OBJECT(
+                  'contentType', rca.content_type,
+                  'contentTitle', rca.content_title,
+                  'contentUrl', rca.content_url
+                ) ORDER BY rca.attachment_order
+              ) FILTER (WHERE rca.id IS NOT NULL),
+              '[]'::json
+            ) as content_attachments
+          `,
         })
         .from(reminderSchedules)
         .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+        .leftJoin(
+          reminderContentAttachments,
+          eq(
+            reminderSchedules.id,
+            reminderContentAttachments.reminderScheduleId
+          )
+        )
         .where(
           and(
             eq(reminderSchedules.isActive, true),
             lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
             notExists(
-              db.select()
+              db
+                .select()
                 .from(reminderLogs)
                 .where(
                   and(
                     eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                    eq(reminderLogs.status, 'DELIVERED'),
+                    eq(reminderLogs.status, "DELIVERED"),
                     gte(reminderLogs.sentAt, todayStart)
                   )
                 )
@@ -195,59 +273,99 @@ async function processReminders() {
           )
         )
         .orderBy(reminderSchedules.scheduledTime)
+        .groupBy(reminderSchedules.id, patients.id); // Add GROUP BY for JSON_AGG
 
       // Transform to match expected structure with null checks
-      reminderSchedulesToProcess = allSchedules.map(item => ({
-        id: item.id,
-        patientId: item.patientId,
-        medicationName: item.medicationName,
-        scheduledTime: item.scheduledTime,
-        startDate: item.startDate,
-        customMessage: item.customMessage,
-        patientName: item.patientName,
-        patientPhoneNumber: item.patientPhoneNumber
-      })).filter(item => item.patientName && item.patientPhoneNumber)
+      reminderSchedulesToProcess = allSchedules
+        .map((item) => ({
+          id: item.id,
+          patientId: item.patientId,
+          medicationName: item.medicationName,
+          scheduledTime: item.scheduledTime,
+          startDate: item.startDate,
+          customMessage: item.customMessage,
+          patientName: item.patientName,
+          patientPhoneNumber: item.patientPhoneNumber,
+          contentAttachments: Array.isArray(item.contentAttachments)
+            ? item.contentAttachments
+            : [],
+        }))
+        .filter((item) => item.patientName && item.patientPhoneNumber);
     }
 
     for (const schedule of reminderSchedulesToProcess) {
-      processedCount++
-      
+      processedCount++;
+
       try {
         // Check if it's time to send this reminder
-        const scheduleDate = schedule.startDate.toISOString().split('T')[0]
-        const shouldSend = shouldSendReminderNow(scheduleDate, schedule.scheduledTime)
+        const scheduleDate = schedule.startDate.toISOString().split("T")[0];
+        const shouldSend = shouldSendReminderNow(
+          scheduleDate,
+          schedule.scheduledTime
+        );
 
         // Debug logging for manual cron troubleshooting
         if (shouldSend) {
-          debugLogs.push(`✅ Reminder ${schedule.patientName} (${schedule.scheduledTime}) should be sent - current: ${getWIBTimeString()}, scheduled: ${schedule.scheduledTime}`)
+          debugLogs.push(
+            `✅ Reminder ${schedule.patientName} (${
+              schedule.scheduledTime
+            }) should be sent - current: ${getWIBTimeString()}, scheduled: ${
+              schedule.scheduledTime
+            }`
+          );
         } else {
-          debugLogs.push(`❌ Reminder ${schedule.patientName} (${schedule.scheduledTime}) not ready - current: ${getWIBTimeString()}, scheduled: ${schedule.scheduledTime}`)
+          debugLogs.push(
+            `❌ Reminder ${schedule.patientName} (${
+              schedule.scheduledTime
+            }) not ready - current: ${getWIBTimeString()}, scheduled: ${
+              schedule.scheduledTime
+            }`
+          );
         }
 
         if (shouldSend) {
           // Validate phone number exists
           if (!schedule.patientPhoneNumber) {
-            errorCount++
-            continue
+            errorCount++;
+            continue;
           }
-          
+
           // Rate limiting temporarily disabled
-          
+
           try {
             // Send WhatsApp message via Fonnte with phone validation
-            const messageBody = schedule.customMessage || `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`
-            const formattedNumber = formatWhatsAppNumber(schedule.patientPhoneNumber)
-            
+            const baseMessage =
+              schedule.customMessage ||
+              `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
+
+            // Generate enhanced message with content attachments
+            const messageBody = generateEnhancedMessage(baseMessage, schedule.contentAttachments);
+
+            const formattedNumber = formatWhatsAppNumber(
+              schedule.patientPhoneNumber
+            );
+
+            logger.info('Sending WhatsApp reminder with content attachments', {
+              api: true,
+              cron: true,
+              patientId: schedule.patientId,
+              reminderId: schedule.id,
+              contentCount: schedule.contentAttachments?.length || 0,
+              messageLength: messageBody.length
+            });
+
             const result = await sendWhatsAppMessage({
               to: formattedNumber,
-              body: messageBody
-            })
+              body: messageBody,
+            });
 
-            const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`
-            debugLogs.push(providerLogMessage)
+            const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
+            debugLogs.push(providerLogMessage);
 
             // Create reminder log
-            const status: 'DELIVERED' | 'FAILED' = result.success ? 'DELIVERED' : 'FAILED'
+            const status: "DELIVERED" | "FAILED" = result.success
+              ? "DELIVERED"
+              : "FAILED";
             const logData = {
               reminderScheduleId: schedule.id,
               patientId: schedule.patientId,
@@ -255,70 +373,114 @@ async function processReminders() {
               status: status,
               message: messageBody,
               phoneNumber: schedule.patientPhoneNumber,
-              fonnteMessageId: result.messageId
-            }
+              fonnteMessageId: result.messageId,
+            };
 
             // Create reminder log with error handling
             try {
-              await db.insert(reminderLogs).values(logData).returning()
+              await db.insert(reminderLogs).values(logData).returning();
               // Log created successfully
             } catch (logError) {
-              console.error(`❌ Failed to create reminder log for ${schedule.patientName}:`, logError)
-              console.error(`❌ Log data that failed:`, logData)
-              errorCount++
-              continue // Skip to next schedule
+              console.error(
+                `❌ Failed to create reminder log for ${schedule.patientName}:`,
+                logError
+              );
+              console.error(`❌ Log data that failed:`, logData);
+              errorCount++;
+              continue; // Skip to next schedule
             }
 
             if (result.success) {
-              sentCount++
+              sentCount++;
             } else {
-              errorCount++
+              errorCount++;
             }
           } catch {
-            errorCount++
-            continue
+            errorCount++;
+            continue;
           }
         }
       } catch {
-        errorCount++
+        errorCount++;
       }
     }
 
-    const duration = Date.now() - startTime
+    const duration = Date.now() - startTime;
     const summary = {
       success: true,
-      message: sentCount > 0 
-        ? `✅ Cron completed: ${sentCount} reminders sent successfully` 
-        : `📋 Cron completed: No reminders needed at this time`,
+      message:
+        sentCount > 0
+          ? `✅ Cron completed: ${sentCount} reminders sent successfully`
+          : `📋 Cron completed: No reminders needed at this time`,
       execution: {
         timestamp: new Date().toISOString(),
         wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
         duration: `${duration}ms`,
-        provider: 'FONNTE'
+        provider: "FONNTE",
       },
       results: {
         schedulesFound: reminderSchedulesToProcess.length,
         schedulesProcessed: processedCount,
         messagesSent: sentCount,
         errors: errorCount,
-        successRate: processedCount > 0 && sentCount >= 0 ? `${Math.round((sentCount / processedCount) * 100)}%` : '0%'
+        successRate:
+          processedCount > 0 && sentCount >= 0
+            ? `${Math.round((sentCount / processedCount) * 100)}%`
+            : "0%",
       },
-      details: debugLogs.length > 0 ? debugLogs : ['No detailed logs available']
-    }
+      details:
+        debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],
+    };
 
-    return NextResponse.json(summary)
-
+    return NextResponse.json(summary);
   } catch {
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error',
-      timestamp: new Date().toISOString(),
-      wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
-      stats: {
-        processed: processedCount,
-        sent: sentCount,
-        errors: errorCount + 1
-      }
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Internal server error",
+        timestamp: new Date().toISOString(),
+        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+        stats: {
+          processed: processedCount,
+          sent: sentCount,
+          errors: errorCount + 1,
+        },
+      },
+      { status: 500 }
+    );
   }
+}
+
+// Helper function to generate enhanced WhatsApp message with content links
+function generateEnhancedMessage(
+  baseMessage: string,
+  contentAttachments: any[]
+) {
+  if (!contentAttachments || contentAttachments.length === 0) {
+    return baseMessage;
+  }
+
+  let message = baseMessage;
+  message += "\n\n📚 Baca juga:";
+
+  contentAttachments.forEach((content: any) => {
+    const icon = content.contentType === "article" ? "📄" : "🎥";
+    message += `\n${icon} ${content.contentTitle}`;
+    message += `\n   ${content.contentUrl}`;
+  });
+
+  message += "\n\n💙 Tim PRIMA";
+
+  // WhatsApp message length validation
+  if (message.length > 900) {
+    logger.warn("WhatsApp message truncated due to length", {
+      api: true,
+      cron: true,
+      originalLength: message.length,
+      contentCount: contentAttachments.length,
+    });
+    message = message.substring(0, 900) + "...\n💙 Tim PRIMA";
+  }
+
+  return message;
 }

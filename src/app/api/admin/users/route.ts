@@ -1,24 +1,35 @@
-import { NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth-utils'
-import { db, users } from '@/db'
-import { eq, desc, asc } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-utils";
+import { db, users } from "@/db";
+import { eq, desc, asc } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 
 export async function GET() {
   try {
-    const currentUser = await getCurrentUser()
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse(
+        "Unauthorized",
+        401,
+        undefined,
+        "AUTHENTICATION_ERROR"
+      );
     }
 
     // Only superadmins can access user management
-    if (currentUser.role !== 'SUPERADMIN') {
-      return NextResponse.json({ error: 'Superadmin access required' }, { status: 403 })
+    if (currentUser.role !== "SUPERADMIN") {
+      return createErrorResponse(
+        "Superadmin access required",
+        403,
+        undefined,
+        "AUTHORIZATION_ERROR"
+      );
     }
 
     // Create alias for approver table to avoid naming conflicts
-    const approver = alias(users, 'approver')
-    
+    const approver = alias(users, "approver");
+
     // Get all users with approval info using Drizzle
     const allUsers = await db
       .select({
@@ -37,17 +48,17 @@ export async function GET() {
         // Approver fields
         approverFirstName: approver.firstName,
         approverLastName: approver.lastName,
-        approverEmail: approver.email
+        approverEmail: approver.email,
       })
       .from(users)
       .leftJoin(approver, eq(users.approvedBy, approver.id))
       .orderBy(
         asc(users.isApproved), // Pending approvals first
         desc(users.createdAt)
-      )
+      );
 
     // Format response to match Prisma structure
-    const formattedUsers = allUsers.map(user => ({
+    const formattedUsers = allUsers.map((user) => ({
       id: user.id,
       clerkId: user.clerkId,
       email: user.email,
@@ -58,25 +69,22 @@ export async function GET() {
       isApproved: user.isApproved,
       createdAt: user.createdAt,
       approvedAt: user.approvedAt,
-      approver: user.approverFirstName ? {
-        firstName: user.approverFirstName,
-        lastName: user.approverLastName,
-        email: user.approverEmail
-      } : null
-    }))
+      approver: user.approverFirstName
+        ? {
+            firstName: user.approverFirstName,
+            lastName: user.approverLastName,
+            email: user.approverEmail,
+          }
+        : null,
+    }));
 
     return NextResponse.json({
       success: true,
       users: formattedUsers,
       count: formattedUsers.length,
-      pendingCount: formattedUsers.filter(u => !u.isApproved).length
-    })
-
+      pendingCount: formattedUsers.filter((u) => !u.isApproved).length,
+    });
   } catch (error) {
-    console.error('Error fetching users for admin:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error'
-    }, { status: 500 })
+    return handleApiError(error, "fetching users for admin");
   }
 }

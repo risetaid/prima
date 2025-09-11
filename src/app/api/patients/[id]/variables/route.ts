@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getAuthUser } from '@/lib/auth-utils'
-import { db, patientVariables, patients } from '@/db'
-import { eq, and, isNull } from 'drizzle-orm'
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth-utils";
+import { db, patientVariables, patients } from "@/db";
+import { eq, and, isNull } from "drizzle-orm";
+import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 
 // GET /api/patients/[id]/variables - Get all variables for a patient
 export async function GET(
@@ -9,22 +10,22 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getAuthUser()
+    const currentUser = await getAuthUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id: patientId } = await params
+    const { id: patientId } = await params;
 
     // Verify patient exists
     const patient = await db
       .select()
       .from(patients)
       .where(eq(patients.id, patientId))
-      .limit(1)
+      .limit(1);
 
     if (patient.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
     }
 
     // Get all active variables for this patient (excluding soft-deleted)
@@ -37,33 +38,30 @@ export async function GET(
         updatedAt: patientVariables.updatedAt,
       })
       .from(patientVariables)
-      .where(and(
-        eq(patientVariables.patientId, patientId),
-        eq(patientVariables.isActive, true),
-        isNull(patientVariables.deletedAt)
-      ))
-      .orderBy(patientVariables.variableName)
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.isActive, true),
+          isNull(patientVariables.deletedAt)
+        )
+      )
+      .orderBy(patientVariables.variableName);
 
     // Convert to object format for easy access
     const variablesObject = variables.reduce((acc, variable) => {
-      acc[variable.variableName] = variable.variableValue
-      return acc
-    }, {} as Record<string, string>)
+      acc[variable.variableName] = variable.variableValue;
+      return acc;
+    }, {} as Record<string, string>);
 
     return NextResponse.json({
       success: true,
       patientId,
       variables: variablesObject,
       variablesList: variables,
-      count: variables.length
-    })
-
+      count: variables.length,
+    });
   } catch (error) {
-    console.error('Error fetching patient variables:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, "fetching patient variables");
   }
 }
 
@@ -73,19 +71,27 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getAuthUser()
+    const currentUser = await getAuthUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse(
+        "Unauthorized",
+        401,
+        undefined,
+        "AUTHENTICATION_ERROR"
+      );
     }
 
-    const { id: patientId } = await params
-    const body = await request.json()
-    const { variables } = body
+    const { id: patientId } = await params;
+    const body = await request.json();
+    const { variables } = body;
 
-    if (!variables || typeof variables !== 'object') {
-      return NextResponse.json({ 
-        error: 'Variables object is required' 
-      }, { status: 400 })
+    if (!variables || typeof variables !== "object") {
+      return createErrorResponse(
+        "Variables object is required",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
+      );
     }
 
     // Verify patient exists
@@ -93,31 +99,38 @@ export async function POST(
       .select()
       .from(patients)
       .where(eq(patients.id, patientId))
-      .limit(1)
+      .limit(1);
 
     if (patient.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      return createErrorResponse(
+        "Patient not found",
+        404,
+        undefined,
+        "NOT_FOUND_ERROR"
+      );
     }
 
     // Get existing variables
     const existingVariables = await db
       .select()
       .from(patientVariables)
-      .where(and(
-        eq(patientVariables.patientId, patientId),
-        eq(patientVariables.isActive, true)
-      ))
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.isActive, true)
+        )
+      );
 
     const existingVariableNames = new Set(
-      existingVariables.map(v => v.variableName)
-    )
+      existingVariables.map((v) => v.variableName)
+    );
 
-    const operations = []
+    const operations = [];
 
     // Process each variable in the request
     for (const [variableName, variableValue] of Object.entries(variables)) {
-      if (typeof variableValue !== 'string' || variableValue.trim() === '') {
-        continue // Skip empty or non-string values
+      if (typeof variableValue !== "string" || variableValue.trim() === "") {
+        continue; // Skip empty or non-string values
       }
 
       if (existingVariableNames.has(variableName)) {
@@ -127,33 +140,33 @@ export async function POST(
             .update(patientVariables)
             .set({
               variableValue: variableValue.trim(),
-              updatedAt: new Date()
+              updatedAt: new Date(),
             })
-            .where(and(
-              eq(patientVariables.patientId, patientId),
-              eq(patientVariables.variableName, variableName),
-              eq(patientVariables.isActive, true)
-            ))
-        )
+            .where(
+              and(
+                eq(patientVariables.patientId, patientId),
+                eq(patientVariables.variableName, variableName),
+                eq(patientVariables.isActive, true)
+              )
+            )
+        );
       } else {
         // Create new variable
         operations.push(
-          db
-            .insert(patientVariables)
-            .values({
-              patientId,
-              variableName,
-              variableValue: variableValue.trim(),
-              createdById: currentUser.id,
-              isActive: true
-            })
-        )
+          db.insert(patientVariables).values({
+            patientId,
+            variableName,
+            variableValue: variableValue.trim(),
+            createdById: currentUser.id,
+            isActive: true,
+          })
+        );
       }
     }
 
     // Execute all operations
     if (operations.length > 0) {
-      await Promise.all(operations)
+      await Promise.all(operations);
     }
 
     // Return updated variables
@@ -166,32 +179,29 @@ export async function POST(
         updatedAt: patientVariables.updatedAt,
       })
       .from(patientVariables)
-      .where(and(
-        eq(patientVariables.patientId, patientId),
-        eq(patientVariables.isActive, true)
-      ))
-      .orderBy(patientVariables.variableName)
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.isActive, true)
+        )
+      )
+      .orderBy(patientVariables.variableName);
 
     const variablesObject = updatedVariables.reduce((acc, variable) => {
-      acc[variable.variableName] = variable.variableValue
-      return acc
-    }, {} as Record<string, string>)
+      acc[variable.variableName] = variable.variableValue;
+      return acc;
+    }, {} as Record<string, string>);
 
     return NextResponse.json({
       success: true,
-      message: 'Variables updated successfully',
+      message: "Variables updated successfully",
       patientId,
       variables: variablesObject,
       variablesList: updatedVariables,
-      count: updatedVariables.length
-    })
-
+      count: updatedVariables.length,
+    });
   } catch (error) {
-    console.error('Error updating patient variables:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, "updating patient variables");
   }
 }
 
@@ -201,19 +211,27 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getAuthUser()
+    const currentUser = await getAuthUser();
     if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createErrorResponse(
+        "Unauthorized",
+        401,
+        undefined,
+        "AUTHENTICATION_ERROR"
+      );
     }
 
-    const { id: patientId } = await params
-    const { searchParams } = new URL(request.url)
-    const variableName = searchParams.get('variableName')
+    const { id: patientId } = await params;
+    const { searchParams } = new URL(request.url);
+    const variableName = searchParams.get("variableName");
 
     if (!variableName) {
-      return NextResponse.json({
-        error: 'variableName parameter is required'
-      }, { status: 400 })
+      return createErrorResponse(
+        "variableName parameter is required",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
+      );
     }
 
     // Soft delete the variable (set deletedAt timestamp)
@@ -222,32 +240,32 @@ export async function DELETE(
       .set({
         deletedAt: new Date(),
         isActive: false,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
-      .where(and(
-        eq(patientVariables.patientId, patientId),
-        eq(patientVariables.variableName, variableName),
-        eq(patientVariables.isActive, true)
-      ))
-      .returning()
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.variableName, variableName),
+          eq(patientVariables.isActive, true)
+        )
+      )
+      .returning();
 
     if (result.length === 0) {
-      return NextResponse.json({
-        error: 'Variable not found or already deleted'
-      }, { status: 404 })
+      return createErrorResponse(
+        "Variable not found or already deleted",
+        404,
+        undefined,
+        "NOT_FOUND_ERROR"
+      );
     }
 
     return NextResponse.json({
       success: true,
       message: `Variable "${variableName}" deleted successfully`,
-      deletedVariable: result[0]
-    })
-
+      deletedVariable: result[0],
+    });
   } catch (error) {
-    console.error('Error deleting patient variable:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error, "deleting patient variable");
   }
 }

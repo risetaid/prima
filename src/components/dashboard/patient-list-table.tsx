@@ -2,6 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import {
+  generateAvatar,
+  getComplianceLabel,
+  formatIndonesianPhone,
+  getStatusLabel,
+  createLoadingState,
+} from "@/lib/ui-utils";
 
 interface Patient {
   id: string;
@@ -17,79 +24,20 @@ interface PatientListTableProps {
   loading: boolean;
 }
 
-export function PatientListTable({
-  patients,
-  loading,
-}: PatientListTableProps) {
+export function PatientListTable({ patients, loading }: PatientListTableProps) {
   const router = useRouter();
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((word) => word.charAt(0))
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getRandomAvatarColor = (name: string) => {
-    const colors = [
-      "bg-blue-500",
-      "bg-purple-500",
-      "bg-pink-500",
-      "bg-indigo-500",
-      "bg-cyan-500",
-      "bg-teal-500",
-      "bg-emerald-500",
-      "bg-lime-500",
-      "bg-orange-500",
-      "bg-rose-500",
-      "bg-violet-500",
-      "bg-sky-500",
-    ];
-    // Use name hash to ensure consistent color per person
-    const hash = name.split("").reduce((a, b) => {
-      a = (a << 5) - a + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  const getComplianceLabel = (rate: number) => {
-    if (rate >= 80)
-      return {
-        text: "Tinggi",
-        bg: "bg-green-100",
-        textColor: "text-green-800",
-      };
-    if (rate >= 50)
-      return {
-        text: "Sedang",
-        bg: "bg-yellow-100",
-        textColor: "text-yellow-800",
-      };
-    return { text: "Rendah", bg: "bg-red-100", textColor: "text-red-800" };
-  };
-
-  const formatPhoneNumber = (phone?: string) => {
-    if (!phone) return "-";
-    // Format Indonesian phone number for display
-    if (phone.startsWith("62")) {
-      return "+62" + phone.substring(2);
-    }
-    return phone;
-  };
 
   const handlePatientClick = (patientId: string) => {
     router.push(`/dashboard/pasien/${patientId}`);
   };
 
   if (loading) {
+    const loadingState = createLoadingState(true, "Memuat data pasien...");
     return (
       <div className="bg-white rounded-lg shadow-sm border">
         <div className="p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Memuat data pasien...</p>
+          <p className="mt-4 text-gray-600">{loadingState.message}</p>
         </div>
       </div>
     );
@@ -120,13 +68,8 @@ export function PatientListTable({
         ) : (
           patients.map((patient) => {
             const complianceLabel = getComplianceLabel(patient.complianceRate);
-            const statusLabel = patient.isActive
-              ? { text: "Aktif", bg: "bg-blue-500", textColor: "text-white" }
-              : {
-                  text: "Nonaktif",
-                  bg: "bg-gray-400",
-                  textColor: "text-white",
-                };
+            const statusLabel = getStatusLabel(patient.isActive);
+            const avatar = generateAvatar(patient.name);
 
             return (
               <div
@@ -147,12 +90,10 @@ export function PatientListTable({
                     </div>
                   ) : (
                     <div
-                      className={`w-12 h-12 ${getRandomAvatarColor(
-                        patient.name
-                      )} rounded-full flex items-center justify-center`}
+                      className={`w-12 h-12 ${avatar.color} rounded-full flex items-center justify-center`}
                     >
                       <span className="text-white font-bold text-sm">
-                        {getInitials(patient.name)}
+                        {avatar.initials}
                       </span>
                     </div>
                   )}
@@ -188,7 +129,7 @@ export function PatientListTable({
 
                 {/* Phone Number */}
                 <div className="text-gray-700 text-center">
-                  {formatPhoneNumber(patient.phoneNumber)}
+                  {formatIndonesianPhone(patient.phoneNumber)}
                 </div>
 
                 {/* Action Button */}

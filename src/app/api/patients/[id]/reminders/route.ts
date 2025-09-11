@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 import {
   db,
   patients,
@@ -13,9 +14,7 @@ import {
 } from "@/db";
 import { eq, desc, and, isNull } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
-import {
-  getWIBTime,
-} from "@/lib/timezone";
+import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 // Rate limiter temporarily disabled
 
@@ -82,10 +81,7 @@ export async function GET(
 
     return NextResponse.json(formattedReminders);
   } catch (error) {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError(error, "creating patient reminders");
   }
 }
 
@@ -96,7 +92,12 @@ export async function POST(
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return createErrorResponse(
+        "Unauthorized",
+        401,
+        undefined,
+        "AUTHENTICATION_ERROR"
+      );
     }
 
     const { id } = await params;
@@ -105,34 +106,42 @@ export async function POST(
       requestBody;
 
     if (!message || !time) {
-      return NextResponse.json(
-        { error: "Missing required fields: message and time" },
-        { status: 400 }
+      return createErrorResponse(
+        "Missing required fields: message and time",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
       );
     }
 
     // Validate input based on recurrence type
     if (customRecurrence) {
       if (!customRecurrence.frequency || !customRecurrence.interval) {
-        return NextResponse.json(
-          { error: "Invalid custom recurrence configuration" },
-          { status: 400 }
+        return createErrorResponse(
+          "Invalid custom recurrence configuration",
+          400,
+          undefined,
+          "VALIDATION_ERROR"
         );
       }
 
       // Prevent infinite loop - interval must be positive
       if (customRecurrence.interval <= 0) {
-        return NextResponse.json(
-          { error: "Recurrence interval must be greater than 0" },
-          { status: 400 }
+        return createErrorResponse(
+          "Recurrence interval must be greater than 0",
+          400,
+          undefined,
+          "VALIDATION_ERROR"
         );
       }
 
       // Prevent excessive occurrences
       if (customRecurrence.occurrences && customRecurrence.occurrences > 1000) {
-        return NextResponse.json(
-          { error: "Maximum 1000 occurrences allowed" },
-          { status: 400 }
+        return createErrorResponse(
+          "Maximum 1000 occurrences allowed",
+          400,
+          undefined,
+          "VALIDATION_ERROR"
         );
       }
     } else {
@@ -141,9 +150,11 @@ export async function POST(
         !Array.isArray(selectedDates) ||
         selectedDates.length === 0
       ) {
-        return NextResponse.json(
-          { error: "Missing required field: selectedDates" },
-          { status: 400 }
+        return createErrorResponse(
+          "Missing required field: selectedDates",
+          400,
+          undefined,
+          "VALIDATION_ERROR"
         );
       }
     }
@@ -160,7 +171,12 @@ export async function POST(
       .limit(1);
 
     if (patientResult.length === 0) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
+      return createErrorResponse(
+        "Patient not found",
+        404,
+        undefined,
+        "NOT_FOUND_ERROR"
+      );
     }
 
     const patient = patientResult[0];
@@ -179,11 +195,11 @@ export async function POST(
     ) {
       validatedContent = await validateContentAttachments(attachedContent);
       if (validatedContent.length === 0) {
-        return NextResponse.json(
-          {
-            error: "None of the selected content items are valid or published",
-          },
-          { status: 400 }
+        return createErrorResponse(
+          "None of the selected content items are valid or published",
+          400,
+          undefined,
+          "VALIDATION_ERROR"
         );
       }
     }
@@ -300,10 +316,7 @@ export async function POST(
       recurrenceType: customRecurrence ? "custom" : "manual",
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetching patient reminders");
   }
 }
 
@@ -476,6 +489,13 @@ async function validateContentAttachments(
     title: string;
   }>
 ) {
+  logger.info("Starting content attachment validation", {
+    api: true,
+    patients: true,
+    reminders: true,
+    contentCount: attachedContent.length,
+  });
+
   const validatedContent: Array<{
     id: string;
     type: "article" | "video";
@@ -485,6 +505,15 @@ async function validateContentAttachments(
 
   for (const content of attachedContent) {
     if (!content.id || !content.type || !content.title) {
+      logger.warn("Skipping invalid content attachment", {
+        api: true,
+        patients: true,
+        reminders: true,
+        contentId: content.id,
+        hasId: !!content.id,
+        hasType: !!content.type,
+        hasTitle: !!content.title,
+      });
       continue; // Skip invalid content
     }
 
@@ -512,6 +541,22 @@ async function validateContentAttachments(
             title: articleResult[0].title,
             url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${articleResult[0].slug}`,
           });
+
+          logger.debug("Article content validated successfully", {
+            api: true,
+            contentId: content.id,
+            title: articleResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${articleResult[0].slug}`,
+          });
+        } else {
+          logger.warn(
+            "Article content validation failed - not found or not published",
+            {
+              api: true,
+              contentId: content.id,
+              title: content.title,
+            }
+          );
         }
       } else if (normalizedType === "video") {
         const videoResult = await db
@@ -533,21 +578,43 @@ async function validateContentAttachments(
             title: videoResult[0].title,
             url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${videoResult[0].slug}`,
           });
+
+          logger.debug("Video content validated successfully", {
+            api: true,
+            contentId: content.id,
+            title: videoResult[0].title,
+            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${videoResult[0].slug}`,
+          });
+        } else {
+          logger.warn(
+            "Video content validation failed - not found or not published",
+            {
+              api: true,
+              contentId: content.id,
+              title: content.title,
+            }
+          );
         }
       }
     } catch (error) {
-      logger.warn('Failed to validate reminder content attachment', {
+      logger.error("Content validation failed", error as Error, {
         api: true,
         patients: true,
         reminders: true,
-        operation: 'validate_content_attachment',
         contentId: content.id,
         contentType: content.type,
-        error: error instanceof Error ? error.message : String(error)
       });
       continue;
     }
   }
+
+  logger.info("Content validation completed", {
+    api: true,
+    patients: true,
+    reminders: true,
+    requested: attachedContent.length,
+    validated: validatedContent.length,
+  });
 
   return validatedContent;
 }
