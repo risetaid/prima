@@ -8,12 +8,9 @@ import {
   reminderContentAttachments,
 } from "@/db";
 import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import { getWIBTime, getWIBDateString, getWIBTimeString } from "@/lib/timezone";
-import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { ValidatedContent } from "@/services/reminder/reminder.types";
 // Rate limiter temporarily disabled
-
-const whatsappService = new WhatsAppService();
 
 // Helper function to create date range for WIB timezone (same as cron)
 function createWIBDateRange(dateString: string) {
@@ -28,6 +25,73 @@ function createWIBDateRange(dateString: string) {
   endOfDay.setDate(endOfDay.getDate() + 1);
 
   return { startOfDay, endOfDay };
+}
+
+// Helper function to get dynamic content prefix based on content type
+function getContentPrefix(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📚 Baca juga:";
+    case "video":
+      return "🎥 Tonton juga:";
+    default:
+      return "📖 Lihat juga:";
+  }
+}
+
+// Helper function to get content icon based on content type
+function getContentIcon(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📄";
+    case "video":
+      return "🎥";
+    default:
+      return "📖";
+  }
+}
+
+// Helper function to generate enhanced WhatsApp message with content links
+function generateEnhancedMessage(
+  originalMessage: string,
+  contentAttachments: Array<{
+    id: string;
+    type: "article" | "video";
+    title: string;
+    url: string;
+  }>
+) {
+  if (contentAttachments.length === 0) {
+    return originalMessage;
+  }
+
+  let message = originalMessage;
+
+  // Group content by type for better organization
+  const contentByType: { [key: string]: any[] } = {};
+  contentAttachments.forEach((content) => {
+    const type = content.type?.toLowerCase() || "other";
+    if (!contentByType[type]) {
+      contentByType[type] = [];
+    }
+    contentByType[type].push(content);
+  });
+
+  // Add content sections
+  Object.keys(contentByType).forEach((contentType) => {
+    const contents = contentByType[contentType];
+    message += `\n\n${getContentPrefix(contentType)}`;
+
+    contents.forEach((content) => {
+      const icon = getContentIcon(content.type);
+      message += `\n${icon} ${content.title}`;
+      message += `\n   ${content.url}`;
+    });
+  });
+
+  message += "\n\n💙 Tim PRIMA";
+
+  return message;
 }
 
 export async function POST() {
@@ -231,19 +295,34 @@ export async function POST() {
 
           // Get content attachments for this reminder and enhance message
           const attachments = contentAttachmentsMap.get(reminder.id) || [];
-          const messageBody = whatsappService.buildMessage(
+          const messageBody = generateEnhancedMessage(
             basicMessage,
-            attachments as ValidatedContent[]
+            attachments
           );
 
           debugLogs.push(
             `📱 Preparing to send to ${reminder.patientName} (${reminder.patientPhoneNumber})`
           );
 
+          let formattedNumber: string;
+          try {
+            formattedNumber = formatWhatsAppNumber(reminder.patientPhoneNumber);
+            debugLogs.push(`📞 Formatted number: ${formattedNumber}`);
+          } catch (formatError) {
+            errorCount++;
+            debugLogs.push(
+              `❌ Phone number formatting error for ${reminder.patientName}: ${formatError}`
+            );
+            continue;
+          }
+
           // Send WhatsApp message
           let result: { success: boolean; messageId?: string; error?: string };
           try {
-            result = await whatsappService.send(reminder.patientPhoneNumber, messageBody);
+            result = await sendWhatsAppMessage({
+              to: formattedNumber,
+              body: messageBody,
+            });
           } catch (sendError) {
             errorCount++;
             debugLogs.push(

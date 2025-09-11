@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
-import {
-  db,
-  patients,
-  users,
-  manualConfirmations,
-  reminderLogs,
-  reminderSchedules,
-  patientMedications,
-  medications,
-} from "@/db";
-import { eq, and, isNull, desc } from "drizzle-orm";
+import { db, patients } from "@/db";
+import { eq } from "drizzle-orm";
 import {
   getCachedData,
   setCachedData,
@@ -19,12 +10,8 @@ import {
   invalidatePatientCache,
 } from "@/lib/cache";
 import { createErrorResponse, handleApiError } from "@/lib/api-utils";
-import { ComplianceService } from "@/lib/compliance-service";
-import {
-  getPatientWithRelations,
-  validatePatientExists,
-} from "@/lib/patient-service";
 import { withRateLimit } from "@/middleware/rate-limit";
+import { PatientService } from "@/services/patient/patient.service";
 
 export const GET = withRateLimit(async function GET(
   request: NextRequest,
@@ -61,8 +48,9 @@ export const GET = withRateLimit(async function GET(
       return NextResponse.json(cachedPatient);
     }
 
-    // Use the patient service to get complete patient data
-    const patient = await getPatientWithRelations(id);
+    // Use centralized PatientService to get complete patient data
+    const service = new PatientService();
+    const patient = await service.getDetail(id);
 
     if (!patient) {
       return createErrorResponse(
@@ -100,63 +88,10 @@ export const PUT = withRateLimit(async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const {
-      name,
-      phoneNumber,
-      address,
-      birthDate,
-      diagnosisDate,
-      cancerStage,
-      emergencyContactName,
-      emergencyContactPhone,
-      notes,
-      isActive,
-      photoUrl,
-    } = body;
 
-    // Check if patient exists and is not soft deleted
-    const patientExists = await validatePatientExists(id);
-    if (!patientExists) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
-    }
-
-    // Update patient (simplified response for now)
-    await db
-      .update(patients)
-      .set({
-        name,
-        phoneNumber,
-        address,
-        birthDate: birthDate ? new Date(birthDate) : null,
-        diagnosisDate: diagnosisDate ? new Date(diagnosisDate) : null,
-        cancerStage,
-        emergencyContactName,
-        emergencyContactPhone,
-        notes,
-        isActive,
-        photoUrl,
-        updatedAt: new Date(),
-      })
-      .where(eq(patients.id, id));
-
-    // Get updated patient
-    const updatedPatientResult = await db
-      .select()
-      .from(patients)
-      .where(eq(patients.id, id))
-      .limit(1);
-
-    const patient = updatedPatientResult[0];
-
-    // Invalidate patient cache after update
-    await invalidatePatientCache(id);
-
-    return NextResponse.json(patient);
+    const service = new PatientService();
+    const updated = await service.updatePatient(id, body);
+    return NextResponse.json(updated);
   } catch (error) {
     return handleApiError(error, "updating patient");
   }
@@ -179,46 +114,9 @@ export const DELETE = withRateLimit(async function DELETE(
     }
 
     const { id } = await params;
-
-    // Check if patient exists and is not already soft deleted
-    const patientExists = await validatePatientExists(id);
-    if (!patientExists) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
-    }
-
-    const deleteTime = new Date();
-
-    // Soft delete by setting deletedAt timestamp
-    await db
-      .update(patients)
-      .set({
-        deletedAt: deleteTime,
-        isActive: false,
-        updatedAt: deleteTime,
-      })
-      .where(eq(patients.id, id));
-
-    // Also deactivate all related reminders
-    await db
-      .update(reminderSchedules)
-      .set({
-        isActive: false,
-        updatedAt: deleteTime,
-      })
-      .where(eq(reminderSchedules.patientId, id));
-
-    // Invalidate patient cache after deletion
-    await invalidatePatientCache(id);
-
-    return NextResponse.json({
-      message: "Patient deleted successfully",
-      deletedAt: deleteTime,
-    });
+    const service = new PatientService();
+    const result = await service.deletePatient(id);
+    return NextResponse.json(result);
   } catch (error) {
     return handleApiError(error, "deleting patient");
   }

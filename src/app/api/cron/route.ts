@@ -7,7 +7,6 @@ import {
   reminderContentAttachments,
 } from "@/db";
 import { eq, and, gte, lte, notExists, count, sql } from "drizzle-orm";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import {
   shouldSendReminderNow,
   getWIBTime,
@@ -16,7 +15,10 @@ import {
   getWIBTodayStart,
 } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
+import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 // Rate limiter temporarily disabled
+
+const whatsappService = new WhatsAppService();
 
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
@@ -374,13 +376,9 @@ async function processReminders() {
               `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
 
             // Generate enhanced message with content attachments
-            const messageBody = generateEnhancedMessage(
+            const messageBody = whatsappService.buildMessage(
               baseMessage,
               schedule.contentAttachments
-            );
-
-            const formattedNumber = formatWhatsAppNumber(
-              schedule.patientPhoneNumber
             );
 
             logger.info("Sending WhatsApp reminder with content attachments", {
@@ -392,10 +390,10 @@ async function processReminders() {
               messageLength: messageBody.length,
             });
 
-            const result = await sendWhatsAppMessage({
-              to: formattedNumber,
-              body: messageBody,
-            });
+            const result = await whatsappService.send(
+              schedule.patientPhoneNumber,
+              messageBody
+            );
 
             const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
             debugLogs.push(providerLogMessage);
@@ -509,85 +507,4 @@ async function processReminders() {
       { status: 500 }
     );
   }
-}
-
-// Helper function to get dynamic content prefix based on content type
-function getContentPrefix(contentType: string): string {
-  switch (contentType?.toLowerCase()) {
-    case "article":
-      return "📚 Baca juga:";
-    case "video":
-      return "🎥 Tonton juga:";
-    default:
-      logger.warn(
-        `Unsupported content type: ${contentType}, using generic prefix`,
-        {
-          api: true,
-          cron: true,
-          contentType,
-        }
-      );
-      return "📖 Lihat juga:";
-  }
-}
-
-// Helper function to get content icon based on content type
-function getContentIcon(contentType: string): string {
-  switch (contentType?.toLowerCase()) {
-    case "article":
-      return "📄";
-    case "video":
-      return "🎥";
-    default:
-      return "📖";
-  }
-}
-
-// Helper function to generate enhanced WhatsApp message with content links
-function generateEnhancedMessage(
-  baseMessage: string,
-  contentAttachments: any[]
-) {
-  if (!contentAttachments || contentAttachments.length === 0) {
-    return baseMessage;
-  }
-
-  let message = baseMessage;
-
-  // Group content by type for better organization
-  const contentByType: { [key: string]: any[] } = {};
-  contentAttachments.forEach((content: any) => {
-    const type = content.contentType?.toLowerCase() || "other";
-    if (!contentByType[type]) {
-      contentByType[type] = [];
-    }
-    contentByType[type].push(content);
-  });
-
-  // Add content sections
-  Object.keys(contentByType).forEach((contentType) => {
-    const contents = contentByType[contentType];
-    message += `\n\n${getContentPrefix(contentType)}`;
-
-    contents.forEach((content: any) => {
-      const icon = getContentIcon(content.contentType);
-      message += `\n${icon} ${content.contentTitle}`;
-      message += `\n   ${content.contentUrl}`;
-    });
-  });
-
-  message += "\n\n💙 Tim PRIMA";
-
-  // WhatsApp message length validation
-  if (message.length > 900) {
-    logger.warn("WhatsApp message truncated due to length", {
-      api: true,
-      cron: true,
-      originalLength: message.length,
-      contentCount: contentAttachments.length,
-    });
-    message = message.substring(0, 900) + "...\n💙 Tim PRIMA";
-  }
-
-  return message;
 }

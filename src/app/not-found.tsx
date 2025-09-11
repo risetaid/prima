@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Home, ArrowLeft, Users, Calendar, FileText, Phone, Heart } from 'lucide-react'
+import { Home, ArrowLeft, Phone, Heart, Users, Calendar, FileText } from 'lucide-react'
 
 export default function NotFound() {
   const router = useRouter()
@@ -15,24 +15,6 @@ export default function NotFound() {
       icon: Home,
       label: 'Dashboard Utama',
       description: 'Kembali ke beranda sistem PRIMA'
-    },
-    {
-      href: '/dashboard/pasien',
-      icon: Users,
-      label: 'Data Pasien',
-      description: 'Kelola data pasien kanker paliatif'
-    },
-    {
-      href: '/dashboard/pengingat',
-      icon: Calendar,
-      label: 'Pengingat Obat',
-      description: 'Atur jadwal dan pengingat medikasi'
-    },
-    {
-      href: '/dashboard/cms',
-      icon: FileText,
-      label: 'Konten Edukasi',
-      description: 'Artikel dan video untuk pasien'
     }
   ]
 
@@ -106,7 +88,8 @@ export default function NotFound() {
           </div>
 
           {/* Quick Navigation Links */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          <div className="flex justify-center mb-12">
+            <div className="max-w-md w-full">
             {quickLinks.map((link) => {
               const Icon = link.icon
               return (
@@ -132,6 +115,7 @@ export default function NotFound() {
                 </Card>
               )
             })}
+            </div>
           </div>
 
           {/* Healthcare Context */}

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, verificationLogs, users } from '@/db'
-import { eq, and, desc } from 'drizzle-orm'
+import { db, patients } from '@/db'
+import { eq, and } from 'drizzle-orm'
+import { PatientService } from '@/services/patient/patient.service'
 
 // Get patient response history for a patient
 export async function GET(
@@ -34,25 +35,9 @@ export async function GET(
       )
     }
 
-    // Get patient response history with user details
-    const historyResult = await db
-      .select({
-        id: verificationLogs.id,
-        action: verificationLogs.action,
-        messageSent: verificationLogs.messageSent,
-        patientResponse: verificationLogs.patientResponse,
-        verificationResult: verificationLogs.verificationResult,
-        createdAt: verificationLogs.createdAt,
-        processedBy: verificationLogs.processedBy,
-        // User details
-        volunteerFirstName: users.firstName,
-        volunteerLastName: users.lastName,
-        volunteerEmail: users.email
-      })
-      .from(verificationLogs)
-      .leftJoin(users, eq(verificationLogs.processedBy, users.id))
-      .where(eq(verificationLogs.patientId, patientId))
-      .orderBy(desc(verificationLogs.createdAt))
+    // Get patient response history with user details via service
+    const service = new PatientService()
+    const historyResult = await service.getVerificationHistory(patientId)
 
     // Format history for UI consumption
     const history = historyResult.map(entry => ({

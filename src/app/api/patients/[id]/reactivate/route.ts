@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, verificationLogs, reminderSchedules } from '@/db'
-import { eq } from 'drizzle-orm'
+import { PatientService } from '@/services/patient/patient.service'
 
 // Reactivate patient after BERHENTI (unsubscribe)
 export async function POST(
@@ -17,81 +16,10 @@ export async function POST(
 
     const { id: patientId } = await params
 
-    // Get current patient status
-    const patientResult = await db
-      .select()
-      .from(patients)
-      .where(eq(patients.id, patientId))
-      .limit(1)
+    const service = new PatientService()
+    const result = await service.reactivatePatient(patientId, { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email })
 
-    if (patientResult.length === 0) {
-      return NextResponse.json(
-        { error: 'Patient not found' },
-        { status: 404 }
-      )
-    }
-
-    const patient = patientResult[0]
-
-    // Validate patient can be reactivated
-    if (patient.isActive) {
-      return NextResponse.json(
-        { error: 'Patient is already active' },
-        { status: 400 }
-      )
-    }
-
-    if (patient.verificationStatus !== 'declined') {
-      return NextResponse.json(
-        { error: 'Patient cannot be reactivated. Only declined patients can be reactivated.' },
-        { status: 400 }
-      )
-    }
-
-    // Reactivate patient - reset to pending verification state
-    const updateData = {
-      isActive: true,
-      verificationStatus: 'pending_verification' as const,
-      verificationSentAt: null,
-      verificationResponseAt: null,
-      verificationMessage: null,
-      verificationAttempts: '0',
-      verificationExpiresAt: null,
-      updatedAt: new Date()
-    }
-
-    await db
-      .update(patients)
-      .set(updateData)
-      .where(eq(patients.id, patientId))
-
-    // Reactivate all reminder schedules for this patient
-    await db
-      .update(reminderSchedules)
-      .set({
-        isActive: true,
-        updatedAt: new Date()
-      })
-      .where(eq(reminderSchedules.patientId, patientId))
-
-    // Log reactivation event
-    await db
-      .insert(verificationLogs)
-      .values({
-        patientId: patientId,
-        action: 'reactivated',
-        patientResponse: `Patient reactivated by volunteer: ${user.firstName} ${user.lastName}`.trim() || user.email,
-        verificationResult: 'pending_verification',
-        processedBy: user.id
-      })
-
-    return NextResponse.json({
-      success: true,
-      message: 'Patient berhasil diaktifkan kembali',
-      newStatus: 'pending_verification',
-      processedBy: `${user.firstName} ${user.lastName}`.trim() || user.email,
-      nextStep: 'Patient siap untuk menerima pesan verifikasi ulang'
-    })
+    return NextResponse.json(result)
 
   } catch (error) {
     console.error('Reactivation error:', error)

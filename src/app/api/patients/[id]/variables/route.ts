@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
-import { db, patientVariables, patients } from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
 import { createErrorResponse, handleApiError } from "@/lib/api-utils";
+import { VariablesService } from "@/services/patient/variables.service";
+import { PatientError } from "@/services/patient/patient.types";
+
+const variablesService = new VariablesService();
 
 // GET /api/patients/[id]/variables - Get all variables for a patient
 export async function GET(
@@ -17,50 +19,12 @@ export async function GET(
 
     const { id: patientId } = await params;
 
-    // Verify patient exists
-    const patient = await db
-      .select()
-      .from(patients)
-      .where(eq(patients.id, patientId))
-      .limit(1);
-
-    if (patient.length === 0) {
-      return NextResponse.json({ error: "Patient not found" }, { status: 404 });
-    }
-
-    // Get all active variables for this patient (excluding soft-deleted)
-    const variables = await db
-      .select({
-        id: patientVariables.id,
-        variableName: patientVariables.variableName,
-        variableValue: patientVariables.variableValue,
-        createdAt: patientVariables.createdAt,
-        updatedAt: patientVariables.updatedAt,
-      })
-      .from(patientVariables)
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.isActive, true),
-          isNull(patientVariables.deletedAt)
-        )
-      )
-      .orderBy(patientVariables.variableName);
-
-    // Convert to object format for easy access
-    const variablesObject = variables.reduce((acc, variable) => {
-      acc[variable.variableName] = variable.variableValue;
-      return acc;
-    }, {} as Record<string, string>);
-
-    return NextResponse.json({
-      success: true,
-      patientId,
-      variables: variablesObject,
-      variablesList: variables,
-      count: variables.length,
-    });
+    const response = await variablesService.get(patientId);
+    return NextResponse.json(response);
   } catch (error) {
+    if (error instanceof PatientError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     return handleApiError(error, "fetching patient variables");
   }
 }
@@ -85,122 +49,12 @@ export async function POST(
     const body = await request.json();
     const { variables } = body;
 
-    if (!variables || typeof variables !== "object") {
-      return createErrorResponse(
-        "Variables object is required",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
-
-    // Verify patient exists
-    const patient = await db
-      .select()
-      .from(patients)
-      .where(eq(patients.id, patientId))
-      .limit(1);
-
-    if (patient.length === 0) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
-    }
-
-    // Get existing variables
-    const existingVariables = await db
-      .select()
-      .from(patientVariables)
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.isActive, true)
-        )
-      );
-
-    const existingVariableNames = new Set(
-      existingVariables.map((v) => v.variableName)
-    );
-
-    const operations = [];
-
-    // Process each variable in the request
-    for (const [variableName, variableValue] of Object.entries(variables)) {
-      if (typeof variableValue !== "string" || variableValue.trim() === "") {
-        continue; // Skip empty or non-string values
-      }
-
-      if (existingVariableNames.has(variableName)) {
-        // Update existing variable
-        operations.push(
-          db
-            .update(patientVariables)
-            .set({
-              variableValue: variableValue.trim(),
-              updatedAt: new Date(),
-            })
-            .where(
-              and(
-                eq(patientVariables.patientId, patientId),
-                eq(patientVariables.variableName, variableName),
-                eq(patientVariables.isActive, true)
-              )
-            )
-        );
-      } else {
-        // Create new variable
-        operations.push(
-          db.insert(patientVariables).values({
-            patientId,
-            variableName,
-            variableValue: variableValue.trim(),
-            createdById: currentUser.id,
-            isActive: true,
-          })
-        );
-      }
-    }
-
-    // Execute all operations
-    if (operations.length > 0) {
-      await Promise.all(operations);
-    }
-
-    // Return updated variables
-    const updatedVariables = await db
-      .select({
-        id: patientVariables.id,
-        variableName: patientVariables.variableName,
-        variableValue: patientVariables.variableValue,
-        createdAt: patientVariables.createdAt,
-        updatedAt: patientVariables.updatedAt,
-      })
-      .from(patientVariables)
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.isActive, true)
-        )
-      )
-      .orderBy(patientVariables.variableName);
-
-    const variablesObject = updatedVariables.reduce((acc, variable) => {
-      acc[variable.variableName] = variable.variableValue;
-      return acc;
-    }, {} as Record<string, string>);
-
-    return NextResponse.json({
-      success: true,
-      message: "Variables updated successfully",
-      patientId,
-      variables: variablesObject,
-      variablesList: updatedVariables,
-      count: updatedVariables.length,
-    });
+    const response = await variablesService.upsertMany(patientId, variables, currentUser.id);
+    return NextResponse.json(response);
   } catch (error) {
+    if (error instanceof PatientError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     return handleApiError(error, "updating patient variables");
   }
 }
@@ -234,38 +88,12 @@ export async function DELETE(
       );
     }
 
-    // Soft delete the variable (set deletedAt timestamp)
-    const result = await db
-      .update(patientVariables)
-      .set({
-        deletedAt: new Date(),
-        isActive: false,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.variableName, variableName),
-          eq(patientVariables.isActive, true)
-        )
-      )
-      .returning();
-
-    if (result.length === 0) {
-      return createErrorResponse(
-        "Variable not found or already deleted",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `Variable "${variableName}" deleted successfully`,
-      deletedVariable: result[0],
-    });
+    const result = await variablesService.delete(patientId, variableName);
+    return NextResponse.json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
+    if (error instanceof PatientError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    }
     return handleApiError(error, "deleting patient variable");
   }
 }
