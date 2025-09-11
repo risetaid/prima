@@ -67,6 +67,68 @@ export default function ScheduledRemindersPage() {
     onConfirm: () => {},
   });
 
+  // Helper function to get dynamic content prefix based on content type
+  const getContentPrefix = (contentType: string): string => {
+    switch (contentType?.toLowerCase()) {
+      case "article":
+        return "📚 Baca juga:";
+      case "video":
+        return "🎥 Tonton juga:";
+      default:
+        return "📖 Lihat juga:";
+    }
+  };
+
+  // Helper function to get content icon based on content type
+  const getContentIcon = (contentType: string): string => {
+    switch (contentType?.toLowerCase()) {
+      case "article":
+        return "📄";
+      case "video":
+        return "🎥";
+      default:
+        return "📖";
+    }
+  };
+
+  // Generate preview message with dynamic content prefixes
+  const generatePreviewMessage = (
+    message: string,
+    content: ContentItem[]
+  ): string => {
+    if (!content || content.length === 0) {
+      return message;
+    }
+
+    let previewMessage = message;
+
+    // Group content by type for better organization
+    const contentByType: { [key: string]: ContentItem[] } = {};
+    content.forEach((item) => {
+      const type = item.type?.toLowerCase() || "other";
+      if (!contentByType[type]) {
+        contentByType[type] = [];
+      }
+      contentByType[type].push(item);
+    });
+
+    // Add content sections
+    Object.keys(contentByType).forEach((contentType) => {
+      const contents = contentByType[contentType];
+      previewMessage += `\n\n${getContentPrefix(contentType)}`;
+
+      contents.forEach((item) => {
+        const icon = getContentIcon(item.type);
+        previewMessage += `\n${icon} ${item.title}`;
+        previewMessage += `\n   ${item.url}`;
+      });
+    });
+
+    previewMessage += "\n\n💙 Tim PRIMA";
+
+    return previewMessage;
+  };
+
   useEffect(() => {
     if (params.id) {
       fetchScheduledReminders(params.id as string);
@@ -459,6 +521,27 @@ export default function ScheduledRemindersPage() {
                   {selectedReminder.scheduledTime}
                 </p>
               </div>
+
+              {/* Message Preview */}
+              {(editMessage.trim() || selectedContent.length > 0) && (
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <h4 className="text-sm font-medium text-blue-700 mb-2">
+                    Pratinjau Pesan WhatsApp:
+                  </h4>
+                  <div className="bg-white p-3 rounded border text-sm text-gray-800 whitespace-pre-line max-h-32 overflow-y-auto">
+                    {generatePreviewMessage(
+                      editMessage.trim() ||
+                        `Minum obat ${
+                          selectedReminder?.medicationName || "obat"
+                        }`,
+                      selectedContent
+                    )}
+                  </div>
+                  <p className="text-xs text-blue-600 mt-2">
+                    Pesan ini akan dikirim ke pasien dengan konten yang dipilih
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div>

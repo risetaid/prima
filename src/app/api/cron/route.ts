@@ -511,6 +511,38 @@ async function processReminders() {
   }
 }
 
+// Helper function to get dynamic content prefix based on content type
+function getContentPrefix(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📚 Baca juga:";
+    case "video":
+      return "🎥 Tonton juga:";
+    default:
+      logger.warn(
+        `Unsupported content type: ${contentType}, using generic prefix`,
+        {
+          api: true,
+          cron: true,
+          contentType,
+        }
+      );
+      return "📖 Lihat juga:";
+  }
+}
+
+// Helper function to get content icon based on content type
+function getContentIcon(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📄";
+    case "video":
+      return "🎥";
+    default:
+      return "📖";
+  }
+}
+
 // Helper function to generate enhanced WhatsApp message with content links
 function generateEnhancedMessage(
   baseMessage: string,
@@ -521,12 +553,27 @@ function generateEnhancedMessage(
   }
 
   let message = baseMessage;
-  message += "\n\n📚 Baca juga:";
 
+  // Group content by type for better organization
+  const contentByType: { [key: string]: any[] } = {};
   contentAttachments.forEach((content: any) => {
-    const icon = content.contentType === "article" ? "📄" : "🎥";
-    message += `\n${icon} ${content.contentTitle}`;
-    message += `\n   ${content.contentUrl}`;
+    const type = content.contentType?.toLowerCase() || "other";
+    if (!contentByType[type]) {
+      contentByType[type] = [];
+    }
+    contentByType[type].push(content);
+  });
+
+  // Add content sections
+  Object.keys(contentByType).forEach((contentType) => {
+    const contents = contentByType[contentType];
+    message += `\n\n${getContentPrefix(contentType)}`;
+
+    contents.forEach((content: any) => {
+      const icon = getContentIcon(content.contentType);
+      message += `\n${icon} ${content.contentTitle}`;
+      message += `\n   ${content.contentUrl}`;
+    });
   });
 
   message += "\n\n💙 Tim PRIMA";
