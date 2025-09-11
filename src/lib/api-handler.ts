@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUser, requireAdmin, requireSuperAdmin, type AuthUser, type AdminUser } from '@/lib/auth-utils'
 import { getCachedData, setCachedData } from '@/lib/cache'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // ===== TYPES =====
 
@@ -225,11 +226,24 @@ export function createApiHandler<TInput = any, TOutput = any>(
         try {
           const cached = await getCachedData(cacheKey)
           if (cached) {
-            console.log(`🎯 API Cache hit: ${cacheKey}`)
+            logger.info('API cache hit', {
+              api: true,
+              cache: true,
+              operation: 'cache_hit',
+              cacheKey,
+              method: request.method,
+              url: request.url
+            })
             return NextResponse.json(cached)
           }
         } catch (error) {
-          console.warn('⚠️ Cache read error (continuing without cache):', error)
+          logger.warn('Cache read error, continuing without cache', {
+            api: true,
+            cache: true,
+            operation: 'cache_read_error',
+            cacheKey,
+            error: error instanceof Error ? error.message : String(error)
+          })
         }
       }
       
@@ -336,15 +350,39 @@ export function createApiHandler<TInput = any, TOutput = any>(
           
         try {
           await setCachedData(cacheKey, result, config.cache.ttl)
-          console.log(`💾 API Cache set: ${cacheKey} (TTL: ${config.cache.ttl}s)`)
+          logger.info('API cache set successfully', {
+            api: true,
+            cache: true,
+            operation: 'cache_set',
+            cacheKey,
+            ttl: config.cache.ttl,
+            method: request.method,
+            url: request.url
+          })
         } catch (error) {
-          console.warn('⚠️ Cache write error (response not cached):', error)
+          logger.warn('Cache write error, response not cached', {
+            api: true,
+            cache: true,
+            operation: 'cache_write_error',
+            cacheKey,
+            ttl: config.cache.ttl,
+            error: error instanceof Error ? error.message : String(error)
+          })
         }
       }
       
       // 8. Log Performance
       const duration = Date.now() - startTime
-      console.log(`⚡ API ${request.method} ${url.pathname} - ${duration}ms - User: ${user?.id || 'anonymous'}`)
+      logger.info('API request completed', {
+        api: true,
+        performance: true,
+        operation: 'api_request',
+        method: request.method,
+        path: url.pathname,
+        duration,
+        userId: user?.id || 'anonymous',
+        status: config.successStatus || 200
+      })
       
       // 9. Return Success Response
       return NextResponse.json(result, { 
@@ -359,8 +397,17 @@ export function createApiHandler<TInput = any, TOutput = any>(
       // Global Error Handler
       const duration = Date.now() - startTime
       const errorId = crypto.randomUUID().slice(0, 8)
-      
-      console.error(`❌ API Error [${errorId}] ${request.method} ${request.url} - ${duration}ms:`, error)
+
+      logger.error('API request failed', error instanceof Error ? error : new Error(String(error)), {
+        api: true,
+        error: true,
+        operation: 'api_error',
+        errorId,
+        method: request.method,
+        url: request.url,
+        duration,
+        userId: apiContext?.user?.id || 'anonymous'
+      })
       
       // Medical-specific error handling
       if (error instanceof Error) {
@@ -491,9 +538,22 @@ export async function invalidatePatientCache(patientId: string) {
   for (const key of cacheKeys) {
     try {
       // This would integrate with your cache invalidation system
-      console.log(`🗑️ Invalidating cache: ${key}`)
+      logger.info('Invalidating patient cache', {
+        api: true,
+        cache: true,
+        operation: 'cache_invalidation',
+        cacheKey: key,
+        patientId
+      })
     } catch (error) {
-      console.warn(`⚠️ Failed to invalidate cache key ${key}:`, error)
+      logger.warn('Failed to invalidate patient cache key', {
+        api: true,
+        cache: true,
+        operation: 'cache_invalidation_error',
+        cacheKey: key,
+        patientId,
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }
 }
@@ -508,9 +568,22 @@ export async function invalidateUserCache(userId: string) {
   
   for (const key of cacheKeys) {
     try {
-      console.log(`🗑️ Invalidating cache: ${key}`)
+      logger.info('Invalidating user cache', {
+        api: true,
+        cache: true,
+        operation: 'cache_invalidation',
+        cacheKey: key,
+        userId
+      })
     } catch (error) {
-      console.warn(`⚠️ Failed to invalidate cache key ${key}:`, error)
+      logger.warn('Failed to invalidate user cache key', {
+        api: true,
+        cache: true,
+        operation: 'cache_invalidation_error',
+        cacheKey: key,
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      })
     }
   }
 }

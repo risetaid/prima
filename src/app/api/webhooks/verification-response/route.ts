@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, patients, verificationLogs, reminderSchedules } from '@/db'
 import { eq, and, or } from 'drizzle-orm'
 import { safeInvalidatePatientCache } from '@/lib/cache'
+import { logger } from '@/lib/logger'
 
 // Process WhatsApp verification responses from patients
 export async function POST(request: NextRequest) {
@@ -14,7 +15,13 @@ export async function POST(request: NextRequest) {
     try {
       parsedBody = JSON.parse(rawBody)
     } catch (parseError) {
-      console.log('Failed to parse webhook body:', rawBody)
+      logger.error('Failed to parse verification webhook body', parseError instanceof Error ? parseError : new Error(String(parseError)), {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'parse_webhook_body',
+        bodyLength: rawBody.length
+      })
       return NextResponse.json(
         { error: 'Invalid JSON body' },
         { status: 400 }
@@ -25,10 +32,26 @@ export async function POST(request: NextRequest) {
     const { device, sender, message, name } = parsedBody
     
     // Log incoming webhook for debugging
-    console.log('Patient response webhook received:', { device, sender, message, name })
+    logger.info('Patient verification response webhook received', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'webhook_received',
+      device,
+      sender,
+      messageLength: message?.length,
+      name
+    })
 
     if (!sender || !message) {
-      console.log('Missing required fields:', { sender, message })
+      logger.warn('Missing required fields in verification webhook', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'validate_webhook_fields',
+        hasSender: !!sender,
+        hasMessage: !!message
+      })
       return NextResponse.json(
         { error: 'Missing sender or message' },
         { status: 400 }
@@ -50,17 +73,25 @@ export async function POST(request: NextRequest) {
       alternativePhone = '62' + phone.slice(1)
     }
 
-    console.log('Looking for patient with phone:', { phone, alternativePhone })
-
     // Process patient response
     const response = message.toLowerCase().trim()
     const verificationResult = processVerificationResponse(response)
+
+    logger.info('Searching for patient by phone number', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'find_patient',
+      phone,
+      alternativePhone,
+      verificationResult
+    })
 
     // For BERHENTI (unsubscribe), accept from any active patient
     // For verification responses (YA/TIDAK), accept from any active patient regardless of current status
     // This allows patients to change their mind (declined → verified or verified → declined)
     const baseWhereClause = and(
-      alternativePhone ? 
+      alternativePhone ?
         or(
           eq(patients.phoneNumber, phone),
           eq(patients.phoneNumber, alternativePhone)
@@ -69,7 +100,7 @@ export async function POST(request: NextRequest) {
       eq(patients.isActive, true)
     )
 
-    const whereClause = verificationResult === 'unsubscribed' 
+    const whereClause = verificationResult === 'unsubscribed'
       ? baseWhereClause
       : baseWhereClause // Remove restriction - allow status changes from any current verification status
 
@@ -80,7 +111,15 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (patientResult.length === 0) {
-      console.log('No patient found for phone:', phone, 'with verification result:', verificationResult, 'alternative phone:', alternativePhone)
+      logger.warn('No patient found for verification webhook', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'patient_not_found',
+        phone,
+        alternativePhone,
+        verificationResult
+      })
       return NextResponse.json(
         { message: 'No patient found or patient not eligible for this action' },
         { status: 200 }
@@ -88,12 +127,24 @@ export async function POST(request: NextRequest) {
     }
 
     const patient = patientResult[0]
-    console.log('Patient found:', { name: patient.name, currentStatus: patient.verificationStatus, newResult: verificationResult })
+    logger.info('Patient found for verification webhook', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'patient_found',
+      patientName: patient.name,
+      currentStatus: patient.verificationStatus,
+      newResult: verificationResult
+    })
 
     // Check if patient is already verified - if so, only log the message but don't change status
     if (patient.verificationStatus === 'verified') {
-      console.log('Patient already verified, logging message but not changing status:', {
-        name: patient.name,
+      logger.info('Patient already verified, logging message only', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'patient_already_verified',
+        patientName: patient.name,
         message: message,
         currentStatus: patient.verificationStatus
       })
@@ -116,8 +167,12 @@ export async function POST(request: NextRequest) {
 
     // Check if patient has unsubscribed - if so, only log the message but don't change status
     if (patient.verificationStatus === 'unsubscribed') {
-      console.log('Patient has unsubscribed, logging message but not changing status:', {
-        name: patient.name,
+      logger.info('Patient has unsubscribed, logging message only', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'patient_unsubscribed',
+        patientName: patient.name,
         message: message,
         currentStatus: patient.verificationStatus
       })
@@ -140,8 +195,12 @@ export async function POST(request: NextRequest) {
 
     // Only process verification responses if patient is in pending_verification status
     if (patient.verificationStatus !== 'pending_verification') {
-      console.log('Patient not in pending verification status, ignoring verification response:', {
-        name: patient.name,
+      logger.info('Patient not in pending verification status, ignoring response', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'ignore_non_pending_response',
+        patientName: patient.name,
         currentStatus: patient.verificationStatus,
         message: message
       })
@@ -173,7 +232,14 @@ export async function POST(request: NextRequest) {
           verificationResult: 'pending_verification' // Keep pending for unknown responses
         })
 
-      console.log('Unknown verification response:', response)
+      logger.info('Unknown verification response received', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'unknown_response',
+        response: response,
+        patientName: patient.name
+      })
       return NextResponse.json(
         { message: 'Unknown response logged' },
         { status: 200 }
@@ -202,14 +268,25 @@ export async function POST(request: NextRequest) {
     // Invalidate patient cache after verification update with error handling
     const cacheResult = await safeInvalidatePatientCache(patient.id)
     if (!cacheResult.success) {
-      console.warn('Cache invalidation partially failed:', cacheResult.errors)
+      logger.warn('Cache invalidation partially failed during verification update', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'cache_invalidation',
+        patientId: patient.id,
+        errors: cacheResult.errors
+      })
       // Continue anyway - don't fail the webhook
     }
 
-    console.log('Patient status updated:', {
-      name: patient.name,
-      from: patient.verificationStatus,
-      to: updateData.verificationStatus,
+    logger.info('Patient verification status updated successfully', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'status_updated',
+      patientName: patient.name,
+      fromStatus: patient.verificationStatus,
+      toStatus: updateData.verificationStatus,
       cacheInvalidation: cacheResult.success ? 'success' : 'partial_failure'
     })
 
@@ -224,7 +301,15 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(reminderSchedules.patientId, patient.id))
       } catch (error) {
-        console.warn('Failed to deactivate reminders:', error)
+        logger.warn('Failed to deactivate reminders during unsubscribe', {
+          api: true,
+          webhooks: true,
+          verification: true,
+          operation: 'deactivate_reminders',
+          patientId: patient.id,
+          patientName: patient.name,
+          error: error instanceof Error ? error.message : String(error)
+        })
         // Continue anyway
       }
     }
@@ -245,7 +330,14 @@ export async function POST(request: NextRequest) {
       await sendConfirmationMessage(phone, confirmationMessage)
     }
 
-    console.log(`Patient response processed: ${patient.name} -> ${verificationResult}`)
+    logger.info('Patient verification response processed successfully', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'response_processed',
+      patientName: patient.name,
+      verificationResult: verificationResult
+    })
 
     return NextResponse.json({
       success: true,
@@ -255,7 +347,12 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Patient response webhook error:', error)
+    logger.error('Patient verification response webhook error', error instanceof Error ? error : new Error(String(error)), {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'webhook_processing'
+    })
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -315,7 +412,13 @@ async function sendConfirmationMessage(phoneNumber: string, message: string) {
   try {
     const fonnte_token = process.env.FONNTE_TOKEN
     if (!fonnte_token) {
-      console.warn('FONNTE_TOKEN not configured, skipping confirmation message')
+      logger.warn('FONNTE_TOKEN not configured, skipping confirmation message', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'send_confirmation',
+        phoneNumber: phoneNumber
+      })
       return
     }
 
@@ -334,11 +437,26 @@ async function sendConfirmationMessage(phoneNumber: string, message: string) {
 
     const result = await response.json()
     if (!response.ok) {
-      console.warn('Failed to send confirmation message:', result)
+      logger.warn('Failed to send confirmation message via Fonnte', {
+        api: true,
+        webhooks: true,
+        verification: true,
+        operation: 'send_confirmation',
+        phoneNumber: phoneNumber,
+        responseStatus: response.status,
+        fonnteResult: result
+      })
     }
 
   } catch (error) {
-    console.warn('Error sending confirmation message:', error)
+    logger.warn('Error sending confirmation message', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'send_confirmation',
+      phoneNumber: phoneNumber,
+      error: error instanceof Error ? error.message : String(error)
+    })
   }
 }
 
@@ -356,7 +474,13 @@ export async function GET(request: NextRequest) {
       name: 'Test Patient'
     }
     
-    console.log('Test verification webhook:', mockWebhook)
+    logger.info('Test verification webhook initiated', {
+      api: true,
+      webhooks: true,
+      verification: true,
+      operation: 'test_webhook',
+      mockData: mockWebhook
+    })
     
     // Process the mock webhook
     const mockRequest = new Request(request.url, {

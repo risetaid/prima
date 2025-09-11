@@ -16,6 +16,7 @@ import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import {
   getWIBTime,
 } from "@/lib/timezone";
+import { logger } from "@/lib/logger";
 // Rate limiter temporarily disabled
 
 export async function GET(
@@ -535,7 +536,15 @@ async function validateContentAttachments(
         }
       }
     } catch (error) {
-      console.warn(`Failed to validate content ${content.id}:`, error);
+      logger.warn('Failed to validate reminder content attachment', {
+        api: true,
+        patients: true,
+        reminders: true,
+        operation: 'validate_content_attachment',
+        contentId: content.id,
+        contentType: content.type,
+        error: error instanceof Error ? error.message : String(error)
+      });
       continue;
     }
   }

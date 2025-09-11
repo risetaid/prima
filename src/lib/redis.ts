@@ -1,4 +1,5 @@
 import Redis from 'ioredis'
+import { logger } from './logger'
 
 class RedisClient {
   private client: Redis | null = null
@@ -29,23 +30,35 @@ class RedisClient {
       })
 
       this.client.on('error', (err: Error) => {
-        console.warn('IORedis Client Error:', err)
+        logger.error('IORedis Client Error', err, {
+          redis: true,
+          connection: 'failed'
+        })
         // Don't throw - gracefully degrade
         this.client = null
       })
 
       this.client.on('connect', () => {
-        console.log('IORedis connected successfully')
+        logger.info('IORedis connected successfully', {
+          redis: true,
+          connection: 'established'
+        })
       })
 
       this.client.on('ready', () => {
-        console.log('IORedis ready for commands')
+        logger.info('IORedis ready for commands', {
+          redis: true,
+          status: 'ready'
+        })
       })
 
       // Test connection
       await this.client.ping()
     } catch (error) {
-      console.warn('Failed to initialize IORedis:', error)
+      logger.error('Failed to initialize IORedis', error instanceof Error ? error : new Error(String(error)), {
+        redis: true,
+        initialization: 'failed'
+      })
       this.client = null
     } finally {
       this.isConnecting = false
@@ -58,7 +71,11 @@ class RedisClient {
     try {
       return await this.client.get(key)
     } catch (error) {
-      console.warn('IORedis GET failed:', error)
+      logger.warn('IORedis GET failed', {
+        redis: true,
+        operation: 'get',
+        error: error instanceof Error ? error.message : String(error)
+      })
       return null
     }
   }
@@ -74,7 +91,11 @@ class RedisClient {
       }
       return true
     } catch (error) {
-      console.warn('IORedis SET failed:', error)
+      logger.warn('IORedis SET failed', {
+        redis: true,
+        operation: 'set',
+        error: error instanceof Error ? error.message : String(error)
+      })
       return false
     }
   }
@@ -86,7 +107,11 @@ class RedisClient {
       await this.client.del(key)
       return true
     } catch (error) {
-      console.warn('IORedis DEL failed:', error)
+      logger.warn('IORedis DEL failed', {
+        redis: true,
+        operation: 'del',
+        error: error instanceof Error ? error.message : String(error)
+      })
       return false
     }
   }
@@ -98,7 +123,11 @@ class RedisClient {
       const result = await this.client.exists(key)
       return result === 1
     } catch (error) {
-      console.warn('IORedis EXISTS failed:', error)
+      logger.warn('IORedis EXISTS failed', {
+        redis: true,
+        operation: 'exists',
+        error: error instanceof Error ? error.message : String(error)
+      })
       return false
     }
   }

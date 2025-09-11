@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, cmsArticles, cmsVideos, users } from '@/db'
 import { eq, desc, and, isNull, sql } from 'drizzle-orm'
+import { logger } from '@/lib/logger'
 
 // GET - Public content API for all authenticated users to access published content
 export async function GET(request: NextRequest) {
@@ -119,7 +120,15 @@ export async function GET(request: NextRequest) {
       })
       .slice(0, limit)
 
-    console.log(`✅ Public Content: Returned ${combinedContent.length} published items for user ${user.role}`)
+    logger.info('Public content retrieved successfully', {
+      api: true,
+      content: true,
+      public: true,
+      userRole: user.role,
+      itemCount: combinedContent.length,
+      type: type,
+      limit: limit
+    })
 
     return NextResponse.json({
       success: true,
@@ -128,7 +137,12 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ Public Content: Unexpected error:', error)
+    logger.error('Failed to retrieve public content', error instanceof Error ? error : new Error(String(error)), {
+      api: true,
+      content: true,
+      public: true,
+      operation: 'get_published_content'
+    })
     
     return NextResponse.json(
       { 

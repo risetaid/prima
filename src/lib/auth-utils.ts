@@ -2,6 +2,7 @@ import { db, users, patients } from '@/db'
 import { redirect } from 'next/navigation'
 import { eq, and, isNull, desc, asc, count } from 'drizzle-orm'
 import type { User } from '@/db/schema'
+import { logger } from '@/lib/logger'
 
 // Server-side only imports - conditionally imported to avoid client-side issues
 let auth: (() => Promise<{ userId: string | null }>) | null = null
@@ -32,7 +33,10 @@ export interface AdminUser extends AuthUser {
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     if (!auth) {
-      console.error('🔍 Auth: Clerk auth function not available')
+      logger.error('Clerk auth function not available', new Error('Auth function not initialized'), {
+        auth: true,
+        clerk: true
+      })
       return null
     }
 
@@ -43,7 +47,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
 
     if (!currentUser) {
-      console.error('🔍 Auth: Clerk currentUser function not available')
+      logger.error('Clerk currentUser function not available', new Error('CurrentUser function not initialized'), {
+        auth: true,
+        clerk: true
+      })
       return null
     }
 
@@ -67,10 +74,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       } catch (dbError: unknown) {
         retries--
         const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
-        console.log(`🔄 Auth: Database query failed, retries left: ${retries}`, {
-          error: errorMessage,
+        logger.warn('Database query failed during user authentication', {
+          auth: true,
+          database: true,
           userId,
-          attempt: 3 - retries
+          retriesLeft: retries,
+          attempt: 3 - retries,
+          error: errorMessage
         })
         
         // Only retry on connection issues with shorter delay
@@ -87,7 +97,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const dbUser = dbUserResult?.[0]
 
     if (!dbUser) {
-      console.log(`🔍 Auth: No database user found for Clerk ID: ${userId}, attempting to sync...`)
+      logger.info('No database user found for Clerk ID, attempting to sync', {
+        auth: true,
+        clerk: true,
+        userId,
+        sync: true
+      })
 
       // Try to sync the user automatically
       try {
@@ -114,7 +129,13 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
           .returning()
 
         const newDbUser = newUserResult[0]
-        console.log(`✅ Auth: User synced successfully - ${newDbUser.role} role`)
+        logger.info('User synced successfully', {
+          auth: true,
+          clerk: true,
+          userId,
+          role: newDbUser.role,
+          sync: true
+        })
 
         const authUser: AuthUser = {
           ...newDbUser,
@@ -124,7 +145,12 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
         return authUser
       } catch (syncError) {
-        console.error('❌ Auth: Failed to sync user:', syncError)
+        logger.error('Failed to sync user', syncError instanceof Error ? syncError : new Error(String(syncError)), {
+          auth: true,
+          clerk: true,
+          userId,
+          sync: true
+        })
         return null
       }
     }
@@ -137,7 +163,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
     return authUser
   } catch (error) {
-    console.error('🔍 Auth: Error getting current user:', error)
+    logger.error('Error getting current user', error instanceof Error ? error : new Error(String(error)), {
+      auth: true,
+      clerk: true
+    })
     return null
   }
 }
@@ -158,7 +187,11 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     const user = await getCurrentUser()
     return user
   } catch (error) {
-    console.warn('🔍 Auth: Failed to get authenticated user for API route:', error)
+    logger.warn('Failed to get authenticated user for API route', {
+      auth: true,
+      api: true,
+      error: error instanceof Error ? error.message : String(error)
+    })
     return null
   }
 }
@@ -233,7 +266,10 @@ export async function getUserPatients(userId: string) {
       updatedAt: row.patients.updatedAt
     }))
   } catch (error) {
-    console.error('Error getting user patients:', error)
+    logger.error('Error getting user patients', error instanceof Error ? error : new Error(String(error)), {
+      auth: true,
+      patients: true
+    })
     return []
   }
 }
