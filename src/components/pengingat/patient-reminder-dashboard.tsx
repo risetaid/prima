@@ -68,75 +68,95 @@ export function PatientReminderDashboard({
   const fetchStats = async () => {
     try {
       // Use the corrected /stats endpoint for badge counts
-      const response = await fetch(`/api/patients/${params.id}/reminders/stats`);
+      const response = await fetch(
+        `/api/patients/${params.id}/reminders/stats`
+      );
       if (response.ok) {
         const statsData = await response.json();
         setStats(statsData);
       } else {
       }
+    } catch (error) {}
+  };
+
+  const fetchScheduledReminders = async () => {
+    try {
+      const response = await fetch(
+        `/api/patients/${params.id}/reminders/scheduled`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          medicationName: item.medicationName || "Obat tidak diketahui",
+          scheduledTime: item.scheduledTime || "--:--",
+          reminderDate:
+            item.nextReminderDate || new Date().toISOString().split("T")[0],
+          customMessage: item.customMessage || "",
+          status: "scheduled",
+        }));
+        setTerjadwalReminders(mappedData);
+      }
     } catch (error) {
+      console.error("Error fetching scheduled reminders:", error);
+    }
+  };
+
+  const fetchPendingReminders = async () => {
+    try {
+      const response = await fetch(
+        `/api/patients/${params.id}/reminders/pending`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          medicationName: item.medicationName || "Obat tidak diketahui",
+          scheduledTime: item.scheduledTime || "--:--",
+          reminderDate: item.sentDate || new Date().toISOString().split("T")[0],
+          customMessage: item.customMessage || "",
+          status: "pending",
+        }));
+        setPerluDiperbaruiReminders(mappedData);
+      }
+    } catch (error) {
+      console.error("Error fetching pending reminders:", error);
+    }
+  };
+
+  const fetchCompletedReminders = async () => {
+    try {
+      const response = await fetch(
+        `/api/patients/${params.id}/reminders/completed`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const mappedData = data.map((item: any) => ({
+          id: item.id,
+          medicationName: item.medicationName || "Obat tidak diketahui",
+          scheduledTime: item.scheduledTime || "--:--",
+          reminderDate:
+            item.completedDate || new Date().toISOString().split("T")[0],
+          customMessage: item.customMessage || "",
+          status: "completed",
+          medicationTaken: item.medicationTaken,
+          confirmedAt: item.confirmedAt,
+        }));
+        setSelesaiReminders(mappedData);
+      }
+    } catch (error) {
+      console.error("Error fetching completed reminders:", error);
     }
   };
 
   const fetchAllReminders = async () => {
     try {
-      // Fetch data for display purposes only, stats come from separate endpoint
-      const response = await fetch(`/api/patients/${params.id}/reminders/all`);
-
-      if (response.ok) {
-        const allData = await response.json();
-
-        // Filter and categorize based on status from API
-        const terjadwal = allData.filter(
-          (item: any) => item.status === "scheduled"
-        );
-        const perlu = allData.filter((item: any) => item.status === "pending");
-        const selesai = allData.filter(
-          (item: any) =>
-            item.status === "completed_taken" ||
-            item.status === "completed_not_taken"
-        );
-
-        // Map to expected format with proper medicationTaken for completed items
-        const mappedTerjadwal = terjadwal.map((item: any) => ({
-          id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
-          scheduledTime: item.scheduledTime || "--:--",
-          reminderDate:
-            item.reminderDate || new Date().toISOString().split("T")[0],
-          customMessage: item.customMessage || "",
-          status: "scheduled",
-        }));
-
-        const mappedPerlu = perlu.map((item: any) => ({
-          id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
-          scheduledTime: item.scheduledTime || "--:--",
-          reminderDate:
-            item.reminderDate || new Date().toISOString().split("T")[0],
-          customMessage: item.customMessage || "",
-          status: "pending",
-        }));
-
-        const mappedSelesai = selesai.map((item: any) => ({
-          id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
-          scheduledTime: item.scheduledTime || "--:--",
-          reminderDate:
-            item.reminderDate || new Date().toISOString().split("T")[0],
-          customMessage: item.customMessage || "",
-          status: "completed",
-          medicationTaken: item.status === "completed_taken",
-          confirmedAt: item.confirmedAt,
-        }));
-
-        setTerjadwalReminders(mappedTerjadwal);
-        setPerluDiperbaruiReminders(mappedPerlu);
-        setSelesaiReminders(mappedSelesai);
-
-      } else {
-        toast.error("Gagal memuat data pengingat");
-      }
+      // Fetch data from separate endpoints for each section
+      await Promise.all([
+        fetchScheduledReminders(),
+        fetchPendingReminders(),
+        fetchCompletedReminders(),
+      ]);
     } catch (error) {
       toast.error("Gagal memuat data pengingat");
     } finally {
@@ -183,7 +203,7 @@ export function PatientReminderDashboard({
         toast.success("Pengingat berhasil diperbarui");
         await fetchStats();
         await fetchStats();
-      await fetchAllReminders();
+        await fetchAllReminders();
         setIsEditModalOpen(false);
         setEditingReminder(null);
       } else {
@@ -219,17 +239,17 @@ export function PatientReminderDashboard({
 
   const performDelete = async () => {
     try {
-      
       const deletePromises = selectedReminders.map(async (reminderId) => {
         // Extract actual UUID from prefixed format (e.g., "pending-uuid" or "completed-uuid")
-        const realId = reminderId.includes('-') && reminderId.split('-').length > 4
-          ? reminderId.split('-').slice(1).join('-')
-          : reminderId;
-        
-        const response = await fetch(`/api/reminders/scheduled/${realId}`, { 
-          method: "DELETE" 
+        const realId =
+          reminderId.includes("-") && reminderId.split("-").length > 4
+            ? reminderId.split("-").slice(1).join("-")
+            : reminderId;
+
+        const response = await fetch(`/api/reminders/scheduled/${realId}`, {
+          method: "DELETE",
         });
-        
+
         if (!response.ok) {
           throw new Error(`Delete failed for ${realId}`);
         }
@@ -239,18 +259,24 @@ export function PatientReminderDashboard({
       });
 
       await Promise.all(deletePromises);
-      
+
       // Update local state immediately (like mobile does)
-      setTerjadwalReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
-      setPerluDiperbaruiReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
-      setSelesaiReminders(prev => prev.filter(r => !selectedReminders.includes(r.id)));
-      
+      setTerjadwalReminders((prev) =>
+        prev.filter((r) => !selectedReminders.includes(r.id))
+      );
+      setPerluDiperbaruiReminders((prev) =>
+        prev.filter((r) => !selectedReminders.includes(r.id))
+      );
+      setSelesaiReminders((prev) =>
+        prev.filter((r) => !selectedReminders.includes(r.id))
+      );
+
       // Update stats immediately
-      setStats(prev => ({
+      setStats((prev) => ({
         ...prev,
-        terjadwal: Math.max(0, prev.terjadwal - selectedReminders.length)
+        terjadwal: Math.max(0, prev.terjadwal - selectedReminders.length),
       }));
-      
+
       toast.success(`${selectedReminders.length} pengingat berhasil dihapus`);
 
       // Clear selected reminders immediately
@@ -274,9 +300,10 @@ export function PatientReminderDashboard({
       // Extract actual UUID from prefixed format (e.g., "pending-uuid" or "completed-uuid")
       // Desktop /all endpoint returns IDs like "pending-732829dc-1b65-4c5b-91c9-0749cd287e95"
       // But API expects just the UUID: "732829dc-1b65-4c5b-91c9-0749cd287e95"
-      const actualReminderId = reminderId.includes('-') && reminderId.split('-').length > 4
-        ? reminderId.split('-').slice(1).join('-')
-        : reminderId;
+      const actualReminderId =
+        reminderId.includes("-") && reminderId.split("-").length > 4
+          ? reminderId.split("-").slice(1).join("-")
+          : reminderId;
 
       const response = await fetch(
         `/api/patients/${params.id}/reminders/${actualReminderId}/confirm`,
@@ -296,7 +323,7 @@ export function PatientReminderDashboard({
         );
         await fetchStats();
         await fetchStats();
-      await fetchAllReminders();
+        await fetchAllReminders();
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to save confirmation");
@@ -370,7 +397,7 @@ export function PatientReminderDashboard({
           />
         </div>
       )}
-      
+
       <div
         className={`flex-1 bg-blue-600 text-white rounded-lg p-4 relative ${
           allowEdit && !showCheckbox && !showActions
@@ -429,7 +456,10 @@ export function PatientReminderDashboard({
   );
 
   const renderSelesaiCard = (reminder: Reminder, index: number) => (
-    <div key={`${reminder.id}-${reminder.status}-${index}`} className="bg-white border rounded-lg p-4">
+    <div
+      key={`${reminder.id}-${reminder.status}-${index}`}
+      className="bg-white border rounded-lg p-4"
+    >
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-semibold text-gray-900">
@@ -592,7 +622,9 @@ export function PatientReminderDashboard({
                 Tidak ada pengingat selesai
               </p>
             ) : (
-               selesaiReminders.map((reminder, index) => renderSelesaiCard(reminder, index))
+              selesaiReminders.map((reminder, index) =>
+                renderSelesaiCard(reminder, index)
+              )
             )}
           </div>
         </div>
