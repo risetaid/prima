@@ -1,229 +1,323 @@
-import { db, users, patients } from '@/db'
-import { redirect } from 'next/navigation'
-import { eq, and, isNull, desc, asc, count } from 'drizzle-orm'
-import type { User } from '@/db/schema'
-import { logger } from '@/lib/logger'
+import { db, users, patients } from "@/db";
+import { redirect } from "next/navigation";
+import { eq, and, isNull, desc, asc, count } from "drizzle-orm";
+import type { User } from "@/db/schema";
+import { logger } from "@/lib/logger";
 
 // Server-side only imports - conditionally imported to avoid client-side issues
-let auth: (() => Promise<{ userId: string | null }>) | null = null
-let currentUser: (() => Promise<{
-  id: string
-  firstName: string | null
-  lastName: string | null
-  primaryEmailAddress?: { emailAddress: string } | null
-} | null>) | null = null
+let auth: (() => Promise<{ userId: string | null }>) | null = null;
+let currentUser:
+  | (() => Promise<{
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      primaryEmailAddress?: { emailAddress: string } | null;
+    } | null>)
+  | null = null;
 
 // Only import server-side Clerk functions when not in browser
-if (typeof window === 'undefined') {
-  const { auth: clerkAuth, currentUser: clerkCurrentUser } = await import('@clerk/nextjs/server')
-  auth = clerkAuth
-  currentUser = clerkCurrentUser
+if (typeof window === "undefined") {
+  const { auth: clerkAuth, currentUser: clerkCurrentUser } = await import(
+    "@clerk/nextjs/server"
+  );
+  auth = clerkAuth;
+  currentUser = clerkCurrentUser;
 }
 
 export interface AuthUser extends User {
-  canAccessDashboard: boolean
-  needsApproval: boolean
+  canAccessDashboard: boolean;
+  needsApproval: boolean;
 }
 
 export interface AdminUser extends AuthUser {
-  id: string
-  role: 'ADMIN' | 'SUPERADMIN'
+  id: string;
+  role: "ADMIN" | "SUPERADMIN";
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
   try {
     if (!auth) {
-      logger.error('Clerk auth function not available', new Error('Auth function not initialized'), {
-        auth: true,
-        clerk: true
-      })
-      return null
+      logger.error(
+        "Clerk auth function not available",
+        new Error("Auth function not initialized"),
+        {
+          auth: true,
+          clerk: true,
+        }
+      );
+      return null;
     }
 
-    const { userId } = await auth()
+    const { userId } = await auth();
 
     if (!userId) {
-      return null
+      return null;
     }
 
     if (!currentUser) {
-      logger.error('Clerk currentUser function not available', new Error('CurrentUser function not initialized'), {
-        auth: true,
-        clerk: true
-      })
-      return null
+      logger.error(
+        "Clerk currentUser function not available",
+        new Error("CurrentUser function not initialized"),
+        {
+          auth: true,
+          clerk: true,
+        }
+      );
+      return null;
     }
 
-    const user = await currentUser()
+    const user = await currentUser();
     if (!user) {
-      return null
+      return null;
     }
 
-    // Get user from database using Clerk ID with optimized retry logic
-    let dbUserResult
-    let retries = 2  // Reduced from 3 to 2
-    
+    // Get user from database using Clerk ID with enhanced retry logic
+    let dbUserResult;
+    let retries = 3; // Increased back to 3 for better reliability
+    const baseDelay = 200; // Start with shorter delay
+
     while (retries > 0) {
       try {
         dbUserResult = await db
           .select()
           .from(users)
           .where(eq(users.clerkId, userId))
-          .limit(1)
-        break
+          .limit(1);
+        break;
       } catch (dbError: unknown) {
-        retries--
-        const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error'
-        logger.warn('Database query failed during user authentication', {
+        retries--;
+        const errorMessage =
+          dbError instanceof Error ? dbError.message : "Unknown error";
+        logger.warn("Database query failed during user authentication", {
           auth: true,
           database: true,
           userId,
           retriesLeft: retries,
-          attempt: 3 - retries,
-          error: errorMessage
-        })
-        
-        // Only retry on connection issues with shorter delay
-        if (retries > 0 && (errorMessage.includes('connection') || errorMessage.includes('timeout'))) {
-          await new Promise(resolve => setTimeout(resolve, 300)) // Reduced from 1000ms to 300ms
-          continue
+          attempt: 4 - retries,
+          error: errorMessage,
+        });
+
+        // Use exponential backoff for retries
+        if (retries > 0) {
+          const isRetriableError =
+            errorMessage.includes("connection") ||
+            errorMessage.includes("timeout") ||
+            errorMessage.includes("ECONNRESET") ||
+            errorMessage.includes("ENOTFOUND") ||
+            errorMessage.includes("pool");
+
+          if (isRetriableError) {
+            const delay = baseDelay * Math.pow(2, 3 - retries); // Exponential backoff
+            logger.info(`Retrying database query in ${delay}ms`, {
+              auth: true,
+              database: true,
+              userId,
+              retryDelay: delay,
+            });
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            continue;
+          }
         }
-        
-        // Don't retry on other types of errors
-        throw dbError
+
+        // For non-retriable errors, throw immediately
+        throw dbError;
       }
     }
 
-    const dbUser = dbUserResult?.[0]
+    const dbUser = dbUserResult?.[0];
 
     if (!dbUser) {
-      logger.info('No database user found for Clerk ID, attempting to sync', {
+      logger.info("No database user found for Clerk ID, attempting to sync", {
         auth: true,
         clerk: true,
         userId,
-        sync: true
-      })
+        sync: true,
+      });
 
-      // Try to sync the user automatically
+      // Try to sync the user automatically with enhanced error handling
       try {
         // Check if this is the first user (should be superadmin)
         const userCountResult = await db
           .select({ count: count(users.id) })
-          .from(users)
+          .from(users);
 
-        const userCount = userCountResult[0]?.count || 0
-        const isFirstUser = userCount === 0
+        const userCount = userCountResult[0]?.count || 0;
+        const isFirstUser = userCount === 0;
 
         // Create user in database
         const newUserResult = await db
           .insert(users)
           .values({
             clerkId: userId,
-            email: user.primaryEmailAddress?.emailAddress || '',
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            role: isFirstUser ? 'SUPERADMIN' : 'MEMBER',
+            email: user.primaryEmailAddress?.emailAddress || "",
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            role: isFirstUser ? "SUPERADMIN" : "MEMBER",
             isApproved: isFirstUser, // First user auto-approved
             approvedAt: isFirstUser ? new Date() : null,
           })
-          .returning()
+          .returning();
 
-        const newDbUser = newUserResult[0]
-        logger.info('User synced successfully', {
+        const newDbUser = newUserResult[0];
+
+        if (!newDbUser) {
+          throw new Error("Failed to create user record - no result returned");
+        }
+
+        logger.info("User synced successfully", {
           auth: true,
           clerk: true,
           userId,
           role: newDbUser.role,
-          sync: true
-        })
+          isApproved: newDbUser.isApproved,
+          sync: true,
+        });
 
         const authUser: AuthUser = {
           ...newDbUser,
           canAccessDashboard: newDbUser.isApproved && newDbUser.isActive,
-          needsApproval: !newDbUser.isApproved
-        }
+          needsApproval: !newDbUser.isApproved,
+        };
 
-        return authUser
+        return authUser;
       } catch (syncError) {
-        logger.error('Failed to sync user', syncError instanceof Error ? syncError : new Error(String(syncError)), {
+        logger.error(
+          "Failed to sync user",
+          syncError instanceof Error ? syncError : new Error(String(syncError)),
+          {
+            auth: true,
+            clerk: true,
+            userId,
+            sync: true,
+            error:
+              syncError instanceof Error
+                ? syncError.message
+                : String(syncError),
+          }
+        );
+
+        // Return a fallback user state instead of null for better UX
+        logger.info("Returning fallback auth state for failed sync", {
           auth: true,
           clerk: true,
           userId,
-          sync: true
-        })
-        return null
+          fallback: true,
+        });
+
+        return {
+          id: "", // Will be populated later when sync succeeds
+          clerkId: userId,
+          email: user.primaryEmailAddress?.emailAddress || "",
+          firstName: user.firstName || "",
+          lastName: user.lastName || "",
+          hospitalName: "", // Required field, will be populated later
+          role: "MEMBER" as const,
+          isApproved: false,
+          isActive: true,
+          approvedAt: null,
+          approvedBy: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+          lastLoginAt: null,
+          canAccessDashboard: false,
+          needsApproval: true,
+        };
       }
+    }
+
+    // Update last login timestamp for existing users
+    try {
+      await db
+        .update(users)
+        .set({ lastLoginAt: new Date() })
+        .where(eq(users.clerkId, userId));
+    } catch (updateError) {
+      // Don't fail the entire auth flow if login timestamp update fails
+      logger.warn("Failed to update last login timestamp", {
+        auth: true,
+        database: true,
+        userId,
+        error:
+          updateError instanceof Error
+            ? updateError.message
+            : String(updateError),
+      });
     }
 
     const authUser: AuthUser = {
       ...dbUser,
       canAccessDashboard: dbUser.isApproved && dbUser.isActive,
-      needsApproval: !dbUser.isApproved
-    }
+      needsApproval: !dbUser.isApproved,
+    };
 
-    return authUser
+    return authUser;
   } catch (error) {
-    logger.error('Error getting current user', error instanceof Error ? error : new Error(String(error)), {
-      auth: true,
-      clerk: true
-    })
-    return null
+    logger.error(
+      "Error getting current user",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        auth: true,
+        clerk: true,
+      }
+    );
+    return null;
   }
 }
 
 export async function requireAuth(): Promise<AuthUser> {
-  const user = await getCurrentUser()
-  
+  const user = await getCurrentUser();
+
   if (!user) {
-    redirect('/sign-in')
+    redirect("/sign-in");
   }
 
-  return user
+  return user;
 }
 
 // Safe version for API routes that returns null instead of throwing redirect
 export async function getAuthUser(): Promise<AuthUser | null> {
   try {
-    const user = await getCurrentUser()
-    return user
+    const user = await getCurrentUser();
+    return user;
   } catch (error) {
-    logger.warn('Failed to get authenticated user for API route', {
+    logger.warn("Failed to get authenticated user for API route", {
       auth: true,
       api: true,
-      error: error instanceof Error ? error.message : String(error)
-    })
-    return null
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }
 
 export async function requireApprovedUser(): Promise<AuthUser> {
-  const user = await requireAuth()
-  
+  const user = await requireAuth();
+
   if (!user.canAccessDashboard) {
-    redirect('/pending-approval')
+    redirect("/pending-approval");
   }
 
-  return user
+  return user;
 }
 
 export async function requireAdmin(): Promise<AdminUser> {
-  const user = await requireApprovedUser()
-  
-  if (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN') {
-    redirect('/unauthorized')
+  const user = await requireApprovedUser();
+
+  if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
+    redirect("/unauthorized");
   }
 
-  return user as AdminUser
+  return user as AdminUser;
 }
 
 export async function requireSuperAdmin(): Promise<AuthUser> {
-  const user = await requireApprovedUser()
-  
-  if (user.role !== 'SUPERADMIN') {
-    redirect('/unauthorized')
+  const user = await requireApprovedUser();
+
+  if (user.role !== "SUPERADMIN") {
+    redirect("/unauthorized");
   }
 
-  return user
+  return user;
 }
 
 export async function getUserPatients(userId: string) {
@@ -239,10 +333,10 @@ export async function getUserPatients(userId: string) {
           isNull(patients.deletedAt)
         )
       )
-      .orderBy(desc(patients.isActive), asc(patients.name))
+      .orderBy(desc(patients.isActive), asc(patients.name));
 
     // For now, return simplified patient data (we can optimize this later with proper joins)
-    return patientsResult.map(row => ({
+    return patientsResult.map((row) => ({
       id: row.patients.id,
       name: row.patients.name,
       phoneNumber: row.patients.phoneNumber,
@@ -256,20 +350,26 @@ export async function getUserPatients(userId: string) {
       isActive: row.patients.isActive,
       deletedAt: row.patients.deletedAt,
       complianceRate: 0, // TODO: Calculate properly with separate queries
-      assignedVolunteer: row.users ? {
-        id: row.users.id,
-        firstName: row.users.firstName,
-        lastName: row.users.lastName,
-        email: row.users.email
-      } : null,
+      assignedVolunteer: row.users
+        ? {
+            id: row.users.id,
+            firstName: row.users.firstName,
+            lastName: row.users.lastName,
+            email: row.users.email,
+          }
+        : null,
       createdAt: row.patients.createdAt,
-      updatedAt: row.patients.updatedAt
-    }))
+      updatedAt: row.patients.updatedAt,
+    }));
   } catch (error) {
-    logger.error('Error getting user patients', error instanceof Error ? error : new Error(String(error)), {
-      auth: true,
-      patients: true
-    })
-    return []
+    logger.error(
+      "Error getting user patients",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        auth: true,
+        patients: true,
+      }
+    );
+    return [];
   }
 }
