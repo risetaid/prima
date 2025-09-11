@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
-import { unauthorizedError, forbiddenError, internalError } from '@/lib/api-error'
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +19,10 @@ export async function GET(request: NextRequest) {
       
       if (!userId || !clerkUser) {
         console.log('❌ Profile API: No Clerk authentication found')
-        return unauthorizedError('Not authenticated')
+        return NextResponse.json(
+          { error: 'Not authenticated' },
+          { status: 401 }
+        )
       }
 
       console.log(`🔍 Profile API: Creating new user for Clerk ID: ${userId}`)
@@ -67,7 +69,10 @@ export async function GET(request: NextRequest) {
         
         if (!user) {
           console.error('❌ Profile API: Failed to retrieve user after creation')
-          return internalError('Failed to create user profile')
+          return NextResponse.json(
+            { error: 'Failed to create user profile' },
+            { status: 500 }
+          )
         }
       } catch (dbError: any) {
         // If user already exists (race condition), try to get them again
@@ -83,7 +88,10 @@ export async function GET(request: NextRequest) {
     // Handle unauthenticated users properly
     if (!user) {
       console.log('❌ Profile API: User still not found after all attempts')
-      return unauthorizedError('Not authenticated')
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401 }
+      )
     }
 
     console.log(`✅ Profile API: User found - Role: ${user.role}, Approved: ${user.isApproved}`)
@@ -91,12 +99,18 @@ export async function GET(request: NextRequest) {
     // Handle unapproved users
     if (!user.canAccessDashboard) {
       console.log('⚠️ Profile API: User not approved for dashboard access')
-      return forbiddenError('Not approved')
+      return NextResponse.json(
+        { error: 'Not approved', needsApproval: true },
+        { status: 403 }
+      )
     }
     
     return NextResponse.json(user)
   } catch (error) {
     console.error('❌ Profile API: Error fetching user profile:', error)
-    return internalError('Failed to fetch user profile')
+    return NextResponse.json(
+      { error: 'Failed to fetch user profile' },
+      { status: 500 }
+    )
   }
 }
