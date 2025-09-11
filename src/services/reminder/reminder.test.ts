@@ -1,6 +1,6 @@
 // Integration tests for centralized reminder system
 import { ReminderService } from './reminder.service'
-import { WhatsAppService } from '@/whatsapp/whatsapp.service'
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 import { ValidationError, NotFoundError } from './reminder.types'
 
 // Test script to verify the centralized system

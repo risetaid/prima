@@ -1,6 +1,6 @@
 // Reminder Service - Core business logic for reminder management
 import { ReminderRepository } from "./reminder.repository";
-import { WhatsAppService } from "@/whatsapp/whatsapp.service";
+import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import {
   CreateReminderDTO,
   UpdateReminderDTO,

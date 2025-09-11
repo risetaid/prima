@@ -1,6 +1,6 @@
 // WhatsApp Messaging Service - centralizes WA message building and sending
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
-import { ValidatedContent } from '@/reminder/reminder.types'
+import { ValidatedContent } from '@/services/reminder/reminder.types'
 
 export class WhatsAppService {
   getContentPrefix(contentType: string): string {
