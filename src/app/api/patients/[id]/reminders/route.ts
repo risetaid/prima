@@ -619,6 +619,30 @@ async function validateContentAttachments(
   return validatedContent;
 }
 
+// Helper function to get dynamic content prefix based on content type
+function getContentPrefix(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📚 Baca juga:";
+    case "video":
+      return "🎥 Tonton juga:";
+    default:
+      return "📖 Lihat juga:";
+  }
+}
+
+// Helper function to get content icon based on content type
+function getContentIcon(contentType: string): string {
+  switch (contentType?.toLowerCase()) {
+    case "article":
+      return "📄";
+    case "video":
+      return "🎥";
+    default:
+      return "📖";
+  }
+}
+
 // Helper function to generate enhanced WhatsApp message with content links
 function generateEnhancedMessage(
   originalMessage: string,
@@ -633,17 +657,31 @@ function generateEnhancedMessage(
     return originalMessage;
   }
 
-  let enhancedMessage = originalMessage;
+  let message = originalMessage;
 
-  // Add content section
-  enhancedMessage += "\n\n📚 Baca juga:";
-
+  // Group content by type for better organization
+  const contentByType: { [key: string]: any[] } = {};
   contentAttachments.forEach((content) => {
-    const icon = content.type === "article" ? "📄" : "🎥";
-    enhancedMessage += `\n${icon} ${content.title}: ${content.url}`;
+    const type = content.type?.toLowerCase() || "other";
+    if (!contentByType[type]) {
+      contentByType[type] = [];
+    }
+    contentByType[type].push(content);
   });
 
-  enhancedMessage += "\n\n💙 Tim PRIMA";
+  // Add content sections
+  Object.keys(contentByType).forEach((contentType) => {
+    const contents = contentByType[contentType];
+    message += `\n\n${getContentPrefix(contentType)}`;
 
-  return enhancedMessage;
+    contents.forEach((content) => {
+      const icon = getContentIcon(content.type);
+      message += `\n${icon} ${content.title}`;
+      message += `\n   ${content.url}`;
+    });
+  });
+
+  message += "\n\n💙 Tim PRIMA";
+
+  return message;
 }
