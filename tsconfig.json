@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "types": ["node", "jest", "@types/jest"],
     "plugins": [
       {
         "name": "next"

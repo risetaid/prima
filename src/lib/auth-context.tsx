@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import type { UserResource } from "@clerk/types";
+import { atomicGet, atomicSet, atomicRemove } from "@/lib/atomic-storage";
 
 interface AuthContextState {
   user: UserResource | null;
@@ -31,6 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [needsApproval, setNeedsApproval] = useState(true);
   const [dbUserLoaded, setDbUserLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isBackgroundFetchRunning, setIsBackgroundFetchRunning] =
+    useState(false);
 
   const isLoaded = userLoaded && authLoaded && dbUserLoaded;
 
@@ -51,24 +54,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Helper function to cache user data
-  const setCachedUserData = (data: any) => {
+  const setCachedUserData = async (data: any) => {
     try {
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({
-          data,
-          timestamp: Date.now(),
-        })
-      );
+      await atomicSet(CACHE_KEY, {
+        data,
+        timestamp: Date.now(),
+      });
     } catch (error) {
       console.warn("Failed to cache user data:", error);
     }
   };
 
   // Helper function to clear cache
-  const clearCachedUserData = () => {
+  const clearCachedUserData = async () => {
     try {
-      localStorage.removeItem(CACHE_KEY);
+      await atomicRemove(CACHE_KEY);
     } catch (error) {
       console.warn("Failed to clear cached user data:", error);
     }
@@ -124,7 +124,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCanAccessDashboard(false);
       setNeedsApproval(true);
       setDbUserLoaded(true);
-      clearCachedUserData();
+      clearCachedUserData().catch(error => {
+        console.warn("Failed to clear cached user data:", error);
+      });
       return;
     }
 
@@ -138,70 +140,107 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDbUserLoaded(true);
 
       // Still fetch fresh data in the background to ensure accuracy
-      fetchUserStatus()
-        .then((data) => {
-          // Only update if data has changed
-          if (JSON.stringify(cachedData) !== JSON.stringify(data)) {
-            console.log("Updating auth state with fresh data");
-            setRole(data.role || "MEMBER");
-            setCanAccessDashboard(data.canAccessDashboard || false);
-            setNeedsApproval(data.needsApproval !== false);
-            setCachedUserData(data);
-          }
-        })
-        .catch((error) => {
-          console.warn(
-            "Background auth refresh failed, using cached data:",
-            error
-          );
-        });
+      // Only run background fetch if not already running
+      if (!isBackgroundFetchRunning) {
+        setIsBackgroundFetchRunning(true);
+        fetchUserStatus()
+          .then((data) => {
+            // Only update if data has changed and component is still mounted
+            if (JSON.stringify(cachedData) !== JSON.stringify(data)) {
+              console.log("Updating auth state with fresh data");
+              setRole(data.role || "MEMBER");
+              setCanAccessDashboard(data.canAccessDashboard || false);
+              setNeedsApproval(data.needsApproval !== false);
+              setCachedUserData(data).catch(error => {
+                console.warn("Failed to cache user data:", error);
+              });
+            }
+          })
+          .catch((error) => {
+            console.warn(
+              "Background auth refresh failed, using cached data:",
+              error
+            );
+          })
+          .finally(() => {
+            setIsBackgroundFetchRunning(false);
+          });
+      }
 
       return;
     }
 
     // No cached data, fetch fresh data
-    fetchUserStatus()
-      .then((data) => {
-        setRole(data.role || "MEMBER");
-        setCanAccessDashboard(data.canAccessDashboard || false);
-        setNeedsApproval(data.needsApproval !== false);
-        setCachedUserData(data);
-        setRetryCount(0);
+    // Only run main fetch if background fetch is not running
+    if (!isBackgroundFetchRunning) {
+      fetchUserStatus()
+        .then((data) => {
+          setRole(data.role || "MEMBER");
+          setCanAccessDashboard(data.canAccessDashboard || false);
+          setNeedsApproval(data.needsApproval !== false);
+          setCachedUserData(data).catch(error => {
+            console.warn("Failed to update cached user data:", error);
+          });
+          setRetryCount(0);
 
-        // Store successful login timestamp for optimistic UI
-        if (data.canAccessDashboard) {
-          localStorage.setItem(
-            "prima_last_successful_login",
-            Date.now().toString()
+          // Store successful login timestamp for optimistic UI
+          if (data.canAccessDashboard) {
+            atomicSet(
+              "prima_last_successful_login",
+              Date.now().toString()
+            ).catch((error) => {
+              console.warn("Failed to store login timestamp:", error);
+            });
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "Failed to fetch user status after all retries:",
+            error
           );
-        }
-      })
-      .catch((error) => {
-        console.error("Failed to fetch user status after all retries:", error);
 
-        // Check if user had successful login recently for graceful degradation
-        const lastLogin = localStorage.getItem("prima_last_successful_login");
-        const recentLogin =
-          lastLogin && Date.now() - parseInt(lastLogin) < 24 * 60 * 60 * 1000; // 24 hours
+          // Check if user had successful login recently for graceful degradation
+          const lastLoginPromise = atomicGet("prima_last_successful_login");
+          lastLoginPromise
+            .then((lastLogin) => {
+              const recentLogin =
+                typeof lastLogin === "string" &&
+                Date.now() - parseInt(lastLogin) < 24 * 60 * 60 * 1000; // 24 hours
 
-        if (recentLogin) {
-          console.log("Using graceful degradation for recent user");
-          setRole("MEMBER");
-          setCanAccessDashboard(true);
-          setNeedsApproval(false);
-        } else {
-          // Fallback to safe defaults for new users
-          console.log("Using safe defaults for failed auth");
-          setRole("MEMBER");
-          setCanAccessDashboard(false);
-          setNeedsApproval(true);
-        }
+              if (recentLogin) {
+                console.log("Using graceful degradation for recent user");
+                setRole("MEMBER");
+                setCanAccessDashboard(true);
+                setNeedsApproval(false);
+              } else {
+                // Fallback to safe defaults for new users
+                console.log("Using safe defaults for failed auth");
+                setRole("MEMBER");
+                setCanAccessDashboard(false);
+                setNeedsApproval(true);
+              }
 
-        setRetryCount((prev) => prev + 1);
-      })
-      .finally(() => {
-        setDbUserLoaded(true);
-      });
+              setRetryCount((prev) => prev + 1);
+              setDbUserLoaded(true);
+            })
+            .catch((error) => {
+              console.warn("Failed to read login timestamp:", error);
+              // Fallback to safe defaults
+              console.log("Using safe defaults for failed auth");
+              setRole("MEMBER");
+              setCanAccessDashboard(false);
+              setNeedsApproval(true);
+              setRetryCount((prev) => prev + 1);
+              setDbUserLoaded(true);
+            });
+        })
+        .finally(() => {
+          setDbUserLoaded(true);
+        });
+    } else {
+      // Background fetch is running, just mark as loaded
+      setDbUserLoaded(true);
+    }
   }, [user, userLoaded, authLoaded]);
 
   const value: AuthContextState = {

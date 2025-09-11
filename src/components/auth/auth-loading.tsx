@@ -1,85 +1,133 @@
-'use client'
+"use client";
 
-import { useAuthContext } from '@/lib/auth-context'
-import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useAuthContext } from "@/lib/auth-context";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
 
 interface AuthLoadingProps {
-  children: React.ReactNode
-  requireAuth?: boolean
-  requireApproval?: boolean
-  allowedRoles?: ('SUPERADMIN' | 'ADMIN' | 'MEMBER')[]
+  children: React.ReactNode;
+  requireAuth?: boolean;
+  requireApproval?: boolean;
+  allowedRoles?: ("SUPERADMIN" | "ADMIN" | "MEMBER")[];
 }
 
 export function AuthLoading({
   children,
   requireAuth = false,
   requireApproval = false,
-  allowedRoles
+  allowedRoles,
 }: AuthLoadingProps) {
-  const { isLoaded, isSignedIn, canAccessDashboard, role } = useAuthContext()
-  const router = useRouter()
-  const pathname = usePathname()
+  const { isLoaded, isSignedIn, canAccessDashboard, role } = useAuthContext();
+  const router = useRouter();
+  const pathname = usePathname();
 
   // Optimistic access for returning users
-  const [optimisticAccess, setOptimisticAccess] = useState(false)
+  const [optimisticAccess, setOptimisticAccess] = useState(false);
+
+  // Redirect debouncing
+  const lastRedirectRef = useRef<{ path: string; timestamp: number } | null>(
+    null
+  );
+  const REDIRECT_DEBOUNCE_MS = 500; // 500ms debounce
+
+  // Debounced redirect function
+  const debouncedRedirect = (path: string) => {
+    const now = Date.now();
+    const lastRedirect = lastRedirectRef.current;
+
+    // If we're redirecting to the same path within debounce window, skip
+    if (
+      lastRedirect &&
+      lastRedirect.path === path &&
+      now - lastRedirect.timestamp < REDIRECT_DEBOUNCE_MS
+    ) {
+      console.log(`Skipping duplicate redirect to ${path} (debounced)`);
+      return;
+    }
+
+    // Update last redirect tracking
+    lastRedirectRef.current = { path, timestamp: now };
+
+    console.log(`Redirecting to ${path}`);
+    router.replace(path);
+  };
 
   useEffect(() => {
     // Check if user had successful login recently for optimistic UI
     if (isSignedIn && !canAccessDashboard && !isLoaded) {
-      const lastLogin = localStorage.getItem('prima_last_successful_login')
-      const recentLogin = lastLogin && (Date.now() - parseInt(lastLogin)) < 24 * 60 * 60 * 1000 // 24 hours
+      const lastLogin = localStorage.getItem("prima_last_successful_login");
+      const recentLogin =
+        lastLogin && Date.now() - parseInt(lastLogin) < 24 * 60 * 60 * 1000; // 24 hours
 
       if (recentLogin) {
-        console.log('Using optimistic access for recent user')
-        setOptimisticAccess(true)
+        console.log("Using optimistic access for recent user");
+        setOptimisticAccess(true);
       }
     }
 
     // Clear optimistic access when auth state is fully loaded
     if (isLoaded) {
-      setOptimisticAccess(false)
+      setOptimisticAccess(false);
     }
-  }, [isSignedIn, canAccessDashboard, isLoaded])
+  }, [isSignedIn, canAccessDashboard, isLoaded]);
 
   useEffect(() => {
-    if (!isLoaded) return // Wait for auth to load
+    if (!isLoaded) return; // Wait for auth to load
 
     // Handle authentication requirements
     if (requireAuth && !isSignedIn) {
-      router.replace('/sign-in')
-      return
+      debouncedRedirect("/sign-in");
+      return;
     }
 
     // Handle approval requirements with optimistic access
-    if (requireApproval && isSignedIn && !canAccessDashboard && !optimisticAccess) {
-      router.replace('/pending-approval')
-      return
+    if (
+      requireApproval &&
+      isSignedIn &&
+      !canAccessDashboard &&
+      !optimisticAccess
+    ) {
+      debouncedRedirect("/pending-approval");
+      return;
     }
 
     // Handle role-based access
     if (allowedRoles && role && !allowedRoles.includes(role)) {
-      router.replace('/unauthorized')
-      return
+      debouncedRedirect("/unauthorized");
+      return;
     }
 
     // Redirect signed-in users away from auth pages - only if they can access dashboard
-    if (isSignedIn && (pathname === '/sign-in' || pathname === '/sign-up')) {
+    if (isSignedIn && (pathname === "/sign-in" || pathname === "/sign-up")) {
       if (canAccessDashboard || optimisticAccess) {
-        router.replace('/dashboard')
+        debouncedRedirect("/dashboard");
       } else {
-        router.replace('/pending-approval')
+        debouncedRedirect("/pending-approval");
       }
-      return
+      return;
     }
 
     // If we're on pending-approval but user can access dashboard, redirect
-    if (isSignedIn && pathname === '/pending-approval' && (canAccessDashboard || optimisticAccess)) {
-      router.replace('/dashboard')
-      return
+    if (
+      isSignedIn &&
+      pathname === "/pending-approval" &&
+      (canAccessDashboard || optimisticAccess)
+    ) {
+      debouncedRedirect("/dashboard");
+      return;
     }
-
-  }, [isLoaded, isSignedIn, canAccessDashboard, role, requireAuth, requireApproval, allowedRoles, router, pathname, optimisticAccess])
+  }, [
+    isLoaded,
+    isSignedIn,
+    canAccessDashboard,
+    role,
+    requireAuth,
+    requireApproval,
+    allowedRoles,
+    router,
+    pathname,
+    optimisticAccess,
+  ]);
 
   // Show loading spinner while auth is loading
   if (!isLoaded) {
@@ -90,14 +138,15 @@ export function AuthLoading({
           <p className="mt-4 text-gray-600">Memuat...</p>
         </div>
       </div>
-    )
+    );
   }
 
   // Don't render children if redirecting
-  if (requireAuth && !isSignedIn) return null
-  if (requireApproval && isSignedIn && !canAccessDashboard) return null
-  if (allowedRoles && role && !allowedRoles.includes(role)) return null
-  if (isSignedIn && (pathname === '/sign-in' || pathname === '/sign-up')) return null
+  if (requireAuth && !isSignedIn) return null;
+  if (requireApproval && isSignedIn && !canAccessDashboard) return null;
+  if (allowedRoles && role && !allowedRoles.includes(role)) return null;
+  if (isSignedIn && (pathname === "/sign-in" || pathname === "/sign-up"))
+    return null;
 
-  return <>{children}</>
+  return <>{children}</>;
 }

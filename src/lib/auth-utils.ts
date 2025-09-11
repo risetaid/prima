@@ -3,6 +3,13 @@ import { redirect } from "next/navigation";
 import { eq, and, isNull, desc, asc, count } from "drizzle-orm";
 import type { User } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import {
+  getCachedData,
+  setCachedData,
+  invalidateCache,
+  CACHE_KEYS,
+  CACHE_TTL,
+} from "@/lib/cache";
 
 // Server-side only imports - conditionally imported to avoid client-side issues
 let auth: (() => Promise<{ userId: string | null }>) | null = null;
@@ -14,6 +21,9 @@ let currentUser:
       primaryEmailAddress?: { emailAddress: string } | null;
     } | null>)
   | null = null;
+
+// Request deduplication map to prevent concurrent getCurrentUser calls for the same user
+const ongoingRequests = new Map<string, Promise<AuthUser | null>>();
 
 // Only import server-side Clerk functions when not in browser
 if (typeof window === "undefined") {
@@ -54,98 +64,117 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       return null;
     }
 
-    if (!currentUser) {
-      logger.error(
-        "Clerk currentUser function not available",
-        new Error("CurrentUser function not initialized"),
-        {
-          auth: true,
-          clerk: true,
-        }
-      );
-      return null;
+    // Check if there's already an ongoing request for this user
+    const ongoingRequest = ongoingRequests.get(userId);
+    if (ongoingRequest) {
+      logger.info("Reusing ongoing auth request for user", {
+        auth: true,
+        userId,
+        deduplication: true,
+      });
+      return await ongoingRequest;
     }
 
-    const user = await currentUser();
-    if (!user) {
-      return null;
+    // Create a new request promise and store it
+    const requestPromise = performGetCurrentUser(userId);
+    ongoingRequests.set(userId, requestPromise);
+
+    try {
+      const result = await requestPromise;
+      return result;
+    } finally {
+      // Clean up the ongoing request
+      ongoingRequests.delete(userId);
     }
+  } catch (error) {
+    logger.error(
+      "Error getting current user",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        auth: true,
+        clerk: true,
+      }
+    );
+    return null;
+  }
+}
 
-    // Get user from database using Clerk ID with enhanced retry logic
-    let dbUserResult;
-    let retries = 3; // Increased back to 3 for better reliability
-    const baseDelay = 200; // Start with shorter delay
+// Internal function that performs the actual user lookup with caching and transaction safety
+async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
+  const cacheKey = CACHE_KEYS.userSession(userId);
 
-    while (retries > 0) {
-      try {
-        dbUserResult = await db
+  // Try to get from cache first
+  const cachedUser = await getCachedData<AuthUser>(cacheKey);
+  if (cachedUser) {
+    logger.info("User data retrieved from cache", {
+      auth: true,
+      userId,
+      cache: true,
+    });
+    return cachedUser;
+  }
+
+  if (!currentUser) {
+    logger.error(
+      "Clerk currentUser function not available",
+      new Error("CurrentUser function not initialized"),
+      {
+        auth: true,
+        clerk: true,
+      }
+    );
+    return null;
+  }
+
+  const user = await currentUser();
+  if (!user) {
+    return null;
+  }
+
+  // Get user from database using Clerk ID with enhanced retry logic and transaction safety
+  let dbUserResult;
+  let retries = 3;
+  const baseDelay = 200;
+
+  while (retries > 0) {
+    try {
+      // Use transaction for user lookup and sync operations
+      dbUserResult = await db.transaction(async (tx) => {
+        // First, try to find existing user
+        const existingUser = await tx
           .select()
           .from(users)
           .where(eq(users.clerkId, userId))
           .limit(1);
-        break;
-      } catch (dbError: unknown) {
-        retries--;
-        const errorMessage =
-          dbError instanceof Error ? dbError.message : "Unknown error";
-        logger.warn("Database query failed during user authentication", {
-          auth: true,
-          database: true,
-          userId,
-          retriesLeft: retries,
-          attempt: 4 - retries,
-          error: errorMessage,
-        });
 
-        // Use exponential backoff for retries
-        if (retries > 0) {
-          const isRetriableError =
-            errorMessage.includes("connection") ||
-            errorMessage.includes("timeout") ||
-            errorMessage.includes("ECONNRESET") ||
-            errorMessage.includes("ENOTFOUND") ||
-            errorMessage.includes("pool");
+        if (existingUser[0]) {
+          // Update last login timestamp atomically
+          await tx
+            .update(users)
+            .set({ lastLoginAt: new Date() })
+            .where(eq(users.clerkId, userId));
 
-          if (isRetriableError) {
-            const delay = baseDelay * Math.pow(2, 3 - retries); // Exponential backoff
-            logger.info(`Retrying database query in ${delay}ms`, {
-              auth: true,
-              database: true,
-              userId,
-              retryDelay: delay,
-            });
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            continue;
-          }
+          return existingUser[0];
         }
 
-        // For non-retriable errors, throw immediately
-        throw dbError;
-      }
-    }
+        // User doesn't exist, sync with Clerk data
+        logger.info("No database user found for Clerk ID, attempting to sync", {
+          auth: true,
+          clerk: true,
+          userId,
+          sync: true,
+        });
 
-    const dbUser = dbUserResult?.[0];
-
-    if (!dbUser) {
-      logger.info("No database user found for Clerk ID, attempting to sync", {
-        auth: true,
-        clerk: true,
-        userId,
-        sync: true,
-      });
-
-      // Try to sync the user automatically with enhanced error handling
-      try {
-        // Check if this is the first user (should be superadmin)
-        const userCountResult = await db
+        // Check if this is the first user (should be superadmin) - use transaction-safe count
+        const userCountResult = await tx
           .select({ count: count(users.id) })
           .from(users);
 
         const userCount = userCountResult[0]?.count || 0;
         const isFirstUser = userCount === 0;
 
-        // Create user in database
-        const newUserResult = await db
+        // Create user in database within transaction
+        const newUserResult = await tx
           .insert(users)
           .values({
             clerkId: userId,
@@ -173,96 +202,103 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
           sync: true,
         });
 
-        const authUser: AuthUser = {
-          ...newDbUser,
-          canAccessDashboard: newDbUser.isApproved && newDbUser.isActive,
-          needsApproval: !newDbUser.isApproved,
-        };
+        return newDbUser;
+      });
 
-        return authUser;
-      } catch (syncError) {
-        logger.error(
-          "Failed to sync user",
-          syncError instanceof Error ? syncError : new Error(String(syncError)),
-          {
-            auth: true,
-            clerk: true,
-            userId,
-            sync: true,
-            error:
-              syncError instanceof Error
-                ? syncError.message
-                : String(syncError),
-          }
-        );
-
-        // Return a fallback user state instead of null for better UX
-        logger.info("Returning fallback auth state for failed sync", {
-          auth: true,
-          clerk: true,
-          userId,
-          fallback: true,
-        });
-
-        return {
-          id: "", // Will be populated later when sync succeeds
-          clerkId: userId,
-          email: user.primaryEmailAddress?.emailAddress || "",
-          firstName: user.firstName || "",
-          lastName: user.lastName || "",
-          hospitalName: "", // Required field, will be populated later
-          role: "MEMBER" as const,
-          isApproved: false,
-          isActive: true,
-          approvedAt: null,
-          approvedBy: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          deletedAt: null,
-          lastLoginAt: null,
-          canAccessDashboard: false,
-          needsApproval: true,
-        };
-      }
-    }
-
-    // Update last login timestamp for existing users
-    try {
-      await db
-        .update(users)
-        .set({ lastLoginAt: new Date() })
-        .where(eq(users.clerkId, userId));
-    } catch (updateError) {
-      // Don't fail the entire auth flow if login timestamp update fails
-      logger.warn("Failed to update last login timestamp", {
+      break;
+    } catch (dbError: unknown) {
+      retries--;
+      const errorMessage =
+        dbError instanceof Error ? dbError.message : "Unknown error";
+      logger.warn("Database query failed during user authentication", {
         auth: true,
         database: true,
         userId,
-        error:
-          updateError instanceof Error
-            ? updateError.message
-            : String(updateError),
+        retriesLeft: retries,
+        attempt: 4 - retries,
+        error: errorMessage,
       });
-    }
 
-    const authUser: AuthUser = {
-      ...dbUser,
-      canAccessDashboard: dbUser.isApproved && dbUser.isActive,
-      needsApproval: !dbUser.isApproved,
+      // Use exponential backoff for retries
+      if (retries > 0) {
+        const isRetriableError =
+          errorMessage.includes("connection") ||
+          errorMessage.includes("timeout") ||
+          errorMessage.includes("ECONNRESET") ||
+          errorMessage.includes("ENOTFOUND") ||
+          errorMessage.includes("pool");
+
+        if (isRetriableError) {
+          const delay = baseDelay * Math.pow(2, 3 - retries);
+          logger.info(`Retrying database query in ${delay}ms`, {
+            auth: true,
+            database: true,
+            userId,
+            retryDelay: delay,
+          });
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+
+      // For non-retriable errors, throw immediately
+      throw dbError;
+    }
+  }
+
+  const dbUser = dbUserResult;
+
+  if (!dbUser) {
+    // Return fallback user state for failed sync
+    logger.info("Returning fallback auth state for failed sync", {
+      auth: true,
+      clerk: true,
+      userId,
+      fallback: true,
+    });
+
+    const fallbackUser: AuthUser = {
+      id: "",
+      clerkId: userId,
+      email: user.primaryEmailAddress?.emailAddress || "",
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      hospitalName: "",
+      role: "MEMBER" as const,
+      isApproved: false,
+      isActive: true,
+      approvedAt: null,
+      approvedBy: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      deletedAt: null,
+      lastLoginAt: null,
+      canAccessDashboard: false,
+      needsApproval: true,
     };
 
-    return authUser;
-  } catch (error) {
-    logger.error(
-      "Error getting current user",
-      error instanceof Error ? error : new Error(String(error)),
-      {
-        auth: true,
-        clerk: true,
-      }
-    );
-    return null;
+    // Cache fallback user for short time to prevent repeated failures
+    await setCachedData(cacheKey, fallbackUser, 60); // 1 minute
+    return fallbackUser;
   }
+
+  const authUser: AuthUser = {
+    ...dbUser,
+    canAccessDashboard: dbUser.isApproved && dbUser.isActive,
+    needsApproval: !dbUser.isApproved,
+  };
+
+  // Cache the user data
+  await setCachedData(cacheKey, authUser, CACHE_TTL.USER_SESSION);
+
+  logger.info("User data cached successfully", {
+    auth: true,
+    userId,
+    cache: true,
+    ttl: CACHE_TTL.USER_SESSION,
+  });
+
+  return authUser;
 }
 
 export async function requireAuth(): Promise<AuthUser> {
