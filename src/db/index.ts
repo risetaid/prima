@@ -19,3 +19,4 @@ export const db = drizzle(client, { schema })
 // Export types for convenience
 export type DB = typeof db
 export * from './schema'
+

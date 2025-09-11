@@ -140,3 +140,4 @@ class RedisClient {
 
 // Export singleton instance
 export const redis = new RedisClient()
+

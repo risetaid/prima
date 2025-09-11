@@ -232,3 +232,4 @@ export function DashboardErrorBoundary({ children }: { children: React.ReactNode
     </ErrorBoundary>
   )
 }
+

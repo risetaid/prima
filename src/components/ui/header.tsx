@@ -23,3 +23,4 @@ export function Header({ showNavigation = true, className = "" }: HeaderProps) {
     </div>
   );
 }
+

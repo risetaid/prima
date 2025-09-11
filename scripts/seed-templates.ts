@@ -10,7 +10,7 @@
  * - Superadmin user (davidyusaku13@gmail.com) must exist and be approved
  */
 
-import { db, whatsappTemplates, users } from "../src/db";
+import { db, whatsappTemplates, users } from "@/db";
 import { eq } from "drizzle-orm";
 
 // ===== TEMPLATE DATA =====

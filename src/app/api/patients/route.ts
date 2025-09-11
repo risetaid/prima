@@ -69,3 +69,4 @@ export const POST = createApiHandler(
     return await service.createPatient(body, { id: user.id, role: user.role })
   }
 )
+

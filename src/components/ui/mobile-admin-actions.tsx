@@ -188,3 +188,4 @@ export function MobilePasienActions({ className = "" }: MobileAdminActionsProps)
     </button>
   );
 }
+

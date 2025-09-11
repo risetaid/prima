@@ -120,3 +120,4 @@ export function logBundleInfo() {
     console.log('Bundle monitoring: Implement with your build tool (Webpack/Vite/etc.)')
   }
 }
+

@@ -115,3 +115,4 @@ export type HealthNoteCreateData = z.infer<typeof HealthNoteCreateSchema>
 export type ArticleCreateData = z.infer<typeof ArticleCreateSchema>
 export type VideoCreateData = z.infer<typeof VideoCreateSchema>
 export type UserProfileUpdateData = z.infer<typeof UserProfileUpdateSchema>
+

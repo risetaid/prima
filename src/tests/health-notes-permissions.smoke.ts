@@ -1,5 +1,5 @@
 // Bun test: HealthNoteService permissions
-import { HealthNoteService } from '../services/patient/health-note.service'
+import { HealthNoteService } from '@/services/patient/health-note.service'
 
 async function run() {
   const svc = new HealthNoteService()
@@ -42,4 +42,5 @@ run().catch(err => {
   console.error('Test failed:', err)
   process.exit(1)
 })
+
 

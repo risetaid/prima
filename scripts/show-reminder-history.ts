@@ -1,4 +1,4 @@
-import { db, patients, reminderSchedules, reminderLogs, manualConfirmations } from '../src/db'
+import { db, patients, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, isNull, desc } from 'drizzle-orm'
 
 async function showReminderHistory() {

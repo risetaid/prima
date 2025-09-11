@@ -98,3 +98,4 @@ export async function POST(request: NextRequest) {
   // If auth passes, run the same test as GET
   return GET(request);
 }
+

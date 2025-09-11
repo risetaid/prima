@@ -1,5 +1,5 @@
 // Bun test: PatientService CRUD (create, update, delete, reactivate)
-import { PatientService } from '../services/patient/patient.service'
+import { PatientService } from '@/services/patient/patient.service'
 
 async function run() {
   const service = new PatientService()
@@ -32,4 +32,5 @@ run().catch(err => {
   console.error('Test failed:', err)
   process.exit(1)
 })
+
 

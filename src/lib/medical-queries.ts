@@ -756,3 +756,4 @@ export async function measureMedicalQuery<T>(
     throw error
   }
 }
+

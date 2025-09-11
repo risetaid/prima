@@ -57,3 +57,4 @@ export function formatDuration(seconds: number): string {
 export function getYouTubeThumbnail(videoId: string, quality: 'default' | 'medium' | 'high' | 'maxres' = 'maxres'): string {
   return `https://img.youtube.com/vi/${videoId}/${quality === 'maxres' ? 'maxresdefault' : quality}.jpg`
 }
+

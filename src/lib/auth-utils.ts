@@ -409,3 +409,4 @@ export async function getUserPatients(userId: string) {
     return [];
   }
 }
+

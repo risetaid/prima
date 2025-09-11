@@ -178,3 +178,4 @@ export default function VerificationInfoPanel({ status, patient }: VerificationI
     </div>
   )
 }
+

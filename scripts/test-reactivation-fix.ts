@@ -1,4 +1,4 @@
-import { db, patients, reminderSchedules } from '../src/db'
+import { db, patients, reminderSchedules } from '@/db'
 import { eq, and, isNull } from 'drizzle-orm'
 
 async function testReactivationFix() {

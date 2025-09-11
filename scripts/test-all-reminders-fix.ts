@@ -1,4 +1,4 @@
-import { db, reminderLogs, reminderSchedules, manualConfirmations } from '../src/db'
+import { db, reminderLogs, reminderSchedules, manualConfirmations } from '@/db'
 import { eq, and, desc, inArray } from 'drizzle-orm'
 
 async function testAllRemindersFix() {

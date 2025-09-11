@@ -146,3 +146,4 @@ export function createTableColumns<T>(
 ): TableColumn<T>[] {
   return columns;
 }
+

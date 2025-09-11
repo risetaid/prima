@@ -1,18 +1,18 @@
 // Jest types are available globally with @types/jest
 import "@testing-library/jest-dom";
-import { ComplianceService } from "../services/patient/compliance.service";
-import { db } from "../db";
-import { logger } from "../lib/logger";
+import { ComplianceService } from "@/services/patient/compliance.service";
+import { db } from "@/db";
+import { logger } from "@/lib/logger";
 
 // Mock the database and logger
-jest.mock("../db", () => ({
+jest.mock("@/db", () => ({
   db: {
     select: jest.fn(),
     execute: jest.fn(),
   },
 }));
 
-jest.mock("../lib/logger", () => ({
+jest.mock("@/lib/logger", () => ({
   logger: {
     performance: jest.fn(),
     error: jest.fn(),
@@ -244,3 +244,4 @@ describe("ComplianceService", () => {
     });
   });
 });
+

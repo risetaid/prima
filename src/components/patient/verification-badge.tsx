@@ -128,3 +128,4 @@ export function getVerificationStatusDescription(status: string, isActive: boole
   const statusInfo = getPatientDisplayStatus({ verificationStatus: status, isActive })
   return statusInfo.description
 }
+

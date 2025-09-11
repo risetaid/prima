@@ -1,4 +1,4 @@
-import { db, reminderLogs, manualConfirmations } from '../src/db'
+import { db, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, count } from 'drizzle-orm'
 
 async function checkComplianceCalculation() {

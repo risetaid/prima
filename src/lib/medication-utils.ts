@@ -114,3 +114,4 @@ export function containsMedicationKeywords(text: string): boolean {
 export function getMedicationKeywords(): readonly string[] {
   return MEDICATION_KEYWORDS;
 }
+

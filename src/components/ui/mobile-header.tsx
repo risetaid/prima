@@ -131,3 +131,4 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
     </header>
   );
 }
+

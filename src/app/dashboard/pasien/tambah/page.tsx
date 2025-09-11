@@ -232,3 +232,4 @@ export default function AddPatientPage() {
     </div>
   )
 }
+

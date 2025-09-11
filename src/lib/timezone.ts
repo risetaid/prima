@@ -89,3 +89,4 @@ export const convertUTCToWIBString = (utcDate: Date): string => {
   const wibDate = new Date(utcDate.getTime() + 7 * 60 * 60 * 1000)
   return wibDate.toISOString()
 }
+

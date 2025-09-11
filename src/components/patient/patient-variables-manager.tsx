@@ -286,3 +286,4 @@ export function PatientVariablesManager({ patientId, patientName }: PatientVaria
     </Card>
   )
 }
+

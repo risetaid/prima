@@ -230,3 +230,4 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
     </Dialog>
   )
 }
+

@@ -275,3 +275,4 @@ export const getStartOfDayWIB = DateUtils.getStartOfDayWIB.bind(DateUtils)
 export const getEndOfDayWIB = DateUtils.getEndOfDayWIB.bind(DateUtils)
 export const getTodayRangeWIB = DateUtils.getTodayRangeWIB.bind(DateUtils)
 export const isTodayWIB = DateUtils.isTodayWIB.bind(DateUtils)
+

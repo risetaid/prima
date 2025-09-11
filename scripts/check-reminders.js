@@ -1,6 +1,6 @@
-import { db, reminderSchedules, reminderLogs, patients } from '../src/db/index.js'
+import { db, reminderSchedules, reminderLogs, patients } from '@/db/index.js'
 import { eq, and, sql, isNull } from 'drizzle-orm'
-import { getWIBDateString } from '../src/lib/timezone.js'
+import { getWIBDateString } from '@/lib/timezone.js'
 
 async function checkReminders() {
   try {

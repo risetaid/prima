@@ -487,3 +487,4 @@ export default function CreateVideoPage() {
     </div>
   );
 }
+

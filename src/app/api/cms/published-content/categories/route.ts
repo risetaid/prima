@@ -75,3 +75,4 @@ function getCategoryIcon(category: string): string {
   }
   return icons[category] || '📄'
 }
+

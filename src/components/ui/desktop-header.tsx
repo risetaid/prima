@@ -229,3 +229,4 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
     </header>
   );
 }
+

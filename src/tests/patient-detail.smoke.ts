@@ -1,5 +1,5 @@
 // Minimal Bun test for PatientService.getDetail
-import { PatientService } from '../services/patient/patient.service'
+import { PatientService } from '@/services/patient/patient.service'
 
 async function main() {
   const service = new PatientService()
@@ -28,4 +28,5 @@ async function main() {
 }
 
 main()
+
 

@@ -193,3 +193,4 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
     </div>
   )
 }
+

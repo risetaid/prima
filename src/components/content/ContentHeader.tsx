@@ -23,3 +23,4 @@ export function ContentHeader({ title, text }: ContentHeaderProps) {
     </header>
   )
 }
+

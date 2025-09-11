@@ -1,5 +1,5 @@
 // Bun test: ComplianceService attach & single rate
-import { ComplianceService } from '../services/patient/compliance.service'
+import { ComplianceService } from '@/services/patient/compliance.service'
 
 async function run() {
   const svc = new ComplianceService()
@@ -25,4 +25,5 @@ run().catch(err => {
   console.error('Test failed:', err)
   process.exit(1)
 })
+
 

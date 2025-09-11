@@ -140,3 +140,4 @@ export async function whatsappRateLimit(request: NextRequest): Promise<{ allowed
 export async function adminRateLimit(request: NextRequest): Promise<{ allowed: boolean; response?: NextResponse }> {
   return rateLimitMiddleware(request, 'ADMIN')
 }
+

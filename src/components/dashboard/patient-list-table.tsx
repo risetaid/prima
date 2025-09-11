@@ -151,3 +151,4 @@ export function PatientListTable({ patients, loading }: PatientListTableProps) {
     </div>
   );
 }
+

@@ -5,7 +5,7 @@
  * Tests the fix for duplicate verification responses
  */
 
-import { db, patients } from '../src/db'
+import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 
 async function testVerificationWebhook() {

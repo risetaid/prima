@@ -566,3 +566,4 @@ export type CmsArticle = typeof cmsArticles.$inferSelect
 export type NewCmsArticle = typeof cmsArticles.$inferInsert
 export type CmsVideo = typeof cmsVideos.$inferSelect
 export type NewCmsVideo = typeof cmsVideos.$inferInsert
+

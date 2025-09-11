@@ -23,3 +23,4 @@ export function generateRandomString(length: number = 8): string {
   }
   return result
 }
+

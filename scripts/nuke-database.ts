@@ -13,7 +13,7 @@
 
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import * as schema from '../src/db/schema'
+import * as schema from '@/db/schema'
 
 // Database connection
 const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL

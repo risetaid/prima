@@ -1,4 +1,4 @@
-import { db, patients, reminderLogs, manualConfirmations } from '../src/db'
+import { db, patients, reminderLogs, manualConfirmations } from '@/db'
 import { eq, and, count, sql } from 'drizzle-orm'
 
 async function testPatientAPI() {

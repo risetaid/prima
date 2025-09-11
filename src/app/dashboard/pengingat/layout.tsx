@@ -5,3 +5,4 @@ export default function PengingatLayout({
 }) {
   return <div className="min-h-screen bg-gray-50">{children}</div>;
 }
+
