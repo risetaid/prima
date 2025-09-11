@@ -1,7 +1,8 @@
 // Reminder Repository - Database access layer for reminders
-import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments, cmsArticles, cmsVideos } from '@/db'
+import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
 import { and, eq, inArray, isNull, sql, desc, gte, lte, notExists, count } from 'drizzle-orm'
 import { ReminderFilters, ReminderSchedule, ReminderScheduleInsert, ValidatedContent } from './reminder.types'
+import { validateContentAttachments } from '@/lib/content-validation'
 
 export class ReminderRepository {
   async getById(id: string) {
@@ -115,38 +116,7 @@ export class ReminderRepository {
   }
 
   async validateAttachments(attachedContent: Array<{ id: string; type: 'article' | 'video' | 'ARTICLE' | 'VIDEO'; title: string }>) {
-    const validated: ValidatedContent[] = []
-
-    for (const content of attachedContent) {
-      if (!content.id || !content.type || !content.title) continue
-      const normalized = content.type.toLowerCase() as 'article' | 'video'
-
-      if (normalized === 'article') {
-        const result = await db
-          .select({ slug: cmsArticles.slug, title: cmsArticles.title })
-          .from(cmsArticles)
-          .where(and(eq(cmsArticles.id, content.id), eq(cmsArticles.status, 'published'), isNull(cmsArticles.deletedAt)))
-          .limit(1)
-
-        if (result.length) {
-          validated.push({ id: content.id, type: 'article', title: result[0].title, url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${result[0].slug}` })
-        }
-      }
-
-      if (normalized === 'video') {
-        const result = await db
-          .select({ slug: cmsVideos.slug, title: cmsVideos.title })
-          .from(cmsVideos)
-          .where(and(eq(cmsVideos.id, content.id), eq(cmsVideos.status, 'published'), isNull(cmsVideos.deletedAt)))
-          .limit(1)
-
-        if (result.length) {
-          validated.push({ id: content.id, type: 'video', title: result[0].title, url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${result[0].slug}` })
-        }
-      }
-    }
-
-    return validated
+    return await validateContentAttachments(attachedContent)
   }
 }
 

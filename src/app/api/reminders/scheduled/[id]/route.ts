@@ -1,35 +1,45 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import {
-  db,
-  reminderSchedules,
-  patients,
-  reminderContentAttachments,
-  cmsArticles,
-  cmsVideos,
-} from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
+import { createApiHandler } from "@/lib/api-handler";
+import { db, reminderSchedules, reminderContentAttachments } from "@/db";
+import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
-import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { extractMedicationName } from "@/lib/medication-utils";
+import { validateContentAttachments } from "@/lib/content-validation";
+import { invalidateAfterReminderOperation } from "@/lib/cache-invalidation";
+import { z } from "zod";
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+const updateReminderBodySchema = z.object({
+  reminderTime: z.string().min(1, "Reminder time is required"),
+  customMessage: z.string().min(1, "Custom message is required"),
+  attachedContent: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.enum(["article", "video"]),
+        title: z.string(),
+      })
+    )
+    .optional(),
+});
 
-    const { id } = await params;
-    const { reminderTime, customMessage, attachedContent } =
-      await request.json();
+const updateReminderParamsSchema = z.object({
+  id: z.string().uuid("Invalid reminder ID format"),
+});
+
+type UpdateReminderBody = z.infer<typeof updateReminderBodySchema>;
+
+export const PUT = createApiHandler(
+  {
+    auth: "required",
+    body: updateReminderBodySchema,
+    params: updateReminderParamsSchema,
+  },
+  async (body: UpdateReminderBody, context) => {
+    const { reminderTime, customMessage, attachedContent } = body;
+    const { id } = context.params!;
 
     if (!reminderTime || !customMessage) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
+      throw new Error(
+        "Missing required fields: reminderTime and customMessage"
       );
     }
 
@@ -62,52 +72,11 @@ export async function PUT(
       .limit(1);
 
     if (reminderScheduleResult.length === 0) {
-      return NextResponse.json(
-        { error: "Reminder not found" },
-        { status: 404 }
-      );
+      throw new Error("Reminder not found");
     }
 
     const patientId = reminderScheduleResult[0].patientId;
-
     const reminderSchedule = reminderScheduleResult[0];
-
-    // Improved medication name extraction from custom message
-    function extractMedicationName(message: string, currentMedicationName?: string): string {
-      const words = message.toLowerCase().split(/[\s,\.]+/); // Split by space, comma, period
-
-      // Common medication patterns
-      const medicationKeywords = [
-        // Common medications
-        "candesartan", "paracetamol", "amoxicillin", "metformin", "ibuprofen",
-        "aspirin", "omeprazole", "simvastatin", "atorvastatin", "amlodipine",
-        "lisinopril", "hydrochlorothiazide", "furosemide", "spironolactone",
-        // Indonesian terms
-        "obat", "tablet", "kapsul", "sirup", "vitamin", "suplemen",
-        // Specific patterns
-        "mg", "ml", "gram"
-      ];
-
-      // Look for medication names (usually after "obat" or before "mg/ml")
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-
-        // If word contains medication keyword, get the context
-        if (medicationKeywords.some(keyword => word.includes(keyword))) {
-          // If it's "obat", look for the next word as medication name
-          if (word.includes("obat") && i + 1 < words.length) {
-            return words[i + 1].charAt(0).toUpperCase() + words[i + 1].slice(1);
-          }
-          // If it's a specific medication, return it
-          if (!word.includes("obat") && !word.includes("mg") && !word.includes("ml")) {
-            return word.charAt(0).toUpperCase() + word.slice(1);
-          }
-        }
-      }
-
-      // Fallback to current medication name if available, otherwise "Obat"
-      return currentMedicationName || "Obat";
-    }
 
     // Update the reminder schedule
     const updatedReminderResult = await db
@@ -115,7 +84,10 @@ export async function PUT(
       .set({
         scheduledTime: reminderTime,
         customMessage: customMessage,
-        medicationName: extractMedicationName(customMessage, reminderSchedule.medicationName),
+        medicationName: extractMedicationName(
+          customMessage,
+          reminderSchedule.medicationName
+        ),
         updatedAt: getWIBTime(),
       })
       .where(eq(reminderSchedules.id, id))
@@ -144,17 +116,17 @@ export async function PUT(
           contentTitle: content.title,
           contentUrl: content.url,
           attachmentOrder: index + 1,
-          createdBy: user.id,
+          createdBy: context.user.id,
         }));
 
         await db.insert(reminderContentAttachments).values(attachmentRecords);
       }
     }
 
-    // Invalidate cache after update
-    await invalidateCache(CACHE_KEYS.reminderStats(patientId));
+    // Invalidate cache after update using systematic approach
+    await invalidateAfterReminderOperation(patientId, "update");
 
-    return NextResponse.json({
+    return {
       message: "Reminder updated successfully",
       reminder: {
         id: updatedReminder.id,
@@ -163,27 +135,17 @@ export async function PUT(
         medicationName: updatedReminder.medicationName,
         attachedContent: validatedContent,
       },
-    });
-  } catch (error) {
-    console.error("Error updating reminder:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id } = await params;
+export const DELETE = createApiHandler(
+  {
+    auth: "required",
+    params: updateReminderParamsSchema,
+  },
+  async (body, context) => {
+    const { id } = context.params!;
 
     // Check if reminder exists
     const reminderScheduleResult = await db
@@ -198,10 +160,7 @@ export async function DELETE(
       .limit(1);
 
     if (reminderScheduleResult.length === 0) {
-      return NextResponse.json(
-        { error: "Reminder not found" },
-        { status: 404 }
-      );
+      throw new Error("Reminder not found");
     }
 
     const reminder = reminderScheduleResult[0];
@@ -216,10 +175,10 @@ export async function DELETE(
       })
       .where(eq(reminderSchedules.id, id));
 
-    // Invalidate cache after deletion
-    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
+    // Invalidate cache after deletion using systematic approach
+    await invalidateAfterReminderOperation(reminder.patientId, "delete");
 
-    return NextResponse.json({
+    return {
       success: true,
       message: "Reminder berhasil dihapus",
       deletedReminder: {
@@ -227,88 +186,6 @@ export async function DELETE(
         medicationName: reminder.medicationName,
         scheduledTime: reminder.scheduledTime,
       },
-    });
-  } catch (error) {
-    console.error("Error deleting reminder:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
-
-// Content validation function
-async function validateContentAttachments(
-  attachedContent: Array<{
-    id: string;
-    type: "article" | "video" | "ARTICLE" | "VIDEO";
-    title: string;
-  }>
-) {
-  const validatedContent: Array<{
-    id: string;
-    type: "article" | "video";
-    title: string;
-    url: string;
-  }> = [];
-
-  for (const content of attachedContent) {
-    if (!content.id || !content.type || !content.title) {
-      continue; // Skip invalid content
-    }
-
-    // Normalize the content type to lowercase
-    const normalizedType = content.type.toLowerCase() as "article" | "video";
-
-    try {
-      if (normalizedType === "article") {
-        const articleResult = await db
-          .select({ slug: cmsArticles.slug, title: cmsArticles.title })
-          .from(cmsArticles)
-          .where(
-            and(
-              eq(cmsArticles.id, content.id),
-              eq(cmsArticles.status, "published"),
-              isNull(cmsArticles.deletedAt)
-            )
-          )
-          .limit(1);
-
-        if (articleResult.length > 0) {
-          validatedContent.push({
-            id: content.id,
-            type: "article",
-            title: articleResult[0].title,
-            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${articleResult[0].slug}`,
-          });
-        }
-      } else if (normalizedType === "video") {
-        const videoResult = await db
-          .select({ slug: cmsVideos.slug, title: cmsVideos.title })
-          .from(cmsVideos)
-          .where(
-            and(
-              eq(cmsVideos.id, content.id),
-              eq(cmsVideos.status, "published"),
-              isNull(cmsVideos.deletedAt)
-            )
-          )
-          .limit(1);
-
-        if (videoResult.length > 0) {
-          validatedContent.push({
-            id: content.id,
-            type: "video",
-            title: videoResult[0].title,
-            url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${videoResult[0].slug}`,
-          });
-        }
-      }
-    } catch (error) {
-      console.warn(`Failed to validate content ${content.id}:`, error);
-      continue;
-    }
-  }
-
-  return validatedContent;
-}
+);

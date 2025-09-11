@@ -1,227 +1,246 @@
 // Jest types are available globally with @types/jest
-import '@testing-library/jest-dom'
-import { ComplianceService } from '../lib/compliance-service'
-import { db } from '../db'
-import { logger } from '../lib/logger'
+import "@testing-library/jest-dom";
+import { ComplianceService } from "../services/patient/compliance.service";
+import { db } from "../db";
+import { logger } from "../lib/logger";
 
 // Mock the database and logger
-jest.mock('../db', () => ({
+jest.mock("../db", () => ({
   db: {
     select: jest.fn(),
-    execute: jest.fn()
-  }
-}))
+    execute: jest.fn(),
+  },
+}));
 
-jest.mock('../lib/logger', () => ({
+jest.mock("../lib/logger", () => ({
   logger: {
     performance: jest.fn(),
     error: jest.fn(),
     cache: jest.fn(),
-    info: jest.fn()
-  }
-}))
+    info: jest.fn(),
+  },
+}));
 
-describe('ComplianceService', () => {
+describe("ComplianceService", () => {
+  let complianceService: ComplianceService;
+
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+    complianceService = new ComplianceService();
+  });
 
   afterEach(() => {
-    jest.resetAllMocks()
-  })
+    jest.resetAllMocks();
+  });
 
-  describe('calculatePatientCompliance', () => {
-    it('should calculate compliance correctly', async () => {
-      const mockDeliveredResult = [{ count: 10 }]
-      const mockConfirmedResult = [{ count: 8 }]
+  describe("calculatePatientCompliance", () => {
+    it("should calculate compliance correctly", async () => {
+      const mockDeliveredResult = [{ count: 10 }];
+      const mockConfirmedResult = [{ count: 8 }];
 
       // Mock database calls
-      const mockSelect = jest.fn().mockReturnThis()
-      const mockFrom = jest.fn().mockReturnThis()
-      const mockWhere = jest.fn()
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn();
 
-      ;(db.select as jest.Mock).mockImplementation(() => ({
+      (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
-        where: mockWhere
-      }))
+        where: mockWhere,
+      }));
 
-      mockWhere.mockResolvedValueOnce(mockDeliveredResult)
-      mockWhere.mockResolvedValueOnce(mockConfirmedResult)
+      mockWhere.mockResolvedValueOnce(mockDeliveredResult);
+      mockWhere.mockResolvedValueOnce(mockConfirmedResult);
 
-      const result = await ComplianceService.calculatePatientCompliance('patient-123')
+      const result = await complianceService.calculatePatientCompliance(
+        "patient-123"
+      );
 
-      expect(result.deliveredCount).toBe(10)
-      expect(result.confirmedCount).toBe(8)
-      expect(result.complianceRate).toBe(80)
-      expect(logger.performance).toHaveBeenCalled()
-    })
+      expect(result.deliveredCount).toBe(10);
+      expect(result.confirmedCount).toBe(8);
+      expect(result.complianceRate).toBe(80);
+      expect(logger.info).toHaveBeenCalled();
+    });
 
-    it('should handle zero delivered reminders', async () => {
-      const mockDeliveredResult = [{ count: 0 }]
-      const mockConfirmedResult = [{ count: 0 }]
+    it("should handle zero delivered reminders", async () => {
+      const mockDeliveredResult = [{ count: 0 }];
+      const mockConfirmedResult = [{ count: 0 }];
 
-      const mockSelect = jest.fn().mockReturnThis()
-      const mockFrom = jest.fn().mockReturnThis()
-      const mockWhere = jest.fn()
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn();
 
-      ;(db.select as jest.Mock).mockImplementation(() => ({
+      (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
-        where: mockWhere
-      }))
+        where: mockWhere,
+      }));
 
-      mockWhere.mockResolvedValueOnce(mockDeliveredResult)
-      mockWhere.mockResolvedValueOnce(mockConfirmedResult)
+      mockWhere.mockResolvedValueOnce(mockDeliveredResult);
+      mockWhere.mockResolvedValueOnce(mockConfirmedResult);
 
-      const result = await ComplianceService.calculatePatientCompliance('patient-123')
+      const result = await complianceService.calculatePatientCompliance(
+        "patient-123"
+      );
 
-      expect(result.deliveredCount).toBe(0)
-      expect(result.confirmedCount).toBe(0)
-      expect(result.complianceRate).toBe(0)
-    })
+      expect(result.deliveredCount).toBe(0);
+      expect(result.confirmedCount).toBe(0);
+      expect(result.complianceRate).toBe(0);
+    });
 
-    it('should handle database errors gracefully', async () => {
-      const mockSelect = jest.fn().mockReturnThis()
-      const mockFrom = jest.fn().mockReturnThis()
-      const mockWhere = jest.fn()
+    it("should handle database errors gracefully", async () => {
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn();
 
-      ;(db.select as jest.Mock).mockImplementation(() => ({
+      (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
-        where: mockWhere
-      }))
+        where: mockWhere,
+      }));
 
-      mockWhere.mockRejectedValueOnce(new Error('Database connection failed'))
+      mockWhere.mockRejectedValueOnce(new Error("Database connection failed"));
 
-      const result = await ComplianceService.calculatePatientCompliance('patient-123')
+      const result = await complianceService.calculatePatientCompliance(
+        "patient-123"
+      );
 
-      expect(result.deliveredCount).toBe(0)
-      expect(result.confirmedCount).toBe(0)
-      expect(result.complianceRate).toBe(0)
-      expect(logger.error).toHaveBeenCalled()
-    })
-  })
+      expect(result.deliveredCount).toBe(0);
+      expect(result.confirmedCount).toBe(0);
+      expect(result.complianceRate).toBe(0);
+      expect(logger.error).toHaveBeenCalled();
+    });
+  });
 
-  describe('getPatientComplianceStats', () => {
-    it('should return detailed compliance statistics', async () => {
+  describe("getPatientComplianceStats", () => {
+    it("should return detailed compliance statistics", async () => {
       const mockCompliance = {
         deliveredCount: 10,
         confirmedCount: 8,
         complianceRate: 80,
-        lastCalculated: new Date()
-      }
+        lastCalculated: new Date(),
+      };
 
-      const mockTotalResult = [{ count: 12 }]
-      const mockPendingResult = [{ count: 2 }]
-      const mockResponseTimeResult = [{ avgResponseTime: 3600 }] // 1 hour in seconds
+      const mockTotalResult = [{ count: 12 }];
+      const mockPendingResult = [{ count: 2 }];
+      const mockResponseTimeResult = [{ avgResponseTime: 3600 }]; // 1 hour in seconds
 
       // Mock the calculatePatientCompliance method
-      jest.spyOn(ComplianceService, 'calculatePatientCompliance')
-        .mockResolvedValue(mockCompliance)
+      jest
+        .spyOn(complianceService, "calculatePatientCompliance")
+        .mockResolvedValue(mockCompliance);
 
-      const mockSelect = jest.fn().mockReturnThis()
-      const mockFrom = jest.fn().mockReturnThis()
-      const mockWhere = jest.fn()
-      const mockLeftJoin = jest.fn().mockReturnThis()
-      const mockOrderBy = jest.fn().mockReturnThis()
-      const mockLimit = jest.fn()
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn();
+      const mockLeftJoin = jest.fn().mockReturnThis();
+      const mockOrderBy = jest.fn().mockReturnThis();
+      const mockLimit = jest.fn();
 
-      ;(db.select as jest.Mock).mockImplementation(() => ({
+      (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
         where: mockWhere,
         leftJoin: mockLeftJoin,
         orderBy: mockOrderBy,
-        limit: mockLimit
-      }))
+        limit: mockLimit,
+      }));
 
-      mockWhere.mockResolvedValueOnce(mockTotalResult)
-      mockWhere.mockResolvedValueOnce(mockPendingResult)
-      mockWhere.mockResolvedValueOnce(mockResponseTimeResult)
+      mockWhere.mockResolvedValueOnce(mockTotalResult);
+      mockWhere.mockResolvedValueOnce(mockPendingResult);
+      mockWhere.mockResolvedValueOnce(mockResponseTimeResult);
 
-      const result = await ComplianceService.getPatientComplianceStats('patient-123')
+      const result = await complianceService.getPatientComplianceStats(
+        "patient-123"
+      );
 
-      expect(result.totalReminders).toBe(12)
-      expect(result.deliveredReminders).toBe(10)
-      expect(result.confirmedReminders).toBe(8)
-      expect(result.pendingConfirmations).toBe(2)
-      expect(result.complianceRate).toBe(80)
-      expect(result.averageResponseTime).toBe(3600)
-    })
-  })
+      expect(result.totalReminders).toBe(12);
+      expect(result.deliveredReminders).toBe(10);
+      expect(result.confirmedReminders).toBe(8);
+      expect(result.pendingConfirmations).toBe(2);
+      expect(result.complianceRate).toBe(80);
+      expect(result.averageResponseTime).toBe(3600);
+    });
+  });
 
-  describe('calculateBulkCompliance', () => {
-    it('should handle empty patient list', async () => {
-      const result = await ComplianceService.calculateBulkCompliance([])
-      expect(result).toEqual({})
-    })
+  describe("calculateBulkCompliance", () => {
+    it("should handle empty patient list", async () => {
+      const result = await complianceService.calculateBulkCompliance([]);
+      expect(result).toEqual({});
+    });
 
-    it('should calculate compliance for multiple patients', async () => {
-      const patients = ['patient-1', 'patient-2']
+    it("should calculate compliance for multiple patients", async () => {
+      const patients = ["patient-1", "patient-2"];
 
       // Mock individual compliance calculations
-      jest.spyOn(ComplianceService, 'calculatePatientCompliance')
+      jest
+        .spyOn(complianceService, "calculatePatientCompliance")
         .mockResolvedValueOnce({
           deliveredCount: 10,
           confirmedCount: 8,
           complianceRate: 80,
-          lastCalculated: new Date()
+          lastCalculated: new Date(),
         })
         .mockResolvedValueOnce({
           deliveredCount: 5,
           confirmedCount: 4,
           complianceRate: 80,
-          lastCalculated: new Date()
-        })
+          lastCalculated: new Date(),
+        });
 
-      const result = await ComplianceService.calculateBulkCompliance(patients)
+      const result = await complianceService.calculateBulkCompliance(patients);
 
-      expect(Object.keys(result)).toHaveLength(2)
-      expect(result['patient-1'].complianceRate).toBe(80)
-      expect(result['patient-2'].complianceRate).toBe(80)
-    })
-  })
+      expect(Object.keys(result)).toHaveLength(2);
+      expect(result["patient-1"].complianceRate).toBe(80);
+      expect(result["patient-2"].complianceRate).toBe(80);
+    });
+  });
 
-  describe('invalidatePatientCompliance', () => {
-    it('should invalidate compliance cache', async () => {
+  describe("invalidatePatientCompliance", () => {
+    it("should invalidate compliance cache", async () => {
       // Mock the cache invalidation (this would normally interact with Redis)
       // For this test, we just ensure the method doesn't throw
       await expect(
-        ComplianceService.invalidatePatientCompliance('patient-123')
-      ).resolves.not.toThrow()
-    })
-  })
+        complianceService.invalidatePatientCompliance("patient-123")
+      ).resolves.not.toThrow();
+    });
+  });
 
-  describe('getComplianceTrends', () => {
-    it('should return compliance trends over time', async () => {
+  describe("getComplianceTrends", () => {
+    it("should return compliance trends over time", async () => {
       const mockReminderLogs = [
-        { sentAt: new Date('2024-01-01'), id: 'log-1' },
-        { sentAt: new Date('2024-01-02'), id: 'log-2' }
-      ]
+        { sentAt: new Date("2024-01-01"), id: "log-1" },
+        { sentAt: new Date("2024-01-02"), id: "log-2" },
+      ];
 
       const mockConfirmations = [
-        { reminderLogId: 'log-1', confirmedAt: new Date('2024-01-01T02:00:00') }
-      ]
+        {
+          reminderLogId: "log-1",
+          confirmedAt: new Date("2024-01-01T02:00:00"),
+        },
+      ];
 
-      const mockSelect = jest.fn().mockReturnThis()
-      const mockFrom = jest.fn().mockReturnThis()
-      const mockWhere = jest.fn()
-      const mockOrderBy = jest.fn()
+      const mockSelect = jest.fn().mockReturnThis();
+      const mockFrom = jest.fn().mockReturnThis();
+      const mockWhere = jest.fn();
+      const mockOrderBy = jest.fn();
 
-      ;(db.select as jest.Mock).mockImplementation(() => ({
+      (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
         where: mockWhere,
-        orderBy: mockOrderBy
-      }))
+        orderBy: mockOrderBy,
+      }));
 
-      mockWhere.mockResolvedValueOnce(mockReminderLogs)
-      mockWhere.mockResolvedValueOnce(mockConfirmations)
+      mockWhere.mockResolvedValueOnce(mockReminderLogs);
+      mockWhere.mockResolvedValueOnce(mockConfirmations);
 
-      const result = await ComplianceService.getComplianceTrends('patient-123', 7)
+      const result = await complianceService.getComplianceTrends(
+        "patient-123",
+        7
+      );
 
-      expect(Array.isArray(result)).toBe(true)
-      expect(result.length).toBeGreaterThan(0)
-      expect(result[0]).toHaveProperty('date')
-      expect(result[0]).toHaveProperty('complianceRate')
-      expect(result[0]).toHaveProperty('deliveredCount')
-      expect(result[0]).toHaveProperty('confirmedCount')
-    })
-  })
-})
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0]).toHaveProperty("date");
+      expect(result[0]).toHaveProperty("complianceRate");
+      expect(result[0]).toHaveProperty("deliveredCount");
+      expect(result[0]).toHaveProperty("confirmedCount");
+    });
+  });
+});

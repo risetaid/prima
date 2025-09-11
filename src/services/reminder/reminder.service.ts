@@ -1,308 +1,298 @@
 // Reminder Service - Core business logic for reminder management
-import { ReminderRepository } from './reminder.repository'
-import { WhatsAppService } from '../whatsapp/whatsapp.service'
-import { 
-  CreateReminderDTO, 
-  UpdateReminderDTO, 
-  CustomRecurrence, 
+import { ReminderRepository } from "./reminder.repository";
+import { WhatsAppService } from "../whatsapp/whatsapp.service";
+import {
+  CreateReminderDTO,
+  UpdateReminderDTO,
+  CustomRecurrence,
   ReminderWithPatient,
   ValidationError,
   NotFoundError,
-  ValidatedContent
-} from './reminder.types'
-import { getWIBTime, shouldSendReminderNow } from '@/lib/timezone'
-import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
-import { logger } from '@/lib/logger'
-import { db, patients, reminderLogs } from '@/db'
-import { eq } from 'drizzle-orm'
+  ValidatedContent,
+} from "./reminder.types";
+import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { logger } from "@/lib/logger";
+import { extractMedicationName } from "@/lib/medication-utils";
+import { db, patients, reminderLogs } from "@/db";
+import { eq } from "drizzle-orm";
 
 export class ReminderService {
-  private repository: ReminderRepository
-  private whatsappService: WhatsAppService
+  private repository: ReminderRepository;
+  private whatsappService: WhatsAppService;
 
   constructor() {
-    this.repository = new ReminderRepository()
-    this.whatsappService = new WhatsAppService()
+    this.repository = new ReminderRepository();
+    this.whatsappService = new WhatsAppService();
   }
 
   // CREATE operations
   async createReminder(dto: CreateReminderDTO) {
     // Validate patient exists
-    const patient = await this.getPatient(dto.patientId)
-    if (!patient) throw new NotFoundError('Patient not found')
+    const patient = await this.getPatient(dto.patientId);
+    if (!patient) throw new NotFoundError("Patient not found");
 
     // Validate and process content attachments
-    let validatedContent: ValidatedContent[] = []
+    let validatedContent: ValidatedContent[] = [];
     if (dto.attachedContent?.length) {
-      validatedContent = await this.repository.validateAttachments(dto.attachedContent)
+      validatedContent = await this.repository.validateAttachments(
+        dto.attachedContent
+      );
       if (!validatedContent.length) {
-        throw new ValidationError('None of the selected content items are valid or published')
+        throw new ValidationError(
+          "None of the selected content items are valid or published"
+        );
       }
     }
 
     // Generate dates based on recurrence
-    const dates = dto.customRecurrence 
+    const dates = dto.customRecurrence
       ? this.generateRecurrenceDates(dto.customRecurrence)
-      : dto.selectedDates || []
+      : dto.selectedDates || [];
 
     if (!dates.length) {
-      throw new ValidationError('No dates specified for reminder')
+      throw new ValidationError("No dates specified for reminder");
     }
 
-    const createdSchedules = []
-    
+    const createdSchedules = [];
+
     for (const dateString of dates) {
-      const reminderDate = new Date(dateString)
-      if (isNaN(reminderDate.getTime())) continue
+      const reminderDate = new Date(dateString);
+      if (isNaN(reminderDate.getTime())) continue;
 
       const schedule = await this.repository.insert({
         patientId: dto.patientId,
-        medicationName: this.extractMedicationName(dto.message),
+        medicationName: extractMedicationName(dto.message),
         scheduledTime: dto.time,
-        frequency: dto.customRecurrence ? 'CUSTOM_RECURRENCE' : 'CUSTOM',
+        frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
         startDate: reminderDate,
         endDate: reminderDate,
         isActive: true,
         customMessage: dto.message,
         createdById: dto.createdById,
-      })
+      });
 
-      createdSchedules.push(schedule)
+      createdSchedules.push(schedule);
 
       // Add content attachments
       if (validatedContent.length) {
-        await this.repository.addAttachments(schedule.id, validatedContent, dto.createdById)
+        await this.repository.addAttachments(
+          schedule.id,
+          validatedContent,
+          dto.createdById
+        );
       }
 
       // Check if should send immediately
-      const scheduleDate = schedule.startDate.toISOString().split('T')[0]
+      const scheduleDate = schedule.startDate.toISOString().split("T")[0];
       if (shouldSendReminderNow(scheduleDate, dto.time)) {
-        await this.sendReminder(schedule.id, patient, dto.message, validatedContent)
+        await this.sendReminder(
+          schedule.id,
+          patient,
+          dto.message,
+          validatedContent
+        );
       }
     }
 
-    await invalidateCache(CACHE_KEYS.reminderStats(dto.patientId))
-    return createdSchedules
+    await invalidateCache(CACHE_KEYS.reminderStats(dto.patientId));
+    return createdSchedules;
   }
 
   // UPDATE operations
   async updateReminder(id: string, dto: UpdateReminderDTO, userId: string) {
-    const reminder = await this.repository.getById(id)
-    if (!reminder) throw new NotFoundError('Reminder not found')
+    const reminder = await this.repository.getById(id);
+    if (!reminder) throw new NotFoundError("Reminder not found");
 
     // Validate content attachments if provided
-    let validatedContent: ValidatedContent[] = []
+    let validatedContent: ValidatedContent[] = [];
     if (dto.attachedContent !== undefined) {
       if (dto.attachedContent.length) {
-        validatedContent = await this.repository.validateAttachments(dto.attachedContent)
+        validatedContent = await this.repository.validateAttachments(
+          dto.attachedContent
+        );
       }
     }
 
     // Update reminder
-    const medicationName = this.extractMedicationName(dto.customMessage, reminder.medicationName || undefined)
+    const medicationName = extractMedicationName(
+      dto.customMessage,
+      reminder.medicationName || undefined
+    );
     const updated = await this.repository.update(id, {
       scheduledTime: dto.reminderTime,
       customMessage: dto.customMessage,
       medicationName,
       updatedAt: getWIBTime(),
-    })
+    });
 
     // Update attachments if provided
     if (dto.attachedContent !== undefined) {
-      await this.repository.removeAttachments(id)
+      await this.repository.removeAttachments(id);
       if (validatedContent.length) {
-        await this.repository.addAttachments(id, validatedContent, userId)
+        await this.repository.addAttachments(id, validatedContent, userId);
       }
     }
 
-    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId))
-    return { ...updated, attachedContent: validatedContent }
+    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
+    return { ...updated, attachedContent: validatedContent };
   }
 
   // DELETE operations
   async deleteReminder(id: string) {
-    const reminder = await this.repository.getById(id)
-    if (!reminder) throw new NotFoundError('Reminder not found')
+    const reminder = await this.repository.getById(id);
+    if (!reminder) throw new NotFoundError("Reminder not found");
 
-    await this.repository.softDelete(id, getWIBTime())
-    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId))
-    
+    await this.repository.softDelete(id, getWIBTime());
+    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
+
     return {
       success: true,
-      message: 'Reminder berhasil dihapus',
+      message: "Reminder berhasil dihapus",
       deletedReminder: {
         id: reminder.id,
         medicationName: reminder.medicationName,
         scheduledTime: reminder.scheduledTime,
-      }
-    }
+      },
+    };
   }
 
   // READ operations
   async getReminder(id: string) {
-    const reminder = await this.repository.getById(id)
-    if (!reminder) throw new NotFoundError('Reminder not found')
-    return reminder
+    const reminder = await this.repository.getById(id);
+    if (!reminder) throw new NotFoundError("Reminder not found");
+    return reminder;
   }
 
   async listPatientReminders(patientId: string) {
-    const reminders = await this.repository.listByPatient(patientId)
-    return reminders.map(r => ({
+    const reminders = await this.repository.listByPatient(patientId);
+    return reminders.map((r) => ({
       ...r,
       patient: {
         name: r.patientName,
         phoneNumber: r.patientPhoneNumber,
-      }
-    }))
+      },
+    }));
   }
 
   // Helper methods
   private async getPatient(patientId: string) {
     const result = await db
-      .select({ id: patients.id, name: patients.name, phoneNumber: patients.phoneNumber })
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber,
+      })
       .from(patients)
       .where(eq(patients.id, patientId))
-      .limit(1)
-    return result[0] || null
+      .limit(1);
+    return result[0] || null;
   }
 
   private async sendReminder(
-    scheduleId: string, 
+    scheduleId: string,
     patient: { id: string; name: string; phoneNumber: string },
     message: string,
     attachments: ValidatedContent[]
   ) {
     try {
-      const enhancedMessage = this.whatsappService.buildMessage(message, attachments)
-      const result = await this.whatsappService.send(patient.phoneNumber, enhancedMessage)
-      
+      const enhancedMessage = this.whatsappService.buildMessage(
+        message,
+        attachments
+      );
+      const result = await this.whatsappService.send(
+        patient.phoneNumber,
+        enhancedMessage
+      );
+
       await db.insert(reminderLogs).values({
         reminderScheduleId: scheduleId,
         patientId: patient.id,
         sentAt: getWIBTime(),
-        status: result.success ? 'DELIVERED' : 'FAILED',
+        status: result.success ? "DELIVERED" : "FAILED",
         message: message,
         phoneNumber: patient.phoneNumber,
         fonnteMessageId: result.messageId,
-      })
+      });
 
-      await invalidateCache(CACHE_KEYS.reminderStats(patient.id))
-      return result
+      await invalidateCache(CACHE_KEYS.reminderStats(patient.id));
+      return result;
     } catch (error) {
-      logger.error('Failed to send reminder', error as Error, {
+      logger.error("Failed to send reminder", error as Error, {
         scheduleId,
-        patientId: patient.id
-      })
-      throw error
+        patientId: patient.id,
+      });
+      throw error;
     }
-  }
-
-  private extractMedicationName(message: string, currentName?: string): string {
-    if (!message || typeof message !== 'string') return currentName || 'Obat'
-    
-    const cleanMessage = message.trim().toLowerCase()
-    if (!cleanMessage.length) return currentName || 'Obat'
-
-    const words = cleanMessage.split(/\s+/)
-    const medicationKeywords = [
-      // keywords and common meds
-      'tablet', 'kapsul', 'sirup', 'candesartan', 'paracetamol',
-      'amoxicillin', 'metformin', 'amlodipine', 'aspirin', 'atorvastatin',
-      'captopril', 'dexamethasone', 'furosemide', 'insulin', 'omeprazole'
-    ]
-
-    // Prefer explicit medication names first
-    for (const word of words) {
-      const cleanWord = word.replace(/[^\w]/g, '')
-      if (cleanWord.length < 3) continue
-      if (medicationKeywords.some(keyword => cleanWord.includes(keyword))) {
-        return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1)
-      }
-    }
-
-    // If the message contains the word 'obat', take the next word as the medication name
-    const obatIndex = words.findIndex(w => w.includes('obat'))
-    if (obatIndex !== -1 && obatIndex + 1 < words.length) {
-      const nextWord = words[obatIndex + 1].replace(/[^\w]/g, '')
-      if (nextWord.length >= 3) {
-        return nextWord.charAt(0).toUpperCase() + nextWord.slice(1)
-      }
-    }
-
-    // Fallback: if the message mentions 'minum', try the word after it
-    const minumIndex = words.findIndex(w => w.includes('minum'))
-    if (minumIndex !== -1 && minumIndex + 1 < words.length) {
-      const nextWord = words[minumIndex + 1].replace(/[^\w]/g, '')
-      if (nextWord.length >= 3) {
-        return nextWord.charAt(0).toUpperCase() + nextWord.slice(1)
-      }
-    }
-
-    return currentName || 'Obat'
   }
 
   private generateRecurrenceDates(recurrence: CustomRecurrence): string[] {
-    const dates: string[] = []
-    const today = new Date()
-    const startDate = new Date(today)
-    
-    let endDate: Date
-    if (recurrence.endType === 'never') {
-      endDate = new Date(today)
-      endDate.setFullYear(endDate.getFullYear() + 1)
-    } else if (recurrence.endType === 'on' && recurrence.endDate) {
-      endDate = new Date(recurrence.endDate)
-    } else if (recurrence.endType === 'after' && recurrence.occurrences) {
-      endDate = new Date(today)
-      endDate.setFullYear(endDate.getFullYear() + 1)
+    const dates: string[] = [];
+    const today = new Date();
+    const startDate = new Date(today);
+
+    let endDate: Date;
+    if (recurrence.endType === "never") {
+      endDate = new Date(today);
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else if (recurrence.endType === "on" && recurrence.endDate) {
+      endDate = new Date(recurrence.endDate);
+    } else if (recurrence.endType === "after" && recurrence.occurrences) {
+      endDate = new Date(today);
+      endDate.setFullYear(endDate.getFullYear() + 1);
     } else {
-      endDate = new Date(today)
-      endDate.setDate(endDate.getDate() + 30)
+      endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + 30);
     }
 
-    const currentDate = new Date(startDate)
-    let occurrenceCount = 0
-    const maxOccurrences = recurrence.endType === 'after' 
-      ? Math.max(1, parseInt(String(recurrence.occurrences)) || 1)
-      : 1000
+    const currentDate = new Date(startDate);
+    let occurrenceCount = 0;
+    const maxOccurrences =
+      recurrence.endType === "after"
+        ? Math.max(1, parseInt(String(recurrence.occurrences)) || 1)
+        : 1000;
 
-    let loopCounter = 0
-    const maxLoops = 10000
+    let loopCounter = 0;
+    const maxLoops = 10000;
 
-    while (currentDate <= endDate && occurrenceCount < maxOccurrences && loopCounter < maxLoops) {
-      loopCounter++
-      let shouldInclude = false
+    while (
+      currentDate <= endDate &&
+      occurrenceCount < maxOccurrences &&
+      loopCounter < maxLoops
+    ) {
+      loopCounter++;
+      let shouldInclude = false;
 
-      if (recurrence.frequency === 'day') {
-        shouldInclude = true
-      } else if (recurrence.frequency === 'week') {
-        const dayOfWeek = currentDate.getDay()
-        const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-        const currentDayName = dayNames[dayOfWeek]
-        
+      if (recurrence.frequency === "day") {
+        shouldInclude = true;
+      } else if (recurrence.frequency === "week") {
+        const dayOfWeek = currentDate.getDay();
+        const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+        const currentDayName = dayNames[dayOfWeek];
+
         if (recurrence.daysOfWeek && Array.isArray(recurrence.daysOfWeek)) {
-          shouldInclude = recurrence.daysOfWeek.includes(currentDayName)
+          shouldInclude = recurrence.daysOfWeek.includes(currentDayName);
         } else {
-          shouldInclude = true
+          shouldInclude = true;
         }
-      } else if (recurrence.frequency === 'month') {
-        shouldInclude = currentDate.getDate() === startDate.getDate()
+      } else if (recurrence.frequency === "month") {
+        shouldInclude = currentDate.getDate() === startDate.getDate();
       }
 
       if (shouldInclude) {
-        dates.push(currentDate.toISOString().split('T')[0])
-        occurrenceCount++
+        dates.push(currentDate.toISOString().split("T")[0]);
+        occurrenceCount++;
       }
 
-      if (recurrence.frequency === 'day') {
-        currentDate.setDate(currentDate.getDate() + recurrence.interval)
-      } else if (recurrence.frequency === 'week') {
-        currentDate.setDate(currentDate.getDate() + 1)
-      } else if (recurrence.frequency === 'month') {
-        currentDate.setMonth(currentDate.getMonth() + recurrence.interval)
+      if (recurrence.frequency === "day") {
+        currentDate.setDate(currentDate.getDate() + recurrence.interval);
+      } else if (recurrence.frequency === "week") {
+        currentDate.setDate(currentDate.getDate() + 1);
+      } else if (recurrence.frequency === "month") {
+        currentDate.setMonth(currentDate.getMonth() + recurrence.interval);
       }
     }
 
-    return dates
+    return dates;
   }
 }

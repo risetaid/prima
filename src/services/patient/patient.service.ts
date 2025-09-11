@@ -1,49 +1,59 @@
 // PatientService centralizes patient listing and verification history
-import { PatientRepository } from './patient.repository'
-import { ComplianceService } from './compliance.service'
-import type { PatientFilters, CreatePatientDTO, UpdatePatientDTO } from './patient.types'
-import { ValidationError, NotFoundError } from './patient.types'
-import { db, patients } from '@/db'
-import { and, eq, isNull } from 'drizzle-orm'
-import { invalidatePatientCache } from '@/lib/cache'
-import { formatWhatsAppNumber } from '@/lib/fonnte'
+import { PatientRepository } from "./patient.repository";
+import { ComplianceService } from "./compliance.service";
+import type {
+  PatientFilters,
+  CreatePatientDTO,
+  UpdatePatientDTO,
+} from "./patient.types";
+import { ValidationError, NotFoundError } from "./patient.types";
+import { db, patients } from "@/db";
+import { and, eq, isNull } from "drizzle-orm";
+import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
+import { validatePhoneWithMessage } from "@/lib/phone-utils";
 
 export class PatientService {
-  private repo: PatientRepository
-  private compliance: ComplianceService
+  private repo: PatientRepository;
+  private compliance: ComplianceService;
 
   constructor() {
-    this.repo = new PatientRepository()
-    this.compliance = new ComplianceService()
+    this.repo = new PatientRepository();
+    this.compliance = new ComplianceService();
   }
 
   async list(filters: PatientFilters) {
     // No caching by default
-    return await this.repo.listPatients(filters)
+    return await this.repo.listPatients(filters);
   }
 
   async listWithCompliance(filters: PatientFilters) {
     // Basic cache key composed from filters
     const keyParts = [
-      filters.includeDeleted, filters.status, filters.assignedVolunteerId,
-      filters.search, filters.page, filters.limit, filters.orderBy, filters.orderDirection
-    ]
-    const cacheKey = `patients:list:${JSON.stringify(keyParts)}`
+      filters.includeDeleted,
+      filters.status,
+      filters.assignedVolunteerId,
+      filters.search,
+      filters.page,
+      filters.limit,
+      filters.orderBy,
+      filters.orderDirection,
+    ];
+    const cacheKey = `patients:list:${JSON.stringify(keyParts)}`;
 
     // Try cache
     try {
-      const { getCachedData, setCachedData } = await import('@/lib/cache')
-      const cached = await getCachedData(cacheKey)
-      if (cached) return cached
+      const { getCachedData, setCachedData } = await import("@/lib/cache");
+      const cached = await getCachedData(cacheKey);
+      if (cached) return cached;
 
-      const rows = await this.repo.listPatients(filters)
-      const withRates = await this.compliance.attachCompliance(rows)
-      await setCachedData(cacheKey, withRates, 600) // 10 minutes
-      return withRates
+      const rows = await this.repo.listPatients(filters);
+      const withRates = await this.compliance.attachCompliance(rows);
+      await setCachedData(cacheKey, withRates, 600); // 10 minutes
+      return withRates;
     } catch {
       // Fallback without cache
-      const rows = await this.repo.listPatients(filters)
-      return await this.compliance.attachCompliance(rows)
+      const rows = await this.repo.listPatients(filters);
+      return await this.compliance.attachCompliance(rows);
     }
   }
 
@@ -52,19 +62,19 @@ export class PatientService {
       .select({ id: patients.id })
       .from(patients)
       .where(and(eq(patients.id, id), isNull(patients.deletedAt)))
-      .limit(1)
-    if (rows.length === 0) throw new NotFoundError('Patient not found')
+      .limit(1);
+    if (rows.length === 0) throw new NotFoundError("Patient not found");
   }
 
   async getVerificationHistory(patientId: string) {
-    if (!patientId) throw new ValidationError('Missing patientId')
-    await this.verifyPatientExists(patientId)
-    return await this.repo.getVerificationHistoryRows(patientId)
+    if (!patientId) throw new ValidationError("Missing patientId");
+    await this.verifyPatientExists(patientId);
+    return await this.repo.getVerificationHistoryRows(patientId);
   }
 
   async getDetail(patientId: string) {
-    if (!patientId) throw new ValidationError('Missing patientId')
-    await this.verifyPatientExists(patientId)
+    if (!patientId) throw new ValidationError("Missing patientId");
+    await this.verifyPatientExists(patientId);
 
     const [basic, confirmations, logs, meds, rate] = await Promise.all([
       this.repo.getPatientBasicData(patientId),
@@ -72,9 +82,9 @@ export class PatientService {
       this.repo.getPatientReminderLogs(patientId),
       this.repo.listActiveMedications(patientId),
       this.compliance.getPatientRate(patientId),
-    ])
+    ]);
 
-    if (!basic) throw new NotFoundError('Patient not found')
+    if (!basic) throw new NotFoundError("Patient not found");
 
     return {
       id: basic.id,
@@ -113,7 +123,7 @@ export class PatientService {
             role: basic.volunteerRole,
           }
         : null,
-      manualConfirmations: confirmations.map(c => ({
+      manualConfirmations: confirmations.map((c) => ({
         id: c.id,
         visitDate: c.visitDate,
         visitTime: c.visitTime,
@@ -121,9 +131,15 @@ export class PatientService {
         patientCondition: c.patientCondition,
         notes: c.notes,
         confirmedAt: c.confirmedAt,
-        volunteer: c.volunteerId ? { id: c.volunteerId, firstName: c.volunteerFirstName, lastName: c.volunteerLastName } : null,
+        volunteer: c.volunteerId
+          ? {
+              id: c.volunteerId,
+              firstName: c.volunteerFirstName,
+              lastName: c.volunteerLastName,
+            }
+          : null,
       })),
-      reminderLogs: logs.map(l => ({
+      reminderLogs: logs.map((l) => ({
         id: l.id,
         message: l.message,
         sentAt: l.sentAt,
@@ -131,7 +147,7 @@ export class PatientService {
         medicationName: l.medicationName,
         dosage: l.dosage,
       })),
-      patientMedications: meds.map(m => ({
+      patientMedications: meds.map((m) => ({
         id: m.id,
         medicationName: m.medicationName,
         dosage: m.dosage,
@@ -143,27 +159,38 @@ export class PatientService {
         createdAt: m.createdAt,
       })),
       complianceRate: rate,
-    }
+    };
   }
 
   async createPatient(body: any, currentUser: { id: string; role: string }) {
-    const name = (body?.name || '').trim()
-    const phoneNumber = (body?.phoneNumber || '').trim()
-    if (!name || !phoneNumber) throw new ValidationError('Missing required fields: name and phoneNumber')
+    const name = (body?.name || "").trim();
+    const phoneNumber = (body?.phoneNumber || "").trim();
+    if (!name || !phoneNumber)
+      throw new ValidationError(
+        "Missing required fields: name and phoneNumber"
+      );
 
     // Validate phone format (do not persist formatted variant)
-    try { formatWhatsAppNumber(phoneNumber) } catch (e) { throw new ValidationError(`Format nomor WhatsApp tidak valid: ${e}`) }
+    const phoneValidation = validatePhoneWithMessage(phoneNumber);
+    if (!phoneValidation.isValid) {
+      throw new ValidationError(phoneValidation.message);
+    }
 
-    const cancerStageStr = body?.cancerStage || ''
-    const cancerStage = cancerStageStr && ['I','II','III','IV'].includes(cancerStageStr) ? cancerStageStr : null
+    const cancerStageStr = body?.cancerStage || "";
+    const cancerStage =
+      cancerStageStr && ["I", "II", "III", "IV"].includes(cancerStageStr)
+        ? cancerStageStr
+        : null;
 
-    let assignedVolunteerId: string | null = body?.assignedVolunteerId || null
-    if (!assignedVolunteerId) assignedVolunteerId = currentUser.id
+    let assignedVolunteerId: string | null = body?.assignedVolunteerId || null;
+    if (!assignedVolunteerId) assignedVolunteerId = currentUser.id;
 
     if (assignedVolunteerId) {
-      const volunteer = await this.repo.getUserById(assignedVolunteerId)
-      if (!volunteer) throw new ValidationError('Relawan yang ditugaskan tidak ditemukan')
-      if (volunteer.isActive === false) throw new ValidationError('Relawan yang ditugaskan sedang tidak aktif')
+      const volunteer = await this.repo.getUserById(assignedVolunteerId);
+      if (!volunteer)
+        throw new ValidationError("Relawan yang ditugaskan tidak ditemukan");
+      if (volunteer.isActive === false)
+        throw new ValidationError("Relawan yang ditugaskan sedang tidak aktif");
     }
 
     const values = {
@@ -179,91 +206,116 @@ export class PatientService {
       photoUrl: body?.photoUrl || null,
       assignedVolunteerId,
       isActive: true,
-    }
+    };
 
-    const created = await this.repo.insertPatient(values)
+    const created = await this.repo.insertPatient(values);
 
-    let assignedVolunteer: any = null
+    let assignedVolunteer: any = null;
     if (created.assignedVolunteerId) {
-      const v = await this.repo.getUserById(created.assignedVolunteerId)
-      if (v) assignedVolunteer = { id: v.id, firstName: v.firstName, lastName: v.lastName, email: v.email }
+      const v = await this.repo.getUserById(created.assignedVolunteerId);
+      if (v)
+        assignedVolunteer = {
+          id: v.id,
+          firstName: v.firstName,
+          lastName: v.lastName,
+          email: v.email,
+        };
     }
 
-    return { ...created, assignedVolunteer }
+    return { ...created, assignedVolunteer };
   }
 
   async updatePatient(id: string, body: UpdatePatientDTO) {
-    await this.verifyPatientExists(id)
+    await this.verifyPatientExists(id);
 
     const values: any = {
       updatedAt: new Date(),
-    }
-    if (body.name !== undefined) values.name = body.name
+    };
+    if (body.name !== undefined) values.name = body.name;
     if (body.phoneNumber !== undefined) {
-      try { formatWhatsAppNumber(body.phoneNumber) } catch (e) { throw new ValidationError(`Format nomor WhatsApp tidak valid: ${e}`) }
-      values.phoneNumber = body.phoneNumber
+      const phoneValidation = validatePhoneWithMessage(body.phoneNumber);
+      if (!phoneValidation.isValid) {
+        throw new ValidationError(phoneValidation.message);
+      }
+      values.phoneNumber = body.phoneNumber;
     }
-    if (body.address !== undefined) values.address = body.address
-    if (body.birthDate !== undefined) values.birthDate = body.birthDate ? new Date(body.birthDate) : null
-    if (body.diagnosisDate !== undefined) values.diagnosisDate = body.diagnosisDate ? new Date(body.diagnosisDate) : null
-    if (body.cancerStage !== undefined) values.cancerStage = body.cancerStage
-    if (body.emergencyContactName !== undefined) values.emergencyContactName = body.emergencyContactName
-    if (body.emergencyContactPhone !== undefined) values.emergencyContactPhone = body.emergencyContactPhone
-    if (body.notes !== undefined) values.notes = body.notes
-    if (body.isActive !== undefined) values.isActive = body.isActive
-    if (body.photoUrl !== undefined) values.photoUrl = body.photoUrl
+    if (body.address !== undefined) values.address = body.address;
+    if (body.birthDate !== undefined)
+      values.birthDate = body.birthDate ? new Date(body.birthDate) : null;
+    if (body.diagnosisDate !== undefined)
+      values.diagnosisDate = body.diagnosisDate
+        ? new Date(body.diagnosisDate)
+        : null;
+    if (body.cancerStage !== undefined) values.cancerStage = body.cancerStage;
+    if (body.emergencyContactName !== undefined)
+      values.emergencyContactName = body.emergencyContactName;
+    if (body.emergencyContactPhone !== undefined)
+      values.emergencyContactPhone = body.emergencyContactPhone;
+    if (body.notes !== undefined) values.notes = body.notes;
+    if (body.isActive !== undefined) values.isActive = body.isActive;
+    if (body.photoUrl !== undefined) values.photoUrl = body.photoUrl;
 
-    const updated = await this.repo.updatePatient(id, values)
-    await invalidatePatientCache(id)
-    return updated
+    const updated = await this.repo.updatePatient(id, values);
+    await invalidateAfterPatientOperation(id, "update");
+    return updated;
   }
 
   async deletePatient(id: string) {
-    await this.verifyPatientExists(id)
-    const now = new Date()
-    await this.repo.softDeletePatient(id, now)
-    await this.repo.setAllRemindersActive(id, false, now)
-    await invalidatePatientCache(id)
-    return { message: 'Patient deleted successfully', deletedAt: now }
+    await this.verifyPatientExists(id);
+    const now = new Date();
+    await this.repo.softDeletePatient(id, now);
+    await this.repo.setAllRemindersActive(id, false, now);
+    await invalidateAfterPatientOperation(id, "delete");
+    return { message: "Patient deleted successfully", deletedAt: now };
   }
 
-  async reactivatePatient(id: string, currentUser: { id: string; firstName?: string | null; lastName?: string | null; email?: string | null }) {
+  async reactivatePatient(
+    id: string,
+    currentUser: {
+      id: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+    }
+  ) {
     // Does not require current patient inactive check beyond existence for simplicity
-    await this.verifyPatientExists(id)
-    const now = new Date()
+    await this.verifyPatientExists(id);
+    const now = new Date();
     const updateData = {
       isActive: true,
-      verificationStatus: 'pending_verification' as const,
+      verificationStatus: "pending_verification" as const,
       verificationSentAt: null,
       verificationResponseAt: null,
       verificationMessage: null,
-      verificationAttempts: '0',
+      verificationAttempts: "0",
       verificationExpiresAt: null,
       lastReactivatedAt: now,
       updatedAt: now,
-    }
+    };
 
-    await this.repo.updatePatient(id, updateData)
-    await this.repo.setAllRemindersActive(id, true, now)
+    await this.repo.updatePatient(id, updateData);
+    await this.repo.setAllRemindersActive(id, true, now);
 
-    const processedByName = `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim() || currentUser.email || currentUser.id
+    const processedByName =
+      `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() ||
+      currentUser.email ||
+      currentUser.id;
     await this.repo.insertVerificationLog({
       patientId: id,
-      action: 'reactivated',
+      action: "reactivated",
       patientResponse: `Patient reactivated by: ${processedByName}`,
-      verificationResult: 'pending_verification',
+      verificationResult: "pending_verification",
       processedBy: currentUser.id,
-    })
+    });
 
-    await invalidatePatientCache(id)
+    await invalidateAfterPatientOperation(id, "reactivate");
 
     return {
       success: true,
-      message: 'Patient berhasil diaktifkan kembali',
-      newStatus: 'pending_verification',
+      message: "Patient berhasil diaktifkan kembali",
+      newStatus: "pending_verification",
       processedBy: processedByName,
-      nextStep: 'Patient siap untuk menerima pesan verifikasi ulang',
-    }
+      nextStep: "Patient siap untuk menerima pesan verifikasi ulang",
+    };
   }
 }
-
