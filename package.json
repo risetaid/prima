@@ -17,7 +17,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "nuke-db": "bun run scripts/nuke-database.ts"
+    "nuke-db": "bun run scripts/nuke-database.ts",
+    "seed:templates": "bun run scripts/seed-templates.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.6",
