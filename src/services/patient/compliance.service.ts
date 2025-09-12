@@ -3,17 +3,17 @@ import { PatientRepository } from "./patient.repository";
 import { logger } from "@/lib/logger";
 
 export interface ComplianceResult {
-  deliveredCount: number;
-  confirmedCount: number;
+  deliveredCount: number; // Now represents "totalConfirmed" (completed reminders)
+  confirmedCount: number; // Now represents "takenCount" (medications actually taken)
   complianceRate: number;
   lastCalculated: Date;
 }
 
 export interface ComplianceStats {
-  totalReminders: number;
-  deliveredReminders: number;
-  confirmedReminders: number;
-  pendingConfirmations: number;
+  totalReminders: number; // Now represents "totalConfirmed" (completed reminders)
+  deliveredReminders: number; // Now represents "totalConfirmed" (completed reminders)
+  confirmedReminders: number; // Now represents "takenCount" (medications actually taken)
+  pendingConfirmations: number; // Now represents unconfirmed reminders (not applicable in simplified logic)
   complianceRate: number;
   averageResponseTime?: number;
 }
@@ -32,23 +32,22 @@ export class ComplianceService {
   }
 
   async getRatesMap(patientIds: string[]) {
-    const [delivered, confirmations] = await Promise.all([
-      this.repo.getDeliveredCounts(patientIds),
-      this.repo.getConfirmationsCounts(patientIds),
-    ]);
+    const complianceData = await this.repo.getCompletedComplianceCounts(
+      patientIds
+    );
 
     const deliveredMap = new Map<string, number>();
-    for (const row of delivered) deliveredMap.set(row.patientId, row.count);
-
     const confirmationsMap = new Map<string, number>();
-    for (const row of confirmations)
-      confirmationsMap.set(row.patientId, row.count);
-
     const rateMap = new Map<string, number>();
-    for (const id of patientIds) {
-      const d = deliveredMap.get(id) || 0;
-      const c = confirmationsMap.get(id) || 0;
-      rateMap.set(id, this.computeRate(d, c));
+
+    for (const data of complianceData) {
+      const totalConfirmed = data.totalConfirmed;
+      const takenCount = data.takenCount;
+      const complianceRate = this.computeRate(totalConfirmed, takenCount);
+
+      deliveredMap.set(data.patientId, totalConfirmed); // Now represents "completed/confirmed"
+      confirmationsMap.set(data.patientId, takenCount); // Now represents "taken"
+      rateMap.set(data.patientId, complianceRate);
     }
 
     return { deliveredMap, confirmationsMap, rateMap };
@@ -89,7 +88,7 @@ export class ComplianceService {
         deliveredCount,
         confirmedCount,
         complianceRate,
-        operation: "compliance_calculation"
+        operation: "compliance_calculation",
       });
 
       return {
@@ -123,16 +122,14 @@ export class ComplianceService {
   async getPatientComplianceStats(patientId: string): Promise<ComplianceStats> {
     const compliance = await this.calculatePatientCompliance(patientId);
 
-    // For now, return basic stats. In a real implementation, this would
-    // include pending confirmations, response times, etc.
+    // Simplified stats - only count completed reminders
     return {
-      totalReminders: compliance.deliveredCount,
-      deliveredReminders: compliance.deliveredCount,
-      confirmedReminders: compliance.confirmedCount,
-      pendingConfirmations:
-        compliance.deliveredCount - compliance.confirmedCount,
+      totalReminders: compliance.deliveredCount, // Total confirmed reminders
+      deliveredReminders: compliance.deliveredCount, // Total confirmed reminders
+      confirmedReminders: compliance.confirmedCount, // Medications actually taken
+      pendingConfirmations: 0, // Not applicable in simplified logic
       complianceRate: compliance.complianceRate,
-      averageResponseTime: undefined, // Would be calculated from logs
+      averageResponseTime: undefined, // Not applicable in simplified logic
     };
   }
 
@@ -196,4 +193,3 @@ export class ComplianceService {
     return [];
   }
 }
-
