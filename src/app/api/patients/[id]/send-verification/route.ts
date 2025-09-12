@@ -100,13 +100,18 @@ export async function POST(
 function generateVerificationMessage(patient: any, volunteer: any): string {
   return `Halo ${patient.name},
 
-Anda didaftarkan ke dalam sistem PRIMA untuk reminder kesehatan oleh relawan kami.
+Anda didaftarkan ke dalam sistem PRIMA untuk pengingat kesehatan oleh relawan kami.
 
-Apakah Anda setuju?
-YA
-TIDAK
+Apakah Anda setuju untuk menerima pengingat obat dan kesehatan?
 
-Terima kasih.`
+💚 *Balas dengan cara apa saja:*
+• YA / IYA / SETUJU / MAU
+• TIDAK / GA MAU / NANTI
+• BERHENTI (untuk stop selamanya)
+
+Contoh: "Ya saya setuju" atau "Ya mau" atau "Iya boleh"
+
+Terima kasih atas kerjasamanya! 🙏`
 }
 
 // Helper function to send WhatsApp message via Fonnte

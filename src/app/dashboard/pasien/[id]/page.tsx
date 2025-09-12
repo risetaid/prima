@@ -252,7 +252,7 @@ export default function PatientDetailPage() {
 
       if (response.ok) {
         const data = await response.json();
-        // Add new note to the beginning of the list
+        // Add new note to the end of the list for chronological order
         const formattedNote: HealthNote = {
           id: data.healthNote.id,
           date: data.healthNote.noteDate.split("T")[0],
@@ -260,7 +260,7 @@ export default function PatientDetailPage() {
           createdAt: data.healthNote.createdAt,
         };
 
-        setHealthNotes((prev) => [formattedNote, ...prev]);
+        setHealthNotes((prev) => [...prev, formattedNote]);
         setNewNoteText("");
         setSelectedDate(new Date().toISOString().split("T")[0]);
         setIsAddNoteModalOpen(false);
@@ -1095,54 +1095,50 @@ export default function PatientDetailPage() {
               {/* Center & Right: Patient Management Features */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Quick Actions */}
-                {!isEditMode && (
-                  <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 sm:p-6 rounded-2xl border border-blue-200 shadow-sm">
-                    <h4 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
-                      <div className="p-2 bg-blue-100 rounded-lg">
-                        <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                      </div>
-                      <span>Aksi Cepat</span>
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <button
-                        onClick={handleAddReminder}
-                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="text-sm sm:text-base">
-                          Buat Pengingat
-                        </span>
-                      </button>
-                      <button
-                        onClick={handleViewReminders}
-                        className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
-                        <span className="text-sm sm:text-base">
-                          Lihat Pengingat
-                        </span>
-                      </button>
+                <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 sm:p-6 rounded-2xl border border-blue-200 shadow-sm">
+                  <h4 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Zap className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                     </div>
-                    {/* Tips */}
-                    <div className="mt-4 pt-4 border-t border-blue-200">
-                      <p className="text-xs sm:text-sm text-gray-600 text-center">
-                        💡 <strong>Tips:</strong> Gunakan &ldquo;Buat
-                        Pengingat&rdquo; untuk sistem auto-fill dengan template
-                        WhatsApp
-                      </p>
-                    </div>
+                    <span>Aksi Cepat</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <button
+                      onClick={handleAddReminder}
+                      className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    >
+                      <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-sm sm:text-base">
+                        Buat Pengingat
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleViewReminders}
+                      className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                    >
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="text-sm sm:text-base">
+                        Lihat Pengingat
+                      </span>
+                    </button>
                   </div>
-                )}
+                  {/* Tips */}
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <p className="text-xs sm:text-sm text-gray-600 text-center">
+                      💡 <strong>Tips:</strong> Gunakan &ldquo;Buat
+                      Pengingat&rdquo; untuk sistem auto-fill dengan template
+                      WhatsApp
+                    </p>
+                  </div>
+                </div>
 
                 {/* Patient Variables */}
-                {!isEditMode && (
-                  <PatientVariablesManager
-                    patientId={
-                      Array.isArray(params.id) ? params.id[0] : params.id!
-                    }
-                    patientName={patient?.name || "Pasien"}
-                  />
-                )}
+                <PatientVariablesManager
+                  patientId={
+                    Array.isArray(params.id) ? params.id[0] : params.id!
+                  }
+                  patientName={patient?.name || "Pasien"}
+                />
 
                 {/* Statistics */}
                 <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-4 sm:p-6 shadow-sm">
@@ -1365,7 +1361,7 @@ export default function PatientDetailPage() {
 
                         {/* Note Number Badge */}
                         <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs sm:text-sm font-bold">
-                          {healthNotes.length - index}
+                          {index + 1}
                         </div>
 
                         {/* Note Content */}
