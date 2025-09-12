@@ -413,8 +413,13 @@ async function processReminders() {
             };
 
             // Create reminder log with error handling
+            let reminderLogId: string | undefined;
             try {
-              await db.insert(reminderLogs).values(logData).returning();
+              const createdLog = await db
+                .insert(reminderLogs)
+                .values(logData)
+                .returning();
+              reminderLogId = createdLog[0]?.id;
               // Log created successfully
             } catch (logError) {
               console.error(
@@ -428,6 +433,52 @@ async function processReminders() {
 
             if (result.success) {
               sentCount++;
+
+              // Schedule follow-up confirmation message (15-20 minutes later)
+              if (reminderLogId) {
+                try {
+                  const confirmationDelayMinutes = 18; // 15-20 minutes, using 18 as middle ground
+                  const confirmationTime = new Date(getWIBTime());
+                  confirmationTime.setMinutes(
+                    confirmationTime.getMinutes() + confirmationDelayMinutes
+                  );
+
+                  const confirmationMessage = `Halo ${schedule.patientName}, apakah sudah diminum obat ${schedule.medicationName}? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`;
+
+                  // Update reminder log with confirmation scheduling info
+                  await db
+                    .update(reminderLogs)
+                    .set({
+                      confirmationMessage,
+                      confirmationSentAt: confirmationTime,
+                      confirmationStatus: "PENDING",
+                    })
+                    .where(eq(reminderLogs.id, reminderLogId));
+
+                  logger.info("Follow-up confirmation scheduled", {
+                    api: true,
+                    cron: true,
+                    reminderLogId,
+                    patientId: schedule.patientId,
+                    confirmationTime: confirmationTime.toISOString(),
+                    delayMinutes: confirmationDelayMinutes,
+                  });
+
+                  debugLogs.push(
+                    `✅ Follow-up confirmation scheduled for ${
+                      schedule.patientName
+                    } at ${confirmationTime.toLocaleTimeString("id-ID", {
+                      timeZone: "Asia/Jakarta",
+                    })}`
+                  );
+                } catch (confirmationError) {
+                  console.error(
+                    `❌ Failed to schedule confirmation for ${schedule.patientName}:`,
+                    confirmationError
+                  );
+                  // Don't fail the whole process for confirmation scheduling errors
+                }
+              }
             } else {
               errorCount++;
             }
@@ -438,6 +489,89 @@ async function processReminders() {
         }
       } catch {
         errorCount++;
+      }
+    }
+
+    // Process pending confirmation messages
+    logger.info("Processing pending confirmation messages", {
+      api: true,
+      cron: true,
+    });
+
+    const now = getWIBTime();
+    const confirmationsToSend = await db
+      .select({
+        id: reminderLogs.id,
+        patientId: reminderLogs.patientId,
+        confirmationMessage: reminderLogs.confirmationMessage,
+        patientName: patients.name,
+        patientPhoneNumber: patients.phoneNumber,
+        reminderScheduleId: reminderLogs.reminderScheduleId,
+      })
+      .from(reminderLogs)
+      .leftJoin(patients, eq(reminderLogs.patientId, patients.id))
+      .where(
+        and(
+          eq(reminderLogs.confirmationStatus, "PENDING"),
+          lte(reminderLogs.confirmationSentAt, now)
+        )
+      );
+
+    logger.info("Found pending confirmations to send", {
+      api: true,
+      cron: true,
+      count: confirmationsToSend.length,
+    });
+
+    let confirmationsSent = 0;
+    let confirmationsFailed = 0;
+
+    for (const confirmation of confirmationsToSend) {
+      try {
+        if (
+          !confirmation.patientPhoneNumber ||
+          !confirmation.confirmationMessage
+        ) {
+          logger.warn("Skipping confirmation - missing phone or message", {
+            api: true,
+            cron: true,
+            confirmationId: confirmation.id,
+          });
+          continue;
+        }
+
+        const result = await whatsappService.send(
+          confirmation.patientPhoneNumber,
+          confirmation.confirmationMessage
+        );
+
+        if (result.success) {
+          // Update confirmation status to sent
+          await db
+            .update(reminderLogs)
+            .set({
+              confirmationSentAt: getWIBTime(), // Update to actual sent time
+            })
+            .where(eq(reminderLogs.id, confirmation.id));
+
+          confirmationsSent++;
+          debugLogs.push(
+            `✅ Confirmation sent to ${confirmation.patientName} (${confirmation.patientPhoneNumber})`
+          );
+        } else {
+          confirmationsFailed++;
+          debugLogs.push(
+            `❌ Confirmation failed for ${confirmation.patientName}: ${result.error}`
+          );
+        }
+      } catch (error) {
+        confirmationsFailed++;
+        logger.error("Failed to send confirmation", error as Error, {
+          api: true,
+          cron: true,
+          confirmationId: confirmation.id,
+          patientId: confirmation.patientId,
+        });
       }
     }
 
@@ -463,6 +597,11 @@ async function processReminders() {
           processedCount > 0 && sentCount >= 0
             ? `${Math.round((sentCount / processedCount) * 100)}%`
             : "0%",
+        confirmations: {
+          pending: confirmationsToSend.length,
+          sent: confirmationsSent,
+          failed: confirmationsFailed,
+        },
       },
       details:
         debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],

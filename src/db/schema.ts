@@ -34,6 +34,12 @@ export const reminderStatusEnum = pgEnum("reminder_status", [
   "DELIVERED",
   "FAILED",
 ]);
+export const confirmationStatusEnum = pgEnum("confirmation_status", [
+  "PENDING",
+  "CONFIRMED",
+  "MISSED",
+  "UNKNOWN",
+]);
 export const patientConditionEnum = pgEnum("patient_condition", [
   "GOOD",
   "FAIR",
@@ -362,6 +368,12 @@ export const reminderLogs = pgTable(
       .notNull()
       .defaultNow(),
     fonnteMessageId: text("fonnte_message_id"),
+    // Confirmation fields
+    confirmationStatus: confirmationStatusEnum("confirmation_status").default("PENDING"),
+    confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
+    confirmationResponseAt: timestamp("confirmation_response_at", { withTimezone: true }),
+    confirmationMessage: text("confirmation_message"),
+    confirmationResponse: text("confirmation_response"),
   },
   (table) => ({
     patientIdIdx: index("reminder_logs_patient_id_idx").on(table.patientId),
@@ -397,6 +409,17 @@ export const reminderLogs = pgTable(
     statusSentAtIdx: index("reminder_logs_status_sent_at_idx").on(
       table.status,
       table.sentAt
+    ),
+    // Confirmation indexes
+    confirmationStatusIdx: index("reminder_logs_confirmation_status_idx").on(
+      table.confirmationStatus
+    ),
+    confirmationSentAtIdx: index("reminder_logs_confirmation_sent_at_idx").on(
+      table.confirmationSentAt
+    ),
+    patientConfirmationStatusIdx: index("reminder_logs_patient_confirmation_idx").on(
+      table.patientId,
+      table.confirmationStatus
     ),
   })
 );

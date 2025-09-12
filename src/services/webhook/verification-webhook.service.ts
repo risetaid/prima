@@ -7,8 +7,14 @@
  * 3. Update status and send confirmation
  */
 
-import { db, patients, verificationLogs, reminderSchedules } from "@/db";
-import { eq, and, or } from "drizzle-orm";
+import {
+  db,
+  patients,
+  verificationLogs,
+  reminderSchedules,
+  reminderLogs,
+} from "@/db";
+import { eq, and, or, desc } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { sendWhatsAppMessage } from "@/lib/fonnte";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
@@ -29,7 +35,14 @@ export interface VerificationResult {
   status?: number;
 }
 
-type ResponseType = "unsubscribe" | "accept" | "decline" | "unknown";
+type ResponseType =
+  | "unsubscribe"
+  | "accept"
+  | "decline"
+  | "confirmation_taken"
+  | "confirmation_missed"
+  | "confirmation_later"
+  | "unknown";
 
 export class VerificationWebhookService {
   /**
@@ -155,6 +168,18 @@ export class VerificationWebhookService {
     const responseType = this.detectResponseType(message);
     console.log(`📋 DETECTED: ${responseType}`);
 
+    // Check if this is a confirmation response first
+    if (this.isConfirmationResponse(responseType)) {
+      console.log(
+        `📋 CONFIRMATION: Processing confirmation response for ${patient.name}`
+      );
+      return await this.handleConfirmationResponse(
+        patient,
+        message,
+        responseType
+      );
+    }
+
     // Always log the response
     await this.logResponse(patient, message, responseType);
 
@@ -207,17 +232,28 @@ export class VerificationWebhookService {
       return "unsubscribe";
     }
 
-    // 2. Check for acceptance
+    // 2. Check for confirmation responses (taken, missed, later)
+    if (this.isConfirmationTaken(normalized)) {
+      return "confirmation_taken";
+    }
+    if (this.isConfirmationMissed(normalized)) {
+      return "confirmation_missed";
+    }
+    if (this.isConfirmationLater(normalized)) {
+      return "confirmation_later";
+    }
+
+    // 3. Check for acceptance
     if (this.isAcceptResponse(normalized)) {
       return "accept";
     }
 
-    // 3. Check for decline
+    // 4. Check for decline
     if (this.isDeclineResponse(normalized)) {
       return "decline";
     }
 
-    // 4. Unknown
+    // 5. Unknown
     return "unknown";
   }
 
@@ -280,6 +316,76 @@ export class VerificationWebhookService {
     ];
 
     return declineWords.includes(message);
+  }
+
+  /**
+   * Check if message indicates medication was taken (confirmation)
+   */
+  private isConfirmationTaken(message: string): boolean {
+    const takenWords = [
+      "sudah",
+      "ya",
+      "iya",
+      "yes",
+      "ok",
+      "oke",
+      "minum",
+      "telah",
+      "udh",
+      "done",
+      "selesai",
+    ];
+
+    return takenWords.includes(message);
+  }
+
+  /**
+   * Check if message indicates medication was missed (confirmation)
+   */
+  private isConfirmationMissed(message: string): boolean {
+    const missedWords = [
+      "belum",
+      "blm",
+      "tidak",
+      "no",
+      "ga",
+      "gak",
+      "engga",
+      "enggak",
+      "lupa",
+      "belum minum",
+      "skip",
+    ];
+
+    return missedWords.includes(message);
+  }
+
+  /**
+   * Check if message indicates medication will be taken later (confirmation)
+   */
+  private isConfirmationLater(message: string): boolean {
+    const laterWords = [
+      "nanti",
+      "besok",
+      "sebentar",
+      "tunggu",
+      "later",
+      "wait",
+      "bentaran",
+    ];
+
+    return laterWords.includes(message);
+  }
+
+  /**
+   * Check if response type is a confirmation response
+   */
+  private isConfirmationResponse(responseType: ResponseType): boolean {
+    return [
+      "confirmation_taken",
+      "confirmation_missed",
+      "confirmation_later",
+    ].includes(responseType);
   }
 
   /**
@@ -373,6 +479,73 @@ export class VerificationWebhookService {
     } catch (error) {
       console.error(
         `💥 DECLINE: Error processing decline for ${patient.name}`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Handle confirmation response (medication taken/missed/later)
+   */
+  private async handleConfirmationResponse(
+    patient: any,
+    message: string,
+    responseType: ResponseType
+  ): Promise<string> {
+    try {
+      console.log(
+        `📋 CONFIRMATION: Processing ${responseType} for ${patient.name}`
+      );
+
+      // Find the most recent pending confirmation for this patient
+      const recentConfirmation = await db
+        .select()
+        .from(reminderLogs)
+        .where(
+          and(
+            eq(reminderLogs.patientId, patient.id),
+            eq(reminderLogs.confirmationStatus, "PENDING")
+          )
+        )
+        .orderBy(desc(reminderLogs.confirmationSentAt))
+        .limit(1);
+
+      if (!recentConfirmation.length) {
+        console.log(
+          `⚠️ CONFIRMATION: No pending confirmation found for ${patient.name}`
+        );
+        return "no_pending_confirmation";
+      }
+
+      const confirmationLog = recentConfirmation[0];
+      const confirmationStatus =
+        this.mapConfirmationResponseToStatus(responseType);
+
+      // Update the confirmation log
+      await db
+        .update(reminderLogs)
+        .set({
+          confirmationStatus,
+          confirmationResponse: message,
+          confirmationResponseAt: new Date(),
+        })
+        .where(eq(reminderLogs.id, confirmationLog.id));
+
+      // Send confirmation acknowledgment
+      await this.sendConfirmationAcknowledgment(
+        patient,
+        responseType,
+        confirmationLog.confirmationMessage || ""
+      );
+
+      console.log(
+        `✅ CONFIRMATION: Successfully processed ${responseType} for ${patient.name}`
+      );
+      return `confirmation_${confirmationStatus.toLowerCase()}`;
+    } catch (error) {
+      console.error(
+        `💥 CONFIRMATION: Error processing confirmation for ${patient.name}`,
         error
       );
       throw error;
@@ -559,6 +732,110 @@ Semua pengingat obat telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.
 Jika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.
 
 Semoga sehat selalu! 🙏💙`;
+    }
+
+    return "";
+  }
+
+  /**
+   * Map confirmation response type to confirmation status
+   */
+  private mapConfirmationResponseToStatus(
+    responseType: ResponseType
+  ): "CONFIRMED" | "MISSED" | "UNKNOWN" {
+    switch (responseType) {
+      case "confirmation_taken":
+        return "CONFIRMED";
+      case "confirmation_missed":
+        return "MISSED";
+      case "confirmation_later":
+        return "UNKNOWN"; // Will be taken later
+      default:
+        return "UNKNOWN";
+    }
+  }
+
+  /**
+   * Send confirmation acknowledgment message
+   */
+  private async sendConfirmationAcknowledgment(
+    patient: any,
+    responseType: ResponseType,
+    originalMessage: string
+  ): Promise<void> {
+    const acknowledgmentMessage = this.generateConfirmationAcknowledgment(
+      patient,
+      responseType,
+      originalMessage
+    );
+
+    if (!acknowledgmentMessage) return;
+
+    console.log(
+      `📤 CONFIRMATION ACK: Sending acknowledgment to ${patient.name}`
+    );
+
+    try {
+      const fonnte_token = process.env.FONNTE_TOKEN;
+      if (!fonnte_token) {
+        console.warn(
+          `⚠️ CONFIRMATION ACK: FONNTE_TOKEN not configured, skipping message to ${patient.phoneNumber}`
+        );
+        return;
+      }
+
+      const response = await fetch("https://api.fonnte.com/send", {
+        method: "POST",
+        headers: {
+          Authorization: fonnte_token,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          target: patient.phoneNumber,
+          message: acknowledgmentMessage,
+          countryCode: "62",
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn(
+          `⚠️ CONFIRMATION ACK: Failed to send to ${patient.phoneNumber}, status: ${response.status}`
+        );
+      } else {
+        console.log(
+          `✅ CONFIRMATION ACK: Successfully sent acknowledgment to ${patient.name}`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `💥 CONFIRMATION ACK: Error sending to ${patient.name}`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Generate confirmation acknowledgment message
+   */
+  private generateConfirmationAcknowledgment(
+    patient: any,
+    responseType: ResponseType,
+    originalMessage: string
+  ): string {
+    const baseMessage = `Terima kasih atas konfirmasinya, ${patient.name}! 🙏`;
+
+    if (responseType === "confirmation_taken") {
+      return `${baseMessage}
+
+Bagus! Terus jaga kesehatan ya. 💊❤️`;
+    } else if (responseType === "confirmation_missed") {
+      return `${baseMessage}
+
+Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙`;
+    } else if (responseType === "confirmation_later") {
+      return `${baseMessage}
+
+Baik, jangan lupa minum obatnya ya. Semoga sehat selalu! 💊`;
     }
 
     return "";
