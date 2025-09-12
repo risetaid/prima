@@ -4,15 +4,20 @@ import { VerificationWebhookService } from "@/services/webhook/verification-webh
 
 // Process WhatsApp verification responses from patients
 export async function POST(request: NextRequest) {
+  console.log(`🔍 WEBHOOK: Incoming POST request to verification-response`);
+
   try {
     // Get raw body first
     const rawBody = await request.text();
+    console.log(`📦 WEBHOOK: Raw body length: ${rawBody.length}`);
 
     // Try to parse as JSON
     let parsedBody;
     try {
       parsedBody = JSON.parse(rawBody);
+      console.log(`✅ WEBHOOK: JSON parsed successfully`);
     } catch (parseError) {
+      console.error(`❌ WEBHOOK: Failed to parse JSON body`, parseError);
       logger.error(
         "Failed to parse verification webhook body",
         parseError instanceof Error
@@ -31,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     // Extract Fonnte webhook data
     const { device, sender, message, name } = parsedBody;
+    console.log(`📱 WEBHOOK: From ${sender}: "${message}" (device: ${device})`);
 
     // Log incoming webhook for debugging
     logger.info("Patient verification response webhook received", {
@@ -52,6 +58,12 @@ export async function POST(request: NextRequest) {
       message,
       name,
     });
+
+    console.log(
+      `📋 WEBHOOK: Processing result: ${
+        result.success ? "SUCCESS" : "FAILED"
+      } - ${result.message}`
+    );
 
     return NextResponse.json(
       {
@@ -84,15 +96,26 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const test = searchParams.get("test");
+  const message = searchParams.get("message") || "YA";
+  const sender = searchParams.get("sender");
 
   if (test === "true") {
+    console.log(`🧪 TEST: Initiating webhook test with message: "${message}"`);
+
+    // Use provided sender or default test number
+    const testSender = sender || "6281333852187";
+
     // Simulate incoming webhook response
     const mockWebhook = {
       device: "628594257362",
-      sender: "6281333852187", // This should match patient phone in database
-      message: "YA", // Test positive response
+      sender: testSender,
+      message: message,
       name: "Test Patient",
     };
+
+    console.log(
+      `📱 TEST: Mock webhook - sender: ${testSender}, message: "${message}"`
+    );
 
     logger.info("Test verification webhook initiated", {
       api: true,
@@ -117,8 +140,18 @@ export async function GET(request: NextRequest) {
     message: "Verification Response Webhook Endpoint",
     endpoint: "/api/webhooks/verification-response",
     methods: ["POST", "GET"],
-    test: "Add ?test=true to simulate patient response",
+    test: {
+      usage: "Add ?test=true to simulate patient response",
+      parameters: {
+        message: "Message to test (default: 'YA')",
+        sender: "Phone number to test with (optional)",
+      },
+      examples: [
+        "/api/webhooks/verification-response?test=true",
+        "/api/webhooks/verification-response?test=true&message=BERHENTI",
+        "/api/webhooks/verification-response?test=true&message=YA&sender=6281234567890",
+      ],
+    },
     timestamp: new Date().toISOString(),
   });
 }
-

@@ -1,12 +1,14 @@
 /**
- * Verification Webhook Service - Handles patient verification responses from WhatsApp
+ * Verification Webhook Service - Simplified patient verification responses from WhatsApp
  *
- * This service centralizes all logic for processing patient verification responses
- * received via WhatsApp webhooks, making the webhook handler much cleaner and testable.
+ * This service handles patient verification responses with a clear, simple flow:
+ * 1. Detect response type (unsubscribe > accept > decline > unknown)
+ * 2. Process based on patient status
+ * 3. Update status and send confirmation
  */
 
 import { db, patients, verificationLogs, reminderSchedules } from "@/db";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { sendWhatsAppMessage } from "@/lib/fonnte";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
@@ -27,15 +29,22 @@ export interface VerificationResult {
   status?: number;
 }
 
+type ResponseType = "unsubscribe" | "accept" | "decline" | "unknown";
+
 export class VerificationWebhookService {
   /**
    * Process a verification webhook payload
    */
   async processWebhook(payload: WebhookPayload): Promise<VerificationResult> {
+    console.log(
+      `🔍 WEBHOOK: Processing message from ${payload.sender}: "${payload.message}"`
+    );
+
     try {
       // Validate webhook payload
       const validation = this.validateWebhookPayload(payload);
       if (!validation.valid) {
+        console.log(`❌ WEBHOOK: Validation failed - ${validation.error}`);
         return {
           success: false,
           message: validation.error!,
@@ -46,6 +55,7 @@ export class VerificationWebhookService {
       // Find patient by phone number
       const patient = await this.findPatientByPhone(payload.sender);
       if (!patient) {
+        console.log(`❌ WEBHOOK: No patient found for ${payload.sender}`);
         return {
           success: false,
           message: "No patient found or patient not eligible for this action",
@@ -53,20 +63,26 @@ export class VerificationWebhookService {
         };
       }
 
+      console.log(
+        `✅ WEBHOOK: Found patient ${patient.name} (status: ${patient.verificationStatus})`
+      );
+
       // Process the verification response
       const result = await this.processVerificationResponse(
         patient,
         payload.message
       );
 
+      console.log(`📋 WEBHOOK: Processing result: ${result}`);
       return {
         success: true,
-        message: `Verification ${result} processed`,
+        message: `Patient response processed successfully`,
         patientId: patient.id,
         result,
         status: 200,
       };
     } catch (error) {
+      console.error(`💥 WEBHOOK: Processing error`, error);
       logger.error(
         "Verification webhook processing error",
         error instanceof Error ? error : new Error(String(error)),
@@ -95,17 +111,8 @@ export class VerificationWebhookService {
     error?: string;
   } {
     if (!payload.sender || !payload.message) {
-      logger.warn("Missing required fields in verification webhook", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "validate_webhook_fields",
-        hasSender: !!payload.sender,
-        hasMessage: !!payload.message,
-      });
       return { valid: false, error: "Missing sender or message" };
     }
-
     return { valid: true };
   }
 
@@ -134,41 +141,91 @@ export class VerificationWebhookService {
   }
 
   /**
-   * Check if this is a duplicate response to prevent multiple processing
+   * Process verification response with simplified logic
    */
-  private async isDuplicateResponse(
+  private async processVerificationResponse(
     patient: any,
     message: string
-  ): Promise<boolean> {
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000); // 5 minutes window
+  ): Promise<string> {
+    console.log(
+      `🔍 PROCESSING: "${message}" for ${patient.name} (${patient.verificationStatus})`
+    );
 
-    const recentLogs = await db
-      .select()
-      .from(verificationLogs)
-      .where(
-        and(
-          eq(verificationLogs.patientId, patient.id),
-          eq(verificationLogs.patientResponse, message),
-          eq(verificationLogs.action, "responded"),
-          sql`${verificationLogs.createdAt} > ${fiveMinutesAgo}`
-        )
-      )
-      .limit(1);
+    // Detect response type with clear priority
+    const responseType = this.detectResponseType(message);
+    console.log(`📋 DETECTED: ${responseType}`);
 
-    return recentLogs.length > 0;
+    // Always log the response
+    await this.logResponse(patient, message, responseType);
+
+    // Process based on response type and current patient status
+    switch (responseType) {
+      case "unsubscribe":
+        console.log(
+          `🛑 UNSUBSCRIBE: Processing unsubscribe for ${patient.name}`
+        );
+        return await this.handleUnsubscribe(patient);
+
+      case "accept":
+        if (patient.verificationStatus === "pending_verification") {
+          console.log(`✅ ACCEPT: Processing acceptance for ${patient.name}`);
+          return await this.handleAccept(patient);
+        } else {
+          console.log(
+            `⚠️ ACCEPT: Patient ${patient.name} already ${patient.verificationStatus}`
+          );
+          return `already_${patient.verificationStatus}`;
+        }
+
+      case "decline":
+        if (patient.verificationStatus === "pending_verification") {
+          console.log(`❌ DECLINE: Processing decline for ${patient.name}`);
+          return await this.handleDecline(patient);
+        } else {
+          console.log(
+            `⚠️ DECLINE: Patient ${patient.name} already ${patient.verificationStatus}`
+          );
+          return `already_${patient.verificationStatus}`;
+        }
+
+      default:
+        console.log(
+          `❓ UNKNOWN: Unknown response "${message}" from ${patient.name}`
+        );
+        return "unknown_response";
+    }
   }
 
   /**
-   * Check if message indicates unsubscribe intent
+   * Simple response type detection with clear priority
    */
-  private isUnsubscribeIntent(message: string): {
-    confidence: number;
-    reasoning: string;
-  } {
-    const response = message.toLowerCase().trim();
+  private detectResponseType(message: string): ResponseType {
+    const normalized = message.toLowerCase().trim();
 
-    // Check exact stop words first (highest confidence)
-    const stopWords = [
+    // 1. Check for unsubscribe commands (highest priority)
+    if (this.isUnsubscribeCommand(normalized)) {
+      return "unsubscribe";
+    }
+
+    // 2. Check for acceptance
+    if (this.isAcceptResponse(normalized)) {
+      return "accept";
+    }
+
+    // 3. Check for decline
+    if (this.isDeclineResponse(normalized)) {
+      return "decline";
+    }
+
+    // 4. Unknown
+    return "unknown";
+  }
+
+  /**
+   * Check if message is an unsubscribe command
+   */
+  private isUnsubscribeCommand(message: string): boolean {
+    const unsubscribeWords = [
       "berhenti",
       "stop",
       "cancel",
@@ -181,648 +238,192 @@ export class VerificationWebhookService {
       "berhenti dulu",
     ];
 
-    if (stopWords.includes(response)) {
-      return { confidence: 1.0, reasoning: `Exact stop word: "${response}"` };
-    }
-
-    // Check stop patterns (high confidence)
-    const stopPatterns = [
-      /\b(berhenti|stop)\s+(dulu|sementara)/i,
-      /\b(jangan|ga|gak)\s+(usik|ganggu)/i,
-      /\b(saya\s+)?(?:mau|ingin)\s+(berhenti|stop)/i,
-      /\b(tolong\s+)?(?:berhenti|stop)\s+(kirim|pesan)/i,
-      /\b(keluar|cabut)\s+(dari\s+)?(?:program|prima)/i,
-    ];
-
-    for (const pattern of stopPatterns) {
-      if (pattern.test(response)) {
-        return {
-          confidence: 0.95,
-          reasoning: `Stop pattern match: ${pattern}`,
-        };
-      }
-    }
-
-    // Check fuzzy stop indicators (medium confidence)
-    const stopIndicators = ["berhenti", "stop", "batal", "keluar"];
-    const words = response.split(/\s+/);
-    let stopScore = 0;
-
-    for (const word of words) {
-      for (const indicator of stopIndicators) {
-        if (
-          word.includes(indicator) ||
-          this.levenshteinDistance(word, indicator) <= 1
-        ) {
-          stopScore += 1;
-        }
-      }
-    }
-
-    if (stopScore > 0) {
-      const confidence = Math.min(stopScore / words.length, 0.7);
-      return {
-        confidence,
-        reasoning: `Fuzzy stop match (score: ${stopScore}/${words.length})`,
-      };
-    }
-
-    return { confidence: 0, reasoning: "No unsubscribe intent detected" };
+    return unsubscribeWords.includes(message);
   }
 
   /**
-   * Process patient unsubscribe request
+   * Check if message indicates acceptance
    */
-  private async processUnsubscribe(
-    patient: any,
-    message: string
-  ): Promise<void> {
-    logger.info("Processing patient unsubscribe request", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "process_unsubscribe",
-      patientName: patient.name,
-      currentStatus: patient.verificationStatus,
-      message,
-    });
-
-    try {
-      // Log the unsubscribe action
-      await db.insert(verificationLogs).values({
-        patientId: patient.id,
-        action: "responded",
-        patientResponse: message,
-        verificationResult: "unsubscribed",
-      });
-      logger.info("Unsubscribe log inserted", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "unsubscribe_log_inserted",
-        patientName: patient.name,
-      });
-
-      // Update patient status to unsubscribed
-      await this.updatePatientStatus(patient, "unsubscribed");
-      logger.info("Patient status updated for unsubscribe", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "unsubscribe_status_updated",
-        patientName: patient.name,
-      });
-
-      // Send confirmation message
-      await this.sendConfirmationMessage(
-        patient,
-        "unsubscribed",
-        patient.phoneNumber
-      );
-      logger.info("Unsubscribe confirmation message sent", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "unsubscribe_message_sent",
-        patientName: patient.name,
-      });
-    } catch (error) {
-      logger.error(
-        "Error in processUnsubscribe",
-        error instanceof Error ? error : new Error(String(error)),
-        {
-          api: true,
-          webhooks: true,
-          verification: true,
-          operation: "process_unsubscribe_error",
-          patientName: patient.name,
-          message,
-        }
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Process verification response for a patient
-   */
-  private async processVerificationResponse(
-    patient: any,
-    message: string
-  ): Promise<string> {
-    const response = message.toLowerCase().trim();
-    const verificationResult = this.parseVerificationResponse(response);
-
-    logger.info("Processing verification response", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "process_response",
-      patientName: patient.name,
-      currentStatus: patient.verificationStatus,
-      response,
-      verificationResult,
-    });
-
-    // Check for duplicate responses to prevent multiple processing
-    const isDuplicate = await this.isDuplicateResponse(patient, message);
-    logger.info("Duplicate check result", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "duplicate_check",
-      patientName: patient.name,
-      message,
-      isDuplicate,
-    });
-    if (isDuplicate) {
-      logger.info("Duplicate response ignored", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "duplicate_ignored",
-        patientName: patient.name,
-        response: message,
-      });
-      return "duplicate_ignored";
-    }
-
-    // 🔥 CRITICAL: ALWAYS check for unsubscribe intent FIRST (patients can unsubscribe at any time)
-    const unsubscribeIntent = this.isUnsubscribeIntent(message);
-    logger.info("Unsubscribe intent check", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "unsubscribe_check",
-      patientName: patient.name,
-      message,
-      confidence: unsubscribeIntent.confidence,
-      reasoning: unsubscribeIntent.reasoning,
-    });
-    if (unsubscribeIntent.confidence >= 0.8) {
-      logger.info("Unsubscribe detected, processing unsubscribe", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "unsubscribe_detected",
-        patientName: patient.name,
-        message,
-      });
-      await this.processUnsubscribe(patient, message);
-      return "unsubscribed";
-    }
-
-    // Handle special cases for already verified/unsubscribed patients
-    if (patient.verificationStatus === "verified") {
-      await this.logMessageOnly(patient, message, "verified");
-      return "verified";
-    }
-
-    if (patient.verificationStatus === "unsubscribed") {
-      await this.logMessageOnly(patient, message, "unsubscribed");
-      return "unsubscribed";
-    }
-
-    // Only process if patient is in pending_verification status
-    if (patient.verificationStatus !== "pending_verification") {
-      await this.logMessageOnly(patient, message, patient.verificationStatus);
-      return patient.verificationStatus;
-    }
-
-    // Handle unknown responses
-    if (!verificationResult) {
-      await this.logUnknownResponse(patient, message, response);
-      return "pending_verification";
-    }
-
-    // ✅ FIX: Always log valid patient responses BEFORE updating status
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action: "responded",
-      patientResponse: message, // This captures "YA", "TIDAK", etc.
-      verificationResult: verificationResult as
-        | "verified"
-        | "declined"
-        | "pending_verification"
-        | "unsubscribed",
-    });
-
-    // Update patient status
-    await this.updatePatientStatus(patient, verificationResult);
-
-    // Handle unsubscribe special case
-    if (verificationResult === "unsubscribed") {
-      await this.deactivatePatientReminders(patient);
-    }
-
-    // Send confirmation message
-    await this.sendConfirmationMessage(
-      patient,
-      verificationResult,
-      patient.phoneNumber
-    );
-
-    return verificationResult;
-  }
-
-  /**
-   * Parse verification response with comprehensive pattern matching and confidence scoring
-   */
-  private parseVerificationResponse(message: string): string | null {
-    const response = message.toLowerCase().trim();
-    const analysis = this.analyzeResponse(response);
-
-    // Return result only if confidence is high enough
-    if (analysis.confidence >= 0.8) {
-      return analysis.intent;
-    }
-
-    // For medium confidence, log for potential review but don't auto-process
-    if (analysis.confidence >= 0.6) {
-      logger.info("Medium confidence response detected", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "medium_confidence_response",
-        response,
-        intent: analysis.intent,
-        confidence: analysis.confidence,
-        reasoning: analysis.reasoning,
-      });
-      return null; // Don't auto-process medium confidence
-    }
-
-    return null; // Unknown or low confidence response
-  }
-
-  /**
-   * Comprehensive response analysis with pattern matching and scoring
-   */
-  private analyzeResponse(response: string): {
-    intent: string | null;
-    confidence: number;
-    reasoning: string;
-  } {
-    // Exact matches (highest confidence)
-    const exactMatches = this.checkExactMatches(response);
-    if (exactMatches.intent) {
-      return {
-        intent: exactMatches.intent,
-        confidence: 1.0,
-        reasoning: `Exact match: ${exactMatches.reasoning}`,
-      };
-    }
-
-    // Pattern-based matches (high confidence)
-    const patternMatches = this.checkPatternMatches(response);
-    if (patternMatches.intent) {
-      return {
-        intent: patternMatches.intent,
-        confidence: patternMatches.confidence,
-        reasoning: patternMatches.reasoning,
-      };
-    }
-
-    // Fuzzy/partial matches (medium confidence)
-    const fuzzyMatches = this.checkFuzzyMatches(response);
-    if (fuzzyMatches.intent) {
-      return {
-        intent: fuzzyMatches.intent,
-        confidence: fuzzyMatches.confidence,
-        reasoning: fuzzyMatches.reasoning,
-      };
-    }
-
-    return {
-      intent: null,
-      confidence: 0,
-      reasoning: "No recognizable patterns found",
-    };
-  }
-
-  /**
-   * Check for exact word matches
-   */
-  private checkExactMatches(response: string): {
-    intent: string | null;
-    reasoning: string;
-  } {
-    const positiveWords = [
+  private isAcceptResponse(message: string): boolean {
+    const acceptWords = [
       "ya",
       "iya",
       "yes",
       "ok",
       "oke",
       "setuju",
-      "saya setuju",
-      "iya setuju",
-      "ya setuju",
       "boleh",
       "baik",
       "siap",
       "mau",
       "ingin",
       "terima",
-      "ya terima",
-      "iya terima",
-      "ya mau",
-      "iya mau",
-      "ya boleh",
-      "iya boleh",
     ];
 
-    const negativeWords = [
+    return acceptWords.includes(message);
+  }
+
+  /**
+   * Check if message indicates decline
+   */
+  private isDeclineResponse(message: string): boolean {
+    const declineWords = [
       "tidak",
       "no",
-      "nope",
       "ga",
       "gak",
       "engga",
       "enggak",
       "tolak",
-      "menolak",
-      "ga mau",
-      "gak mau",
-      "tidak mau",
-      "ga setuju",
-      "gak setuju",
-      "tidak setuju",
-      "nanti",
-      "besok",
-      "lagi",
-      "ga sekarang",
-      "gak sekarang",
-    ];
-
-    const stopWords = [
-      "berhenti",
-      "stop",
-      "cancel",
-      "batal",
-      "keluar",
-      "hapus",
-      "unsubscribe",
-      "cabut",
-      "keluar",
-      "stop dulu",
-      "berhenti dulu",
-    ];
-
-    if (positiveWords.includes(response)) {
-      return { intent: "verified", reasoning: `Positive word: "${response}"` };
-    }
-
-    if (negativeWords.includes(response)) {
-      return { intent: "declined", reasoning: `Negative word: "${response}"` };
-    }
-
-    if (stopWords.includes(response)) {
-      return { intent: "unsubscribed", reasoning: `Stop word: "${response}"` };
-    }
-
-    return { intent: null, reasoning: "" };
-  }
-
-  /**
-   * Check for pattern-based matches using regex
-   */
-  private checkPatternMatches(response: string): {
-    intent: string | null;
-    confidence: number;
-    reasoning: string;
-  } {
-    // Positive patterns (high confidence)
-    const positivePatterns = [
-      /\b(ya|iya|yes|yaa|yaaa)\s+(saya\s+)?(?:mau|ingin|boleh|setuju|terima|siap|baik)/i,
-      /\b(saya\s+)?(?:mau|ingin|boleh|setuju|terima|siap|baik)\s+(ya|iya|yes)/i,
-      /\b(terima\s+kasih|makasih)\s+(ya|iya)/i,
-      /\b(baik|oke|ok)\s+lah/i,
-      /\b(ya\s+)?dong/i,
-      /\b(ya\s+)?saja/i,
-      /\b(lanjutkan|teruskan)/i,
-    ];
-
-    // Negative patterns (high confidence)
-    const negativePatterns = [
-      /\b(tidak|ga|gak|engga|enggak)\s+(mau|ingin|boleh|setuju)/i,
-      /\b(saya\s+)?(?:tidak|ga|gak)\s+(mau|ingin|boleh)/i,
-      /\b(nanti|besok|lagi)\s+(saja|dulu)/i,
-      /\b(saya\s+)?(?:sedang|lagi)\s+sakit/i,
-      /\b(belum|masih)\s+(sembuh|bisa)/i,
-    ];
-
-    // Stop patterns (high confidence)
-    const stopPatterns = [
-      /\b(berhenti|stop)\s+(dulu|sementara)/i,
-      /\b(jangan|ga)\s+(usik|ganggu)/i,
-      /\b(saya\s+)?(?:mau|ingin)\s+(berhenti|stop)/i,
-    ];
-
-    for (const pattern of positivePatterns) {
-      if (pattern.test(response)) {
-        return {
-          intent: "verified",
-          confidence: 0.95,
-          reasoning: `Positive pattern match: ${pattern}`,
-        };
-      }
-    }
-
-    for (const pattern of negativePatterns) {
-      if (pattern.test(response)) {
-        return {
-          intent: "declined",
-          confidence: 0.95,
-          reasoning: `Negative pattern match: ${pattern}`,
-        };
-      }
-    }
-
-    for (const pattern of stopPatterns) {
-      if (pattern.test(response)) {
-        return {
-          intent: "unsubscribed",
-          confidence: 0.95,
-          reasoning: `Stop pattern match: ${pattern}`,
-        };
-      }
-    }
-
-    return { intent: null, confidence: 0, reasoning: "" };
-  }
-
-  /**
-   * Check for fuzzy/partial matches (lower confidence)
-   */
-  private checkFuzzyMatches(response: string): {
-    intent: string | null;
-    confidence: number;
-    reasoning: string;
-  } {
-    // Simple fuzzy matching for common typos and partial matches
-    const positiveIndicators = [
-      "ya",
-      "iya",
-      "yes",
-      "ok",
-      "setuju",
-      "mau",
-      "boleh",
-      "terima",
-      "siap",
-    ];
-    const negativeIndicators = [
-      "tidak",
-      "ga",
-      "gak",
-      "no",
-      "tolak",
       "nanti",
       "besok",
     ];
-    const stopIndicators = ["berhenti", "stop", "batal", "keluar"];
 
-    let positiveScore = 0;
-    let negativeScore = 0;
-    let stopScore = 0;
-
-    const words = response.split(/\s+/);
-
-    for (const word of words) {
-      // Check for partial matches and typos
-      for (const indicator of positiveIndicators) {
-        if (
-          word.includes(indicator) ||
-          this.levenshteinDistance(word, indicator) <= 1
-        ) {
-          positiveScore += 1;
-        }
-      }
-
-      for (const indicator of negativeIndicators) {
-        if (
-          word.includes(indicator) ||
-          this.levenshteinDistance(word, indicator) <= 1
-        ) {
-          negativeScore += 1;
-        }
-      }
-
-      for (const indicator of stopIndicators) {
-        if (
-          word.includes(indicator) ||
-          this.levenshteinDistance(word, indicator) <= 1
-        ) {
-          stopScore += 1;
-        }
-      }
-    }
-
-    // Determine intent based on highest score
-    const maxScore = Math.max(positiveScore, negativeScore, stopScore);
-
-    if (maxScore >= 1) {
-      const totalWords = words.length;
-      const confidence = Math.min(maxScore / totalWords, 0.7); // Cap at 0.7 for fuzzy matches
-
-      if (positiveScore === maxScore) {
-        return {
-          intent: "verified",
-          confidence,
-          reasoning: `Fuzzy positive match (score: ${positiveScore}/${totalWords})`,
-        };
-      } else if (negativeScore === maxScore) {
-        return {
-          intent: "declined",
-          confidence,
-          reasoning: `Fuzzy negative match (score: ${negativeScore}/${totalWords})`,
-        };
-      } else if (stopScore === maxScore) {
-        return {
-          intent: "unsubscribed",
-          confidence,
-          reasoning: `Fuzzy stop match (score: ${stopScore}/${totalWords})`,
-        };
-      }
-    }
-
-    return { intent: null, confidence: 0, reasoning: "" };
+    return declineWords.includes(message);
   }
 
   /**
-   * Calculate Levenshtein distance for fuzzy matching
+   * Handle unsubscribe request
    */
-  private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = [];
+  private async handleUnsubscribe(patient: any): Promise<string> {
+    console.log(
+      `🛑 UNSUBSCRIBE: Starting unsubscribe process for ${patient.name}`
+    );
 
-    for (let i = 0; i <= str2.length; i++) {
-      matrix[i] = [i];
+    try {
+      // Update patient status to declined + deactivate
+      console.log(`🔄 UNSUBSCRIBE: Updating patient status...`);
+      await this.updatePatientStatus(patient, "unsubscribed");
+      console.log(`✅ UNSUBSCRIBE: Patient status updated`);
+
+      // Deactivate all reminders
+      console.log(`🔕 UNSUBSCRIBE: Deactivating reminders...`);
+      await this.deactivatePatientReminders(patient);
+      console.log(`✅ UNSUBSCRIBE: Reminders deactivated`);
+
+      // Send confirmation message
+      console.log(`📤 UNSUBSCRIBE: Sending confirmation message...`);
+      await this.sendConfirmationMessage(
+        patient,
+        "unsubscribed",
+        patient.phoneNumber
+      );
+      console.log(`✅ UNSUBSCRIBE: Confirmation message sent`);
+
+      console.log(`✅ UNSUBSCRIBE: Successfully processed for ${patient.name}`);
+      return "unsubscribed";
+    } catch (error) {
+      console.error(
+        `💥 UNSUBSCRIBE: Error processing unsubscribe for ${patient.name}`,
+        error
+      );
+      console.error(`💥 UNSUBSCRIBE: Error details:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        patientId: patient.id,
+        patientName: patient.name,
+      });
+      throw error;
     }
-
-    for (let j = 0; j <= str1.length; j++) {
-      matrix[0][j] = j;
-    }
-
-    for (let i = 1; i <= str2.length; i++) {
-      for (let j = 1; j <= str1.length; j++) {
-        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1, // substitution
-            matrix[i][j - 1] + 1, // insertion
-            matrix[i - 1][j] + 1 // deletion
-          );
-        }
-      }
-    }
-
-    return matrix[str2.length][str1.length];
   }
 
   /**
-   * Log message without changing patient status
+   * Handle acceptance
    */
-  private async logMessageOnly(
+  private async handleAccept(patient: any): Promise<string> {
+    try {
+      // Update patient status to verified
+      await this.updatePatientStatus(patient, "verified");
+
+      // Send confirmation message
+      await this.sendConfirmationMessage(
+        patient,
+        "verified",
+        patient.phoneNumber
+      );
+
+      console.log(`✅ ACCEPT: Successfully processed for ${patient.name}`);
+      return "verified";
+    } catch (error) {
+      console.error(
+        `💥 ACCEPT: Error processing acceptance for ${patient.name}`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Handle decline
+   */
+  private async handleDecline(patient: any): Promise<string> {
+    try {
+      // Update patient status to declined
+      await this.updatePatientStatus(patient, "declined");
+
+      // Send confirmation message
+      await this.sendConfirmationMessage(
+        patient,
+        "declined",
+        patient.phoneNumber
+      );
+
+      console.log(`✅ DECLINE: Successfully processed for ${patient.name}`);
+      return "declined";
+    } catch (error) {
+      console.error(
+        `💥 DECLINE: Error processing decline for ${patient.name}`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Log response to database
+   */
+  private async logResponse(
     patient: any,
     message: string,
+    responseType: ResponseType
+  ): Promise<void> {
+    const action =
+      responseType === "unknown" ? "message_received" : "responded";
+    const verificationResult = this.mapResponseTypeToResult(
+      responseType,
+      patient.verificationStatus
+    );
+
+    await db.insert(verificationLogs).values({
+      patientId: patient.id,
+      action,
+      patientResponse: message,
+      verificationResult,
+    });
+
+    console.log(`📝 LOGGED: ${action} - ${responseType} for ${patient.name}`);
+  }
+
+  /**
+   * Map response type to verification result
+   */
+  private mapResponseTypeToResult(
+    responseType: ResponseType,
     currentStatus: string
-  ) {
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action: "message_received",
-      patientResponse: message,
-      verificationResult: currentStatus as
-        | "verified"
-        | "declined"
-        | "pending_verification"
-        | "unsubscribed",
-    });
-  }
-
-  /**
-   * Log unknown response
-   */
-  private async logUnknownResponse(
-    patient: any,
-    message: string,
-    response: string
-  ) {
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action: "responded",
-      patientResponse: message,
-      verificationResult: "pending_verification",
-    });
-
-    logger.info("Unknown verification response received", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "unknown_response",
-      response,
-      patientName: patient.name,
-    });
+  ): "verified" | "declined" | "pending_verification" {
+    switch (responseType) {
+      case "unsubscribe":
+        return "declined"; // Unsubscribe sets status to declined
+      case "accept":
+        return "verified";
+      case "decline":
+        return "declined";
+      default:
+        return currentStatus as
+          | "verified"
+          | "declined"
+          | "pending_verification";
+    }
   }
 
   /**
@@ -839,78 +440,49 @@ export class VerificationWebhookService {
     if (verificationResult === "unsubscribed") {
       updateData.verificationStatus = "declined";
       updateData.isActive = false;
-      logger.info("Unsubscribe detected, setting status to declined and deactivating", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "unsubscribe_status_change",
-        patientName: patient.name,
-        originalStatus: patient.verificationStatus,
-      });
+      console.log(`🔄 STATUS: Setting ${patient.name} to declined + inactive`);
     }
 
-    logger.info("Updating patient status in database", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "db_update_start",
-      patientName: patient.name,
-      patientId: patient.id,
-      fromStatus: patient.verificationStatus,
-      toStatus: updateData.verificationStatus,
-      isActive: updateData.isActive,
-    });
+    console.log(
+      `💾 DB UPDATE: ${patient.name} from ${patient.verificationStatus} to ${updateData.verificationStatus}`
+    );
 
     await db
       .update(patients)
       .set(updateData)
       .where(eq(patients.id, patient.id));
 
-    logger.info("Patient status updated successfully", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "db_update_success",
-      patientName: patient.name,
-      patientId: patient.id,
-    });
-
-    // Invalidate cache using systematic approach
+    // Invalidate cache
     await invalidateAfterPatientOperation(patient.id, "update");
 
-    logger.info("Patient verification status updated", {
-      api: true,
-      webhooks: true,
-      verification: true,
-      operation: "status_updated",
-      patientName: patient.name,
-      fromStatus: patient.verificationStatus,
-      toStatus: updateData.verificationStatus,
-    });
+    console.log(`✅ DB UPDATED: ${patient.name} status changed successfully`);
   }
 
   /**
    * Deactivate all reminders for unsubscribed patient
    */
   private async deactivatePatientReminders(patient: any) {
+    console.log(`🔕 REMINDERS: Deactivating reminders for ${patient.name}`);
+
     try {
-      await db
+      const result = await db
         .update(reminderSchedules)
         .set({
           isActive: false,
           updatedAt: new Date(),
         })
         .where(eq(reminderSchedules.patientId, patient.id));
+
+      console.log(`✅ REMINDERS: Successfully deactivated for ${patient.name}`);
     } catch (error) {
-      logger.warn("Failed to deactivate reminders during unsubscribe", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "deactivate_reminders",
-        patientId: patient.id,
-        patientName: patient.name,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      console.error(
+        `💥 REMINDERS: Error deactivating reminders for ${patient.name}`,
+        error
+      );
+      // Don't throw - reminder deactivation failure shouldn't stop unsubscribe
+      console.warn(
+        `⚠️ REMINDERS: Continuing unsubscribe despite reminder deactivation error`
+      );
     }
   }
 
@@ -925,18 +497,15 @@ export class VerificationWebhookService {
     const message = this.generateConfirmationMessage(patient, status);
     if (!message) return;
 
+    console.log(
+      `📤 MESSAGE: Sending ${status} confirmation to ${patient.name}`
+    );
+
     try {
       const fonnte_token = process.env.FONNTE_TOKEN;
       if (!fonnte_token) {
-        logger.warn(
-          "FONNTE_TOKEN not configured, skipping confirmation message",
-          {
-            api: true,
-            webhooks: true,
-            verification: true,
-            operation: "send_confirmation",
-            phoneNumber,
-          }
+        console.warn(
+          `⚠️ MESSAGE: FONNTE_TOKEN not configured, skipping message to ${phoneNumber}`
         );
         return;
       }
@@ -954,27 +523,17 @@ export class VerificationWebhookService {
         }),
       });
 
-      const result = await response.json();
       if (!response.ok) {
-        logger.warn("Failed to send confirmation message via Fonnte", {
-          api: true,
-          webhooks: true,
-          verification: true,
-          operation: "send_confirmation",
-          phoneNumber,
-          responseStatus: response.status,
-          fonnteResult: result,
-        });
+        console.warn(
+          `⚠️ MESSAGE: Failed to send to ${phoneNumber}, status: ${response.status}`
+        );
+      } else {
+        console.log(
+          `✅ MESSAGE: Successfully sent ${status} confirmation to ${patient.name}`
+        );
       }
     } catch (error) {
-      logger.warn("Error sending confirmation message", {
-        api: true,
-        webhooks: true,
-        verification: true,
-        operation: "send_confirmation",
-        phoneNumber,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      console.error(`💥 MESSAGE: Error sending to ${patient.name}`, error);
     }
   }
 
