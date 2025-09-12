@@ -62,6 +62,11 @@ export async function GET(
         reminderScheduleId: reminderLogs.reminderScheduleId,
         sentAt: reminderLogs.sentAt,
         message: reminderLogs.message,
+        // Automated confirmation fields
+        confirmationStatus: reminderLogs.confirmationStatus,
+        confirmationResponse: reminderLogs.confirmationResponse,
+        confirmationResponseAt: reminderLogs.confirmationResponseAt,
+        confirmationSentAt: reminderLogs.confirmationSentAt,
         // Schedule fields
         medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,

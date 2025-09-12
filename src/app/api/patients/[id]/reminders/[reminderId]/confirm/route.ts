@@ -109,9 +109,9 @@ export async function PUT(
         .limit(1);
     }
 
-    // Check if this ReminderLog is already confirmed
-    console.log("🔍 Checking for existing confirmation:", { logId });
-    const existingConfirmation = await db
+    // Check if this ReminderLog is already manually confirmed
+    console.log("🔍 Checking for existing manual confirmation:", { logId });
+    const existingManualConfirmation = await db
       .select({
         id: manualConfirmations.id,
       })
@@ -119,22 +119,64 @@ export async function PUT(
       .where(eq(manualConfirmations.reminderLogId, logId))
       .limit(1);
 
-    console.log("📊 Existing confirmation check:", {
-      exists: existingConfirmation.length > 0,
-      id: existingConfirmation[0]?.id,
+    console.log("📊 Existing manual confirmation check:", {
+      exists: existingManualConfirmation.length > 0,
+      id: existingManualConfirmation[0]?.id,
     });
 
-    if (existingConfirmation.length > 0) {
-      console.error("❌ REMINDER ALREADY CONFIRMED:", {
+    if (existingManualConfirmation.length > 0) {
+      console.error("❌ REMINDER ALREADY MANUALLY CONFIRMED:", {
         logId,
-        existingId: existingConfirmation[0].id,
+        existingId: existingManualConfirmation[0].id,
       });
       return NextResponse.json(
-        { error: "Reminder already confirmed" },
-        { status: 400 }
+        { error: "Reminder already manually confirmed by volunteer" },
+        { status: 409 }
       );
     }
-    console.log("✅ No existing confirmation found, proceeding with creation");
+
+    // Check for automated confirmation conflict
+    console.log("🔍 Checking for automated confirmation conflict:", { logId });
+    const reminderLogData = await db
+      .select({
+        confirmationStatus: reminderLogs.confirmationStatus,
+        confirmationResponse: reminderLogs.confirmationResponse,
+        confirmationResponseAt: reminderLogs.confirmationResponseAt,
+      })
+      .from(reminderLogs)
+      .where(eq(reminderLogs.id, logId))
+      .limit(1);
+
+    const automatedConfirmation = reminderLogData[0];
+    console.log("📊 Automated confirmation check:", {
+      status: automatedConfirmation?.confirmationStatus,
+      hasResponse: !!automatedConfirmation?.confirmationResponse,
+      responseTime: automatedConfirmation?.confirmationResponseAt,
+    });
+
+    if (
+      automatedConfirmation?.confirmationStatus &&
+      automatedConfirmation.confirmationStatus !== "PENDING"
+    ) {
+      console.error("❌ AUTOMATED CONFIRMATION CONFLICT:", {
+        logId,
+        automatedStatus: automatedConfirmation.confirmationStatus,
+        automatedResponse: automatedConfirmation.confirmationResponse,
+      });
+      return NextResponse.json(
+        {
+          error: "Automated confirmation already exists",
+          automatedStatus: automatedConfirmation.confirmationStatus,
+          automatedResponse: automatedConfirmation.confirmationResponse,
+          conflictType: "automated_confirmation_exists",
+        },
+        { status: 409 }
+      );
+    }
+
+    console.log(
+      "✅ No confirmation conflicts found, proceeding with manual confirmation"
+    );
 
     // Create manual confirmation with proper relations
     console.log("💾 Creating manual confirmation:", {

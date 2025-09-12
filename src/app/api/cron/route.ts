@@ -5,6 +5,7 @@ import {
   patients,
   reminderLogs,
   reminderContentAttachments,
+  manualConfirmations,
 } from "@/db";
 import { eq, and, gte, lte, notExists, count, sql } from "drizzle-orm";
 import {
@@ -434,46 +435,71 @@ async function processReminders() {
             if (result.success) {
               sentCount++;
 
-              // Schedule follow-up confirmation message (15-20 minutes later)
+              // Check for conflict prevention: don't schedule automated confirmation if manual confirmation exists
               if (reminderLogId) {
                 try {
-                  const confirmationDelayMinutes = 18; // 15-20 minutes, using 18 as middle ground
-                  const confirmationTime = new Date(getWIBTime());
-                  confirmationTime.setMinutes(
-                    confirmationTime.getMinutes() + confirmationDelayMinutes
-                  );
+                  // Check if manual confirmation already exists for this reminder log
+                  const existingManualConfirmation = await db
+                    .select({ id: manualConfirmations.id })
+                    .from(manualConfirmations)
+                    .where(eq(manualConfirmations.reminderLogId, reminderLogId))
+                    .limit(1);
 
-                  const confirmationMessage = `Halo ${schedule.patientName}, apakah sudah diminum obat ${schedule.medicationName}? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`;
+                  if (existingManualConfirmation.length > 0) {
+                    logger.info(
+                      "Skipping automated confirmation - manual confirmation already exists",
+                      {
+                        api: true,
+                        cron: true,
+                        reminderLogId,
+                        patientId: schedule.patientId,
+                        manualConfirmationId: existingManualConfirmation[0].id,
+                      }
+                    );
 
-                  // Update reminder log with confirmation scheduling info
-                  await db
-                    .update(reminderLogs)
-                    .set({
-                      confirmationMessage,
-                      confirmationSentAt: confirmationTime,
-                      confirmationStatus: "PENDING",
-                    })
-                    .where(eq(reminderLogs.id, reminderLogId));
+                    debugLogs.push(
+                      `⚠️ Skipping automated confirmation for ${schedule.patientName} - manual confirmation exists`
+                    );
+                  } else {
+                    // No manual confirmation exists, proceed with automated confirmation scheduling
+                    const confirmationDelayMinutes = 18; // 15-20 minutes, using 18 as middle ground
+                    const confirmationTime = new Date(getWIBTime());
+                    confirmationTime.setMinutes(
+                      confirmationTime.getMinutes() + confirmationDelayMinutes
+                    );
 
-                  logger.info("Follow-up confirmation scheduled", {
-                    api: true,
-                    cron: true,
-                    reminderLogId,
-                    patientId: schedule.patientId,
-                    confirmationTime: confirmationTime.toISOString(),
-                    delayMinutes: confirmationDelayMinutes,
-                  });
+                    const confirmationMessage = `Halo ${schedule.patientName}, apakah sudah diminum obat ${schedule.medicationName}? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`;
 
-                  debugLogs.push(
-                    `✅ Follow-up confirmation scheduled for ${
-                      schedule.patientName
-                    } at ${confirmationTime.toLocaleTimeString("id-ID", {
-                      timeZone: "Asia/Jakarta",
-                    })}`
-                  );
+                    // Update reminder log with confirmation scheduling info
+                    await db
+                      .update(reminderLogs)
+                      .set({
+                        confirmationMessage,
+                        confirmationSentAt: confirmationTime,
+                        confirmationStatus: "PENDING",
+                      })
+                      .where(eq(reminderLogs.id, reminderLogId));
+
+                    logger.info("Follow-up confirmation scheduled", {
+                      api: true,
+                      cron: true,
+                      reminderLogId,
+                      patientId: schedule.patientId,
+                      confirmationTime: confirmationTime.toISOString(),
+                      delayMinutes: confirmationDelayMinutes,
+                    });
+
+                    debugLogs.push(
+                      `✅ Follow-up confirmation scheduled for ${
+                        schedule.patientName
+                      } at ${confirmationTime.toLocaleTimeString("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                      })}`
+                    );
+                  }
                 } catch (confirmationError) {
                   console.error(
-                    `❌ Failed to schedule confirmation for ${schedule.patientName}:`,
+                    `❌ Failed to check/schedule confirmation for ${schedule.patientName}:`,
                     confirmationError
                   );
                   // Don't fail the whole process for confirmation scheduling errors
