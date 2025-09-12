@@ -241,7 +241,7 @@ export class CacheInvalidationService {
     });
 
     // Always invalidate patient-specific data
-    await this.invalidatePatientData(patientId);
+    await CacheInvalidationService.invalidatePatientData(patientId);
 
     // For create/update operations, also invalidate dashboard
     if (
@@ -249,7 +249,7 @@ export class CacheInvalidationService {
       operation === "update" ||
       operation === "delete"
     ) {
-      await this.invalidateDashboardData();
+      await CacheInvalidationService.invalidateDashboardData();
     }
   }
 
@@ -268,7 +268,7 @@ export class CacheInvalidationService {
     });
 
     // Always invalidate reminder-specific data
-    await this.invalidateReminderData(patientId);
+    await CacheInvalidationService.invalidateReminderData(patientId);
 
     // For create/update/delete operations, also invalidate patient data
     if (
@@ -276,7 +276,7 @@ export class CacheInvalidationService {
       operation === "update" ||
       operation === "delete"
     ) {
-      await this.invalidatePatientData(patientId);
+      await CacheInvalidationService.invalidatePatientData(patientId);
     }
   }
 
@@ -294,11 +294,11 @@ export class CacheInvalidationService {
       userOperation: operation,
     });
 
-    await this.invalidateUserData(userId);
+    await CacheInvalidationService.invalidateUserData(userId);
 
     // For admin operations, also invalidate dashboard
     if (operation === "create" || operation === "delete") {
-      await this.invalidateDashboardData();
+      await CacheInvalidationService.invalidateDashboardData();
     }
   }
 }
@@ -325,4 +325,3 @@ export const invalidateAfterReminderOperation =
   CacheInvalidationService.invalidateAfterReminderOperation;
 export const invalidateAfterUserOperation =
   CacheInvalidationService.invalidateAfterUserOperation;
-

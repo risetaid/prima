@@ -207,7 +207,7 @@ async function findSuperAdminUser(): Promise<any> {
     if (
       !adminUser.isActive ||
       !adminUser.isApproved ||
-      adminUser.role !== "SUPERADMIN"
+      adminUser.role !== "DEVELOPER"
     ) {
       console.error("❌ ERROR: User found but not properly configured!");
       console.error(

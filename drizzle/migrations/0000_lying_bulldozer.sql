@@ -35,7 +35,7 @@ EXCEPTION
 END $$;
 --> statement-breakpoint
 DO $$ BEGIN
- CREATE TYPE "public"."user_role" AS ENUM('ADMIN', 'MEMBER');
+ CREATE TYPE "public"."user_role" AS ENUM('DEVELOPER', 'ADMIN', 'RELAWAN');
 EXCEPTION
  WHEN duplicate_object THEN null;
 END $$;
@@ -153,14 +153,16 @@ CREATE TABLE IF NOT EXISTS "users" (
 	"first_name" text,
 	"last_name" text,
 	"hospital_name" text,
-	"role" "user_role" DEFAULT 'MEMBER' NOT NULL,
+	"role" "user_role" DEFAULT 'RELAWAN' NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_login_at" timestamp with time zone,
 	"approved_at" timestamp with time zone,
 	"approved_by" uuid,
 	"is_approved" boolean DEFAULT false NOT NULL,
 	"clerk_id" text NOT NULL,
+	"deleted_at" timestamp with time zone,
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
 	CONSTRAINT "users_clerk_id_unique" UNIQUE("clerk_id")
 );
@@ -213,4 +215,6 @@ CREATE INDEX IF NOT EXISTS "users_clerk_approved_active_idx" ON "users" USING bt
 CREATE INDEX IF NOT EXISTS "whatsapp_templates_category_idx" ON "whatsapp_templates" USING btree ("category");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "whatsapp_templates_is_active_idx" ON "whatsapp_templates" USING btree ("is_active");--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "whatsapp_templates_category_active_idx" ON "whatsapp_templates" USING btree ("category","is_active");--> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "whatsapp_templates_created_by_idx" ON "whatsapp_templates" USING btree ("created_by");
+CREATE INDEX IF NOT EXISTS "whatsapp_templates_created_by_idx" ON "whatsapp_templates" USING btree ("created_by");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "users_last_login_idx" ON "users" USING btree ("last_login_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "users_deleted_at_idx" ON "users" USING btree ("deleted_at");

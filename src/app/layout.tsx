@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth-context";
+import { TimeFormatInitializer } from "@/components/ui/time-format-initializer";
 import "./globals.css";
 
 const inter = Inter({
@@ -64,20 +65,21 @@ export default function RootLayout({
           appearance={{
             baseTheme: undefined,
             variables: {
-              colorPrimary: '#3b82f6',
-              colorBackground: '#ffffff',
-              colorInputBackground: '#ffffff',
-              colorInputText: '#000000',
+              colorPrimary: "#3b82f6",
+              colorBackground: "#ffffff",
+              colorInputBackground: "#ffffff",
+              colorInputText: "#000000",
             },
             elements: {
-              formButtonPrimary: 'bg-blue-600 hover:bg-blue-700 text-white',
-              card: 'shadow-lg border-0',
-              headerTitle: 'text-gray-900',
-              headerSubtitle: 'text-gray-600',
-            }
+              formButtonPrimary: "bg-blue-600 hover:bg-blue-700 text-white",
+              card: "shadow-lg border-0",
+              headerTitle: "text-gray-900",
+              headerSubtitle: "text-gray-600",
+            },
           }}
         >
           <AuthProvider>
+            <TimeFormatInitializer />
             {children}
             <Toaster
               position="top-center"
@@ -89,11 +91,9 @@ export default function RootLayout({
                 },
               }}
             />
-
           </AuthProvider>
         </ClerkProvider>
       </body>
     </html>
   );
 }
-

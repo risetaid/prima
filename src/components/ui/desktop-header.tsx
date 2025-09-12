@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { Shield } from "lucide-react";
-import { useAuthContext } from '@/lib/auth-context'
+import { useAuthContext } from "@/lib/auth-context";
 // Role cache temporarily disabled
 
 interface DesktopHeaderProps {
@@ -12,21 +12,21 @@ interface DesktopHeaderProps {
 }
 
 function AdminActions() {
-  const { role: userRole, isLoaded } = useAuthContext()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [isHydrated, setIsHydrated] = useState(false)
+  const { role: userRole, isLoaded } = useAuthContext();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    setIsHydrated(true)
-  }, [])
+    setIsHydrated(true);
+  }, []);
 
   // Don't render anything during SSR to prevent hydration mismatch
   if (!isHydrated || !isLoaded) {
     return null;
   }
 
-  if (userRole !== "SUPERADMIN" && userRole !== "ADMIN") {
+  if (userRole !== "DEVELOPER") {
     return null;
   }
 
@@ -48,8 +48,6 @@ function AdminActions() {
         <Shield className="w-4 h-4" />
         <span>Admin Panel</span>
       </button>
-
-
     </>
   );
 }
@@ -74,15 +72,10 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   const getRoleBasedNavItems = () => {
     if (!user) return baseNavItems;
 
-    if (userRole === 'MEMBER') {
-      // MEMBER users see: Beranda, Pasien (view only), Berita, Video Edukasi
+    // RELAWAN users see: Beranda, Pengingat, Berita, Video Edukasi
+    if (userRole === "RELAWAN") {
       return [
         ...baseNavItems,
-        {
-          label: "Pasien",
-          href: "/dashboard",
-          active: pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
-        },
         {
           label: "Berita",
           href: "/dashboard/berita",
@@ -96,7 +89,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
       ];
     }
 
-    // ADMIN and SUPERADMIN see all navigation including patient management
+    // ADMIN and DEVELOPER see all navigation including patient management
     return [
       ...baseNavItems,
       {
@@ -120,14 +113,18 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
 
   const roleBasedNavItems = getRoleBasedNavItems();
 
-  // Add CMS navigation only for ADMIN and SUPERADMIN
+  // Add CMS navigation only for ADMIN and DEVELOPER
   const navItems = [
     ...roleBasedNavItems,
-    ...(userRole && ['ADMIN', 'SUPERADMIN'].includes(userRole) ? [{
-      label: "CMS",
-      href: "/dashboard/cms",
-      active: pathname.startsWith("/dashboard/cms"),
-    }] : [])
+    ...(userRole && ["ADMIN", "DEVELOPER"].includes(userRole)
+      ? [
+          {
+            label: "CMS",
+            href: "/dashboard/cms",
+            active: pathname.startsWith("/dashboard/cms"),
+          },
+        ]
+      : []),
   ];
 
   const handleNavigation = (href: string) => {
@@ -158,11 +155,12 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
           {/* Desktop Navigation */}
           {showNavigation && (
             <nav className="hidden lg:flex items-center space-x-8">
-              {isHydrated ? navItems.map((item) => (
-                <button
-                  key={item.href}
-                  onClick={() => handleNavigation(item.href)}
-                  className={`
+              {isHydrated ? (
+                navItems.map((item) => (
+                  <button
+                    key={item.href}
+                    onClick={() => handleNavigation(item.href)}
+                    className={`
                     px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer
                     ${
                       item.active
@@ -170,10 +168,11 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
                         : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
                     }
                   `}
-                >
-                  {item.label}
-                </button>
-              )) : (
+                  >
+                    {item.label}
+                  </button>
+                ))
+              ) : (
                 // Show skeleton/placeholder during SSR
                 <div className="flex items-center space-x-8">
                   <div className="px-3 py-2 rounded-md text-sm font-medium text-gray-600">
@@ -229,4 +228,3 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
     </header>
   );
 }
-

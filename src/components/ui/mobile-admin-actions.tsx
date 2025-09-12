@@ -1,31 +1,40 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { Shield, FileText, Calendar, Newspaper, Video, UserCheck } from "lucide-react";
-import { useAuthContext } from '@/lib/auth-context'
+import {
+  Shield,
+  FileText,
+  Calendar,
+  Newspaper,
+  Video,
+  UserCheck,
+} from "lucide-react";
+import { useAuthContext } from "@/lib/auth-context";
 // Role cache temporarily disabled
 
 interface MobileAdminActionsProps {
   className?: string;
 }
 
-
-
-export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) {
-  const { role: userRole, isLoaded } = useAuthContext()
-  const router = useRouter()
-  const pathname = usePathname()
+export function MobileAdminActions({
+  className = "",
+}: MobileAdminActionsProps) {
+  const { role: userRole, isLoaded } = useAuthContext();
+  const router = useRouter();
+  const pathname = usePathname();
 
   if (!isLoaded || !userRole) {
     return (
-      <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
+      <div
+        className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}
+      >
         <Shield className="w-4 h-4 text-gray-400" />
       </div>
     );
   }
 
-  // Only show for SUPERADMIN users
-  if (userRole !== "SUPERADMIN") {
+  // Only show for DEVELOPER users
+  if (userRole !== "DEVELOPER") {
     return null;
   }
 
@@ -51,20 +60,22 @@ export function MobileAdminActions({ className = "" }: MobileAdminActionsProps) 
 }
 
 export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
-  const { role: userRole, isLoaded } = useAuthContext()
+  const { role: userRole, isLoaded } = useAuthContext();
   const router = useRouter();
   const pathname = usePathname();
 
   if (!isLoaded) {
     return (
-      <div className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}>
+      <div
+        className={`p-1.5 rounded-full bg-gray-100 animate-pulse flex-shrink-0 ${className}`}
+      >
         <FileText className="w-4 h-4 text-gray-400" />
       </div>
     );
   }
 
-  // Show for both ADMIN and SUPERADMIN (consistent with desktop)
-  if (!userRole || !['ADMIN', 'SUPERADMIN'].includes(userRole)) {
+  // Show for both ADMIN and DEVELOPER (consistent with desktop)
+  if (!userRole || !["ADMIN", "DEVELOPER"].includes(userRole)) {
     return null;
   }
 
@@ -89,7 +100,9 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
   );
 }
 
-export function MobileReminderActions({ className = "" }: MobileAdminActionsProps) {
+export function MobileReminderActions({
+  className = "",
+}: MobileAdminActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -114,7 +127,9 @@ export function MobileReminderActions({ className = "" }: MobileAdminActionsProp
   );
 }
 
-export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps) {
+export function MobileBeritaActions({
+  className = "",
+}: MobileAdminActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -139,7 +154,9 @@ export function MobileBeritaActions({ className = "" }: MobileAdminActionsProps)
   );
 }
 
-export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) {
+export function MobileVideoActions({
+  className = "",
+}: MobileAdminActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -164,11 +181,14 @@ export function MobileVideoActions({ className = "" }: MobileAdminActionsProps) 
   );
 }
 
-export function MobilePasienActions({ className = "" }: MobileAdminActionsProps) {
+export function MobilePasienActions({
+  className = "",
+}: MobileAdminActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const isActive = pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien");
+  const isActive =
+    pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien");
 
   return (
     <button
@@ -188,4 +208,3 @@ export function MobilePasienActions({ className = "" }: MobileAdminActionsProps)
     </button>
   );
 }
-

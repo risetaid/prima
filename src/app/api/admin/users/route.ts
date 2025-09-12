@@ -17,8 +17,8 @@ export async function GET() {
       );
     }
 
-    // Only superadmins can access user management
-    if (currentUser.role !== "SUPERADMIN") {
+    // Only developers can access user management
+    if (currentUser.role !== "DEVELOPER") {
       return createErrorResponse(
         "Superadmin access required",
         403,
@@ -88,4 +88,3 @@ export async function GET() {
     return handleApiError(error, "fetching users for admin");
   }
 }
-

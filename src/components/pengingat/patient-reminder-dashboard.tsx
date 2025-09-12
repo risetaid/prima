@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { ContentSelector } from "@/components/reminder/ContentSelector";
+import { TimePicker24h } from "@/components/ui/time-picker-24h";
 
 interface ContentItem {
   id: string;
@@ -795,16 +796,15 @@ export function PatientReminderDashboard({
                   <label className="block text-gray-700 text-sm font-medium mb-2">
                     Jam
                   </label>
-                  <input
-                    type="time"
+                  <TimePicker24h
                     value={editFormData.time}
-                    onChange={(e) =>
+                    onChange={(time) =>
                       setEditFormData((prev) => ({
                         ...prev,
-                        time: e.target.value,
+                        time: time,
                       }))
                     }
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Pilih jam pengingat"
                   />
                 </div>
 
@@ -844,4 +844,3 @@ export function PatientReminderDashboard({
     </div>
   );
 }
-

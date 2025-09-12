@@ -54,7 +54,7 @@ export async function POST() {
 
     // Build patient filter based on role
     const patientConditions = [isNull(patients.deletedAt)];
-    if (user.role === "ADMIN" || user.role === "MEMBER") {
+    if (user.role === "ADMIN" || user.role === "RELAWAN") {
       // Both ADMIN and MEMBER can only send to patients they manage
       patientConditions.push(eq(patients.assignedVolunteerId, user.id));
     }
@@ -243,7 +243,10 @@ export async function POST() {
           // Send WhatsApp message
           let result: { success: boolean; messageId?: string; error?: string };
           try {
-            result = await whatsappService.send(reminder.patientPhoneNumber, messageBody);
+            result = await whatsappService.send(
+              reminder.patientPhoneNumber,
+              messageBody
+            );
           } catch (sendError) {
             errorCount++;
             debugLogs.push(
@@ -363,4 +366,3 @@ export async function POST() {
     );
   }
 }
-

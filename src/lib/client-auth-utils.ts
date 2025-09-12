@@ -3,12 +3,12 @@
  * These functions are safe to use in client components
  */
 
-import { useUser } from '@clerk/nextjs'
-import type { User } from '@/db/schema'
+import { useUser } from "@clerk/nextjs";
+import type { User } from "@/db/schema";
 
 export interface ClientAuthUser extends User {
-  canAccessDashboard: boolean
-  needsApproval: boolean
+  canAccessDashboard: boolean;
+  needsApproval: boolean;
 }
 
 /**
@@ -16,10 +16,10 @@ export interface ClientAuthUser extends User {
  * Uses Clerk's useUser hook instead of server-side auth
  */
 export function useCurrentUser(): ClientAuthUser | null {
-  const { user: clerkUser, isLoaded } = useUser()
+  const { user: clerkUser, isLoaded } = useUser();
 
   if (!isLoaded || !clerkUser) {
-    return null
+    return null;
   }
 
   // For client components, we can't query the database directly
@@ -27,11 +27,11 @@ export function useCurrentUser(): ClientAuthUser | null {
   // For now, return a basic user object with Clerk data
   const basicUser: ClientAuthUser = {
     id: clerkUser.id,
-    email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    email: clerkUser.primaryEmailAddress?.emailAddress || "",
     firstName: clerkUser.firstName || null,
     lastName: clerkUser.lastName || null,
     hospitalName: null,
-    role: 'MEMBER', // Default role - will be updated via API if needed
+    role: "RELAWAN", // Default role - will be updated via API if needed
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -42,30 +42,29 @@ export function useCurrentUser(): ClientAuthUser | null {
     clerkId: clerkUser.id,
     deletedAt: null,
     canAccessDashboard: false,
-    needsApproval: true
-  }
+    needsApproval: true,
+  };
 
-  return basicUser
+  return basicUser;
 }
 
 /**
  * Get user role from Clerk public metadata
  * This is a safer approach for client components
  */
-export function useUserRole(): 'SUPERADMIN' | 'ADMIN' | 'MEMBER' | null {
-  const { user } = useUser()
+export function useUserRole(): "DEVELOPER" | "ADMIN" | "RELAWAN" | null {
+  const { user } = useUser();
 
   if (!user) {
-    return null
+    return null;
   }
 
   // Try to get role from Clerk public metadata
-  const role = user.publicMetadata?.role as string
+  const role = user.publicMetadata?.role as string;
 
-  if (role === 'SUPERADMIN' || role === 'ADMIN' || role === 'MEMBER') {
-    return role
+  if (role === "DEVELOPER" || role === "ADMIN" || role === "RELAWAN") {
+    return role;
   }
 
-  return 'MEMBER' // Default role
+  return "RELAWAN"; // Default role
 }
-

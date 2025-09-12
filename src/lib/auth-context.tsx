@@ -9,7 +9,7 @@ interface AuthContextState {
   user: UserResource | null;
   isLoaded: boolean;
   isSignedIn: boolean;
-  role: "SUPERADMIN" | "ADMIN" | "MEMBER" | null;
+  role: "DEVELOPER" | "ADMIN" | "RELAWAN" | null;
   canAccessDashboard: boolean;
   needsApproval: boolean;
 }
@@ -25,7 +25,7 @@ const MAX_RETRIES = 3;
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded: userLoaded } = useUser();
   const { isSignedIn, isLoaded: authLoaded } = useAuth();
-  const [role, setRole] = useState<"SUPERADMIN" | "ADMIN" | "MEMBER" | null>(
+  const [role, setRole] = useState<"DEVELOPER" | "ADMIN" | "RELAWAN" | null>(
     null
   );
   const [canAccessDashboard, setCanAccessDashboard] = useState(false);
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setCanAccessDashboard(false);
       setNeedsApproval(true);
       setDbUserLoaded(true);
-      clearCachedUserData().catch(error => {
+      clearCachedUserData().catch((error) => {
         console.warn("Failed to clear cached user data:", error);
       });
       return;
@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const cachedData = getCachedUserData();
     if (cachedData) {
       console.log("Using cached auth data for faster loading");
-      setRole(cachedData.role || "MEMBER");
+      setRole(cachedData.role || "RELAWAN");
       setCanAccessDashboard(cachedData.canAccessDashboard || false);
       setNeedsApproval(cachedData.needsApproval !== false);
       setDbUserLoaded(true);
@@ -148,10 +148,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Only update if data has changed and component is still mounted
             if (JSON.stringify(cachedData) !== JSON.stringify(data)) {
               console.log("Updating auth state with fresh data");
-              setRole(data.role || "MEMBER");
+              setRole(data.role || "RELAWAN");
               setCanAccessDashboard(data.canAccessDashboard || false);
               setNeedsApproval(data.needsApproval !== false);
-              setCachedUserData(data).catch(error => {
+              setCachedUserData(data).catch((error) => {
                 console.warn("Failed to cache user data:", error);
               });
             }
@@ -175,10 +175,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isBackgroundFetchRunning) {
       fetchUserStatus()
         .then((data) => {
-          setRole(data.role || "MEMBER");
+          setRole(data.role || "RELAWAN");
           setCanAccessDashboard(data.canAccessDashboard || false);
           setNeedsApproval(data.needsApproval !== false);
-          setCachedUserData(data).catch(error => {
+          setCachedUserData(data).catch((error) => {
             console.warn("Failed to update cached user data:", error);
           });
           setRetryCount(0);
@@ -209,13 +209,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               if (recentLogin) {
                 console.log("Using graceful degradation for recent user");
-                setRole("MEMBER");
+                setRole("RELAWAN");
                 setCanAccessDashboard(true);
                 setNeedsApproval(false);
               } else {
                 // Fallback to safe defaults for new users
                 console.log("Using safe defaults for failed auth");
-                setRole("MEMBER");
+                setRole("RELAWAN");
                 setCanAccessDashboard(false);
                 setNeedsApproval(true);
               }
@@ -227,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.warn("Failed to read login timestamp:", error);
               // Fallback to safe defaults
               console.log("Using safe defaults for failed auth");
-              setRole("MEMBER");
+              setRole("RELAWAN");
               setCanAccessDashboard(false);
               setNeedsApproval(true);
               setRetryCount((prev) => prev + 1);
@@ -262,4 +262,3 @@ export function useAuthContext() {
   }
   return context;
 }
-

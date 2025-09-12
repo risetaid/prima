@@ -41,7 +41,12 @@ export interface AuthUser extends User {
 
 export interface AdminUser extends AuthUser {
   id: string;
-  role: "ADMIN" | "SUPERADMIN";
+  role: "ADMIN" | "DEVELOPER";
+}
+
+export interface DeveloperUser extends AuthUser {
+  id: string;
+  role: "DEVELOPER";
 }
 
 export async function getCurrentUser(): Promise<AuthUser | null> {
@@ -181,7 +186,7 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
             email: user.primaryEmailAddress?.emailAddress || "",
             firstName: user.firstName || "",
             lastName: user.lastName || "",
-            role: isFirstUser ? "SUPERADMIN" : "MEMBER",
+            role: isFirstUser ? "DEVELOPER" : "RELAWAN",
             isApproved: isFirstUser, // First user auto-approved
             approvedAt: isFirstUser ? new Date() : null,
           })
@@ -264,7 +269,7 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
       firstName: user.firstName || "",
       lastName: user.lastName || "",
       hospitalName: "",
-      role: "MEMBER" as const,
+      role: "RELAWAN" as const,
       isApproved: false,
       isActive: true,
       approvedAt: null,
@@ -339,21 +344,41 @@ export async function requireApprovedUser(): Promise<AuthUser> {
 export async function requireAdmin(): Promise<AdminUser> {
   const user = await requireApprovedUser();
 
-  if (user.role !== "ADMIN" && user.role !== "SUPERADMIN") {
+  if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
     redirect("/unauthorized");
   }
 
   return user as AdminUser;
 }
 
-export async function requireSuperAdmin(): Promise<AuthUser> {
+export async function requireDeveloper(): Promise<DeveloperUser> {
   const user = await requireApprovedUser();
 
-  if (user.role !== "SUPERADMIN") {
+  if (user.role !== "DEVELOPER") {
     redirect("/unauthorized");
   }
 
-  return user;
+  return user as DeveloperUser;
+}
+
+export async function requireAdminOrDeveloper(): Promise<AdminUser> {
+  const user = await requireApprovedUser();
+
+  if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
+    redirect("/unauthorized");
+  }
+
+  return user as AdminUser;
+}
+
+export async function requireDeveloperOnly(): Promise<DeveloperUser> {
+  const user = await requireApprovedUser();
+
+  if (user.role !== "DEVELOPER") {
+    redirect("/unauthorized");
+  }
+
+  return user as DeveloperUser;
 }
 
 export async function getUserPatients(userId: string) {
@@ -409,4 +434,3 @@ export async function getUserPatients(userId: string) {
     return [];
   }
 }
-

@@ -9,6 +9,7 @@ import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { toast } from "@/components/ui/toast";
 import { ReminderListSkeleton } from "@/components/ui/dashboard-skeleton";
 import { ContentSelector } from "@/components/reminder/ContentSelector";
+import { TimePicker24h } from "@/components/ui/time-picker-24h";
 
 interface ContentItem {
   id: string;
@@ -562,12 +563,12 @@ export default function ScheduledRemindersPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Waktu Pengingat
                   </label>
-                  <input
-                    type="time"
+                  <TimePicker24h
                     value={editTime}
-                    onChange={(e) => setEditTime(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={setEditTime}
+                    placeholder="Pilih waktu pengingat"
                     disabled={isUpdating}
+                    required
                   />
                 </div>
 

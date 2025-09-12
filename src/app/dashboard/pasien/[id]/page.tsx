@@ -87,7 +87,6 @@ interface HealthNote {
   createdAt: string;
 }
 
-
 export default function PatientDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -121,7 +120,7 @@ export default function PatientDetailPage() {
 
   // Simple Reminder Modal State
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
-  
+
   // Ref to track previous verification status for toast notifications
   const prevVerificationStatus = useRef<string | null>(null);
 
@@ -132,49 +131,60 @@ export default function PatientDetailPage() {
     }
   }, [params.id]);
 
-  // Add polling for real-time verification updates
+  // Add polling for real-time verification updates (disabled during edit mode)
   useEffect(() => {
-    if (!params.id) return;
+    if (!params.id || isEditMode) return;
 
     // Poll every 10 seconds when page is visible and patient is in pending verification
     const pollInterval = setInterval(() => {
       // Only poll if document is visible and patient is waiting for verification
-      if (document.visibilityState === 'visible' && patient?.verificationStatus === 'pending_verification') {
+      if (
+        document.visibilityState === "visible" &&
+        patient?.verificationStatus === "pending_verification"
+      ) {
         fetchPatient(params.id as string, true); // true = isPolling
       }
     }, 10000); // 10 seconds
 
     return () => clearInterval(pollInterval);
-  }, [params.id, patient?.verificationStatus]);
+  }, [params.id, patient?.verificationStatus, isEditMode]);
 
   const fetchPatient = async (id: string, isPolling = false) => {
     try {
       const response = await fetch(`/api/patients/${id}`);
       if (response.ok) {
         const data = await response.json();
-        
+
         // Check if verification status changed and show toast notification
-        if (isPolling && prevVerificationStatus.current && 
-            prevVerificationStatus.current !== data.verificationStatus) {
+        if (
+          isPolling &&
+          prevVerificationStatus.current &&
+          prevVerificationStatus.current !== data.verificationStatus
+        ) {
           const statusMessages: Record<string, string> = {
-            'verified': '✅ Pasien telah memverifikasi WhatsApp!',
-            'declined': '❌ Pasien menolak verifikasi WhatsApp',
-            'unsubscribed': '🛑 Pasien berhenti dari layanan'
+            verified: "✅ Pasien telah memverifikasi WhatsApp!",
+            declined: "❌ Pasien menolak verifikasi WhatsApp",
+            unsubscribed: "🛑 Pasien berhenti dari layanan",
           };
-          
-          const message = statusMessages[data.verificationStatus] || `Status verifikasi diubah menjadi: ${data.verificationStatus}`;
+
+          const message =
+            statusMessages[data.verificationStatus] ||
+            `Status verifikasi diubah menjadi: ${data.verificationStatus}`;
           toast.success(message);
         }
-        
+
         // Update previous status reference
         prevVerificationStatus.current = data.verificationStatus;
-        
+
         setPatient(data);
-        setEditData({
-          name: data.name,
-          phoneNumber: data.phoneNumber,
-          photoUrl: data.photoUrl || "",
-        });
+        // Only update editData if not in edit mode (to prevent resetting user input)
+        if (!isEditMode) {
+          setEditData({
+            name: data.name,
+            phoneNumber: data.phoneNumber,
+            photoUrl: data.photoUrl || "",
+          });
+        }
         setError(null);
       } else {
         setError("Gagal memuat data pasien");
@@ -638,7 +648,6 @@ export default function PatientDetailPage() {
     setEditData({ ...editData, photoUrl: "" });
   };
 
-
   const handleToggleStatus = async () => {
     if (!patient) return;
 
@@ -799,10 +808,8 @@ export default function PatientDetailPage() {
       {/* Responsive Header */}
       <Header showNavigation={true} />
 
-
-
-       {/* Main Content */}
-       <main className="px-4 lg:px-8 py-4 relative z-10 space-y-6">
+      {/* Main Content */}
+      <main className="px-4 lg:px-8 py-4 relative z-10 space-y-6">
         {/* Patient Profile Section - Full Width */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Profile Header */}
@@ -827,10 +834,10 @@ export default function PatientDetailPage() {
             {patient.assignedVolunteer && (
               <div className="mt-4 pt-4 border-t border-white/20">
                 <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
-                   <div className="flex items-center space-x-2 text-blue-100 mb-1">
-                     <User className="w-4 h-4" />
-                     <span className="text-sm font-medium">Dikelola oleh</span>
-                   </div>
+                  <div className="flex items-center space-x-2 text-blue-100 mb-1">
+                    <User className="w-4 h-4" />
+                    <span className="text-sm font-medium">Dikelola oleh</span>
+                  </div>
                   <div className="text-white">
                     <div className="font-semibold">
                       {patient.volunteerFirstName} {patient.volunteerLastName}
@@ -1052,22 +1059,22 @@ export default function PatientDetailPage() {
                     </>
                   ) : (
                     <>
-                       <button
-                         onClick={handleEdit}
-                         className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg"
-                       >
+                      <button
+                        onClick={handleEdit}
+                        className="cursor-pointer w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg"
+                      >
                         <Edit className="w-5 h-5" />
                         <span>Edit Profil</span>
                       </button>
 
-                       <button
-                         onClick={handleToggleStatus}
-                         className={`cursor-pointer w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg ${
-                           patient.isActive
-                             ? "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700"
-                             : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
-                         }`}
-                       >
+                      <button
+                        onClick={handleToggleStatus}
+                        className={`cursor-pointer w-full py-3 px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg ${
+                          patient.isActive
+                            ? "bg-gradient-to-r from-red-500 to-red-600 text-white hover:from-red-600 hover:to-red-700"
+                            : "bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700"
+                        }`}
+                      >
                         {patient.isActive ? (
                           <>
                             <User className="w-5 h-5" />
@@ -1097,19 +1104,19 @@ export default function PatientDetailPage() {
                       <span>Aksi Cepat</span>
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                       <button
-                         onClick={handleAddReminder}
-                         className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                       >
+                      <button
+                        onClick={handleAddReminder}
+                        className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      >
                         <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
                           Buat Pengingat
                         </span>
                       </button>
-                       <button
-                         onClick={handleViewReminders}
-                         className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                       >
+                      <button
+                        onClick={handleViewReminders}
+                        className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      >
                         <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
                         <span className="text-sm sm:text-base">
                           Lihat Pengingat
@@ -1119,8 +1126,9 @@ export default function PatientDetailPage() {
                     {/* Tips */}
                     <div className="mt-4 pt-4 border-t border-blue-200">
                       <p className="text-xs sm:text-sm text-gray-600 text-center">
-                        💡 <strong>Tips:</strong> Gunakan &ldquo;Buat Pengingat&rdquo; untuk
-                        sistem auto-fill dengan template WhatsApp
+                        💡 <strong>Tips:</strong> Gunakan &ldquo;Buat
+                        Pengingat&rdquo; untuk sistem auto-fill dengan template
+                        WhatsApp
                       </p>
                     </div>
                   </div>
@@ -1333,7 +1341,8 @@ export default function PatientDetailPage() {
                     Belum ada catatan kesehatan
                   </h3>
                   <p className="text-xs sm:text-sm">
-                    Klik &ldquo;Tambah Catatan&rdquo; untuk menambah catatan pertama
+                    Klik &ldquo;Tambah Catatan&rdquo; untuk menambah catatan
+                    pertama
                   </p>
                 </div>
               ) : (
@@ -1402,38 +1411,38 @@ export default function PatientDetailPage() {
           {/* Health Notes Footer */}
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-               <button
-                 onClick={() => {
-                   setIsAddNoteModalOpen(true);
-                   setNewNoteText("");
-                   setSelectedDate(new Date().toISOString().split("T")[0]);
-                   setCurrentMonth(new Date());
-                   setShowCalendar(false);
-                 }}
-                 className="flex-1 bg-white text-purple-600 px-4 sm:px-6 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
-               >
+              <button
+                onClick={() => {
+                  setIsAddNoteModalOpen(true);
+                  setNewNoteText("");
+                  setSelectedDate(new Date().toISOString().split("T")[0]);
+                  setCurrentMonth(new Date());
+                  setShowCalendar(false);
+                }}
+                className="flex-1 bg-white text-purple-600 px-4 sm:px-6 py-3 rounded-xl font-semibold hover:bg-purple-50 transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
+              >
                 <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">
                   Tambah Catatan Kesehatan
                 </span>
               </button>
-               <button
-                 onClick={() => {
-                   if (isDeleteMode && selectedNotes.length > 0) {
-                     handleDeleteSelectedNotes();
-                   } else {
-                     setIsDeleteMode(!isDeleteMode);
-                     setSelectedNotes([]);
-                   }
-                 }}
-                 className={`px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl ${
-                   isDeleteMode && selectedNotes.length > 0
-                     ? "bg-red-600 text-white hover:bg-red-700"
-                     : isDeleteMode
-                     ? "bg-gray-600 text-white hover:bg-gray-700"
-                     : "bg-red-500 text-white hover:bg-red-600"
-                 }`}
-               >
+              <button
+                onClick={() => {
+                  if (isDeleteMode && selectedNotes.length > 0) {
+                    handleDeleteSelectedNotes();
+                  } else {
+                    setIsDeleteMode(!isDeleteMode);
+                    setSelectedNotes([]);
+                  }
+                }}
+                className={`px-4 sm:px-6 py-3 rounded-xl font-semibold transition-all duration-200 cursor-pointer flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl ${
+                  isDeleteMode && selectedNotes.length > 0
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : isDeleteMode
+                    ? "bg-gray-600 text-white hover:bg-gray-700"
+                    : "bg-red-500 text-white hover:bg-red-600"
+                }`}
+              >
                 <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-sm sm:text-base">
                   {isDeleteMode && selectedNotes.length > 0

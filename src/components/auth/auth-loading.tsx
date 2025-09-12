@@ -8,7 +8,7 @@ interface AuthLoadingProps {
   children: React.ReactNode;
   requireAuth?: boolean;
   requireApproval?: boolean;
-  allowedRoles?: ("SUPERADMIN" | "ADMIN" | "MEMBER")[];
+  allowedRoles?: ("DEVELOPER" | "ADMIN" | "RELAWAN")[];
 }
 
 export function AuthLoading({
@@ -150,4 +150,3 @@ export function AuthLoading({
 
   return <>{children}</>;
 }
-

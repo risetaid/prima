@@ -1,17 +1,13 @@
-import { Header } from "@/components/ui/header"
-import { CMSErrorBoundary } from '@/components/ui/error-boundary'
-import { AuthLoading } from '@/components/auth/auth-loading'
+import { Header } from "@/components/ui/header";
+import { CMSErrorBoundary } from "@/components/ui/error-boundary";
+import { AuthLoading } from "@/components/auth/auth-loading";
 
-export default function CMSLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function CMSLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AuthLoading 
-      requireAuth={true} 
+    <AuthLoading
+      requireAuth={true}
       requireApproval={true}
-      allowedRoles={['ADMIN', 'SUPERADMIN']}
+      allowedRoles={["ADMIN", "DEVELOPER"]}
     >
       <CMSErrorBoundary>
         <div className="min-h-screen bg-gray-50">
@@ -30,13 +26,10 @@ export default function CMSLayout({
 
           {/* Main Content */}
           <main className="relative z-10">
-            <div className="px-4 sm:px-6 lg:px-8 py-6">
-              {children}
-            </div>
+            <div className="px-4 sm:px-6 lg:px-8 py-6">{children}</div>
           </main>
         </div>
       </CMSErrorBoundary>
     </AuthLoading>
-  )
+  );
 }
-

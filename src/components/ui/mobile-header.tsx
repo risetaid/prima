@@ -2,8 +2,12 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { MobileAdminActions, MobileCMSActions, MobilePasienActions } from "./mobile-admin-actions";
-import { useAuthContext } from '@/lib/auth-context'
+import {
+  MobileAdminActions,
+  MobileCMSActions,
+  MobilePasienActions,
+} from "./mobile-admin-actions";
+import { useAuthContext } from "@/lib/auth-context";
 // Role cache temporarily disabled
 import { UserCheck } from "lucide-react";
 
@@ -11,14 +15,14 @@ interface MobileHeaderProps {
   showNavigation?: boolean;
 }
 
-type UserRole = 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
+type UserRole = "DEVELOPER" | "ADMIN" | "RELAWAN";
 
 // Role-based mobile navigation component
 function MobileNavigationActions() {
-  const { role: userRole } = useAuthContext()
-  const pathname = usePathname()
-  const router = useRouter()
-  
+  const { role: userRole } = useAuthContext();
+  const pathname = usePathname();
+  const router = useRouter();
+
   // If on homepage, show simplified navigation
   if (pathname === "/") {
     return (
@@ -31,30 +35,27 @@ function MobileNavigationActions() {
         >
           <UserCheck className="w-4 h-4" />
         </button>
-        
-        {/* Management actions for ADMIN/SUPERADMIN */}
-        {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
+
+        {/* Management actions for ADMIN/DEVELOPER */}
+        {(userRole === "ADMIN" || userRole === "DEVELOPER") && (
           <MobileCMSActions />
         )}
-        
-        {/* Admin Panel for SUPERADMIN only */}
-        {userRole === 'SUPERADMIN' && (
-          <MobileAdminActions />
-        )}
-        
+
+        {/* Admin Panel for DEVELOPER only */}
+        {userRole === "DEVELOPER" && <MobileAdminActions />}
+
         <div className="ml-2">
           <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </div>
     );
   }
-  
+
   // For other pages, show role-specific navigation
-  if (userRole === 'MEMBER') {
-    // MEMBER users see: Only Pasien (view-only) - other features available in blue nav
+  if (userRole === "RELAWAN") {
+    // RELAWAN users see: Only basic navigation - features available in blue nav
     return (
       <div className="flex items-center">
-        <MobilePasienActions />
         {/* Fixed User Button */}
         <div className="ml-2 flex-shrink-0">
           <UserButton afterSignOutUrl="/sign-in" />
@@ -62,8 +63,8 @@ function MobileNavigationActions() {
       </div>
     );
   }
-  
-  if (userRole === 'ADMIN') {
+
+  if (userRole === "ADMIN") {
     // ADMIN users see: Pasien + CMS (management functions only)
     return (
       <div className="flex items-center">
@@ -78,8 +79,8 @@ function MobileNavigationActions() {
       </div>
     );
   }
-  
-  // SUPERADMIN users see: Pasien + CMS + Admin Panel (management functions only)
+
+  // DEVELOPER users see: Pasien + CMS + Admin Panel (management functions only)
   return (
     <div className="flex items-center">
       <div className="flex items-center space-x-1">
@@ -114,9 +115,7 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
         </div>
 
         {/* Mobile Actions & User Menu */}
-        {showNavigation && user && (
-          <MobileNavigationActions />
-        )}
+        {showNavigation && user && <MobileNavigationActions />}
 
         {/* Sign In Button for unauthenticated users */}
         {showNavigation && !user && (
@@ -131,4 +130,3 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
     </header>
   );
 }
-

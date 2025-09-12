@@ -246,11 +246,117 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;             /* Safari and Chrome */
   }
-  
+
   .scroll-snap-x {
     scroll-snap-type: x mandatory;
   }
   .scroll-snap-start {
     scroll-snap-align: start;
   }
+}
+
+/* 24-Hour Time Format Enforcement */
+/* Force 24-hour format for time inputs across all browsers */
+
+/* Global time input overrides */
+input[type="time"] {
+  /* CSS custom property to indicate 24-hour preference */
+  --time-format: 24;
+}
+
+/* Hide AM/PM field in WebKit browsers (Chrome, Safari, Edge) */
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Hide AM/PM field in Firefox */
+input[type="time"]::-moz-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Hide AM/PM field in Microsoft Edge */
+input[type="time"]::-ms-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ensure time inputs use 24-hour format in all contexts */
+input[type="time"] {
+  /* Override browser locale settings for time format */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Additional styling for time inputs to ensure consistency */
+.time-input-24h {
+  /* Custom class for explicit 24-hour time inputs */
+  --time-format: 24;
+}
+
+.time-input-24h::-webkit-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.time-input-24h::-moz-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.time-input-24h::-ms-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Force 24-hour format using JavaScript-like CSS approach */
+/* This ensures the time picker shows 24-hour format */
+input[type="time"] {
+  /* Attempt to force 24-hour format through CSS */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Specific overrides for common time input containers */
+.time-input-container input[type="time"]::-webkit-datetime-edit-ampm-field,
+.modal-content input[type="time"]::-webkit-datetime-edit-ampm-field,
+.dialog input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }

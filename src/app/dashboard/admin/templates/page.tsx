@@ -21,9 +21,9 @@ export default function AdminTemplatesPage() {
       const response = await fetch("/api/user/profile");
       if (response.ok) {
         const data = await response.json();
-        if (data.role !== "SUPERADMIN" && data.role !== "ADMIN") {
+        if (data.role !== "DEVELOPER" && data.role !== "ADMIN") {
           toast.error("Akses Ditolak", {
-            description: "Anda tidak memiliki akses ke halaman admin."
+            description: "Anda tidak memiliki akses ke halaman admin.",
           });
           router.push("/dashboard");
           return;
@@ -53,10 +53,10 @@ export default function AdminTemplatesPage() {
   const confirmSeedTemplates = async () => {
     setSeeding(true);
     try {
-      const response = await fetch('/api/admin/templates/seed', {
-        method: 'POST',
+      const response = await fetch("/api/admin/templates/seed", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
 
@@ -64,17 +64,17 @@ export default function AdminTemplatesPage() {
 
       if (response.ok) {
         toast.success(`Template berhasil ditambahkan!`, {
-          description: `Dibuat: ${data.stats.created}, Dilewati: ${data.stats.skipped}`
+          description: `Dibuat: ${data.stats.created}, Dilewati: ${data.stats.skipped}`,
         });
 
         // Refresh the page to show new templates
         window.location.reload();
       } else {
-        toast.error(data.error || 'Gagal menambahkan template');
+        toast.error(data.error || "Gagal menambahkan template");
       }
     } catch (error) {
-      console.error('Error seeding templates:', error);
-      toast.error('Terjadi kesalahan saat menambahkan template');
+      console.error("Error seeding templates:", error);
+      toast.error("Terjadi kesalahan saat menambahkan template");
     } finally {
       setSeeding(false);
     }
@@ -109,7 +109,9 @@ export default function AdminTemplatesPage() {
                 <ArrowLeft className="w-5 h-5 mr-2" />
                 Kembali
               </button>
-              <h1 className="text-lg font-semibold text-gray-900">Template Pesan</h1>
+              <h1 className="text-lg font-semibold text-gray-900">
+                Template Pesan
+              </h1>
               <div className="w-8"></div>
             </div>
           </header>
@@ -158,7 +160,9 @@ export default function AdminTemplatesPage() {
             </button>
             <div className="flex items-center space-x-2">
               <MessageSquareText className="w-5 h-5 text-green-600" />
-              <h1 className="text-lg font-semibold text-gray-900">Template WhatsApp</h1>
+              <h1 className="text-lg font-semibold text-gray-900">
+                Template WhatsApp
+              </h1>
             </div>
           </div>
         </header>
@@ -179,7 +183,10 @@ export default function AdminTemplatesPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl my-4 lg:my-8 mx-auto relative z-10 px-4 sm:px-6 lg:px-8">
-        <TemplateManagement onSeedTemplates={handleSeedTemplates} seeding={seeding} />
+        <TemplateManagement
+          onSeedTemplates={handleSeedTemplates}
+          seeding={seeding}
+        />
       </main>
 
       {/* Seed Templates Confirmation Modal */}
@@ -196,4 +203,3 @@ export default function AdminTemplatesPage() {
     </div>
   );
 }
-

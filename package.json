@@ -18,6 +18,10 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "nuke-db": "bun run scripts/nuke-database.ts",
+    "nuke-recreate-db": "bun run scripts/nuke-recreate-database.ts",
+    "add-missing-columns": "bun run scripts/add-missing-columns.ts",
+    "check-enum": "bun run scripts/check-enum-values.ts",
+    "setup-first-user": "bun run scripts/setup-first-user.ts",
     "seed:templates": "bun run scripts/seed-templates.ts"
   },
   "dependencies": {

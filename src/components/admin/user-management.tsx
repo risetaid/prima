@@ -1,316 +1,371 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AdminUsersTableSkeleton } from '@/components/ui/dashboard-skeleton'
-import { CheckCircle, XCircle, Clock, User, Mail, Calendar, Crown, UserCheck, RefreshCw } from 'lucide-react'
-import { toast } from 'sonner'
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminUsersTableSkeleton } from "@/components/ui/dashboard-skeleton";
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  User,
+  Mail,
+  Calendar,
+  Crown,
+  UserCheck,
+  RefreshCw,
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface User {
-  id: string
-  clerkId: string
-  email: string
-  firstName: string | null
-  lastName: string | null
-  role: 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
-  isActive: boolean
-  isApproved: boolean
-  createdAt: string
-  approvedAt: string | null
+  id: string;
+  clerkId: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: "DEVELOPER" | "ADMIN" | "RELAWAN";
+  isActive: boolean;
+  isApproved: boolean;
+  createdAt: string;
+  approvedAt: string | null;
   approver?: {
-    firstName: string | null
-    lastName: string | null
-    email: string
-  } | null
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([])
-  const [currentUser, setCurrentUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const fetchUsers = async () => {
     try {
-      setLoading(true)
-      
+      setLoading(true);
+
       // Fetch both users list and current user info
       const [usersResponse, profileResponse] = await Promise.all([
-        fetch('/api/admin/users'),
-        fetch('/api/user/profile')
-      ])
-      
-      const usersData = await usersResponse.json()
-      const profileData = await profileResponse.json()
-      
+        fetch("/api/admin/users"),
+        fetch("/api/user/profile"),
+      ]);
+
+      const usersData = await usersResponse.json();
+      const profileData = await profileResponse.json();
+
       if (usersData.success) {
-        setUsers(usersData.users)
+        setUsers(usersData.users);
       } else {
-        toast.error('Failed to fetch users')
+        toast.error("Failed to fetch users");
       }
-      
+
       if (profileResponse.ok && profileData.id) {
-        setCurrentUser(profileData)
+        setCurrentUser(profileData);
       }
-      
     } catch (error) {
-      console.error('Error fetching users:', error)
-      toast.error('Failed to fetch users')
+      console.error("Error fetching users:", error);
+      toast.error("Failed to fetch users");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const handleApproval = async (userId: string, action: 'approve' | 'reject') => {
+  const handleApproval = async (
+    userId: string,
+    action: "approve" | "reject"
+  ) => {
     try {
-      setActionLoading(userId)
-      
-      const response = await fetch(`/api/admin/users/${userId}/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
+      setActionLoading(userId);
 
-      const data = await response.json()
-      
+      const response = await fetch(`/api/admin/users/${userId}/${action}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
       if (data.success) {
-        toast.success(`User ${action === 'approve' ? 'approved' : 'rejected'} successfully`)
-        fetchUsers() // Refresh the list
+        toast.success(
+          `User ${action === "approve" ? "approved" : "rejected"} successfully`
+        );
+        fetchUsers(); // Refresh the list
       } else {
-        toast.error(data.error || `Failed to ${action} user`)
+        toast.error(data.error || `Failed to ${action} user`);
       }
     } catch (error) {
-      console.error(`Error ${action}ing user:`, error)
-      toast.error(`Failed to ${action} user`)
+      console.error(`Error ${action}ing user:`, error);
+      toast.error(`Failed to ${action} user`);
     } finally {
-      setActionLoading(null)
+      setActionLoading(null);
     }
-  }
+  };
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      setActionLoading(userId)
-      
-      const response = await fetch(`/api/admin/users/${userId}/toggle-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
+      setActionLoading(userId);
 
-      const data = await response.json()
-      
+      const response = await fetch(`/api/admin/users/${userId}/toggle-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
       if (data.success) {
-        toast.success(`User ${currentStatus ? 'deactivated' : 'activated'} successfully`)
-        fetchUsers()
+        toast.success(
+          `User ${currentStatus ? "deactivated" : "activated"} successfully`
+        );
+        fetchUsers();
       } else {
-        toast.error(data.error || 'Failed to update user status')
+        toast.error(data.error || "Failed to update user status");
       }
     } catch (error) {
-      console.error('Error toggling user status:', error)
-      toast.error('Failed to update user status')
+      console.error("Error toggling user status:", error);
+      toast.error("Failed to update user status");
     } finally {
-      setActionLoading(null)
+      setActionLoading(null);
     }
-  }
+  };
 
-  const toggleUserRole = async (user: User, currentRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER') => {
+  const toggleUserRole = async (
+    user: User,
+    currentRole: "DEVELOPER" | "ADMIN" | "RELAWAN"
+  ) => {
     try {
-      setActionLoading(user.id)
-      
-      // Prevent Superadmin from demoting themselves
-      if (currentUser?.id === user.id && currentRole === 'SUPERADMIN') {
-        toast.error('Tidak dapat demote diri sendiri sebagai Superadmin')
-        return
+      setActionLoading(user.id);
+
+      // Prevent Developer from demoting themselves
+      if (currentUser?.id === user.id && currentRole === "DEVELOPER") {
+        toast.error("Tidak dapat demote diri sendiri sebagai Developer");
+        return;
       }
-      
+
       // Option B: Smart role cycling based on hierarchy
       // Priority: Always allow promotion up, and demotion down
-      let newRole: 'SUPERADMIN' | 'ADMIN' | 'MEMBER'
-      
-      if (currentRole === 'MEMBER') {
-        // MEMBER can only go up to ADMIN
-        newRole = 'ADMIN'
-      } else if (currentRole === 'ADMIN') {
-        // ADMIN can go up to SUPERADMIN or down to MEMBER
+      let newRole: "DEVELOPER" | "ADMIN" | "RELAWAN";
+
+      if (currentRole === "RELAWAN") {
+        // RELAWAN can only go up to ADMIN
+        newRole = "ADMIN";
+      } else if (currentRole === "ADMIN") {
+        // ADMIN can go up to DEVELOPER or down to RELAWAN
         // Default to promotion (up), but we'll add separate demotion button
-        newRole = 'SUPERADMIN'  
-      } else { // currentRole === 'SUPERADMIN'
-        // SUPERADMIN can go down to ADMIN (gradual demotion)
-        newRole = 'ADMIN'
-      }
-      const response = await fetch(`/api/admin/users/${user.clerkId}/toggle-role`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole })
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        toast.success(`User role updated to ${newRole} successfully`)
-        fetchUsers()
+        newRole = "DEVELOPER";
       } else {
-        toast.error(data.error || 'Failed to update user role')
+        // currentRole === 'DEVELOPER'
+        // DEVELOPER can go down to ADMIN (gradual demotion)
+        newRole = "ADMIN";
+      }
+      const response = await fetch(
+        `/api/admin/users/${user.clerkId}/toggle-role`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success(`User role updated to ${newRole} successfully`);
+        fetchUsers();
+      } else {
+        toast.error(data.error || "Failed to update user role");
       }
     } catch (error) {
-      console.error('Error toggling user role:', error)
-      toast.error('Failed to update user role')
+      console.error("Error toggling user role:", error);
+      toast.error("Failed to update user role");
     } finally {
-      setActionLoading(null)
+      setActionLoading(null);
     }
-  }
+  };
 
-  const demoteUserRole = async (user: User, targetRole: 'ADMIN' | 'MEMBER') => {
+  const demoteUserRole = async (
+    user: User,
+    targetRole: "ADMIN" | "RELAWAN"
+  ) => {
     try {
-      setActionLoading(user.id)
-      
-      // Prevent Superadmin from demoting themselves
-      if (currentUser?.id === user.id && user.role === 'SUPERADMIN') {
-        toast.error('Tidak dapat demote diri sendiri sebagai Superadmin')
-        return
-      }
-      
-      const response = await fetch(`/api/admin/users/${user.clerkId}/toggle-role`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: targetRole })
-      })
+      setActionLoading(user.id);
 
-      const data = await response.json()
-      
+      // Prevent Developer from demoting themselves
+      if (currentUser?.id === user.id && user.role === "DEVELOPER") {
+        toast.error("Tidak dapat demote diri sendiri sebagai Developer");
+        return;
+      }
+
+      const response = await fetch(
+        `/api/admin/users/${user.clerkId}/toggle-role`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ role: targetRole }),
+        }
+      );
+
+      const data = await response.json();
+
       if (data.success) {
-        toast.success(`User demoted to ${targetRole} successfully`)
-        fetchUsers()
+        toast.success(`User demoted to ${targetRole} successfully`);
+        fetchUsers();
       } else {
-        toast.error(data.error || 'Failed to demote user')
+        toast.error(data.error || "Failed to demote user");
       }
     } catch (error) {
-      console.error('Error demoting user role:', error)
-      toast.error('Failed to demote user')
+      console.error("Error demoting user role:", error);
+      toast.error("Failed to demote user");
     } finally {
-      setActionLoading(null)
+      setActionLoading(null);
     }
-  }
+  };
 
   const handleClerkSync = useCallback(async () => {
-    if (syncing) return // Prevent multiple simultaneous syncs
-    
-    try {
-      setSyncing(true)
-      
-      const response = await fetch('/api/admin/sync-clerk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      })
+    if (syncing) return; // Prevent multiple simultaneous syncs
 
-      const data = await response.json()
-      
+    try {
+      setSyncing(true);
+
+      const response = await fetch("/api/admin/sync-clerk", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
       if (data.success) {
-        const { results } = data
-        const messages = []
-        
-        if (results.created > 0) messages.push(`${results.created} user baru`)
-        if (results.updated > 0) messages.push(`${results.updated} user diperbarui`)
-        if (results.reactivated > 0) messages.push(`${results.reactivated} user diaktifkan kembali`)
-        if (results.deactivated > 0) messages.push(`${results.deactivated} user dinonaktifkan`)
-        
-        const summary = messages.length > 0 ? messages.join(', ') : 'Tidak ada perubahan'
-        
-        toast.success('Sync Clerk berhasil', {
-          description: `Sinkronisasi selesai: ${summary}`
-        })
-        
+        const { results } = data;
+        const messages = [];
+
+        if (results.created > 0) messages.push(`${results.created} user baru`);
+        if (results.updated > 0)
+          messages.push(`${results.updated} user diperbarui`);
+        if (results.reactivated > 0)
+          messages.push(`${results.reactivated} user diaktifkan kembali`);
+        if (results.deactivated > 0)
+          messages.push(`${results.deactivated} user dinonaktifkan`);
+
+        const summary =
+          messages.length > 0 ? messages.join(", ") : "Tidak ada perubahan";
+
+        toast.success("Sync Clerk berhasil", {
+          description: `Sinkronisasi selesai: ${summary}`,
+        });
+
         // Refresh user list
-        fetchUsers()
+        fetchUsers();
       } else {
-        toast.error('Sync Clerk gagal', {
-          description: data.error || 'Terjadi kesalahan pada server'
-        })
+        toast.error("Sync Clerk gagal", {
+          description: data.error || "Terjadi kesalahan pada server",
+        });
       }
     } catch (error) {
-      console.error('Error syncing with Clerk:', error)
-      toast.error('Sync Clerk gagal', {
-        description: 'Terjadi kesalahan jaringan'
-      })
+      console.error("Error syncing with Clerk:", error);
+      toast.error("Sync Clerk gagal", {
+        description: "Terjadi kesalahan jaringan",
+      });
     } finally {
-      setSyncing(false)
+      setSyncing(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    fetchUsers()
+    fetchUsers();
     // Auto-sync when Admin Panel opens
     const autoSync = setTimeout(() => {
-      handleClerkSync()
-    }, 1000) // Delay 1 second after initial load
+      handleClerkSync();
+    }, 1000); // Delay 1 second after initial load
 
-    return () => clearTimeout(autoSync)
-  }, [handleClerkSync])
+    return () => clearTimeout(autoSync);
+  }, [handleClerkSync]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
+    return new Date(dateString).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const getStatusBadge = (user: User) => {
     if (!user.isApproved) {
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs whitespace-nowrap">
-        <span className="sm:hidden">⏳</span> <span>Menunggu Persetujuan</span>
-      </Badge>
+      return (
+        <Badge
+          variant="outline"
+          className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs whitespace-nowrap"
+        >
+          <span className="sm:hidden">⏳</span>{" "}
+          <span>Menunggu Persetujuan</span>
+        </Badge>
+      );
     }
     if (!user.isActive) {
-      return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-xs whitespace-nowrap">
-        <span className="sm:hidden">❌</span> <span>Tidak Aktif</span>
-      </Badge>
+      return (
+        <Badge
+          variant="outline"
+          className="bg-red-50 text-red-700 border-red-200 text-xs whitespace-nowrap"
+        >
+          <span className="sm:hidden">❌</span> <span>Tidak Aktif</span>
+        </Badge>
+      );
     }
-    return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap">
-      <span className="sm:hidden">✅</span> <span>Aktif</span>
-    </Badge>
-  }
+    return (
+      <Badge
+        variant="outline"
+        className="bg-green-50 text-green-700 border-green-200 text-xs whitespace-nowrap"
+      >
+        <span className="sm:hidden">✅</span> <span>Aktif</span>
+      </Badge>
+    );
+  };
 
   const getRoleBadge = (role: string) => {
-    if (role === 'SUPERADMIN') {
+    if (role === "DEVELOPER") {
       return (
-        <Badge variant="default" className="text-xs whitespace-nowrap bg-purple-600 hover:bg-purple-700">
-          <span className="sm:hidden">⭐</span> <span>Superadmin</span>
+        <Badge
+          variant="default"
+          className="text-xs whitespace-nowrap bg-purple-600 hover:bg-purple-700"
+        >
+          <span className="sm:hidden">⭐</span> <span>Developer</span>
         </Badge>
-      )
-    } else if (role === 'ADMIN') {
+      );
+    } else if (role === "ADMIN") {
       return (
-        <Badge variant="default" className="text-xs whitespace-nowrap bg-blue-600 hover:bg-blue-700">
+        <Badge
+          variant="default"
+          className="text-xs whitespace-nowrap bg-blue-600 hover:bg-blue-700"
+        >
           <span className="sm:hidden">👑</span> <span>Admin</span>
         </Badge>
-      )
+      );
     } else {
       return (
         <Badge variant="outline" className="text-xs whitespace-nowrap">
-          <span className="sm:hidden">👤</span> <span>Member</span>
+          <span className="sm:hidden">👤</span> <span>Relawan</span>
         </Badge>
-      )
+      );
     }
-  }
+  };
 
   if (loading) {
-    return <AdminUsersTableSkeleton />
+    return <AdminUsersTableSkeleton />;
   }
 
-  const pendingUsers = users.filter(user => !user.isApproved)
+  const pendingUsers = users.filter((user) => !user.isApproved);
   // const approvedUsers = users.filter(user => user.isApproved) // Not currently used
 
   return (
@@ -345,7 +400,9 @@ export default function UserManagement() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-gray-600">
-            Sinkronisasi otomatis dijalankan saat panel dibuka. Gunakan tombol sync manual jika diperlukan untuk memastikan konsistensi data antara Clerk dan database PRIMA.
+            Sinkronisasi otomatis dijalankan saat panel dibuka. Gunakan tombol
+            sync manual jika diperlukan untuk memastikan konsistensi data antara
+            Clerk dan database PRIMA.
           </p>
         </CardContent>
       </Card>
@@ -356,21 +413,30 @@ export default function UserManagement() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
-              <span className="hidden sm:inline">Pending Approvals ({pendingUsers.length})</span>
-              <span className="sm:hidden">Menunggu Persetujuan ({pendingUsers.length})</span>
+              <span className="hidden sm:inline">
+                Pending Approvals ({pendingUsers.length})
+              </span>
+              <span className="sm:hidden">
+                Menunggu Persetujuan ({pendingUsers.length})
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3 sm:space-y-4">
               {pendingUsers.map((user) => (
-                <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-yellow-50 rounded-lg border border-yellow-200 space-y-3 sm:space-y-0">
+                <div
+                  key={user.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-yellow-50 rounded-lg border border-yellow-200 space-y-3 sm:space-y-0"
+                >
                   <div className="flex items-center space-x-3 flex-1 min-w-0">
                     <div className="w-8 h-8 sm:w-10 sm:h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <User className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-700" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm sm:text-base text-gray-900 truncate">
-                        {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Unnamed User'}
+                        {user.firstName && user.lastName
+                          ? `${user.firstName} ${user.lastName}`
+                          : "Unnamed User"}
                       </div>
                       <div className="text-xs sm:text-sm text-gray-600 flex items-center gap-1 truncate">
                         <Mail className="w-3 h-3 flex-shrink-0" />
@@ -378,7 +444,9 @@ export default function UserManagement() {
                       </div>
                       <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5 sm:mt-1">
                         <Calendar className="w-3 h-3 flex-shrink-0" />
-                        <span className="hidden sm:inline">Registered: </span><span className="sm:hidden">Daftar: </span>{formatDate(user.createdAt)}
+                        <span className="hidden sm:inline">Registered: </span>
+                        <span className="sm:hidden">Daftar: </span>
+                        {formatDate(user.createdAt)}
                       </div>
                     </div>
                   </div>
@@ -388,7 +456,7 @@ export default function UserManagement() {
                     </div>
                     <div className="flex space-x-2">
                       <Button
-                        onClick={() => handleApproval(user.id, 'approve')}
+                        onClick={() => handleApproval(user.id, "approve")}
                         disabled={actionLoading === user.id}
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 cursor-pointer flex-1 sm:flex-none text-xs sm:text-sm px-2 sm:px-3 py-1.5"
@@ -404,7 +472,7 @@ export default function UserManagement() {
                         )}
                       </Button>
                       <Button
-                        onClick={() => handleApproval(user.id, 'reject')}
+                        onClick={() => handleApproval(user.id, "reject")}
                         disabled={actionLoading === user.id}
                         size="sm"
                         variant="outline"
@@ -441,14 +509,19 @@ export default function UserManagement() {
         <CardContent>
           <div className="space-y-3 sm:space-y-4">
             {users.map((user) => (
-              <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
+              <div
+                key={user.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0"
+              >
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
                   <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                     <User className="w-4 h-4 sm:w-5 sm:h-5 text-blue-700" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-sm sm:text-base text-gray-900 truncate">
-                      {user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : 'Unnamed User'}
+                      {user.firstName && user.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : "Unnamed User"}
                     </div>
                     <div className="text-xs sm:text-sm text-gray-600 flex items-center gap-1 truncate">
                       <Mail className="w-3 h-3 flex-shrink-0" />
@@ -456,7 +529,9 @@ export default function UserManagement() {
                     </div>
                     <div className="text-xs text-gray-500 flex flex-wrap items-center gap-1 mt-0.5 sm:mt-1">
                       <Calendar className="w-3 h-3 flex-shrink-0" />
-                      <span className="hidden sm:inline">Joined: </span><span className="sm:hidden">Bergabung: </span>{formatDate(user.createdAt)}
+                      <span className="hidden sm:inline">Joined: </span>
+                      <span className="sm:hidden">Bergabung: </span>
+                      {formatDate(user.createdAt)}
                       {user.approvedAt && (
                         <span className="hidden sm:inline">
                           {` • Approved: ${formatDate(user.approvedAt)}`}
@@ -474,33 +549,43 @@ export default function UserManagement() {
                     {/* Role Toggle Button */}
                     <Button
                       onClick={() => toggleUserRole(user, user.role)}
-                      disabled={actionLoading === user.id || (currentUser?.id === user.id && user.role === 'SUPERADMIN')}
+                      disabled={
+                        actionLoading === user.id ||
+                        (currentUser?.id === user.id &&
+                          user.role === "DEVELOPER")
+                      }
                       size="sm"
-                      variant={user.role === 'MEMBER' ? 'outline' : 'default'}
-                      title={currentUser?.id === user.id && user.role === 'SUPERADMIN' ? 'Tidak dapat demote diri sendiri' : 'Click untuk ganti role'}
+                      variant={user.role === "RELAWAN" ? "outline" : "default"}
+                      title={
+                        currentUser?.id === user.id && user.role === "DEVELOPER"
+                          ? "Tidak dapat demote diri sendiri"
+                          : "Click untuk ganti role"
+                      }
                       className={`cursor-pointer text-xs sm:text-sm px-2 sm:px-3 py-1.5 whitespace-nowrap ${
-                        user.role === 'SUPERADMIN' 
-                          ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                          : user.role === 'ADMIN'
-                          ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                        user.role === "DEVELOPER"
+                          ? "bg-purple-600 hover:bg-purple-700 text-white"
+                          : user.role === "ADMIN"
+                          ? "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "border-gray-300 text-gray-700 hover:bg-gray-50"
                       }`}
                     >
                       {actionLoading === user.id ? (
                         <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                       ) : (
                         <>
-                          {user.role === 'SUPERADMIN' ? (
+                          {user.role === "DEVELOPER" ? (
                             <>
                               <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
                               <span className="hidden sm:inline">↓ Admin</span>
                               <span className="sm:hidden">↓ Admin</span>
                             </>
-                          ) : user.role === 'ADMIN' ? (
+                          ) : user.role === "ADMIN" ? (
                             <>
                               <Crown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                              <span className="hidden sm:inline">↑ Superadmin</span>
-                              <span className="sm:hidden">↑ Super</span>
+                              <span className="hidden sm:inline">
+                                ↑ Developer
+                              </span>
+                              <span className="sm:hidden">↑ Developer</span>
                             </>
                           ) : (
                             <>
@@ -514,10 +599,13 @@ export default function UserManagement() {
                     </Button>
 
                     {/* Demote Button - Only for ADMIN to demote to MEMBER */}
-                    {user.role === 'ADMIN' && (
+                    {user.role === "ADMIN" && (
                       <Button
-                        onClick={() => demoteUserRole(user, 'MEMBER')}
-                        disabled={actionLoading === user.id || (currentUser?.id === user.id)}
+                        onClick={() => demoteUserRole(user, "RELAWAN")}
+                        disabled={
+                          actionLoading === user.id ||
+                          currentUser?.id === user.id
+                        }
                         size="sm"
                         variant="outline"
                         title="Demote to Member"
@@ -533,9 +621,9 @@ export default function UserManagement() {
                         )}
                       </Button>
                     )}
-                    
+
                     {/* Status Toggle Button - Only for regular members */}
-                    {user.role === 'MEMBER' && (
+                    {user.role === "RELAWAN" && (
                       <Button
                         onClick={() => toggleUserStatus(user.id, user.isActive)}
                         disabled={actionLoading === user.id}
@@ -547,8 +635,12 @@ export default function UserManagement() {
                           <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <>
-                            <span className="hidden sm:inline">{user.isActive ? 'Deactivate' : 'Activate'}</span>
-                            <span className="sm:hidden">{user.isActive ? 'Nonaktifkan' : 'Aktifkan'}</span>
+                            <span className="hidden sm:inline">
+                              {user.isActive ? "Deactivate" : "Activate"}
+                            </span>
+                            <span className="sm:hidden">
+                              {user.isActive ? "Nonaktifkan" : "Aktifkan"}
+                            </span>
                           </>
                         )}
                       </Button>
@@ -561,6 +653,5 @@ export default function UserManagement() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
-
