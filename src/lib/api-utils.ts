@@ -1,26 +1,27 @@
-import { NextResponse } from 'next/server'
-import { ZodError } from 'zod'
+import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+import { logger } from "@/lib/logger";
 
 /**
  * Standard API error response types
  */
 export interface ApiError {
-  error: string
-  details?: any
-  code?: string
+  error: string;
+  details?: any;
+  code?: string;
 }
 
 /**
  * Standard API success response types
  */
 export interface ApiSuccess<T = any> {
-  data?: T
-  message?: string
+  data?: T;
+  message?: string;
   meta?: {
-    total?: number
-    page?: number
-    limit?: number
-  }
+    total?: number;
+    page?: number;
+    limit?: number;
+  };
 }
 
 /**
@@ -35,10 +36,10 @@ export function createErrorResponse(
   const errorResponse: ApiError = {
     error: message,
     ...(details && { details }),
-    ...(code && { code })
-  }
+    ...(code && { code }),
+  };
 
-  return NextResponse.json(errorResponse, { status })
+  return NextResponse.json(errorResponse, { status });
 }
 
 /**
@@ -48,15 +49,15 @@ export function createSuccessResponse<T = any>(
   data?: T,
   message?: string,
   status: number = 200,
-  meta?: ApiSuccess['meta']
+  meta?: ApiSuccess["meta"]
 ): NextResponse<ApiSuccess<T>> {
   const successResponse: ApiSuccess<T> = {
     ...(data !== undefined && { data }),
     ...(message && { message }),
-    ...(meta && { meta })
-  }
+    ...(meta && { meta }),
+  };
 
-  return NextResponse.json(successResponse, { status })
+  return NextResponse.json(successResponse, { status });
 }
 
 /**
@@ -64,74 +65,84 @@ export function createSuccessResponse<T = any>(
  */
 export function handleApiError(
   error: unknown,
-  context: string = 'API operation',
+  context: string = "API operation",
   logError: boolean = true
 ): NextResponse<ApiError> {
   if (logError) {
-    console.error(`❌ ${context}:`, error)
+    logger.error(
+      `${context} failed`,
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        operation: "api_error_handling",
+        context,
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+      }
+    );
   }
 
   // Handle Zod validation errors
   if (error instanceof ZodError) {
     return createErrorResponse(
-      'Validation failed',
+      "Validation failed",
       400,
       error.issues.map((err: any) => ({
-        field: err.path.join('.'),
-        message: err.message
+        field: err.path.join("."),
+        message: err.message,
       })),
-      'VALIDATION_ERROR'
-    )
+      "VALIDATION_ERROR"
+    );
   }
 
   // Handle known error types
   if (error instanceof Error) {
     // Database connection errors
-    if (error.message.includes('connection') || error.message.includes('timeout')) {
+    if (
+      error.message.includes("connection") ||
+      error.message.includes("timeout")
+    ) {
       return createErrorResponse(
-        'Database connection error',
+        "Database connection error",
         503,
         undefined,
-        'DATABASE_CONNECTION_ERROR'
-      )
+        "DATABASE_CONNECTION_ERROR"
+      );
     }
 
     // Authentication errors
-    if (error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+    if (
+      error.message.includes("unauthorized") ||
+      error.message.includes("forbidden")
+    ) {
       return createErrorResponse(
-        'Authentication required',
+        "Authentication required",
         401,
         undefined,
-        'AUTHENTICATION_ERROR'
-      )
+        "AUTHENTICATION_ERROR"
+      );
     }
 
     // Not found errors
-    if (error.message.includes('not found')) {
+    if (error.message.includes("not found")) {
       return createErrorResponse(
         error.message,
         404,
         undefined,
-        'NOT_FOUND_ERROR'
-      )
+        "NOT_FOUND_ERROR"
+      );
     }
 
     // Return generic error with original message
-    return createErrorResponse(
-      error.message,
-      500,
-      undefined,
-      'GENERIC_ERROR'
-    )
+    return createErrorResponse(error.message, 500, undefined, "GENERIC_ERROR");
   }
 
   // Handle unknown errors
   return createErrorResponse(
-    'An unexpected error occurred',
+    "An unexpected error occurred",
     500,
     undefined,
-    'UNKNOWN_ERROR'
-  )
+    "UNKNOWN_ERROR"
+  );
 }
 
 /**
@@ -141,21 +152,21 @@ export function validateRequiredParams(
   params: Record<string, any>,
   requiredFields: string[]
 ): NextResponse<ApiError> | null {
-  const missingFields = requiredFields.filter(field => {
-    const value = params[field]
-    return value === undefined || value === null || value === ''
-  })
+  const missingFields = requiredFields.filter((field) => {
+    const value = params[field];
+    return value === undefined || value === null || value === "";
+  });
 
   if (missingFields.length > 0) {
     return createErrorResponse(
-      `Missing required parameters: ${missingFields.join(', ')}`,
+      `Missing required parameters: ${missingFields.join(", ")}`,
       400,
       { missingFields },
-      'MISSING_PARAMETERS'
-    )
+      "MISSING_PARAMETERS"
+    );
   }
 
-  return null
+  return null;
 }
 
 /**
@@ -163,10 +174,14 @@ export function validateRequiredParams(
  */
 export function safeJsonParse<T = any>(jsonString: string, fallback: T): T {
   try {
-    return JSON.parse(jsonString) as T
+    return JSON.parse(jsonString) as T;
   } catch (error) {
-    console.warn('Failed to parse JSON, using fallback:', error)
-    return fallback
+    logger.warn("JSON parsing failed, using fallback", {
+      operation: "json_parsing",
+      error: error instanceof Error ? error.message : String(error),
+      fallbackType: typeof fallback,
+    });
+    return fallback;
   }
 }
 
@@ -180,15 +195,9 @@ export function createPaginatedResponse<T>(
   limit: number,
   message?: string
 ): NextResponse<ApiSuccess<T[]>> {
-  return createSuccessResponse(
-    data,
-    message,
-    200,
-    {
-      total,
-      page,
-      limit
-    }
-  )
+  return createSuccessResponse(data, message, 200, {
+    total,
+    page,
+    limit,
+  });
 }
-

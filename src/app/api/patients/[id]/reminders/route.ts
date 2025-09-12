@@ -16,6 +16,7 @@ import { eq, desc, and, isNull } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
+import { requirePatientAccess } from "@/lib/patient-access-control";
 // Rate limiter temporarily disabled
 
 export async function GET(
@@ -29,6 +30,14 @@ export async function GET(
     }
 
     const { id } = await params;
+
+    // Check role-based access to this patient
+    await requirePatientAccess(
+      user.id,
+      user.role,
+      id,
+      "view this patient's reminders"
+    );
 
     // Get reminders for patient with patient info
     const reminders = await db
@@ -101,6 +110,15 @@ export async function POST(
     }
 
     const { id } = await params;
+
+    // Check role-based access to this patient
+    await requirePatientAccess(
+      user.id,
+      user.role,
+      id,
+      "create reminders for this patient"
+    );
+
     const requestBody = await request.json();
     const { message, time, selectedDates, customRecurrence, attachedContent } =
       requestBody;

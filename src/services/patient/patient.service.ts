@@ -11,6 +11,7 @@ import { db, patients } from "@/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 import { validatePhoneWithMessage } from "@/lib/phone-utils";
+import { requirePatientAccess } from "@/lib/patient-access-control";
 
 export class PatientService {
   private repo: PatientRepository;
@@ -72,9 +73,19 @@ export class PatientService {
     return await this.repo.getVerificationHistoryRows(patientId);
   }
 
-  async getDetail(patientId: string) {
+  async getDetail(patientId: string, user?: { id: string; role: string }) {
     if (!patientId) throw new ValidationError("Missing patientId");
     await this.verifyPatientExists(patientId);
+
+    // Check role-based access if user is provided
+    if (user) {
+      await requirePatientAccess(
+        user.id,
+        user.role,
+        patientId,
+        "view this patient's details"
+      );
+    }
 
     const [basic, confirmations, logs, meds, rate] = await Promise.all([
       this.repo.getPatientBasicData(patientId),
@@ -319,4 +330,3 @@ export class PatientService {
     };
   }
 }
-

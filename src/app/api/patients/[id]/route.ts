@@ -50,7 +50,10 @@ export const GET = withRateLimit(async function GET(
 
     // Use centralized PatientService to get complete patient data
     const service = new PatientService();
-    const patient = await service.getDetail(id);
+    const patient = await service.getDetail(id, {
+      id: user.id,
+      role: user.role,
+    });
 
     if (!patient) {
       return createErrorResponse(
