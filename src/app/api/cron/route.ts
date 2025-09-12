@@ -576,6 +576,7 @@ async function processReminders() {
           await db
             .update(reminderLogs)
             .set({
+              confirmationStatus: "SENT",
               confirmationSentAt: getWIBTime(), // Update to actual sent time
             })
             .where(eq(reminderLogs.id, confirmation.id));

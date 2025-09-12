@@ -36,6 +36,7 @@ export const reminderStatusEnum = pgEnum("reminder_status", [
 ]);
 export const confirmationStatusEnum = pgEnum("confirmation_status", [
   "PENDING",
+  "SENT",
   "CONFIRMED",
   "MISSED",
   "UNKNOWN",
