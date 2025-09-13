@@ -148,11 +148,11 @@ export async function GET(
     // DEBUG: Log the filter criteria first
     const todayWIBStart = getWIBTodayStart()
 
-    // Filter out reminders that have already been delivered
+    // Filter out reminders that have already been sent (SENT or DELIVERED)
     const filteredReminders = scheduledReminders.filter(reminder => {
       const logs = logsMap.get(reminder.id) || []
-      const hasDeliveredLog = logs.some((log: any) => log.status === 'DELIVERED')
-      return !hasDeliveredLog
+      const hasSentOrDeliveredLog = logs.some((log: any) => ['SENT', 'DELIVERED'].includes(log.status))
+      return !hasSentOrDeliveredLog
     })
 
     // DEBUG: Log what we found after filtering

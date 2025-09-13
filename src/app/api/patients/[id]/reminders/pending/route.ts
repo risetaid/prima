@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, reminderLogs, reminderSchedules, manualConfirmations } from "@/db";
-import { eq, and, desc, gte, lte, notExists, isNull } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  gte,
+  lte,
+  notExists,
+  isNull,
+  inArray,
+} from "drizzle-orm";
 
 export async function GET(
   request: NextRequest,
@@ -25,8 +34,8 @@ export async function GET(
     // Build where conditions with proper logic
     const whereConditions = [
       eq(reminderLogs.patientId, id),
-      // Only show DELIVERED reminders that haven't been confirmed yet
-      eq(reminderLogs.status, "DELIVERED"),
+      // Show SENT or DELIVERED reminders that haven't been confirmed yet
+      inArray(reminderLogs.status, ["SENT", "DELIVERED"]),
       // Must not have manual confirmation
       notExists(
         db
@@ -56,7 +65,7 @@ export async function GET(
       whereConditions.push(lte(reminderLogs.sentAt, endOfDay));
     }
 
-    // Get reminder logs that are DELIVERED but don't have manual confirmation yet
+    // Get reminder logs that are SENT or DELIVERED but don't have manual confirmation yet
     const pendingReminders = await db
       .select({
         id: reminderLogs.id,
