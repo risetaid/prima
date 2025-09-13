@@ -11,13 +11,15 @@ PRIMA is a fully functional healthcare management platform with advanced feature
 ## ✨ Current Features (All Implemented)
 
 ### 🔐 **Authentication & Access Control**
+
 - Role-based permissions (SUPERADMIN/ADMIN/MEMBER)
 - Clerk-based OAuth with Gmail integration
 - Volunteer approval workflows
 - Session management with Redis caching
 
 ### 👨‍⚕️ **Patient Management System**
-- Complete patient CRUD with photo upload (Vercel Blob)
+
+- Complete patient CRUD with photo upload (Minio)
 - WhatsApp-based verification system with retry logic
 - Health notes tracking with bulk operations
 - Custom patient variables for personalized care
@@ -25,16 +27,18 @@ PRIMA is a fully functional healthcare management platform with advanced feature
 - Medical records management with audit trails
 
 ### 📱 **WhatsApp Integration & Reminders**
+
 - WhatsApp Business API integration via Fonnte
 - Automated medication reminders via cron jobs with debug monitoring
 - **Content-Rich Reminders**: Include educational articles and videos with medication reminders
-- **Full Edit Capabilities**: Complete editing support for scheduled reminders including content updates  
+- **Full Edit Capabilities**: Complete editing support for scheduled reminders including content updates
 - Template-based message management
 - Delivery status tracking and retry mechanisms
 - Timezone optimization (WIB/UTC+7)
 - Comprehensive reminder dashboard with multiple views (scheduled, completed, needs updates)
 
 ### 📚 **Content Management System**
+
 - Article creation with TinyMCE rich text editor
 - Video management with YouTube integration
 - Category-based content organization
@@ -42,6 +46,7 @@ PRIMA is a fully functional healthcare management platform with advanced feature
 - ISR optimization for fast public content loading
 
 ### 🛠️ **Admin Panel**
+
 - User approval and role management
 - System health monitoring dashboard
 - Template management for communications
@@ -49,6 +54,7 @@ PRIMA is a fully functional healthcare management platform with advanced feature
 - Database management tools
 
 ### ⚡ **Performance & Reliability**
+
 - Redis caching (3min sessions, 15min patient data)
 - ISR with 1-hour revalidation for content
 - Comprehensive database indexing
@@ -59,25 +65,26 @@ PRIMA is a fully functional healthcare management platform with advanced feature
 
 - **Framework**: Next.js 15 + React 19 + TypeScript 5
 - **Authentication**: Clerk with Gmail OAuth and role-based access control
-- **Database**: PostgreSQL (Supabase) + Drizzle ORM with comprehensive soft delete patterns
+- **Database**: PostgreSQL (Railway) + Drizzle ORM with comprehensive soft delete patterns
 - **Caching**: Redis with ioredis client (3min sessions, 15min patient data)
 - **UI**: Tailwind CSS 4 + shadcn/ui + Lucide React icons
 - **WhatsApp**: Fonnte WhatsApp Business API
-- **File Storage**: Vercel Blob storage for patient photos
+- **File Storage**: Minio for patient photos and content
 - **Rich Text**: TinyMCE with image upload support
-- **Deployment**: Vercel with optimized serverless configuration
+- **Deployment**: Railway with GitHub integration
 - **Package Manager**: Bun
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js 18+ installed
 - Bun package manager
-- PostgreSQL database (Supabase recommended with pgBouncer)
-- Redis instance (Upstash for production, local for development)
+- PostgreSQL database (Railway)
+- Redis instance (Railway)
+- Minio Bucket and Minio Console
 - Fonnte WhatsApp Business API account
 - Clerk authentication setup
-- Vercel Blob storage token
 - TinyMCE API key
 
 ### Installation
@@ -112,11 +119,11 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 Create a `.env.local` file with the required environment variables. See `.env.example` for the complete list of required variables:
 
-- **Database**: PostgreSQL connection strings (pooled and direct)
-- **Authentication**: Clerk OAuth configuration  
+- **Database**: Railway PostgreSQL connection string
+- **Authentication**: Clerk OAuth configuration
 - **WhatsApp API**: Fonnte API token for messaging
-- **Caching**: Redis configuration for performance
-- **File Storage**: Vercel Blob for patient photos and content
+- **Caching**: Railway Redis configuration
+- **File Storage**: Minio for patient photos and content
 - **Content Management**: TinyMCE API key for rich text editing
 - **Automation**: Cron secret for automated reminder system
 
@@ -125,12 +132,14 @@ Create a `.env.local` file with the required environment variables. See `.env.ex
 ## 📱 User Roles & Permissions
 
 ### SUPERADMIN
+
 - Complete system administration
 - User role management and permissions
 - System configuration and settings
 - Access to all data and system functions
 
 ### ADMIN
+
 - User management (approve/reject/activate volunteers)
 - Access to all patient data across the system
 - Content management system administration
@@ -138,6 +147,7 @@ Create a `.env.local` file with the required environment variables. See `.env.ex
 - System monitoring and reporting
 
 ### MEMBER (Healthcare Volunteer)
+
 - Patient management for assigned cases
 - Medication reminder scheduling and management
 - Health notes tracking and medical records
@@ -189,7 +199,7 @@ bun run lint                   # ESLint check
 # Database Management (Drizzle ORM)
 bun run db:generate            # Generate Drizzle schema
 bun run db:migrate             # Run migrations
-bun run db:push                # Push schema changes  
+bun run db:push                # Push schema changes
 bun run db:studio              # Open Drizzle Studio GUI
 
 # Content Management
@@ -201,25 +211,30 @@ bun start                      # Start production server
 
 ## 🚀 Deployment
 
-### Recommended: Vercel Deployment
-The application is optimized for Vercel with:
-1. Connect repository to Vercel
-2. Configure environment variables in dashboard
-3. Automatic deployments on git push
-4. Optimized for serverless functions with connection pooling
+### Recommended: Railway Deployment
+
+The application is optimized for Railway with GitHub integration:
+
+1. Connect GitHub repository to Railway
+2. Configure Railway PostgreSQL and Redis services
+3. Set up Minio Bucket for file storage
+4. Configure environment variables in Railway dashboard
+5. Automatic deployments on git push
 
 ### Database Configuration
-- **Production**: Supabase PostgreSQL with pgBouncer
-  - **Pooled Connection**: Port 6543 for app operations (`DATABASE_URL`)
-  - **Direct Connection**: Port 5432 for migrations (`DIRECT_URL`)
-- **Caching**: Upstash Redis for production, local Redis for development
-- **File Storage**: Vercel Blob for patient photos and content
+
+- **Production**: Railway PostgreSQL
+  - **Connection**: Direct PostgreSQL connection (`DATABASE_URL`)
+- **Caching**: Railway Redis
+  - **Connection**: Redis URL with authentication (`REDIS_URL`)
+- **File Storage**: Minio Bucket with Minio Console
 
 ### Build Configuration
+
 - **Build Command**: `bun run build` (includes schema generation)
 - **Start Command**: `bun start`
 - **Node.js**: 18+ runtime required
-- **Environment**: All variables from `.env.local` must be configured
+- **Environment**: All variables from Railway environment must be configured
 
 ## 🤝 Contributing
 
@@ -241,15 +256,17 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🎯 Recent Major Updates (January 2025)
 
 ### ✅ **Production-Ready Milestone Achieved**
+
 - **Database Schema**: Comprehensive foreign key relationships and soft delete patterns
 - **Database Cleanup**: Removed 8 unused legacy tables, maintaining 15 optimized tables
-- **Code Quality**: Removed 12 unused files, cleaned codebase with 55+ API routes and 45+ components  
+- **Code Quality**: Removed 12 unused files, cleaned codebase with 55+ API routes and 45+ components
 - **Authentication Fix**: Resolved sign-in race condition with proper redirect configuration
 - **Reminder Enhancement**: Added content attachment support and full editing capabilities
 - **Performance Optimization**: Redis caching, connection pooling, and ISR implementation
 - **Feature Complete**: All core healthcare management features fully implemented and optimized
 
 ### 🚀 **System Highlights**
+
 - **Medical-Grade Reliability**: Comprehensive audit trails and data integrity
 - **Scalable Architecture**: Optimized for Indonesian healthcare volunteer networks
 - **Enhanced WhatsApp Integration**: Content-rich reminders with educational materials
@@ -261,8 +278,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Indonesian healthcare volunteers for their dedication and feedback
 - Fonnte for reliable WhatsApp Business API service
 - Clerk for seamless authentication and user management
-- Supabase for robust PostgreSQL hosting with connection pooling
-- Vercel for excellent deployment platform and Blob storage
+- Railway for comprehensive full-stack deployment platform
+- Minio for S3-compatible object storage
 - shadcn/ui for beautiful, accessible React components
 
 ## 📚 Documentation
@@ -273,5 +290,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-*Built with ❤️ for Indonesian healthcare workers*
-*Last Updated: January 2025 - Production Ready Release*
+_Built with ❤️ for Indonesian healthcare workers_
+_Last Updated: January 2025 - Production Ready Release_
