@@ -188,10 +188,10 @@ export default function PendingUpdatePage() {
             return (
               <div
                 key={reminder.id}
-                className="bg-white rounded-2xl shadow-sm overflow-hidden border border-blue-200"
+                className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200"
               >
                 {/* Main Card */}
-                <div className="bg-blue-500 text-white p-4">
+                <div className="bg-white text-gray-900 p-4 border-b border-gray-200">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h3 className="font-semibold text-white mb-1">
@@ -237,10 +237,10 @@ export default function PendingUpdatePage() {
                   <button
                     onClick={() => handleConfirmation(reminder.id, true)}
                     disabled={hasAutomatedConfirmation}
-                    className={`flex-1 py-4 font-semibold transition-colors border-r border-blue-200 ${
+                    className={`flex-1 py-4 font-semibold transition-colors ${
                       hasAutomatedConfirmation
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-white text-blue-500 hover:bg-blue-50 cursor-pointer"
+                        : "bg-green-500 text-white hover:bg-green-600 cursor-pointer"
                     }`}
                   >
                     Ya
@@ -251,7 +251,7 @@ export default function PendingUpdatePage() {
                     className={`flex-1 py-4 font-semibold transition-colors ${
                       hasAutomatedConfirmation
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "bg-white text-red-500 hover:bg-red-50 cursor-pointer"
+                        : "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
                     }`}
                   >
                     Tidak

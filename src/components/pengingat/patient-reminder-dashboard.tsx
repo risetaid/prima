@@ -158,6 +158,17 @@ export function PatientReminderDashboard({
     }
   }, [params.id]);
 
+  // Refresh stats periodically to catch cron updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (params.id) {
+        fetchStats();
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [params.id]);
+
   const fetchStats = async () => {
     try {
       // Use the corrected /stats endpoint for badge counts
@@ -260,10 +271,11 @@ export function PatientReminderDashboard({
 
   const handleAddReminder = () => {
     if (!canAddReminders) {
-      toast.error('Pasien belum terverifikasi', {
-        description: 'Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.'
-      })
-      return
+      toast.error("Pasien belum terverifikasi", {
+        description:
+          "Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.",
+      });
+      return;
     }
     setIsAddModalOpen(true);
   };
@@ -483,76 +495,89 @@ export function PatientReminderDashboard({
     showCheckbox = false,
     showActions = false,
     allowEdit = false
-  ) => (
-    <div key={reminder.id} className="flex items-start space-x-3">
-      {showCheckbox && (
-        <div className="flex items-center pt-4">
-          <input
-            type="checkbox"
-            checked={selectedReminders.includes(reminder.id)}
-            onChange={() => toggleReminderSelection(reminder.id)}
-            className="w-4 h-4 text-blue-600 rounded"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+  ) => {
+    const isPending = showActions;
+    const cardBg = isPending
+      ? "bg-white border border-gray-200"
+      : "bg-blue-600";
+    const textColor = isPending ? "text-gray-900" : "text-white";
+    const timeColor = isPending ? "text-gray-600" : "text-white/90";
 
-      <div
-        className={`flex-1 bg-blue-600 text-white rounded-lg p-4 relative ${
-          allowEdit && !showCheckbox && !showActions
-            ? "cursor-pointer hover:bg-blue-700 transition-colors"
-            : ""
-        }`}
-        onClick={() => {
-          if (allowEdit && !showCheckbox && !showActions) {
-            handleEditReminder(reminder);
-          }
-        }}
-      >
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <h3 className="font-semibold text-lg">
-              {reminder.customMessage ||
-                reminder.medicationName ||
-                "Pesan pengingat"}
-            </h3>
-            <p className="text-sm opacity-90">
-              {formatDate(reminder.reminderDate)}
-            </p>
-          </div>
-          <div className="flex items-center text-white/90">
-            <Clock className="w-4 h-4 mr-1" />
-            <span className="font-semibold">
-              {formatTime(reminder.scheduledTime)}
-            </span>
-          </div>
-        </div>
-
-        {showActions && (
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePendingAction(reminder.id, "ya");
-              }}
-              className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
-            >
-              Ya
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePendingAction(reminder.id, "tidak");
-              }}
-              className="flex-1 bg-white/20 hover:bg-white/30 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
-            >
-              Tidak
-            </button>
+    return (
+      <div key={reminder.id} className="flex items-start space-x-3">
+        {showCheckbox && (
+          <div className="flex items-center pt-4">
+            <input
+              type="checkbox"
+              checked={selectedReminders.includes(reminder.id)}
+              onChange={() => toggleReminderSelection(reminder.id)}
+              className="w-4 h-4 text-blue-600 rounded"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         )}
+
+        <div
+          className={`flex-1 ${cardBg} ${textColor} rounded-lg p-4 relative ${
+            allowEdit && !showCheckbox && !showActions
+              ? "cursor-pointer hover:bg-blue-700 transition-colors"
+              : ""
+          }`}
+          onClick={() => {
+            if (allowEdit && !showCheckbox && !showActions) {
+              handleEditReminder(reminder);
+            }
+          }}
+        >
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h3 className={`font-semibold text-lg ${textColor}`}>
+                {reminder.customMessage ||
+                  reminder.medicationName ||
+                  "Pesan pengingat"}
+              </h3>
+              <p
+                className={`text-sm ${
+                  isPending ? "text-gray-600" : "opacity-90"
+                }`}
+              >
+                {formatDate(reminder.reminderDate)}
+              </p>
+            </div>
+            <div className={`flex items-center ${timeColor}`}>
+              <Clock className="w-4 h-4 mr-1" />
+              <span className="font-semibold">
+                {formatTime(reminder.scheduledTime)}
+              </span>
+            </div>
+          </div>
+
+          {showActions && (
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePendingAction(reminder.id, "ya");
+                }}
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+              >
+                Ya
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePendingAction(reminder.id, "tidak");
+                }}
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+              >
+                Tidak
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderSelesaiCard = (reminder: Reminder, index: number) => (
     <div
@@ -627,15 +652,18 @@ export function PatientReminderDashboard({
               disabled={!canAddReminders}
               className={`px-6 py-3 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors ${
                 canAddReminders
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
-                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
+                  : "bg-gray-200 text-gray-500 cursor-not-allowed"
               }`}
             >
               <Plus className="w-5 h-5" />
               <span>Tambah Pengingat Baru</span>
             </button>
             {!canAddReminders && (
-              <p className="text-xs text-gray-500 mt-1">Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA".</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
+                "YA".
+              </p>
             )}
           </div>
         </div>

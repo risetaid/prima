@@ -66,6 +66,7 @@ export async function GET(
     }
 
     // Get reminder logs that are SENT or DELIVERED but don't have manual confirmation yet
+    // Only for active (non-deleted) schedules
     const pendingReminders = await db
       .select({
         id: reminderLogs.id,
@@ -83,11 +84,12 @@ export async function GET(
         customMessage: reminderSchedules.customMessage,
       })
       .from(reminderLogs)
-      .leftJoin(
+      .innerJoin(
         reminderSchedules,
         and(
           eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-          isNull(reminderSchedules.deletedAt) // Critical: soft delete filter for schedules
+          isNull(reminderSchedules.deletedAt), // Only active schedules
+          eq(reminderSchedules.isActive, true) // Extra safety
         )
       )
       .where(and(...whereConditions))
