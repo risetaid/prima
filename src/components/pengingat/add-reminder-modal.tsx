@@ -34,12 +34,8 @@ interface WhatsAppTemplate {
 
 interface AutoFillData {
   nama: string;
-  nomor: string;
-  obat?: string;
-  dosis?: string;
   dokter?: string;
   rumahSakit?: string;
-  volunteer: string;
   waktu?: string;
   tanggal?: string;
   dataContext?: {
@@ -189,13 +185,10 @@ export function AddReminderModal({
       // Apply template with auto-filled data
       const messageWithData = applyTemplateVariables(template.templateText, {
         nama: autoFillData.nama,
-        obat: autoFillData.obat || "{obat}",
-        dosis: autoFillData.dosis || "{dosis}",
         waktu: formData.time,
         tanggal: selectedDates.length > 0 ? selectedDates[0] : "{tanggal}",
         dokter: autoFillData.dokter || "{dokter}",
         rumahSakit: autoFillData.rumahSakit || "{rumahSakit}",
-        volunteer: autoFillData.volunteer,
       });
       setFormData((prev) => ({ ...prev, message: messageWithData }));
     } else if (template) {
@@ -203,13 +196,10 @@ export function AddReminderModal({
       // Fallback to basic template if no autoFillData
       const messageWithData = applyTemplateVariables(template.templateText, {
         nama: patient?.name || "{nama}",
-        obat: "{obat}",
-        dosis: "{dosis}",
         waktu: formData.time,
         tanggal: selectedDates.length > 0 ? selectedDates[0] : "{tanggal}",
         dokter: "{dokter}",
         rumahSakit: "{rumahSakit}",
-        volunteer: "{volunteer}",
       });
       setFormData((prev) => ({ ...prev, message: messageWithData }));
     }
@@ -223,12 +213,9 @@ export function AddReminderModal({
 
     // Auto-fill common variables if they exist in the message
     const autoFillMap = {
-      "{obat}": autoFillData.obat,
-      "{dosis}": autoFillData.dosis,
       "{dokter}": autoFillData.dokter,
       "{rumahSakit}": autoFillData.rumahSakit,
       "{nama}": autoFillData.nama,
-      "{volunteer}": autoFillData.volunteer,
       "{waktu}": formData.time,
       "{tanggal}": selectedDates.length > 0 ? selectedDates[0] : "{tanggal}",
     };
@@ -550,54 +537,13 @@ export function AddReminderModal({
                         {autoFillData.nama && (
                           <div className="bg-white p-2 rounded-lg">
                             <div className="text-xs text-gray-500">
-                              Nama Pasien
+                              Nama Lengkap Pasien
                             </div>
                             <div className="text-sm font-medium text-gray-800">
                               {autoFillData.nama}
                             </div>
                             <div className="text-xs text-blue-600 mt-1">
                               {"{nama}"}
-                            </div>
-                          </div>
-                        )}
-
-                        {autoFillData.nomor && (
-                          <div className="bg-white p-2 rounded-lg">
-                            <div className="text-xs text-gray-500">
-                              No. WhatsApp
-                            </div>
-                            <div className="text-sm font-medium text-gray-800">
-                              {autoFillData.nomor}
-                            </div>
-                            <div className="text-xs text-blue-600 mt-1">
-                              {"{nomor}"}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Medical Info */}
-                        {autoFillData.obat && (
-                          <div className="bg-white p-2 rounded-lg">
-                            <div className="text-xs text-gray-500">
-                              Nama Obat
-                            </div>
-                            <div className="text-sm font-medium text-gray-800">
-                              {autoFillData.obat}
-                            </div>
-                            <div className="text-xs text-blue-600 mt-1">
-                              {"{obat}"}
-                            </div>
-                          </div>
-                        )}
-
-                        {autoFillData.dosis && (
-                          <div className="bg-white p-2 rounded-lg">
-                            <div className="text-xs text-gray-500">Dosis</div>
-                            <div className="text-sm font-medium text-gray-800">
-                              {autoFillData.dosis}
-                            </div>
-                            <div className="text-xs text-blue-600 mt-1">
-                              {"{dosis}"}
                             </div>
                           </div>
                         )}
@@ -630,7 +576,7 @@ export function AddReminderModal({
                           </div>
                         )}
 
-                        {/* Time & Volunteer Info */}
+                        {/* Time Info */}
                         <div className="bg-white p-2 rounded-lg">
                           <div className="text-xs text-gray-500">Waktu</div>
                           <div className="text-sm font-medium text-gray-800">
@@ -641,19 +587,18 @@ export function AddReminderModal({
                           </div>
                         </div>
 
-                        {autoFillData.volunteer && (
-                          <div className="bg-white p-2 rounded-lg">
-                            <div className="text-xs text-gray-500">
-                              Volunteer
-                            </div>
-                            <div className="text-sm font-medium text-gray-800">
-                              {autoFillData.volunteer}
-                            </div>
-                            <div className="text-xs text-blue-600 mt-1">
-                              {"{volunteer}"}
-                            </div>
+                        {/* Date Info */}
+                        <div className="bg-white p-2 rounded-lg">
+                          <div className="text-xs text-gray-500">Tanggal</div>
+                          <div className="text-sm font-medium text-gray-800">
+                            {selectedDates.length > 0
+                              ? selectedDates[0]
+                              : "Belum dipilih"}
                           </div>
-                        )}
+                          <div className="text-xs text-blue-600 mt-1">
+                            {"{tanggal}"}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
