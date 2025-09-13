@@ -357,9 +357,12 @@ async function handleMedicationPoll(
 }
 
 export async function POST(request: NextRequest) {
-  // token auth
-  const authError = requireWebhookToken(request)
-  if (authError) return authError
+  // TEMPORARILY DISABLED for debugging poll responses
+  // TODO: Re-enable after identifying poll response format
+  // const authError = requireWebhookToken(request)
+  // if (authError) return authError
+  
+  logger.info('Webhook auth temporarily disabled for debugging')
 
   // parse body as json or form
   let parsed: any = {}
@@ -376,18 +379,35 @@ export async function POST(request: NextRequest) {
     }
   } catch {}
 
-  // DEBUG: Log the raw webhook payload to understand Fonnte's format
+  // DEBUG: Enhanced logging to understand Fonnte's format
   logger.info('Raw Fonnte webhook payload received', {
+    timestamp: new Date().toISOString(),
+    method: request.method,
+    url: request.url,
     contentType,
     headers: Object.fromEntries(request.headers.entries()),
+    queryParams: Object.fromEntries(new URL(request.url).searchParams.entries()),
     rawPayload: parsed,
     payloadKeys: Object.keys(parsed || {}),
+    payloadValues: Object.entries(parsed || {}).reduce((acc, [key, value]) => {
+      acc[key] = typeof value === 'string' ? value.substring(0, 100) + (value.length > 100 ? '...' : '') : value
+      return acc
+    }, {} as any),
     hasPollingFields: {
       poll_name: Boolean(parsed.poll_name),
-      pollname: Boolean(parsed.pollname),
+      pollname: Boolean(parsed.pollname), 
+      poll_title: Boolean(parsed.poll_title),
       selected_option: Boolean(parsed.selected_option),
       poll_response: Boolean(parsed.poll_response),
-      choice: Boolean(parsed.choice)
+      choice: Boolean(parsed.choice),
+      poll: Boolean(parsed.poll)
+    },
+    messageFields: {
+      message: Boolean(parsed.message),
+      text: Boolean(parsed.text),
+      body: Boolean(parsed.body),
+      sender: Boolean(parsed.sender || parsed.phone || parsed.from),
+      device: Boolean(parsed.device || parsed.gateway)
     }
   })
 
@@ -412,8 +432,19 @@ export async function POST(request: NextRequest) {
   const lookup = new PatientLookupService()
   const found = await lookup.findPatientByPhone(sender)
   if (!found.found || !found.patient) {
-    logger.warn('Incoming webhook: no patient matched; ignoring', { sender })
-    return NextResponse.json({ ok: true, ignored: true })
+    logger.warn('Incoming webhook: no patient matched; ignoring', { 
+      sender, 
+      normalizedSender: sender,
+      allPayloadFields: Object.keys(parsed || {}),
+      senderFields: {
+        sender: parsed.sender,
+        phone: parsed.phone,
+        from: parsed.from,
+        number: parsed.number,
+        wa_number: parsed.wa_number
+      }
+    })
+    return NextResponse.json({ ok: true, ignored: true, reason: 'no_patient_match' })
   }
 
   const patient = found.patient
@@ -435,6 +466,15 @@ export async function POST(request: NextRequest) {
   // PRIORITY 1: Process poll responses first
   const activePollName = poll_name || pollname
   const pollOption = selected_option || poll_response
+  
+  logger.info('Checking for poll response', {
+    activePollName,
+    pollOption, 
+    hasPollName: Boolean(activePollName),
+    hasPollOption: Boolean(pollOption),
+    normalizedData: { poll_name, pollname, selected_option, poll_response },
+    patientId: patient.id
+  })
   
   if (activePollName && pollOption) {
     logger.info('Processing poll response', { 
@@ -459,6 +499,13 @@ export async function POST(request: NextRequest) {
           action: pollResult.action,
           source: 'poll_response'
         })
+      } else {
+        logger.warn('Poll response not processed by handler', {
+          patientId: patient.id,
+          pollName: activePollName,
+          selectedOption: pollOption,
+          result: pollResult
+        })
       }
     } catch (error) {
       logger.error('Failed to process poll response', error as Error, {
@@ -468,6 +515,14 @@ export async function POST(request: NextRequest) {
       })
       // Continue to text-based processing as fallback
     }
+  } else {
+    logger.info('No poll response detected, checking text-based intent', {
+      patientId: patient.id,
+      hasMessage: Boolean(message),
+      message: message?.substring(0, 50) + (message && message.length > 50 ? '...' : ''),
+      activePollName,
+      pollOption
+    })
   }
 
   // FALLBACK: Text-based verification handling (for backward compatibility)
