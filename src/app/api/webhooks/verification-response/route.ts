@@ -7,31 +7,87 @@ export async function POST(request: NextRequest) {
   console.log(`🔍 WEBHOOK: Incoming POST request to verification-response`);
 
   try {
-    // Get raw body first
-    const rawBody = await request.text();
-    console.log(`📦 WEBHOOK: Raw body length: ${rawBody.length}`);
+    // Check content type
+    const contentType = request.headers.get("content-type") || "";
+    console.log(`📦 WEBHOOK: Content-Type: "${contentType}"`);
 
-    // Try to parse as JSON
-    let parsedBody;
-    try {
-      parsedBody = JSON.parse(rawBody);
-      console.log(`✅ WEBHOOK: JSON parsed successfully`);
-    } catch (parseError) {
-      console.error(`❌ WEBHOOK: Failed to parse JSON body`, parseError);
-      logger.error(
-        "Failed to parse verification webhook body",
-        parseError instanceof Error
-          ? parseError
-          : new Error(String(parseError)),
-        {
-          api: true,
-          webhooks: true,
-          verification: true,
-          operation: "parse_webhook_body",
-          bodyLength: rawBody.length,
-        }
-      );
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    let parsedBody: any;
+
+    if (contentType.includes("application/json")) {
+      // Handle JSON payload
+      const rawBody = await request.text();
+      console.log(`📦 WEBHOOK: Raw body length: ${rawBody.length}`);
+      console.log(`📦 WEBHOOK: Raw body content: "${rawBody}"`);
+
+      try {
+        parsedBody = JSON.parse(rawBody);
+        console.log(`✅ WEBHOOK: JSON parsed successfully`);
+        console.log(`📋 WEBHOOK: Parsed data:`, parsedBody);
+      } catch (parseError) {
+        console.error(`❌ WEBHOOK: Failed to parse JSON body`, parseError);
+        console.error(`❌ WEBHOOK: Raw body was: "${rawBody}"`);
+        logger.error(
+          "Failed to parse verification webhook body",
+          parseError instanceof Error
+            ? parseError
+            : new Error(String(parseError)),
+          {
+            api: true,
+            webhooks: true,
+            verification: true,
+            operation: "parse_webhook_body",
+            bodyLength: rawBody.length,
+            rawBody: rawBody.substring(0, 500), // Log first 500 chars
+          }
+        );
+        return NextResponse.json(
+          {
+            error: "Invalid JSON body",
+            details:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+            rawBody: rawBody.substring(0, 200), // Include part of raw body for debugging
+          },
+          { status: 400 }
+        );
+      }
+    } else if (
+      contentType.includes("application/x-www-form-urlencoded") ||
+      contentType.includes("multipart/form-data")
+    ) {
+      // Handle form data
+      console.log(`📦 WEBHOOK: Handling as form data`);
+      const formData = await request.formData();
+      parsedBody = {};
+      for (const [key, value] of formData.entries()) {
+        parsedBody[key] = value;
+      }
+      console.log(`✅ WEBHOOK: Form data parsed successfully`);
+      console.log(`📋 WEBHOOK: Parsed data:`, parsedBody);
+    } else {
+      // Try to parse as JSON anyway (fallback)
+      console.log(`📦 WEBHOOK: Unknown content type, trying JSON fallback`);
+      const rawBody = await request.text();
+      console.log(`📦 WEBHOOK: Raw body length: ${rawBody.length}`);
+      console.log(`📦 WEBHOOK: Raw body content: "${rawBody}"`);
+
+      try {
+        parsedBody = JSON.parse(rawBody);
+        console.log(`✅ WEBHOOK: JSON fallback parsed successfully`);
+        console.log(`📋 WEBHOOK: Parsed data:`, parsedBody);
+      } catch (parseError) {
+        console.error(`❌ WEBHOOK: All parsing methods failed`);
+        console.error(`❌ WEBHOOK: Raw body was: "${rawBody}"`);
+        return NextResponse.json(
+          {
+            error: "Unsupported content type and invalid body",
+            contentType,
+            rawBody: rawBody.substring(0, 200),
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Extract Fonnte webhook data
