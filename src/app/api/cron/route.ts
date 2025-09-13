@@ -217,6 +217,15 @@ async function processReminders() {
   const debugLogs: string[] = [];
 
   try {
+    // Debug logging to identify initialization issues
+    logger.info("🔄 Starting reminder cron job - initialization", {
+      api: true,
+      cron: true,
+      nodeEnv: process.env.NODE_ENV,
+      hasDbConnection: Boolean(db),
+      hasWhatsAppService: Boolean(whatsappService),
+    });
+
     logger.info("🔄 Starting reminder cron job", {
       api: true,
       cron: true,
@@ -247,17 +256,19 @@ async function processReminders() {
       todayStart: todayStart.toISOString(),
     });
 
-    const totalCountResult = await db
-      .select({ count: count() })
-      .from(reminderSchedules)
-      .where(
-        and(
-          eq(reminderSchedules.isActive, true),
-          lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
-          // Haven't been delivered today yet (using notExists for efficiency)
-          notExists(
-            db
-              .select()
+    let totalCountResult;
+    try {
+      totalCountResult = await db
+        .select({ count: count() })
+        .from(reminderSchedules)
+        .where(
+          and(
+            eq(reminderSchedules.isActive, true),
+            lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
+            // Haven't been delivered today yet (using notExists for efficiency)
+            notExists(
+              db
+                .select()
               .from(reminderLogs)
               .where(
                 and(
@@ -269,6 +280,15 @@ async function processReminders() {
           )
         )
       );
+    } catch (dbError) {
+      logger.error("Database count query failed", dbError as Error, {
+        api: true,
+        cron: true,
+        todayWIB,
+        endOfDay: endOfDay.toISOString(),
+      });
+      throw new Error(`Database count query failed: ${(dbError as Error).message}`);
+    }
 
     const totalCount = totalCountResult[0]?.count || 0;
 
