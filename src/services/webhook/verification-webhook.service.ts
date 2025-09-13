@@ -232,7 +232,17 @@ export class VerificationWebhookService {
       return "unsubscribe";
     }
 
-    // 2. Check for confirmation responses (taken, missed, later)
+    // 2. Check for acceptance (treats "ya/iya/ok" as verification acceptance, not confirmation)
+    if (this.isAcceptResponse(normalized)) {
+      return "accept";
+    }
+
+    // 3. Check for decline
+    if (this.isDeclineResponse(normalized)) {
+      return "decline";
+    }
+
+    // 4. Check for confirmation responses (taken, missed, later)
     if (this.isConfirmationTaken(normalized)) {
       return "confirmation_taken";
     }
@@ -241,16 +251,6 @@ export class VerificationWebhookService {
     }
     if (this.isConfirmationLater(normalized)) {
       return "confirmation_later";
-    }
-
-    // 3. Check for acceptance
-    if (this.isAcceptResponse(normalized)) {
-      return "accept";
-    }
-
-    // 4. Check for decline
-    if (this.isDeclineResponse(normalized)) {
-      return "decline";
     }
 
     // 5. Unknown
@@ -324,11 +324,6 @@ export class VerificationWebhookService {
   private isConfirmationTaken(message: string): boolean {
     const takenWords = [
       "sudah",
-      "ya",
-      "iya",
-      "yes",
-      "ok",
-      "oke",
       "minum",
       "telah",
       "udh",

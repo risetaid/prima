@@ -260,8 +260,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Update conversation state based on processed message
+    let updatedConversationState = conversationState
     if (processedMessage.intent.primary !== 'unknown') {
-      await conversationService.updateConversationState(conversationState.id, {
+      updatedConversationState = await conversationService.updateConversationState(conversationState.id, {
         currentContext: processedMessage.intent.primary === 'accept' || processedMessage.intent.primary === 'decline'
           ? 'verification'
           : processedMessage.intent.primary === 'confirm_taken' || processedMessage.intent.primary === 'confirm_missed' || processedMessage.intent.primary === 'confirm_later'
@@ -286,11 +287,26 @@ export async function POST(request: NextRequest) {
       name,
     });
 
+    // If context is verification (post-update), process enhanced verification
+    if (updatedConversationState.currentContext === 'verification') {
+      try {
+        verificationResult = await enhancedVerificationService.processVerificationResponse(
+          updatedConversationState.id,
+          message
+        );
+      } catch (error) {
+        logger.error('Enhanced verification processing failed', error as Error, {
+          conversationStateId: updatedConversationState.id,
+          message
+        });
+      }
+    }
+
     // Combine results from both processing methods
     const result = {
       ...legacyResult,
       processedMessage,
-      conversationStateId: conversationState.id,
+      conversationStateId: updatedConversationState.id,
       verificationResult,
     };
 
