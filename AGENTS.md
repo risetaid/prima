@@ -4,26 +4,27 @@
 
 - App: `src/app` (API routes, pages, middleware); cron at `src/app/api/cron`.
 - Services: `src/services/{patient,reminder,whatsapp}` for business logic.
-- Data: `db/schema.ts` (Drizzle), `db/index.ts` (conn), soft-deletes on all tables.
-- UI: `src/components` (admin, patients, ui, providers), content at `src/app/content`.
-- Lib: `src/lib` (auth, cache, timezone, phone, validations).
+- Data: `src/db/schema.ts` (Drizzle) and `src/db/index.ts` (connection); soft-deletes via `deletedAt`.
+- UI: `src/components` (admin, patient, reminder, ui, providers); content at `src/app/content`.
+- Lib: `src/lib` (auth, cache, timezone, phone, validations, webhook, fonnte).
 - Tests: `src/__tests__` for unit/integration.
 
 ## Build, Test, and Development Commands
 
 - Install: `bun install` — install dependencies.
-- Dev: `bun dev` — Next.js dev server.
-- Build: `bun run build` — typecheck + Next build + schema gen.
-- Start: `bun start` — run production build locally.
-- Test: `bun test` — run test suite; `bun test -w` to watch.
-- Lint/Format: `bun run lint` / `bun run format`.
+- Dev: `bun run dev` — start Next.js dev server.
+- Build: `bun run build` — production build (includes TS type checks).
+- Start: `bun run start` — serve the production build.
+- Lint: `bun run lint` — ESLint (Next core-web-vitals).
+- DB: `bun run db:migrate`, `bun run db:generate`, `bun run db:studio`.
+- Tests: `bunx jest` (watch: `bunx jest --watch`).
 
 ## Coding Style & Naming Conventions
 
 - TypeScript strict; 2-space indent; Prettier + ESLint (Next config).
 - Files: kebab-case; React components `PascalCase` in `*.tsx`.
-- Variables/functions: `camelCase`; Drizzle schema: `snake_case` columns, `camelCase` fields in TS.
-- Follow soft-deletes (use `deletedAt`) and RBAC guards; validate with Zod in `lib/validations.ts`.
+- Variables/functions: `camelCase`; Drizzle columns `snake_case`, mapped to TS `camelCase`.
+- Validate inputs with Zod in `src/lib/validations.ts`; respect RBAC guards.
 
 ## Testing Guidelines
 

@@ -137,6 +137,10 @@ export default function VerificationActionsPanel({
             >
               Verifikasi Manual
             </button>
+            <div className="sm:ml-2 text-xs text-gray-500 sm:self-center">
+              Balasan pasien via WhatsApp diproses otomatis.<br />
+              Contoh: "YA" untuk setuju, "TIDAK" untuk menolak, "BERHENTI" untuk berhenti.
+            </div>
           </div>
         )}
 

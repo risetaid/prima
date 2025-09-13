@@ -651,68 +651,60 @@ export default function PatientDetailPage() {
   const handleToggleStatus = async () => {
     if (!patient) return;
 
-    const action = patient.isActive ? "nonaktifkan" : "aktifkan";
     const actionTitle = patient.isActive ? "Nonaktifkan" : "Aktifkan";
 
-    // Show confirmation toast
+    // Confirm
     const confirmed = await new Promise<boolean>((resolve) => {
       toast.warning(`${actionTitle} ${patient.name}?`, {
-        description: `Pasien akan di${action} dan ${
-          patient.isActive
-            ? "tidak muncul di daftar"
-            : "muncul kembali di daftar"
-        }.`,
-        action: {
-          label: actionTitle,
-          onClick: () => resolve(true),
-        },
-        cancel: {
-          label: "Batal",
-          onClick: () => resolve(false),
-        },
+        description: patient.isActive
+          ? 'Pasien akan dinonaktifkan (BERHENTI) dan tidak menerima pengingat.'
+          : 'Pasien akan diaktifkan kembali.',
+        action: { label: actionTitle, onClick: () => resolve(true) },
+        cancel: { label: 'Batal', onClick: () => resolve(false) },
         duration: 10000,
-      });
-    });
+      })
+    })
 
-    if (!confirmed) return;
+    if (!confirmed) return
 
     try {
-      const response = await fetch(`/api/patients/${params.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...patient,
-          isActive: !patient.isActive,
-        }),
-      });
-
-      if (response.ok) {
-        const updatedPatient = await response.json();
-        setPatient(updatedPatient);
-        toast.success(`Pasien ${action}`, {
-          description: `${patient.name} berhasil di${action}.`,
-        });
+      if (patient.isActive) {
+        // Deactivate via BERHENTI flow
+        const resp = await fetch(`/api/patients/${params.id}/deactivate`, { method: 'POST' })
+        const data = await resp.json()
+        if (resp.ok) {
+          toast.success('Pasien dinonaktifkan (BERHENTI)', { description: `${patient.name} tidak akan menerima pengingat.` })
+          fetchPatient(params.id as string)
+        } else {
+          toast.error('Gagal menonaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+        }
       } else {
-        const error = await response.json();
-        toast.error(`Gagal ${actionTitle}`, {
-          description: `Error: ${
-            error.error || "Terjadi kesalahan pada server"
-          }`,
-        });
+        // Reactivate via API
+        const resp = await fetch(`/api/patients/${params.id}/reactivate`, { method: 'POST' })
+        const data = await resp.json()
+        if (resp.ok) {
+          toast.success('Pasien diaktifkan kembali', { description: data.message || 'Status verifikasi direset ke pending.' })
+          fetchPatient(params.id as string)
+        } else {
+          toast.error('Gagal mengaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+        }
       }
     } catch (error) {
-      console.error("Error toggling patient status:", error);
-      toast.error("Kesalahan Jaringan", {
-        description:
-          "Tidak dapat mengubah status pasien. Periksa koneksi internet Anda.",
-      });
+      console.error('Error changing patient status:', error)
+      toast.error('Kesalahan Jaringan', { description: 'Tidak dapat mengubah status pasien.' })
     }
   };
 
   // Simplified Reminder Functions
   const handleAddReminder = () => {
+    if (!patient) return
+    const allowed = patient.verificationStatus === 'verified' && patient.isActive
+    if (!allowed) {
+      toast.error('Pasien belum terverifikasi', {
+        description: 'Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.'
+      })
+      return
+    }
     setIsReminderModalOpen(true);
   };
 
@@ -1105,13 +1097,23 @@ export default function PatientDetailPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <button
                       onClick={handleAddReminder}
-                      className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      disabled={!(patient.verificationStatus === 'verified' && patient.isActive)}
+                      className={`cursor-pointer py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 transition-all duration-200 ${
+                        patient.verificationStatus === 'verified' && patient.isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
+                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      }`}
                     >
                       <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span className="text-sm sm:text-base">
                         Buat Pengingat
                       </span>
                     </button>
+                    {!(patient.verificationStatus === 'verified' && patient.isActive) && (
+                      <p className="text-xs text-gray-500 sm:col-span-2 text-center">
+                        Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA" untuk mengaktifkan fitur ini.
+                      </p>
+                    )}
                     <button
                       onClick={handleViewReminders}
                       className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, verificationLogs } from '@/db'
 import { eq, and } from 'drizzle-orm'
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 // import { addHours } from 'date-fns'
 
 // Send verification message to patient
@@ -37,13 +38,11 @@ export async function POST(
 
     const patient = patientResult[0]
 
-    // Generate simple verification message
-    const verificationMessage = generateVerificationMessage(patient, user)
-    
-    // Send WhatsApp message via Fonnte
-    const whatsappResult = await sendWhatsAppMessage(
+    // Send verification message with clear instructions
+    const whatsappService = new WhatsAppService()
+    const whatsappResult = await whatsappService.sendVerificationMessage(
       patient.phoneNumber,
-      verificationMessage
+      patient.name
     )
 
     if (!whatsappResult.success) {
@@ -62,7 +61,7 @@ export async function POST(
       .set({
         verificationStatus: 'pending_verification',
         verificationSentAt: new Date(),
-        verificationMessage: verificationMessage,
+        verificationMessage: `Text message: Verification request sent to ${patient.name}`,
         verificationAttempts: (currentAttempts + 1).toString(),
         verificationExpiresAt: expiresAt,
         updatedAt: new Date()
@@ -75,16 +74,17 @@ export async function POST(
       .values({
         patientId: patientId,
         action: 'sent',
-        messageSent: verificationMessage,
+        messageSent: `Text verification sent with clear response options`,
         verificationResult: 'pending_verification',
         processedBy: user.id
       })
 
     return NextResponse.json({
       success: true,
-      message: 'Verification message sent successfully',
+      message: 'Verification message sent successfully with clear response options',
       expiresAt: expiresAt.toISOString(),
-      attempt: currentAttempts + 1
+      attempt: currentAttempts + 1,
+      method: 'text_verification'
     })
 
   } catch (error) {
@@ -93,66 +93,5 @@ export async function POST(
       { error: 'Internal server error' },
       { status: 500 }
     )
-  }
-}
-
-// Helper function to generate verification message
-function generateVerificationMessage(patient: any, volunteer: any): string {
-  return `Halo ${patient.name},
-
-Anda didaftarkan ke dalam sistem PRIMA untuk pengingat kesehatan oleh relawan kami.
-
-Apakah Anda setuju untuk menerima pengingat obat dan kesehatan?
-
-💚 *Balas dengan cara apa saja:*
-• YA / IYA / SETUJU / MAU
-• TIDAK / GA MAU / NANTI
-• BERHENTI (untuk stop selamanya)
-
-Contoh: "Ya saya setuju" atau "Ya mau" atau "Iya boleh"
-
-Terima kasih atas kerjasamanya! 🙏`
-}
-
-// Helper function to send WhatsApp message via Fonnte
-async function sendWhatsAppMessage(phoneNumber: string, message: string) {
-  try {
-    // Format Indonesian phone number
-    let formattedPhone = phoneNumber
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '62' + formattedPhone.slice(1)
-    } else if (!formattedPhone.startsWith('62')) {
-      formattedPhone = '62' + formattedPhone
-    }
-
-    const fonnte_token = process.env.FONNTE_TOKEN
-    if (!fonnte_token) {
-      throw new Error('FONNTE_TOKEN not configured')
-    }
-
-    const response = await fetch('https://api.fonnte.com/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': fonnte_token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        target: formattedPhone,
-        message: message,
-        countryCode: '62'
-      })
-    })
-
-    const result = await response.json()
-    
-    if (response.ok && result.status) {
-      return { success: true, data: result }
-    } else {
-      return { success: false, error: result.reason || 'Unknown error' }
-    }
-
-  } catch (error) {
-    console.error('WhatsApp sending error:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to send message' }
   }
 }

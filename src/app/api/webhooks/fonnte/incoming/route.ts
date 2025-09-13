@@ -1,0 +1,621 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { requireWebhookToken } from '@/lib/webhook-auth'
+import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
+import { db, patients, verificationLogs, reminderSchedules, reminderLogs } from '@/db'
+import { eq, and, isNull, desc } from 'drizzle-orm'
+import { PatientLookupService } from '@/services/patient/patient-lookup.service'
+import { ConversationStateService } from '@/services/conversation-state.service'
+import { logger } from '@/lib/logger'
+// Poll-based messaging handled by WhatsAppService
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
+
+const IncomingSchema = z.object({
+  sender: z.string().min(6),
+  message: z.string().min(1),
+  device: z.string().optional(),
+  name: z.string().optional(),
+  id: z.string().optional(),
+  timestamp: z.union([z.string(), z.number()]).optional(),
+  // Poll response fields (based on Fonnte poll response format)
+  poll_name: z.string().optional(),
+  pollname: z.string().optional(),
+  selected_option: z.string().optional(),
+  poll_response: z.string().optional(),
+  poll_data: z.any().optional(),
+})
+
+function normalizeIncoming(body: any) {
+  const sender = body.sender || body.phone || body.from || body.number || body.wa_number
+  const message = body.message || body.text || body.body
+  const device = body.device || body.gateway || body.instance
+  const name = body.name || body.sender_name || body.contact_name
+  const id = body.id || body.message_id || body.msgId
+  const timestamp = body.timestamp || body.time || body.created_at
+  
+  // Poll response data - comprehensive field mapping for various possible formats
+  const poll_name = body.poll_name || body.pollname || body.poll_title || body.poll?.name
+  const pollname = body.pollname || body.poll_name || body.poll_title || body.poll?.name
+  const selected_option = body.selected_option || body.poll_response || body.choice || body.poll?.choice || body.poll?.selected
+  const poll_response = body.poll_response || body.selected_option || body.choice || body.poll?.choice || body.poll?.selected
+  const poll_data = body.poll_data || body.poll || {}
+  
+  const normalized = { 
+    sender, message, device, name, id, timestamp,
+    poll_name, pollname, selected_option, poll_response, poll_data
+  }
+
+  // Log normalization for debugging
+  logger.info('Webhook normalization result', {
+    sender: Boolean(sender),
+    message: Boolean(message),
+    hasPollName: Boolean(poll_name),
+    hasSelectedOption: Boolean(selected_option),
+    pollName: poll_name,
+    selectedOption: selected_option,
+    originalKeys: Object.keys(body || {}),
+    normalizedKeys: Object.keys(normalized).filter(key => (normalized as any)[key])
+  })
+  
+  return normalized
+}
+
+interface IntentResult {
+  intent: 'accept' | 'decline' | 'unsubscribe' | 'medication_taken' | 'medication_pending' | 'need_help' | 'other'
+  confidence: number
+  matchedWords: string[]
+}
+
+function detectIntentEnhanced(rawMessage: string, context?: 'verification' | 'medication'): IntentResult {
+  const msg = (rawMessage || '').toLowerCase().trim()
+  const words = msg.split(/\s+/)
+  
+  // Enhanced Indonesian language patterns with weights
+  const patterns = {
+    accept: [
+      // Direct acceptance
+      { words: ['ya', 'iya', 'yaa', 'iya', 'yes', 'yep', 'yup'], weight: 10 },
+      { words: ['setuju', 'stuju', 'setujuu'], weight: 10 },
+      { words: ['boleh', 'blh', 'bole', 'bolh'], weight: 9 },
+      { words: ['baik', 'bagus', 'good'], weight: 8 },
+      { words: ['ok', 'oke', 'okay', 'okey', 'okeh'], weight: 8 },
+      { words: ['siap', 'ready', 'sip'], weight: 7 },
+      { words: ['mau', 'ingin', 'pengen', 'want'], weight: 7 },
+      { words: ['terima', 'accept', 'trimakasih'], weight: 6 },
+      // Phrases
+      { words: ['ya boleh', 'iya setuju', 'ok siap'], weight: 12 },
+    ],
+    decline: [
+      { words: ['tidak', 'tdk', 'gak', 'ga', 'engga', 'enggak', 'no', 'nope'], weight: 10 },
+      { words: ['tolak', 'refuse', 'nolak'], weight: 10 },
+      { words: ['nanti', 'besok', 'later'], weight: 7 },
+      { words: ['jangan', 'dont', 'stop'], weight: 8 },
+      { words: ['maaf', 'sorry', 'sori'], weight: 6 },
+      // Phrases
+      { words: ['tidak mau', 'ga mau', 'tidak setuju'], weight: 12 },
+    ],
+    unsubscribe: [
+      { words: ['berhenti', 'stop', 'cancel', 'batal'], weight: 10 },
+      { words: ['keluar', 'out', 'exit'], weight: 9 },
+      { words: ['hapus', 'delete', 'remove'], weight: 9 },
+      { words: ['unsubscribe', 'unsub', 'cabut'], weight: 10 },
+    ],
+    medication_taken: [
+      { words: ['sudah', 'udah', 'done', 'selesai'], weight: 10 },
+      { words: ['diminum', 'minum', 'taken'], weight: 9 },
+      { words: ['oke', 'ok', 'siap', 'good'], weight: 7 },
+      // Phrases
+      { words: ['sudah minum', 'udah diminum', 'sudah selesai'], weight: 15 },
+      { words: ['obat sudah', 'sudah makan obat'], weight: 14 },
+    ],
+    medication_pending: [
+      { words: ['belum', 'not yet', 'nanti'], weight: 10 },
+      { words: ['sebentar', 'tunggu', 'wait'], weight: 8 },
+      { words: ['lupa', 'forgot', 'lupaa'], weight: 9 },
+      // Phrases
+      { words: ['belum minum', 'belum diminum'], weight: 14 },
+      { words: ['nanti dulu', 'sebentar lagi'], weight: 12 },
+    ],
+    need_help: [
+      { words: ['bantuan', 'help', 'tolong'], weight: 10 },
+      { words: ['bingung', 'confused', 'susah'], weight: 9 },
+      { words: ['tanya', 'ask', 'pertanyaan'], weight: 8 },
+      { words: ['relawan', 'staff', 'perawat'], weight: 8 },
+      // Phrases
+      { words: ['butuh bantuan', 'perlu bantuan', 'minta tolong'], weight: 15 },
+    ]
+  }
+
+  let bestMatch: IntentResult = { intent: 'other', confidence: 0, matchedWords: [] }
+
+  for (const [intentKey, patternList] of Object.entries(patterns)) {
+    const intent = intentKey as any
+    let totalScore = 0
+    const matchedWords: string[] = []
+
+    for (const pattern of patternList) {
+      const patternWords = pattern.words.join(' ')
+      
+      // Check for full phrase match
+      if (msg.includes(patternWords)) {
+        totalScore += pattern.weight * 1.5 // Bonus for phrase match
+        matchedWords.push(patternWords)
+        continue
+      }
+
+      // Check individual words
+      for (const word of pattern.words) {
+        if (words.includes(word) || msg.includes(word)) {
+          totalScore += pattern.weight
+          matchedWords.push(word)
+        }
+      }
+    }
+
+    // Calculate confidence based on score and context
+    let confidence = Math.min(totalScore / 10, 1) // Normalize to 0-1
+
+    // Context bonus
+    if (context === 'verification' && ['accept', 'decline'].includes(intent)) {
+      confidence *= 1.2
+    } else if (context === 'medication' && ['medication_taken', 'medication_pending', 'need_help'].includes(intent)) {
+      confidence *= 1.2
+    }
+
+    if (confidence > bestMatch.confidence) {
+      bestMatch = { intent, confidence, matchedWords: [...new Set(matchedWords)] }
+    }
+  }
+
+  return bestMatch
+}
+
+// Legacy function for backward compatibility
+function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' | 'unsubscribe' | 'other' {
+  const result = detectIntentEnhanced(rawMessage, 'verification')
+  
+  if (result.confidence < 0.3) return 'other'
+  
+  switch (result.intent) {
+    case 'accept': return 'accept'
+    case 'decline': return 'decline'
+    case 'unsubscribe': return 'unsubscribe'
+    default: return 'other'
+  }
+}
+
+const whatsappService = new WhatsAppService()
+
+async function sendAck(phoneNumber: string, message: string) {
+  try {
+    await whatsappService.sendAck(phoneNumber, message)
+  } catch (e) {
+    console.warn('Failed to send ACK via WhatsApp:', e)
+  }
+}
+
+
+/**
+ * Handle verification text responses using enhanced intent detection
+ */
+async function handleVerificationResponse(
+  message: string,
+  patient: any
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  const intentResult = detectIntentEnhanced(message, 'verification')
+  
+  logger.info('Processing verification text response', { 
+    originalMessage: message, 
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    matchedWords: intentResult.matchedWords,
+    patientId: patient.id 
+  })
+  
+  // Only process if confidence is high enough
+  if (intentResult.confidence < 0.4) {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`)
+    return { processed: true, action: 'clarification_requested', message: 'Low confidence response - clarification sent' }
+  }
+
+  if (intentResult.intent === 'accept') {
+    try {
+      logger.info('Updating patient verification status to verified', { patientId: patient.id })
+      
+      const updateResult = await db.update(patients).set({
+        verificationStatus: 'verified',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(patients.id, patient.id))
+
+      const logResult = await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: message,
+        verificationResult: 'verified',
+      })
+
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat obat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`)
+
+      return { processed: true, action: 'verified', message: 'Patient verified via text' }
+    } catch (error) {
+      logger.error('Failed to process verification acceptance', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+  
+  if (intentResult.intent === 'decline') {
+    try {
+      logger.info('Updating patient verification status to declined', { patientId: patient.id })
+      
+      const updateResult = await db.update(patients).set({
+        verificationStatus: 'declined',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(patients.id, patient.id))
+
+      const logResult = await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: message,
+        verificationResult: 'declined',
+      })
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`)
+
+      return { processed: true, action: 'declined', message: 'Patient declined verification via text' }
+    } catch (error) {
+      logger.error('Failed to process verification decline', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+
+  if (intentResult.intent === 'unsubscribe') {
+    try {
+      logger.info('Processing unsubscribe request', { patientId: patient.id })
+      
+      await db.update(patients).set({
+        verificationStatus: 'declined',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+        isActive: false,
+      }).where(eq(patients.id, patient.id))
+
+      await db.update(reminderSchedules).set({ 
+        isActive: false, 
+        updatedAt: new Date() 
+      }).where(eq(reminderSchedules.patientId, patient.id))
+
+      await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: message,
+        verificationResult: 'unsubscribed',
+      })
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`)
+
+      return { processed: true, action: 'unsubscribed', message: 'Patient unsubscribed' }
+    } catch (error) {
+      logger.error('Failed to process unsubscribe', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+  
+  return { processed: false }
+}
+
+/**
+ * Handle medication text responses using enhanced intent detection
+ */
+async function handleMedicationResponse(
+  message: string,
+  patient: any
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  // Find the most recent pending reminder for this patient
+  const pendingReminder = await db
+    .select()
+    .from(reminderLogs)
+    .where(
+      and(
+        eq(reminderLogs.patientId, patient.id),
+        eq(reminderLogs.status, 'SENT'), // Waiting for confirmation
+        isNull(reminderLogs.confirmedAt)
+      )
+    )
+    .orderBy(desc(reminderLogs.sentAt))
+    .limit(1)
+
+  if (!pendingReminder.length) {
+    // No pending reminder, but maybe it's a general medication response
+    const intentResult = detectIntentEnhanced(message, 'medication')
+    
+    if (intentResult.intent !== 'other' && intentResult.confidence > 0.5) {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`)
+      return { processed: true, action: 'no_pending_reminder', message: 'Response without pending reminder' }
+    }
+    
+    return { processed: false, message: 'No pending reminder found' }
+  }
+
+  const reminder = pendingReminder[0]
+  const intentResult = detectIntentEnhanced(message, 'medication')
+  
+  logger.info('Processing medication text response', { 
+    originalMessage: message, 
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    matchedWords: intentResult.matchedWords,
+    patientId: patient.id,
+    reminderId: reminder.id
+  })
+  
+  // Low confidence responses get clarification
+  if (intentResult.confidence < 0.4) {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`)
+    return { processed: true, action: 'clarification_requested', message: 'Low confidence response - clarification sent' }
+  }
+
+  if (intentResult.intent === 'medication_taken') {
+    try {
+      await db.update(reminderLogs).set({
+        status: 'DELIVERED', // Mark as completed
+        confirmedAt: new Date(),
+        confirmationResponse: message,
+        updatedAt: new Date()
+      }).where(eq(reminderLogs.id, reminder.id))
+
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`)
+
+      return { processed: true, action: 'confirmed', message: 'Medication confirmed via text' }
+    } catch (error) {
+      logger.error('Failed to process medication confirmation', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+  
+  if (intentResult.intent === 'medication_pending') {
+    try {
+      await db.update(reminderLogs).set({
+        confirmationResponse: message,
+        updatedAt: new Date()
+        // Keep status as SENT for potential follow-up
+      }).where(eq(reminderLogs.id, reminder.id))
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`)
+
+      return { processed: true, action: 'extended', message: 'Medication reminder extended' }
+    } catch (error) {
+      logger.error('Failed to process medication pending', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+  
+  if (intentResult.intent === 'need_help') {
+    try {
+      await db.update(reminderLogs).set({
+        confirmationResponse: message,
+        updatedAt: new Date()
+        // Keep status as SENT but flag for manual intervention
+      }).where(eq(reminderLogs.id, reminder.id))
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!\n\n💙 Tim PRIMA`)
+
+      logger.info('Patient requested help - escalating to relawan', { 
+        patientId: patient.id, 
+        reminderId: reminder.id 
+      })
+
+      return { processed: true, action: 'escalated', message: 'Medication reminder escalated to relawan' }
+    } catch (error) {
+      logger.error('Failed to process help request', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
+  
+  return { processed: false }
+}
+
+export async function POST(request: NextRequest) {
+  // Re-enabled webhook authentication - poll debugging complete
+  const authError = requireWebhookToken(request)
+  if (authError) return authError
+
+  // parse body as json or form
+  let parsed: any = {}
+  const contentType = request.headers.get('content-type') || ''
+  try {
+    if (contentType.includes('application/json')) {
+      parsed = await request.json()
+    } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+      const form = await request.formData()
+      form.forEach((v, k) => { (parsed as any)[k] = v })
+    } else {
+      const text = await request.text()
+      try { parsed = JSON.parse(text) } catch { parsed = {} }
+    }
+  } catch {}
+
+  // DEBUG: Enhanced logging to understand Fonnte's format
+  logger.info('Raw Fonnte webhook payload received', {
+    timestamp: new Date().toISOString(),
+    method: request.method,
+    url: request.url,
+    contentType,
+    headers: Object.fromEntries(request.headers.entries()),
+    queryParams: Object.fromEntries(new URL(request.url).searchParams.entries()),
+    rawPayload: parsed,
+    payloadKeys: Object.keys(parsed || {}),
+    payloadValues: Object.entries(parsed || {}).reduce((acc, [key, value]) => {
+      acc[key] = typeof value === 'string' ? value.substring(0, 100) + (value.length > 100 ? '...' : '') : value
+      return acc
+    }, {} as any),
+    hasPollingFields: {
+      poll_name: Boolean(parsed.poll_name),
+      pollname: Boolean(parsed.pollname), 
+      poll_title: Boolean(parsed.poll_title),
+      selected_option: Boolean(parsed.selected_option),
+      poll_response: Boolean(parsed.poll_response),
+      choice: Boolean(parsed.choice),
+      poll: Boolean(parsed.poll)
+    },
+    messageFields: {
+      message: Boolean(parsed.message),
+      text: Boolean(parsed.text),
+      body: Boolean(parsed.body),
+      sender: Boolean(parsed.sender || parsed.phone || parsed.from),
+      device: Boolean(parsed.device || parsed.gateway)
+    }
+  })
+
+  const normalized = normalizeIncoming(parsed)
+  const result = IncomingSchema.safeParse(normalized)
+  if (!result.success) {
+    return NextResponse.json({ error: 'Invalid payload', issues: result.error.flatten() }, { status: 400 })
+  }
+
+  const { sender, message, device, name, id, timestamp, poll_name, pollname, selected_option, poll_response, poll_data } = result.data
+
+  // idempotency key
+  const fallbackId = hashFallbackId([id, sender, String(timestamp || ''), message])
+  const idemKey = `webhook:fonnte:incoming:${fallbackId}`
+  if (await isDuplicateEvent(idemKey)) {
+    return NextResponse.json({ ok: true, duplicate: true })
+  }
+
+  logger.info('Fonnte incoming webhook received', { sender, device, hasId: Boolean(id) })
+
+  // find existing patient
+  const lookup = new PatientLookupService()
+  const found = await lookup.findPatientByPhone(sender)
+  if (!found.found || !found.patient) {
+    logger.warn('Incoming webhook: no patient matched; ignoring', { 
+      sender, 
+      normalizedSender: sender,
+      allPayloadFields: Object.keys(parsed || {}),
+      senderFields: {
+        sender: parsed.sender,
+        phone: parsed.phone,
+        from: parsed.from,
+        number: parsed.number,
+        wa_number: parsed.wa_number
+      }
+    })
+    return NextResponse.json({ ok: true, ignored: true, reason: 'no_patient_match' })
+  }
+
+  const patient = found.patient
+
+  // conversation log (best-effort)
+  try {
+    const conv = new ConversationStateService()
+    const state = await conv.getOrCreateConversationState(patient.id, sender, 'general_inquiry')
+    await conv.addMessage(state.id, {
+      message,
+      direction: 'inbound',
+      messageType: poll_name || pollname ? 'confirmation' : 'general',
+      intent: undefined,
+      confidence: undefined,
+      processedAt: new Date()
+    })
+  } catch {}
+
+  // PRIORITY 1: Check if patient is awaiting verification
+  if (patient.verificationStatus === 'pending_verification') {
+    logger.info('Processing verification response', {
+      patientId: patient.id,
+      hasMessage: Boolean(message),
+      message: message?.substring(0, 100) + (message && message.length > 100 ? '...' : '')
+    })
+    
+    try {
+      const verificationResult = await handleVerificationResponse(message, patient)
+      
+      if (verificationResult.processed) {
+        logger.info('Verification response processed successfully', {
+          patientId: patient.id,
+          action: verificationResult.action,
+          message: verificationResult.message
+        })
+        
+        return NextResponse.json({ 
+          ok: true, 
+          processed: true, 
+          action: verificationResult.action,
+          source: 'text_verification'
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to process verification response', error as Error, {
+        patientId: patient.id,
+        message: message?.substring(0, 100)
+      })
+      return NextResponse.json({ error: 'Internal error processing verification' }, { status: 500 })
+    }
+  }
+
+  // PRIORITY 2: Check for medication responses (if patient is verified)
+  if (patient.verificationStatus === 'verified') {
+    logger.info('Processing potential medication response', {
+      patientId: patient.id,
+      hasMessage: Boolean(message),
+      message: message?.substring(0, 100) + (message && message.length > 100 ? '...' : '')
+    })
+    
+    try {
+      const medicationResult = await handleMedicationResponse(message, patient)
+      
+      if (medicationResult.processed) {
+        logger.info('Medication response processed successfully', {
+          patientId: patient.id,
+          action: medicationResult.action,
+          message: medicationResult.message
+        })
+        
+        return NextResponse.json({ 
+          ok: true, 
+          processed: true, 
+          action: medicationResult.action,
+          source: 'text_medication'
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to process medication response', error as Error, {
+        patientId: patient.id,
+        message: message?.substring(0, 100)
+      })
+      return NextResponse.json({ error: 'Internal error processing medication response' }, { status: 500 })
+    }
+  }
+
+  // FALLBACK: Handle unrecognized messages
+  logger.info('Message not processed by specific handlers', {
+    patientId: patient.id,
+    verificationStatus: patient.verificationStatus,
+    messageLength: message?.length || 0,
+    message: message?.substring(0, 50) + (message && message.length > 50 ? '...' : '')
+  })
+
+  // Send a helpful response for unrecognized messages
+  if (patient.verificationStatus === 'pending_verification') {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas pesan verifikasi dengan:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`)
+  } else if (patient.verificationStatus === 'verified') {
+    // Check if there are pending reminders
+    const intentResult = detectIntentEnhanced(message)
+    if (intentResult.confidence > 0.3) {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`)
+    } else {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, terima kasih atas pesannya.\n\nJika ada pertanyaan tentang obat, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`)
+    }
+  }
+
+  return NextResponse.json({ ok: true, processed: true, action: 'none' })
+}
+
+export async function GET(request: NextRequest) {
+  const authError = requireWebhookToken(request)
+  if (authError) return authError
+  const { searchParams } = new URL(request.url)
+  const mode = searchParams.get('mode') || 'ping'
+  return NextResponse.json({ ok: true, route: 'fonnte/incoming', mode })
+}

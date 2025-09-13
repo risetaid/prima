@@ -28,6 +28,7 @@ export default function PatientReminderPage() {
   })
   const [loading, setLoading] = useState(true)
   const [patientName, setPatientName] = useState('')
+  const [canAddReminders, setCanAddReminders] = useState<boolean>(false)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   useEffect(() => {
@@ -69,6 +70,8 @@ export default function PatientReminderPage() {
       if (response.ok) {
         const patient = await response.json()
         setPatientName(patient.name)
+        const allowed = patient.verificationStatus === 'verified' && patient.isActive === true
+        setCanAddReminders(allowed)
       }
     } catch (error) {
       console.error('Error fetching patient:', error)
@@ -78,6 +81,7 @@ export default function PatientReminderPage() {
   }
 
   const handleAddReminder = () => {
+    if (!canAddReminders) return
     setIsAddModalOpen(true)
   }
 
@@ -138,7 +142,7 @@ export default function PatientReminderPage() {
 
       {/* Desktop: 3-Column Layout */}
       <div className="hidden lg:block py-8 relative z-10">
-        <PatientReminderDashboard patientName={patientName} />
+        <PatientReminderDashboard patientName={patientName} canAddReminders={canAddReminders} />
       </div>
 
       {/* Mobile: Card Layout */}
@@ -154,11 +158,17 @@ export default function PatientReminderPage() {
           {/* Add New Reminder Button */}
           <button
             onClick={handleAddReminder}
-            className="w-full bg-blue-500 text-white py-4 px-6 rounded-full font-semibold flex items-center justify-center space-x-2 mb-8 hover:bg-blue-600 transition-colors cursor-pointer"
+            disabled={!canAddReminders}
+            className={`w-full py-4 px-6 rounded-full font-semibold flex items-center justify-center space-x-2 mb-8 transition-colors ${
+              canAddReminders ? 'bg-blue-500 text-white hover:bg-blue-600 cursor-pointer' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+            }`}
           >
             <Plus className="w-5 h-5" />
             <span>Tambah Pengingat Baru</span>
           </button>
+          {!canAddReminders && (
+            <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA".</p>
+          )}
 
           {/* Add Reminder Modal */}
           <AddReminderModal

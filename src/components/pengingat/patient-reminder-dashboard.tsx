@@ -55,10 +55,12 @@ interface ReminderStats {
 
 interface PatientReminderDashboardProps {
   patientName: string;
+  canAddReminders?: boolean;
 }
 
 export function PatientReminderDashboard({
   patientName,
+  canAddReminders = true,
 }: PatientReminderDashboardProps) {
   const params = useParams();
   const [terjadwalReminders, setTerjadwalReminders] = useState<Reminder[]>([]);
@@ -257,6 +259,12 @@ export function PatientReminderDashboard({
   };
 
   const handleAddReminder = () => {
+    if (!canAddReminders) {
+      toast.error('Pasien belum terverifikasi', {
+        description: 'Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.'
+      })
+      return
+    }
     setIsAddModalOpen(true);
   };
 
@@ -616,11 +624,19 @@ export function PatientReminderDashboard({
 
             <button
               onClick={handleAddReminder}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2 cursor-pointer"
+              disabled={!canAddReminders}
+              className={`px-6 py-3 rounded-lg font-medium flex items-center justify-center space-x-2 transition-colors ${
+                canAddReminders
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
             >
               <Plus className="w-5 h-5" />
               <span>Tambah Pengingat Baru</span>
             </button>
+            {!canAddReminders && (
+              <p className="text-xs text-gray-500 mt-1">Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA".</p>
+            )}
           </div>
         </div>
       </div>

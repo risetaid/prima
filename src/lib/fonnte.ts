@@ -1,13 +1,23 @@
 // Fonnte WhatsApp API integration for PRIMA
+import * as crypto from 'crypto'
+
 // Primary WhatsApp provider for Indonesian healthcare system
 
 const FONNTE_BASE_URL = process.env.FONNTE_BASE_URL || 'https://api.fonnte.com'
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN
+const FONNTE_WEBHOOK_SECRET = process.env.FONNTE_WEBHOOK_SECRET
+const ALLOW_UNSIGNED_WEBHOOKS =
+  (process.env.ALLOW_UNSIGNED_WEBHOOKS || '').toLowerCase() === 'true' ||
+  process.env.NODE_ENV !== 'production'
 
 export interface WhatsAppMessage {
   to: string           // Format: 6281234567890 (no + prefix)
   body: string
   mediaUrl?: string    // Optional image/document URL
+  // Poll parameters for interactive messages
+  choices?: string     // Comma-separated poll options (min 2, max 12)
+  select?: 'single' | 'multiple'  // Poll selection type
+  pollname?: string    // Poll title/name
 }
 
 export interface WhatsAppMessageResult {
@@ -42,6 +52,17 @@ export const sendWhatsAppMessage = async (
     // Add media if provided
     if (message.mediaUrl) {
       payload.url = message.mediaUrl
+    }
+
+    // Add poll parameters if provided (based on official Fonnte documentation)
+    if (message.choices) {
+      payload.choices = message.choices
+    }
+    if (message.select) {
+      payload.select = message.select
+    }
+    if (message.pollname) {
+      payload.pollname = message.pollname
     }
 
     const response = await fetch(`${FONNTE_BASE_URL}/send`, {
@@ -189,21 +210,131 @@ _Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_`
 }
 
 /**
+ * Create verification poll message for WhatsApp verification
+ */
+export const createVerificationPoll = (patientName: string): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `🏥 *PRIMA - Verifikasi WhatsApp*
+
+Halo ${patientName}!
+
+Apakah Anda bersedia menerima pengingat obat dari PRIMA?
+
+Pilih salah satu opsi di bawah ini:`,
+    choices: 'Ya,Tidak',
+    select: 'single',
+    pollname: 'Verifikasi PRIMA'
+  }
+}
+
+/**
+ * Create medication reminder poll message
+ */
+export const createMedicationPoll = (
+  patientName: string,
+  medicationName: string,
+  dosage: string,
+  time: string
+): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `🏥 *Pengingat Minum Obat - PRIMA*
+
+Halo ${patientName},
+
+⏰ Saatnya minum obat:
+💊 *${medicationName}* 
+📏 Dosis: ${dosage}
+🕐 Waktu: ${time}
+
+Jangan lupa minum obat sesuai jadwal ya!
+
+Pilih status minum obat Anda:`,
+    choices: 'Sudah Minum,Belum Minum',
+    select: 'single',
+    pollname: 'Konfirmasi Obat'
+  }
+}
+
+/**
+ * Create follow-up poll message (sent 15 minutes after initial reminder)
+ */
+export const createFollowUpPoll = (patientName: string): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `Halo ${patientName}, apakah sudah diminum obatnya?`,
+    choices: 'Sudah,Belum,Butuh Bantuan',
+    select: 'single',
+    pollname: 'Follow-up Obat'
+  }
+}
+
+/**
  * Validate Fonnte webhook signature for security
  */
 export const validateFonnteWebhook = (
   signature: string,
-  _body: unknown
+  body: unknown
 ): boolean => {
-  if (!FONNTE_TOKEN) return false
-  
+  // Prefer dedicated webhook secret; fallback to API token for backward-compat
+  const secret = FONNTE_WEBHOOK_SECRET || FONNTE_TOKEN
+  if (!secret) return false
+
   try {
-    // Implement Fonnte webhook validation if available
-    // For now, basic token validation
-    return signature === FONNTE_TOKEN
+    // Fonnte uses HMAC-SHA256 for webhook signatures
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(body))
+      .digest('hex')
+
+    return signature === expectedSignature
   } catch (error) {
     console.error('Fonnte webhook validation error:', error)
     return false
   }
+}
+
+/**
+ * Enhanced webhook validation with multiple security checks
+ */
+export const validateWebhookRequest = (
+  signature: string,
+  body: unknown,
+  timestamp?: string
+): { valid: boolean; error?: string } => {
+  // Check if secrets are configured
+  if (!FONNTE_WEBHOOK_SECRET && !FONNTE_TOKEN) {
+    return { valid: false, error: 'Fonnte credentials not configured' }
+  }
+
+  // Validate signature
+  if (!signature) {
+    if (ALLOW_UNSIGNED_WEBHOOKS) {
+      return { valid: true }
+    }
+    return { valid: false, error: 'Missing webhook signature' }
+  }
+
+  if (!validateFonnteWebhook(signature, body)) {
+    if (ALLOW_UNSIGNED_WEBHOOKS) {
+      return { valid: true }
+    }
+    return { valid: false, error: 'Invalid webhook signature' }
+  }
+
+  // Check timestamp if provided (prevent replay attacks)
+  if (timestamp) {
+    const now = Date.now()
+    const webhookTime = parseInt(timestamp)
+    const timeDiff = Math.abs(now - webhookTime)
+
+    // Allow 5 minute window for webhook delivery
+    if (timeDiff > 5 * 60 * 1000) {
+      return { valid: false, error: 'Webhook timestamp too old' }
+    }
+  }
+
+  return { valid: true }
 }
 
