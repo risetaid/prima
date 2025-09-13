@@ -532,10 +532,10 @@ export function AddReminderModal({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 gap-3">
                         {/* Patient Basic Info */}
                         {autoFillData.nama && (
-                          <div className="bg-white p-2 rounded-lg">
+                          <div className="bg-white p-3 rounded-lg">
                             <div className="text-xs text-gray-500">
                               Nama Lengkap Pasien
                             </div>
@@ -549,7 +549,7 @@ export function AddReminderModal({
                         )}
 
                         {autoFillData.dokter && (
-                          <div className="bg-white p-2 rounded-lg">
+                          <div className="bg-white p-3 rounded-lg">
                             <div className="text-xs text-gray-500">
                               Nama Dokter
                             </div>
@@ -563,7 +563,7 @@ export function AddReminderModal({
                         )}
 
                         {autoFillData.rumahSakit && (
-                          <div className="bg-white p-2 rounded-lg">
+                          <div className="bg-white p-3 rounded-lg">
                             <div className="text-xs text-gray-500">
                               Rumah Sakit
                             </div>
@@ -575,30 +575,6 @@ export function AddReminderModal({
                             </div>
                           </div>
                         )}
-
-                        {/* Time Info */}
-                        <div className="bg-white p-2 rounded-lg">
-                          <div className="text-xs text-gray-500">Waktu</div>
-                          <div className="text-sm font-medium text-gray-800">
-                            {formData.time}
-                          </div>
-                          <div className="text-xs text-blue-600 mt-1">
-                            {"{waktu}"}
-                          </div>
-                        </div>
-
-                        {/* Date Info */}
-                        <div className="bg-white p-2 rounded-lg">
-                          <div className="text-xs text-gray-500">Tanggal</div>
-                          <div className="text-sm font-medium text-gray-800">
-                            {selectedDates.length > 0
-                              ? selectedDates[0]
-                              : "Belum dipilih"}
-                          </div>
-                          <div className="text-xs text-blue-600 mt-1">
-                            {"{tanggal}"}
-                          </div>
-                        </div>
                       </div>
                     </div>
                   )}
@@ -663,14 +639,22 @@ export function AddReminderModal({
 
                 {/* Date Selection Field */}
                 <div
-                  className={`p-4 rounded-lg border-2 transition-colors ${
-                    selectedDates.length > 0 && !customRecurrence.enabled
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                    customRecurrence.enabled
+                      ? "border-gray-300 bg-gray-100 opacity-60 pointer-events-none"
+                      : selectedDates.length > 0 && !customRecurrence.enabled
                       ? "border-green-500 bg-green-50"
                       : "border-gray-200"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-gray-700 text-sm font-medium">
+                    <label
+                      className={`block text-sm font-medium ${
+                        customRecurrence.enabled
+                          ? "text-gray-500"
+                          : "text-gray-700"
+                      }`}
+                    >
                       Pilih Tanggal Pengingat
                     </label>
                     {selectedDates.length > 0 && !customRecurrence.enabled && (
@@ -680,26 +664,42 @@ export function AddReminderModal({
                     )}
                     {customRecurrence.enabled && (
                       <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                        Tidak aktif
+                        Dinonaktifkan
                       </span>
                     )}
                   </div>
-                  <DatePickerCalendar
-                    selectedDates={selectedDates}
-                    onDateChange={handleDateChange}
-                  />
+                  <div
+                    className={
+                      customRecurrence.enabled
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                  >
+                    <DatePickerCalendar
+                      selectedDates={selectedDates}
+                      onDateChange={handleDateChange}
+                    />
+                  </div>
                 </div>
 
                 {/* Custom Recurrence Option */}
                 <div
-                  className={`p-4 rounded-lg border-2 transition-colors ${
-                    customRecurrence.enabled
+                  className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+                    selectedDates.length > 0
+                      ? "border-gray-300 bg-gray-100 opacity-60 pointer-events-none"
+                      : customRecurrence.enabled
                       ? "border-blue-500 bg-blue-50"
                       : "border-gray-200"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <label className="block text-gray-700 text-sm font-medium">
+                    <label
+                      className={`block text-sm font-medium ${
+                        selectedDates.length > 0
+                          ? "text-gray-500"
+                          : "text-gray-700"
+                      }`}
+                    >
                       Pengulangan Kustom
                     </label>
                     {customRecurrence.enabled && (
@@ -709,15 +709,26 @@ export function AddReminderModal({
                     )}
                     {selectedDates.length > 0 && !customRecurrence.enabled && (
                       <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs">
-                        Tidak aktif
+                        Dinonaktifkan
                       </span>
                     )}
                   </div>
-                  <div className="mt-4">
+                  <div
+                    className={`mt-4 ${
+                      selectedDates.length > 0
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }`}
+                  >
                     <button
                       type="button"
                       onClick={() => setIsCustomRecurrenceOpen(true)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                      disabled={selectedDates.length > 0}
+                      className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+                        selectedDates.length > 0
+                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer"
+                      }`}
                     >
                       <Repeat className="w-4 h-4" />
                       <span className="text-sm font-medium">
