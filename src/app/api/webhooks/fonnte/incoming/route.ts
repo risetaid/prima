@@ -33,17 +33,31 @@ function normalizeIncoming(body: any) {
   const id = body.id || body.message_id || body.msgId
   const timestamp = body.timestamp || body.time || body.created_at
   
-  // Poll response data
-  const poll_name = body.poll_name || body.pollname
-  const pollname = body.pollname || body.poll_name
-  const selected_option = body.selected_option || body.poll_response || body.choice
-  const poll_response = body.poll_response || body.selected_option
+  // Poll response data - comprehensive field mapping for various possible formats
+  const poll_name = body.poll_name || body.pollname || body.poll_title || body.poll?.name
+  const pollname = body.pollname || body.poll_name || body.poll_title || body.poll?.name
+  const selected_option = body.selected_option || body.poll_response || body.choice || body.poll?.choice || body.poll?.selected
+  const poll_response = body.poll_response || body.selected_option || body.choice || body.poll?.choice || body.poll?.selected
   const poll_data = body.poll_data || body.poll || {}
   
-  return { 
+  const normalized = { 
     sender, message, device, name, id, timestamp,
     poll_name, pollname, selected_option, poll_response, poll_data
   }
+
+  // Log normalization for debugging
+  logger.info('Webhook normalization result', {
+    sender: Boolean(sender),
+    message: Boolean(message),
+    hasPollName: Boolean(poll_name),
+    hasSelectedOption: Boolean(selected_option),
+    pollName: poll_name,
+    selectedOption: selected_option,
+    originalKeys: Object.keys(body || {}),
+    normalizedKeys: Object.keys(normalized).filter(key => (normalized as any)[key])
+  })
+  
+  return normalized
 }
 
 function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' | 'unsubscribe' | 'other' {
@@ -83,15 +97,29 @@ async function processPollResponse(
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
   logger.info('Processing poll response', { pollName, selectedOption, patientId: patient.id })
   
-  // Handle verification polls
-  if (pollName === 'Verifikasi PRIMA') {
+  // Normalize poll name for case-insensitive matching
+  const normalizedPollName = (pollName || '').toLowerCase().trim()
+  
+  // Handle verification polls (case-insensitive matching)
+  if (normalizedPollName === 'verifikasi prima' || normalizedPollName.includes('verifikasi')) {
+    logger.info('Matched verification poll', { originalPollName: pollName, normalizedPollName })
     return await handleVerificationPoll(selectedOption, patient)
   }
   
-  // Handle medication polls
-  if (pollName === 'Konfirmasi Obat' || pollName === 'Follow-up Obat') {
+  // Handle medication polls (case-insensitive matching)  
+  if (normalizedPollName === 'konfirmasi obat' || 
+      normalizedPollName === 'follow-up obat' ||
+      normalizedPollName.includes('konfirmasi') ||
+      normalizedPollName.includes('obat')) {
+    logger.info('Matched medication poll', { originalPollName: pollName, normalizedPollName })
     return await handleMedicationPoll(selectedOption, patient)
   }
+  
+  logger.warn('No matching poll handler found', { 
+    pollName, 
+    normalizedPollName, 
+    patientId: patient.id 
+  })
   
   return { processed: false }
 }
@@ -103,47 +131,113 @@ async function handleVerificationPoll(
   selectedOption: string,
   patient: any
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
-  const option = selectedOption.toLowerCase().trim()
+  const option = (selectedOption || '').toLowerCase().trim()
   
-  if (option === 'ya') {
-    // Accept verification
-    await db.update(patients).set({
-      verificationStatus: 'verified',
-      verificationResponseAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(patients.id, patient.id))
+  logger.info('Processing verification poll option', { 
+    originalOption: selectedOption, 
+    normalizedOption: option,
+    patientId: patient.id 
+  })
+  
+  // Accept variations: ya, yes, iya, setuju, etc.
+  if (option === 'ya' || option === 'iya' || option === 'yes' || option.includes('ya') || option.includes('setuju')) {
+    try {
+      logger.info('Updating patient verification status to verified', { patientId: patient.id })
+      
+      // Accept verification
+      const updateResult = await db.update(patients).set({
+        verificationStatus: 'verified',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(patients.id, patient.id))
 
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action: 'responded',
-      patientResponse: selectedOption,
-      verificationResult: 'verified',
-    })
+      logger.info('Patient verification status updated successfully', { 
+        patientId: patient.id, 
+        updateResult: updateResult 
+      })
 
-    await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima reminder dari relawan PRIMA.\n\nUntuk berhenti, ketik: BERHENTI`)
+      const logResult = await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: selectedOption,
+        verificationResult: 'verified',
+      })
 
-    return { processed: true, action: 'verified', message: 'Patient verified via poll' }
+      logger.info('Verification log inserted successfully', { 
+        patientId: patient.id, 
+        logResult: logResult 
+      })
+
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima reminder dari relawan PRIMA.\n\nUntuk berhenti, ketik: BERHENTI`)
+
+      logger.info('Verification acceptance processed successfully', { 
+        patientId: patient.id, 
+        selectedOption 
+      })
+
+      return { processed: true, action: 'verified', message: 'Patient verified via poll' }
+    } catch (error) {
+      logger.error('Failed to process verification acceptance', error as Error, {
+        patientId: patient.id,
+        selectedOption,
+        phoneNumber: patient.phoneNumber
+      })
+      throw error
+    }
   }
   
-  if (option === 'tidak') {
-    // Decline verification
-    await db.update(patients).set({
-      verificationStatus: 'declined',
-      verificationResponseAt: new Date(),
-      updatedAt: new Date(),
-    }).where(eq(patients.id, patient.id))
+  // Decline variations: tidak, no, ga, gak, engga, etc.
+  if (option === 'tidak' || option === 'no' || option.includes('tidak') || option.includes('ga') || option.includes('engga')) {
+    try {
+      logger.info('Updating patient verification status to declined', { patientId: patient.id })
+      
+      // Decline verification
+      const updateResult = await db.update(patients).set({
+        verificationStatus: 'declined',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(patients.id, patient.id))
 
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action: 'responded',
-      patientResponse: selectedOption,
-      verificationResult: 'declined',
-    })
+      logger.info('Patient verification status updated to declined', { 
+        patientId: patient.id, 
+        updateResult: updateResult 
+      })
 
-    await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏`)
+      const logResult = await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: selectedOption,
+        verificationResult: 'declined',
+      })
 
-    return { processed: true, action: 'declined', message: 'Patient declined verification via poll' }
+      logger.info('Verification decline log inserted successfully', { 
+        patientId: patient.id, 
+        logResult: logResult 
+      })
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏`)
+
+      logger.info('Verification decline processed successfully', { 
+        patientId: patient.id, 
+        selectedOption 
+      })
+
+      return { processed: true, action: 'declined', message: 'Patient declined verification via poll' }
+    } catch (error) {
+      logger.error('Failed to process verification decline', error as Error, {
+        patientId: patient.id,
+        selectedOption,
+        phoneNumber: patient.phoneNumber
+      })
+      throw error
+    }
   }
+  
+  logger.warn('Verification poll response not recognized', { 
+    patientId: patient.id, 
+    selectedOption, 
+    normalizedOption: option 
+  })
   
   return { processed: false }
 }
@@ -178,23 +272,55 @@ async function handleMedicationPoll(
   }
 
   const reminder = pendingReminder[0]
-  const option = selectedOption.toLowerCase().trim()
+  const option = (selectedOption || '').toLowerCase().trim()
   
-  if (option === 'sudah' || option === 'sudah minum') {
-    // Confirm medication taken
-    await db.update(reminderLogs).set({
-      status: 'DELIVERED', // Mark as completed
-      confirmedAt: new Date(),
-      confirmationResponse: selectedOption,
-      updatedAt: new Date()
-    }).where(eq(reminderLogs.id, reminder.id))
+  logger.info('Processing medication poll option', { 
+    originalOption: selectedOption, 
+    normalizedOption: option,
+    patientId: patient.id,
+    reminderId: reminder.id
+  })
+  
+  // Accept variations: sudah, sudah minum, done, selesai, etc.
+  if (option === 'sudah' || option === 'sudah minum' || option.includes('sudah') || option === 'done' || option === 'selesai') {
+    try {
+      logger.info('Confirming medication taken', { patientId: patient.id, reminderId: reminder.id })
+      
+      // Confirm medication taken
+      const updateResult = await db.update(reminderLogs).set({
+        status: 'DELIVERED', // Mark as completed
+        confirmedAt: new Date(),
+        confirmationResponse: selectedOption,
+        updatedAt: new Date()
+      }).where(eq(reminderLogs.id, reminder.id))
 
-    await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`)
+      logger.info('Medication confirmation updated successfully', { 
+        patientId: patient.id, 
+        reminderId: reminder.id,
+        updateResult: updateResult 
+      })
 
-    return { processed: true, action: 'confirmed', message: 'Medication confirmed via poll' }
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`)
+
+      logger.info('Medication confirmation processed successfully', { 
+        patientId: patient.id, 
+        reminderId: reminder.id,
+        selectedOption 
+      })
+
+      return { processed: true, action: 'confirmed', message: 'Medication confirmed via poll' }
+    } catch (error) {
+      logger.error('Failed to process medication confirmation', error as Error, {
+        patientId: patient.id,
+        reminderId: reminder.id,
+        selectedOption
+      })
+      throw error
+    }
   }
   
-  if (option === 'belum' || option === 'belum minum') {
+  // Not yet variations: belum, belum minum, not yet, etc.
+  if (option === 'belum' || option === 'belum minum' || option.includes('belum') || option === 'not yet') {
     // Patient hasn't taken medication yet - extend deadline
     await db.update(reminderLogs).set({
       confirmationResponse: selectedOption,
@@ -207,7 +333,8 @@ async function handleMedicationPoll(
     return { processed: true, action: 'extended', message: 'Medication reminder extended' }
   }
   
-  if (option === 'butuh bantuan') {
+  // Help variations: butuh bantuan, perlu bantuan, help, etc.
+  if (option === 'butuh bantuan' || option === 'perlu bantuan' || option.includes('bantuan') || option === 'help') {
     // Patient needs help - escalate to relawan
     await db.update(reminderLogs).set({
       confirmationResponse: selectedOption,
@@ -248,6 +375,21 @@ export async function POST(request: NextRequest) {
       try { parsed = JSON.parse(text) } catch { parsed = {} }
     }
   } catch {}
+
+  // DEBUG: Log the raw webhook payload to understand Fonnte's format
+  logger.info('Raw Fonnte webhook payload received', {
+    contentType,
+    headers: Object.fromEntries(request.headers.entries()),
+    rawPayload: parsed,
+    payloadKeys: Object.keys(parsed || {}),
+    hasPollingFields: {
+      poll_name: Boolean(parsed.poll_name),
+      pollname: Boolean(parsed.pollname),
+      selected_option: Boolean(parsed.selected_option),
+      poll_response: Boolean(parsed.poll_response),
+      choice: Boolean(parsed.choice)
+    }
+  })
 
   const normalized = normalizeIncoming(parsed)
   const result = IncomingSchema.safeParse(normalized)

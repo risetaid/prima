@@ -6,7 +6,11 @@
       "Bash(bun lint:*)",
       "WebFetch(domain:docs.fonnte.com)",
       "WebFetch(domain:fonnte.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(bunx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
