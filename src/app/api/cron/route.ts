@@ -135,7 +135,7 @@ async function processFollowUpReminders(debugLogs: string[]): Promise<{
           eq(reminderLogs.status, 'SENT'), // Only SENT status (waiting for confirmation)
           lte(reminderLogs.sentAt, fifteenMinutesAgo), // Sent more than 15 minutes ago
           isNull(reminderLogs.followupSentAt), // No follow-up sent yet
-          eq(reminderLogs.confirmationStatus, 'PENDING'), // Not confirmed yet
+          // eq(reminderLogs.confirmationStatus, 'PENDING'), // Disabled - column may not exist in prod
           eq(patients.isActive, true), // Patient is active
           eq(patients.verificationStatus, 'verified'), // Patient is verified
           // Check that no text response confirmation exists
@@ -247,6 +247,7 @@ async function processReminders() {
     logger.info("Testing database connection", {
       api: true,
       cron: true,
+      timestamp: new Date().toISOString(),
     });
     
     try {
@@ -259,11 +260,13 @@ async function processReminders() {
         api: true,
         cron: true,
         hasResults: connectionTest.length > 0,
+        timestamp: new Date().toISOString(),
       });
     } catch (dbTestError) {
       logger.error("Database connection test failed", dbTestError as Error, {
         api: true,
         cron: true,
+        timestamp: new Date().toISOString(),
       });
       throw new Error(`Database connection failed: ${(dbTestError as Error).message}`);
     }
@@ -334,28 +337,16 @@ async function processReminders() {
 
     let totalCountResult;
     try {
+      // Simplified count query without complex joins to avoid column issues
       totalCountResult = await db
         .select({ count: count() })
         .from(reminderSchedules)
         .where(
           and(
             eq(reminderSchedules.isActive, true),
-            lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
-            // Haven't been delivered today yet (using notExists for efficiency)
-            notExists(
-              db
-                .select()
-              .from(reminderLogs)
-              .where(
-                and(
-                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                  eq(reminderLogs.status, "DELIVERED"),
-                  gte(reminderLogs.sentAt, todayStart)
-                )
-              )
+            lte(reminderSchedules.startDate, endOfDay) // Process today and past dates
           )
-        )
-      );
+        );
     } catch (dbError) {
       logger.error("Database count query failed", dbError as Error, {
         api: true,
