@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  db,
-  reminderSchedules,
-  patients,
-  reminderLogs,
-  reminderContentAttachments,
-} from "@/db";
+import { db, reminderSchedules, patients, reminderLogs } from "@/db";
 import { eq, and, gte, lte, notExists, count, sql, isNull } from "drizzle-orm";
 import {
   shouldSendReminderNow,
@@ -20,29 +14,6 @@ import { isDuplicateEvent } from "@/lib/idempotency";
 // Rate limiter temporarily disabled
 
 const whatsappService = new WhatsAppService();
-
-// Helper function to load content attachments separately
-async function loadContentAttachments(reminderScheduleId: string) {
-  try {
-    const attachments = await db
-      .select({
-        type: reminderContentAttachments.contentType,
-        title: reminderContentAttachments.contentTitle,
-        url: reminderContentAttachments.contentUrl,
-        order: reminderContentAttachments.attachmentOrder,
-      })
-      .from(reminderContentAttachments)
-      .where(eq(reminderContentAttachments.reminderScheduleId, reminderScheduleId))
-      .orderBy(reminderContentAttachments.attachmentOrder);
-    
-    return attachments || [];
-  } catch (error) {
-    logger.error("Failed to load content attachments", error as Error, {
-      reminderScheduleId
-    });
-    return []; // Return empty array on error to prevent blocking reminder
-  }
-}
 
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
@@ -100,132 +71,6 @@ export async function POST(request: NextRequest) {
   return await processReminders();
 }
 
-/**
- * Process 15-minute follow-up reminders for patients who haven't responded
- */
-async function processFollowUpReminders(debugLogs: string[]): Promise<{
-  sentCount: number;
-  errorCount: number;
-}> {
-  let sentCount = 0;
-  let errorCount = 0;
-
-  try {
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    
-    // Find reminder logs that:
-    // 1. Were sent more than 15 minutes ago
-    // 2. Status is SENT (not yet confirmed/delivered)
-    // 3. Haven't had a follow-up sent yet
-    // 4. Haven't been confirmed via poll response or manual confirmation
-    // 5. Patient is still active and verified
-    const pendingReminders = await db
-      .select({
-        id: reminderLogs.id,
-        patientId: reminderLogs.patientId,
-        phoneNumber: reminderLogs.phoneNumber,
-        sentAt: reminderLogs.sentAt,
-        patientName: patients.name,
-        medicationName: reminderLogs.message, // Using message field for now
-      })
-      .from(reminderLogs)
-      .leftJoin(patients, eq(patients.id, reminderLogs.patientId))
-      .where(
-        and(
-          eq(reminderLogs.status, 'SENT'), // Only SENT status (waiting for confirmation)
-          lte(reminderLogs.sentAt, fifteenMinutesAgo), // Sent more than 15 minutes ago
-          isNull(reminderLogs.followupSentAt), // No follow-up sent yet
-          // eq(reminderLogs.confirmationStatus, 'PENDING'), // Disabled - column may not exist in prod
-          eq(patients.isActive, true), // Patient is active
-          eq(patients.verificationStatus, 'verified'), // Patient is verified
-          // Check that no text response confirmation exists
-          isNull(reminderLogs.confirmationResponse)
-        )
-      )
-      .limit(50); // Limit to prevent overwhelming the system
-
-    debugLogs.push(`📞 Found ${pendingReminders.length} reminders needing follow-up`);
-
-    for (const reminder of pendingReminders) {
-      if (!reminder.patientName || !reminder.phoneNumber) {
-        errorCount++;
-        continue;
-      }
-
-      try {
-        // Send follow-up text message
-        const result = await whatsappService.sendFollowUpMessage(
-          reminder.phoneNumber,
-          reminder.patientName
-        );
-
-        if (result.success) {
-          // Update reminder log with follow-up info
-          await db
-            .update(reminderLogs)
-            .set({
-              followupSentAt: getWIBTime(),
-              followupMessageId: result.messageId,
-              updatedAt: getWIBTime(),
-            })
-            .where(eq(reminderLogs.id, reminder.id));
-
-          sentCount++;
-          debugLogs.push(
-            `📞 Follow-up sent to ${reminder.patientName} (15min after initial)`
-          );
-
-          logger.info('Follow-up reminder sent', {
-            api: true,
-            cron: true,
-            patientId: reminder.patientId,
-            reminderLogId: reminder.id,
-            followupMessageId: result.messageId,
-          });
-        } else {
-          errorCount++;
-          debugLogs.push(
-            `❌ Follow-up failed for ${reminder.patientName}: ${result.error}`
-          );
-          
-          logger.error('Follow-up reminder failed', new Error(result.error || 'Unknown error'), {
-            api: true,
-            cron: true,
-            patientId: reminder.patientId,
-            reminderLogId: reminder.id,
-            error: result.error,
-          });
-        }
-
-        // Add small delay between sends to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-      } catch (error) {
-        errorCount++;
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        debugLogs.push(
-          `❌ Follow-up error for ${reminder.patientName}: ${errorMessage}`
-        );
-        
-        logger.error('Follow-up reminder processing failed', error as Error, {
-          api: true,
-          cron: true,
-          patientId: reminder.patientId,
-          reminderLogId: reminder.id,
-        });
-      }
-    }
-
-    return { sentCount, errorCount };
-  } catch (error) {
-    logger.error('Follow-up processing failed', error as Error, {
-      api: true,
-      cron: true,
-    });
-    return { sentCount, errorCount: errorCount + 1 };
-  }
-}
-
 async function processReminders() {
   const startTime = Date.now();
   let processedCount = 0;
@@ -249,13 +94,13 @@ async function processReminders() {
       cron: true,
       timestamp: new Date().toISOString(),
     });
-    
+
     try {
       const connectionTest = await db
         .select({ count: count() })
         .from(patients)
         .limit(1);
-      
+
       logger.info("Database connection test successful", {
         api: true,
         cron: true,
@@ -268,7 +113,9 @@ async function processReminders() {
         cron: true,
         timestamp: new Date().toISOString(),
       });
-      throw new Error(`Database connection failed: ${(dbTestError as Error).message}`);
+      throw new Error(
+        `Database connection failed: ${(dbTestError as Error).message}`
+      );
     }
 
     logger.info("🔄 Starting reminder cron job", {
@@ -286,327 +133,83 @@ async function processReminders() {
     let todayWIB: string;
     let endOfDay: Date;
     let todayStart: Date;
-    
+
     try {
       todayWIB = getWIBDateString();
       logger.info("WIB date string generated successfully", {
         api: true,
         cron: true,
-        todayWIB
+        todayWIB,
       });
     } catch (error) {
       logger.error("Failed to get WIB date string", error as Error, {
         api: true,
-        cron: true
+        cron: true,
       });
-      throw new Error(`Timezone calculation failed: ${(error as Error).message}`);
+      throw new Error(
+        `Timezone calculation failed: ${(error as Error).message}`
+      );
     }
 
-    // Use batch processing for better memory management
-    const batchSize = 50; // Process in batches to prevent memory issues
+    // Simple timezone calculations
+    const dateRange = createWIBDateRange(todayWIB);
+    endOfDay = dateRange.endOfDay;
+    todayStart = getWIBTodayStart();
 
-    // First, get count to determine if we need batch processing
-    try {
-      const dateRange = createWIBDateRange(todayWIB);
-      endOfDay = dateRange.endOfDay;
-      todayStart = getWIBTodayStart();
-      
-      logger.info("Timezone calculations completed", {
-        api: true,
-        cron: true,
-        endOfDay: endOfDay.toISOString(),
-        todayStart: todayStart.toISOString(),
-      });
-    } catch (error) {
-      logger.error("Failed to calculate timezone ranges", error as Error, {
-        api: true,
-        cron: true,
-        todayWIB
-      });
-      throw new Error(`Timezone range calculation failed: ${(error as Error).message}`);
-    }
-
-    // Count reminder schedules that haven't been delivered today yet
-    logger.info("Executing database count query for reminder schedules", {
+    logger.info("Timezone calculations completed", {
       api: true,
       cron: true,
-      todayWIB,
       endOfDay: endOfDay.toISOString(),
       todayStart: todayStart.toISOString(),
     });
 
-    let totalCountResult;
-    try {
-      // Simplified count query without complex joins to avoid column issues
-      totalCountResult = await db
-        .select({ count: count() })
-        .from(reminderSchedules)
-        .where(
-          and(
-            eq(reminderSchedules.isActive, true),
-            lte(reminderSchedules.startDate, endOfDay) // Process today and past dates
-          )
-        );
-    } catch (dbError) {
-      logger.error("Database count query failed", dbError as Error, {
-        api: true,
-        cron: true,
-        todayWIB,
-        endOfDay: endOfDay.toISOString(),
-      });
-      throw new Error(`Database count query failed: ${(dbError as Error).message}`);
-    }
-
-    const totalCount = totalCountResult[0]?.count || 0;
-
-    logger.info("Database count query completed", {
+    // Get all active reminder schedules that haven't been sent today
+    logger.info("Executing reminder schedules query", {
       api: true,
       cron: true,
-      totalCount,
-      batchSize,
+      todayWIB,
     });
 
-    let reminderSchedulesToProcess: Array<{
-      id: string;
-      patientId: string;
-      medicationName: string;
-      scheduledTime: string;
-      startDate: Date;
-      customMessage: string | null;
-      patientName: string | null;
-      patientPhoneNumber: string | null;
-      contentAttachments: any[];
-    }> = [];
-    if (totalCount > batchSize) {
-      // Process in batches to prevent memory overload
-      logger.info("Starting batch processing", {
-        api: true,
-        cron: true,
-        totalCount,
-        batchSize,
-        totalBatches: Math.ceil(totalCount / batchSize)
-      });
-      
-      for (let skip = 0; skip < totalCount; skip += batchSize) {
-        logger.info("Processing batch", {
-          api: true,
-          cron: true,
-          skip,
-          batchSize,
-          currentBatch: Math.floor(skip / batchSize) + 1
-        });
-        
-        let batch;
-        try {
-          batch = await db
-          .select({
-            // Schedule fields
-            id: reminderSchedules.id,
-            patientId: reminderSchedules.patientId,
-            medicationName: reminderSchedules.medicationName,
-            scheduledTime: reminderSchedules.scheduledTime,
-            startDate: reminderSchedules.startDate,
-            customMessage: reminderSchedules.customMessage,
-            // Patient fields
-            patientName: patients.name,
-            patientPhoneNumber: patients.phoneNumber,
-            // Simplified: Load attachments separately to avoid complex JSON aggregation
-            // This reduces query complexity and potential database errors
-            attachmentCount: sql`COUNT(${reminderContentAttachments.id})`,
-          })
-          .from(reminderSchedules)
-          .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
-          .leftJoin(
-            reminderContentAttachments,
-            eq(
-              reminderSchedules.id,
-              reminderContentAttachments.reminderScheduleId
-            )
-          )
-          .where(
-            and(
-              eq(reminderSchedules.isActive, true),
-              lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
-              notExists(
-                db
-                  .select()
-                  .from(reminderLogs)
-                  .where(
-                    and(
-                      eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                      eq(reminderLogs.status, "DELIVERED"),
-                      gte(reminderLogs.sentAt, todayStart)
-                    )
-                  )
-              )
-            )
-          )
-          .offset(skip)
-          .limit(batchSize)
-          .orderBy(reminderSchedules.scheduledTime)
-          .groupBy(
-            reminderSchedules.id, 
-            reminderSchedules.patientId,
-            reminderSchedules.medicationName,
-            reminderSchedules.scheduledTime,
-            reminderSchedules.startDate,
-            reminderSchedules.customMessage,
-            patients.id,
-            patients.name,
-            patients.phoneNumber
-          ); // Add GROUP BY for JSON_AGG
-        
-        logger.info("Batch query completed successfully", {
-          api: true,
-          cron: true,
-          batchLength: batch.length,
-          skip,
-          batchSize
-        });
-        } catch (batchError) {
-          logger.error("Batch query failed", batchError as Error, {
-            api: true,
-            cron: true,
-            skip,
-            batchSize,
-            totalCount,
-            errorMessage: (batchError as Error).message
-          });
-          throw new Error(`Batch query failed at skip ${skip}: ${(batchError as Error).message}`);
-        }
-
-        // Transform to match expected structure with null checks
-        // Load content attachments separately for each reminder
-        const formattedBatch: Array<{
-          id: string;
-          patientId: string;
-          medicationName: string;
-          scheduledTime: string;
-          startDate: Date;
-          customMessage: string | null;
-          patientName: string | null;
-          patientPhoneNumber: string | null;
-          contentAttachments: any[];
-        }> = [];
-        
-        for (const item of batch) {
-          if (item.patientName && item.patientPhoneNumber) {
-            // Load content attachments for this specific reminder schedule
-            const contentAttachments = await loadContentAttachments(item.id);
-            
-            formattedBatch.push({
-              id: item.id,
-              patientId: item.patientId,
-              medicationName: item.medicationName,
-              scheduledTime: item.scheduledTime,
-              startDate: item.startDate,
-              customMessage: item.customMessage,
-              patientName: item.patientName,
-              patientPhoneNumber: item.patientPhoneNumber,
-              contentAttachments,
-            });
-          }
-        }
-
-        reminderSchedulesToProcess.push(...formattedBatch);
-
-        // Small delay between batches to prevent database overload
-        if (skip + batchSize < totalCount) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-      }
-    } else {
-      // Small dataset, process all at once
-      logger.info("Executing main reminder schedules query", {
-        api: true,
-        cron: true,
-        queryType: "single_batch",
-      });
-
-      const allSchedules = await db
-        .select({
-          // Schedule fields
-          id: reminderSchedules.id,
-          patientId: reminderSchedules.patientId,
-          medicationName: reminderSchedules.medicationName,
-          scheduledTime: reminderSchedules.scheduledTime,
-          startDate: reminderSchedules.startDate,
-          customMessage: reminderSchedules.customMessage,
-          // Patient fields
-          patientName: patients.name,
-          patientPhoneNumber: patients.phoneNumber,
-          // Simplified: Load attachments separately to avoid complex JSON aggregation
-          attachmentCount: sql`COUNT(${reminderContentAttachments.id})`,
-        })
-        .from(reminderSchedules)
-        .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
-        .leftJoin(
-          reminderContentAttachments,
-          eq(
-            reminderSchedules.id,
-            reminderContentAttachments.reminderScheduleId
-          )
-        )
-        .where(
-          and(
-            eq(reminderSchedules.isActive, true),
-            lte(reminderSchedules.startDate, endOfDay), // Process today and past dates
-            notExists(
-              db
-                .select()
-                .from(reminderLogs)
-                .where(
-                  and(
-                    eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                    eq(reminderLogs.status, "DELIVERED"),
-                    gte(reminderLogs.sentAt, todayStart)
-                  )
+    const reminderSchedulesToProcess = await db
+      .select({
+        id: reminderSchedules.id,
+        patientId: reminderSchedules.patientId,
+        medicationName: reminderSchedules.medicationName,
+        scheduledTime: reminderSchedules.scheduledTime,
+        startDate: reminderSchedules.startDate,
+        customMessage: reminderSchedules.customMessage,
+        patientName: patients.name,
+        patientPhoneNumber: patients.phoneNumber,
+      })
+      .from(reminderSchedules)
+      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+      .where(
+        and(
+          eq(reminderSchedules.isActive, true),
+          lte(reminderSchedules.startDate, endOfDay),
+          eq(patients.isActive, true),
+          eq(patients.verificationStatus, "verified"),
+          notExists(
+            db
+              .select()
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                  eq(reminderLogs.status, "DELIVERED"),
+                  gte(reminderLogs.sentAt, todayStart)
                 )
-            )
+              )
           )
         )
-        .orderBy(reminderSchedules.scheduledTime)
-        .groupBy(
-          reminderSchedules.id, 
-          reminderSchedules.patientId,
-          reminderSchedules.medicationName,
-          reminderSchedules.scheduledTime,
-          reminderSchedules.startDate,
-          reminderSchedules.customMessage,
-          patients.id,
-          patients.name,
-          patients.phoneNumber
-        ); // Add GROUP BY for JSON_AGG
+      )
+      .orderBy(reminderSchedules.scheduledTime);
 
-      logger.info("Main query completed successfully", {
-        api: true,
-        cron: true,
-        schedulesFound: allSchedules.length,
-      });
-
-      // Transform to match expected structure with null checks
-      // Load content attachments separately for each reminder
-      reminderSchedulesToProcess = [];
-      
-      for (const item of allSchedules) {
-        if (item.patientName && item.patientPhoneNumber) {
-          // Load content attachments for this specific reminder schedule
-          const contentAttachments = await loadContentAttachments(item.id);
-          
-          reminderSchedulesToProcess.push({
-            id: item.id,
-            patientId: item.patientId,
-            medicationName: item.medicationName,
-            scheduledTime: item.scheduledTime,
-            startDate: item.startDate,
-            customMessage: item.customMessage,
-            patientName: item.patientName,
-            patientPhoneNumber: item.patientPhoneNumber,
-            contentAttachments,
-          });
-        }
-      }
-    }
+    logger.info("Query completed successfully", {
+      api: true,
+      cron: true,
+      schedulesFound: reminderSchedulesToProcess.length,
+    });
 
     for (const schedule of reminderSchedulesToProcess) {
       processedCount++;
@@ -640,8 +243,13 @@ async function processReminders() {
 
         if (shouldSend) {
           // Idempotency: ensure we only send once per schedule per WIB day
-          const idempotencyKey = `reminder:sent:${schedule.id}:${getWIBDateString()}`;
-          const alreadySent = await isDuplicateEvent(idempotencyKey, 24 * 60 * 60);
+          const idempotencyKey = `reminder:sent:${
+            schedule.id
+          }:${getWIBDateString()}`;
+          const alreadySent = await isDuplicateEvent(
+            idempotencyKey,
+            24 * 60 * 60
+          );
           if (alreadySent) {
             debugLogs.push(
               `⏭️ Skipping duplicate send for ${schedule.patientName} (${schedule.scheduledTime})`
@@ -658,23 +266,22 @@ async function processReminders() {
           // Rate limiting temporarily disabled
 
           try {
-            // Send WhatsApp medication reminder with confirmation options
+            // Send WhatsApp medication reminder
             logger.info("Sending WhatsApp medication reminder", {
               api: true,
               cron: true,
               patientId: schedule.patientId,
               reminderId: schedule.id,
-              contentCount: schedule.contentAttachments?.length || 0,
               medicationName: schedule.medicationName,
             });
 
             const result = await whatsappService.sendMedicationReminder(
               schedule.patientPhoneNumber,
               schedule.patientName!,
-              schedule.medicationName || 'obat Anda',
-              'sesuai resep', // Default dosage text
+              schedule.medicationName || "obat Anda",
+              "sesuai resep", // Default dosage text
               schedule.scheduledTime,
-              schedule.contentAttachments
+              [] // No attachments for simplified version
             );
 
             const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
@@ -682,7 +289,7 @@ async function processReminders() {
 
             // Create reminder log - SENT means waiting for poll confirmation
             const status: "SENT" | "FAILED" = result.success
-              ? "SENT"  // Changed from DELIVERED since we need poll confirmation
+              ? "SENT" // Changed from DELIVERED since we need poll confirmation
               : "FAILED";
             const logData = {
               reminderScheduleId: schedule.id,
@@ -692,8 +299,6 @@ async function processReminders() {
               message: `Text: Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
               phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId,
-              needsFollowup: true, // Enable 15-minute follow-up
-              confirmationSource: 'text_pending',
             };
 
             // Create reminder log with error handling
@@ -723,12 +328,14 @@ async function processReminders() {
                     message: `Text: Medication reminder for ${schedule.medicationName}`,
                     phoneNumber: schedule.patientPhoneNumber,
                     fonnteMessageId: result.messageId,
-                    needsFollowup: true,
                   })
                   .returning();
                 reminderLogId = minimalLog[0]?.id;
               } catch (fallbackError) {
-                console.error("❌ Fallback reminder log insert also failed", fallbackError);
+                console.error(
+                  "❌ Fallback reminder log insert also failed",
+                  fallbackError
+                );
               }
               errorCount++;
               continue; // Skip to next schedule
@@ -748,11 +355,6 @@ async function processReminders() {
         errorCount++;
       }
     }
-
-    // PHASE 2: Send 15-minute follow-up messages
-    const followUpResults = await processFollowUpReminders(debugLogs);
-    sentCount += followUpResults.sentCount;
-    errorCount += followUpResults.errorCount;
 
     const duration = Date.now() - startTime;
     const summary = {
@@ -807,7 +409,8 @@ async function processReminders() {
         error: "Internal server error",
         details: errorMessage, // Show error message for debugging
         debugInfo: {
-          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorType:
+            error instanceof Error ? error.constructor.name : typeof error,
           stack: errorStack?.substring(0, 300), // Show partial stack trace
         },
         timestamp: new Date().toISOString(),
