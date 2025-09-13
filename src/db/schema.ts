@@ -376,6 +376,17 @@ export const reminderLogs = pgTable(
     confirmationResponseAt: timestamp("confirmation_response_at", { withTimezone: true }),
     confirmationMessage: text("confirmation_message"),
     confirmationResponse: text("confirmation_response"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    // Follow-up fields for 15-minute follow-up system
+    followupSentAt: timestamp("followup_sent_at", { withTimezone: true }),
+    followupMessageId: text("followup_message_id"),
+    needsFollowup: boolean("needs_followup").default(true),
+    // Poll response tracking
+    pollResponse: jsonb("poll_response"),
+    pollName: text("poll_name"),
+    selectedOption: text("selected_option"),
+    confirmationSource: text("confirmation_source"), // 'poll_response', 'text_response', 'manual'
   },
   (table) => ({
     patientIdIdx: index("reminder_logs_patient_id_idx").on(table.patientId),
@@ -837,6 +848,38 @@ export const reminderContentAttachments = pgTable(
   })
 );
 
+// ===== POLL RESPONSES TABLE =====
+
+export const pollResponses = pgTable(
+  "poll_responses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reminderLogId: uuid("reminder_log_id").references(() => reminderLogs.id),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id),
+    pollType: text("poll_type").notNull(), // 'verification', 'medication', 'followup'
+    pollName: text("poll_name").notNull(), // 'Verifikasi PRIMA', 'Konfirmasi Obat', 'Follow-up Obat'
+    selectedOption: text("selected_option").notNull(),
+    responseTime: timestamp("response_time", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    messageId: text("message_id"), // Fonnte message ID
+    pollData: jsonb("poll_data"), // Full poll response data from Fonnte
+    phoneNumber: text("phone_number").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    patientIdIdx: index("poll_responses_patient_id_idx").on(table.patientId),
+    reminderLogIdIdx: index("poll_responses_reminder_log_id_idx").on(table.reminderLogId),
+    pollTypeIdx: index("poll_responses_poll_type_idx").on(table.pollType),
+    responseTimeIdx: index("poll_responses_response_time_idx").on(table.responseTime),
+    phoneNumberIdx: index("poll_responses_phone_number_idx").on(table.phoneNumber),
+  })
+);
+
 // ===== RELATIONS =====
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -871,6 +914,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   patientVariables: many(patientVariables),
   verificationLogs: many(verificationLogs),
   conversationStates: many(conversationStates),
+  pollResponses: many(pollResponses),
 }));
 
 export const reminderSchedulesRelations = relations(
@@ -926,6 +970,7 @@ export const reminderLogsRelations = relations(reminderLogs, ({ one, many }) => 
     references: [patients.id],
   }),
   manualConfirmations: many(manualConfirmations),
+  pollResponses: many(pollResponses),
 }));
 
 export const manualConfirmationsRelations = relations(manualConfirmations, ({ one }) => ({
@@ -1025,6 +1070,17 @@ export const medicationsRelations = relations(medications, ({ many }) => ({
   patientMedications: many(patientMedications),
 }));
 
+export const pollResponsesRelations = relations(pollResponses, ({ one }) => ({
+  reminderLog: one(reminderLogs, {
+    fields: [pollResponses.reminderLogId],
+    references: [reminderLogs.id],
+  }),
+  patient: one(patients, {
+    fields: [pollResponses.patientId],
+    references: [patients.id],
+  }),
+}));
+
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1052,3 +1108,7 @@ export type CmsArticle = typeof cmsArticles.$inferSelect;
 export type NewCmsArticle = typeof cmsArticles.$inferInsert;
 export type CmsVideo = typeof cmsVideos.$inferSelect;
 export type NewCmsVideo = typeof cmsVideos.$inferInsert;
+
+// Poll Response Types
+export type PollResponse = typeof pollResponses.$inferSelect;
+export type NewPollResponse = typeof pollResponses.$inferInsert;

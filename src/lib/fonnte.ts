@@ -14,6 +14,10 @@ export interface WhatsAppMessage {
   to: string           // Format: 6281234567890 (no + prefix)
   body: string
   mediaUrl?: string    // Optional image/document URL
+  // Poll parameters for interactive messages
+  choices?: string     // Comma-separated poll options (min 2, max 12)
+  select?: 'single' | 'multiple'  // Poll selection type
+  pollname?: string    // Poll title/name
 }
 
 export interface WhatsAppMessageResult {
@@ -48,6 +52,17 @@ export const sendWhatsAppMessage = async (
     // Add media if provided
     if (message.mediaUrl) {
       payload.url = message.mediaUrl
+    }
+
+    // Add poll parameters if provided (based on official Fonnte documentation)
+    if (message.choices) {
+      payload.choices = message.choices
+    }
+    if (message.select) {
+      payload.select = message.select
+    }
+    if (message.pollname) {
+      payload.pollname = message.pollname
     }
 
     const response = await fetch(`${FONNTE_BASE_URL}/send`, {
@@ -192,6 +207,67 @@ Jika ada kendala, segera hubungi relawan atau rumah sakit.
 Semoga sehat selalu! 🙏
 
 _Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_`
+}
+
+/**
+ * Create verification poll message for WhatsApp verification
+ */
+export const createVerificationPoll = (patientName: string): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `🏥 *PRIMA - Verifikasi WhatsApp*
+
+Halo ${patientName}!
+
+Apakah Anda bersedia menerima pengingat obat dari PRIMA?
+
+Pilih salah satu opsi di bawah ini:`,
+    choices: 'Ya,Tidak',
+    select: 'single',
+    pollname: 'Verifikasi PRIMA'
+  }
+}
+
+/**
+ * Create medication reminder poll message
+ */
+export const createMedicationPoll = (
+  patientName: string,
+  medicationName: string,
+  dosage: string,
+  time: string
+): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `🏥 *Pengingat Minum Obat - PRIMA*
+
+Halo ${patientName},
+
+⏰ Saatnya minum obat:
+💊 *${medicationName}* 
+📏 Dosis: ${dosage}
+🕐 Waktu: ${time}
+
+Jangan lupa minum obat sesuai jadwal ya!
+
+Pilih status minum obat Anda:`,
+    choices: 'Sudah Minum,Belum Minum',
+    select: 'single',
+    pollname: 'Konfirmasi Obat'
+  }
+}
+
+/**
+ * Create follow-up poll message (sent 15 minutes after initial reminder)
+ */
+export const createFollowUpPoll = (patientName: string): WhatsAppMessage => {
+  return {
+    to: '', // Will be set by caller
+    body: `Halo ${patientName}, apakah sudah diminum obatnya?`,
+    choices: 'Sudah,Belum,Butuh Bantuan',
+    select: 'single',
+    pollname: 'Follow-up Obat'
+  }
 }
 
 /**

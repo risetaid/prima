@@ -5,9 +5,9 @@ import {
   patients,
   reminderLogs,
   reminderContentAttachments,
-  manualConfirmations,
+  pollResponses,
 } from "@/db";
-import { eq, and, gte, lte, notExists, count, sql } from "drizzle-orm";
+import { eq, and, gte, lte, notExists, count, sql, isNull } from "drizzle-orm";
 import {
   shouldSendReminderNow,
   getWIBTime,
@@ -76,6 +76,137 @@ export async function POST(request: NextRequest) {
   }
 
   return await processReminders();
+}
+
+/**
+ * Process 15-minute follow-up reminders for patients who haven't responded
+ */
+async function processFollowUpReminders(debugLogs: string[]): Promise<{
+  sentCount: number;
+  errorCount: number;
+}> {
+  let sentCount = 0;
+  let errorCount = 0;
+
+  try {
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    
+    // Find reminder logs that:
+    // 1. Were sent more than 15 minutes ago
+    // 2. Status is SENT (not yet confirmed/delivered)
+    // 3. Haven't had a follow-up sent yet
+    // 4. Haven't been confirmed via poll response or manual confirmation
+    // 5. Patient is still active and verified
+    const pendingReminders = await db
+      .select({
+        id: reminderLogs.id,
+        patientId: reminderLogs.patientId,
+        phoneNumber: reminderLogs.phoneNumber,
+        sentAt: reminderLogs.sentAt,
+        patientName: patients.name,
+        medicationName: reminderLogs.message, // Using message field for now
+      })
+      .from(reminderLogs)
+      .leftJoin(patients, eq(patients.id, reminderLogs.patientId))
+      .where(
+        and(
+          eq(reminderLogs.status, 'SENT'), // Only SENT status (waiting for confirmation)
+          lte(reminderLogs.sentAt, fifteenMinutesAgo), // Sent more than 15 minutes ago
+          isNull(reminderLogs.followupSentAt), // No follow-up sent yet
+          isNull(reminderLogs.confirmedAt), // Not manually confirmed
+          eq(patients.isActive, true), // Patient is active
+          eq(patients.verificationStatus, 'verified'), // Patient is verified
+          // Check that no poll response exists for this reminder
+          notExists(
+            db
+              .select()
+              .from(pollResponses)
+              .where(eq(pollResponses.reminderLogId, reminderLogs.id))
+          )
+        )
+      )
+      .limit(50); // Limit to prevent overwhelming the system
+
+    debugLogs.push(`📞 Found ${pendingReminders.length} reminders needing follow-up`);
+
+    for (const reminder of pendingReminders) {
+      if (!reminder.patientName || !reminder.phoneNumber) {
+        errorCount++;
+        continue;
+      }
+
+      try {
+        // Send follow-up poll message
+        const result = await whatsappService.sendFollowUpPoll(
+          reminder.phoneNumber,
+          reminder.patientName
+        );
+
+        if (result.success) {
+          // Update reminder log with follow-up info
+          await db
+            .update(reminderLogs)
+            .set({
+              followupSentAt: getWIBTime(),
+              followupMessageId: result.messageId,
+              updatedAt: getWIBTime(),
+            })
+            .where(eq(reminderLogs.id, reminder.id));
+
+          sentCount++;
+          debugLogs.push(
+            `📞 Follow-up sent to ${reminder.patientName} (15min after initial)`
+          );
+
+          logger.info('Follow-up reminder sent', {
+            api: true,
+            cron: true,
+            patientId: reminder.patientId,
+            reminderLogId: reminder.id,
+            followupMessageId: result.messageId,
+          });
+        } else {
+          errorCount++;
+          debugLogs.push(
+            `❌ Follow-up failed for ${reminder.patientName}: ${result.error}`
+          );
+          
+          logger.error('Follow-up reminder failed', new Error(result.error || 'Unknown error'), {
+            api: true,
+            cron: true,
+            patientId: reminder.patientId,
+            reminderLogId: reminder.id,
+            error: result.error,
+          });
+        }
+
+        // Add small delay between sends to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } catch (error) {
+        errorCount++;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        debugLogs.push(
+          `❌ Follow-up error for ${reminder.patientName}: ${errorMessage}`
+        );
+        
+        logger.error('Follow-up reminder processing failed', error as Error, {
+          api: true,
+          cron: true,
+          patientId: reminder.patientId,
+          reminderLogId: reminder.id,
+        });
+      }
+    }
+
+    return { sentCount, errorCount };
+  } catch (error) {
+    logger.error('Follow-up processing failed', error as Error, {
+      api: true,
+      cron: true,
+    });
+    return { sentCount, errorCount: errorCount + 1 };
+  }
 }
 
 async function processReminders() {
@@ -382,46 +513,43 @@ async function processReminders() {
           // Rate limiting temporarily disabled
 
           try {
-            // Send WhatsApp message via Fonnte with phone validation
-            const baseMessage =
-              schedule.customMessage ||
-              `Halo ${schedule.patientName}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
-
-            // Generate enhanced message with content attachments
-            const messageBody = whatsappService.buildMessage(
-              baseMessage,
-              schedule.contentAttachments
-            );
-
-            logger.info("Sending WhatsApp reminder with content attachments", {
+            // Send WhatsApp medication poll with confirmation options
+            logger.info("Sending WhatsApp medication reminder poll", {
               api: true,
               cron: true,
               patientId: schedule.patientId,
               reminderId: schedule.id,
               contentCount: schedule.contentAttachments?.length || 0,
-              messageLength: messageBody.length,
+              medicationName: schedule.medicationName,
             });
 
-            const result = await whatsappService.send(
+            const result = await whatsappService.sendMedicationPoll(
               schedule.patientPhoneNumber,
-              messageBody
+              schedule.patientName!,
+              schedule.medicationName || 'obat Anda',
+              'sesuai resep', // Default dosage text
+              schedule.scheduledTime,
+              schedule.contentAttachments
             );
 
             const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
             debugLogs.push(providerLogMessage);
 
-            // Create reminder log
-            const status: "DELIVERED" | "FAILED" = result.success
-              ? "DELIVERED"
+            // Create reminder log - SENT means waiting for poll confirmation
+            const status: "SENT" | "FAILED" = result.success
+              ? "SENT"  // Changed from DELIVERED since we need poll confirmation
               : "FAILED";
             const logData = {
               reminderScheduleId: schedule.id,
               patientId: schedule.patientId,
               sentAt: getWIBTime(),
               status: status,
-              message: messageBody,
+              message: `Poll: Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
               phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId,
+              needsFollowup: true, // Enable 15-minute follow-up
+              pollName: 'Konfirmasi Obat',
+              confirmationSource: 'poll_pending',
             };
 
             // Create reminder log with error handling
@@ -448,9 +576,11 @@ async function processReminders() {
                     patientId: schedule.patientId,
                     sentAt: getWIBTime(),
                     status: status,
-                    message: baseMessage,
+                    message: `Poll: Medication reminder for ${schedule.medicationName}`,
                     phoneNumber: schedule.patientPhoneNumber,
                     fonnteMessageId: result.messageId,
+                    needsFollowup: true,
+                    pollName: 'Konfirmasi Obat',
                   })
                   .returning();
                 reminderLogId = minimalLog[0]?.id;
@@ -463,77 +593,6 @@ async function processReminders() {
 
             if (result.success) {
               sentCount++;
-
-              // Check for conflict prevention: don't schedule automated confirmation if manual confirmation exists
-              if (reminderLogId) {
-                try {
-                  // Check if manual confirmation already exists for this reminder log
-                  const existingManualConfirmation = await db
-                    .select({ id: manualConfirmations.id })
-                    .from(manualConfirmations)
-                    .where(eq(manualConfirmations.reminderLogId, reminderLogId))
-                    .limit(1);
-
-                  if (existingManualConfirmation.length > 0) {
-                    logger.info(
-                      "Skipping automated confirmation - manual confirmation already exists",
-                      {
-                        api: true,
-                        cron: true,
-                        reminderLogId,
-                        patientId: schedule.patientId,
-                        manualConfirmationId: existingManualConfirmation[0].id,
-                      }
-                    );
-
-                    debugLogs.push(
-                      `⚠️ Skipping automated confirmation for ${schedule.patientName} - manual confirmation exists`
-                    );
-                  } else {
-                    // No manual confirmation exists, proceed with automated confirmation scheduling
-                    const confirmationDelayMinutes = 18; // 15-20 minutes, using 18 as middle ground
-                    const confirmationTime = new Date(getWIBTime());
-                    confirmationTime.setMinutes(
-                      confirmationTime.getMinutes() + confirmationDelayMinutes
-                    );
-
-                    const confirmationMessage = `Halo ${schedule.patientName}, apakah obatnya sudah diminum?`;
-
-                    // Update reminder log with confirmation scheduling info
-                    await db
-                      .update(reminderLogs)
-                      .set({
-                        confirmationMessage,
-                        confirmationSentAt: confirmationTime,
-                        confirmationStatus: "PENDING",
-                      })
-                      .where(eq(reminderLogs.id, reminderLogId));
-
-                    logger.info("Follow-up confirmation scheduled", {
-                      api: true,
-                      cron: true,
-                      reminderLogId,
-                      patientId: schedule.patientId,
-                      confirmationTime: confirmationTime.toISOString(),
-                      delayMinutes: confirmationDelayMinutes,
-                    });
-
-                    debugLogs.push(
-                      `✅ Follow-up confirmation scheduled for ${
-                        schedule.patientName
-                      } at ${confirmationTime.toLocaleTimeString("id-ID", {
-                        timeZone: "Asia/Jakarta",
-                      })}`
-                    );
-                  }
-                } catch (confirmationError) {
-                  console.error(
-                    `❌ Failed to check/schedule confirmation for ${schedule.patientName}:`,
-                    confirmationError
-                  );
-                  // Don't fail the whole process for confirmation scheduling errors
-                }
-              }
             } else {
               errorCount++;
             }
@@ -547,113 +606,10 @@ async function processReminders() {
       }
     }
 
-    // Process pending confirmation messages
-    logger.info("Processing pending confirmation messages", {
-      api: true,
-      cron: true,
-    });
-
-    const now = getWIBTime();
-    const confirmationsToSend = await db
-      .select({
-        id: reminderLogs.id,
-        patientId: reminderLogs.patientId,
-        confirmationMessage: reminderLogs.confirmationMessage,
-        patientName: patients.name,
-        patientPhoneNumber: patients.phoneNumber,
-        reminderScheduleId: reminderLogs.reminderScheduleId,
-        dueAt: reminderLogs.confirmationSentAt,
-      })
-      .from(reminderLogs)
-      .leftJoin(patients, eq(reminderLogs.patientId, patients.id))
-      .where(
-        and(
-          eq(reminderLogs.confirmationStatus, "PENDING"),
-          lte(reminderLogs.confirmationSentAt, now)
-        )
-      );
-
-    logger.info("Found pending confirmations to send", {
-      api: true,
-      cron: true,
-      count: confirmationsToSend.length,
-    });
-
-    let confirmationsSent = 0;
-    let confirmationsFailed = 0;
-
-    for (const confirmation of confirmationsToSend) {
-      try {
-        if (
-          !confirmation.patientPhoneNumber ||
-          !confirmation.confirmationMessage
-        ) {
-          logger.warn("Skipping confirmation - missing phone or message", {
-            api: true,
-            cron: true,
-            confirmationId: confirmation.id,
-          });
-          continue;
-        }
-
-        // Claim this confirmation atomically to avoid duplicate sends on concurrent cron runs
-        const claimed = await db
-          .update(reminderLogs)
-          .set({
-            confirmationStatus: "SENT",
-            confirmationSentAt: getWIBTime(), // mark as handled now
-          })
-          .where(
-            and(
-              eq(reminderLogs.id, confirmation.id),
-              eq(reminderLogs.confirmationStatus, "PENDING")
-            )
-          )
-          .returning({ id: reminderLogs.id });
-
-        if (claimed.length === 0) {
-          // Another worker has claimed or already processed it; skip
-          debugLogs.push(
-            `⏭️ Skipped confirmation already claimed for ${confirmation.patientName}`
-          );
-          continue;
-        }
-
-        const result = await whatsappService.send(
-          confirmation.patientPhoneNumber,
-          confirmation.confirmationMessage
-        );
-
-        if (result.success) {
-          // Already marked as SENT; nothing else to do
-          
-          confirmationsSent++;
-          debugLogs.push(
-            `✅ Confirmation sent to ${confirmation.patientName} (${confirmation.patientPhoneNumber})`
-          );
-        } else {
-          confirmationsFailed++;
-          debugLogs.push(
-            `❌ Confirmation failed for ${confirmation.patientName}: ${result.error}`
-          );
-          // Revert status to PENDING and retry in 5 minutes
-          const retryAt = new Date(getWIBTime());
-          retryAt.setMinutes(retryAt.getMinutes() + 5);
-          await db
-            .update(reminderLogs)
-            .set({ confirmationStatus: "PENDING", confirmationSentAt: retryAt })
-            .where(eq(reminderLogs.id, confirmation.id));
-        }
-      } catch (error) {
-        confirmationsFailed++;
-        logger.error("Failed to send confirmation", error as Error, {
-          api: true,
-          cron: true,
-          confirmationId: confirmation.id,
-          patientId: confirmation.patientId,
-        });
-      }
-    }
+    // PHASE 2: Send 15-minute follow-up messages
+    const followUpResults = await processFollowUpReminders(debugLogs);
+    sentCount += followUpResults.sentCount;
+    errorCount += followUpResults.errorCount;
 
     const duration = Date.now() - startTime;
     const summary = {
@@ -677,11 +633,6 @@ async function processReminders() {
           processedCount > 0 && sentCount >= 0
             ? `${Math.round((sentCount / processedCount) * 100)}%`
             : "0%",
-        confirmations: {
-          pending: confirmationsToSend.length,
-          sent: confirmationsSent,
-          failed: confirmationsFailed,
-        },
       },
       details:
         debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireWebhookToken } from '@/lib/webhook-auth'
 import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
-import { db, patients, verificationLogs, reminderSchedules } from '@/db'
-import { eq } from 'drizzle-orm'
+import { db, patients, verificationLogs, reminderSchedules, reminderLogs } from '@/db'
+import { eq, and, isNull, desc } from 'drizzle-orm'
 import { PatientLookupService } from '@/services/patient/patient-lookup.service'
 import { ConversationStateService } from '@/services/conversation-state.service'
 import { logger } from '@/lib/logger'
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
+// Poll-based messaging handled by WhatsAppService
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -16,6 +17,12 @@ const IncomingSchema = z.object({
   name: z.string().optional(),
   id: z.string().optional(),
   timestamp: z.union([z.string(), z.number()]).optional(),
+  // Poll response fields (based on Fonnte poll response format)
+  poll_name: z.string().optional(),
+  pollname: z.string().optional(),
+  selected_option: z.string().optional(),
+  poll_response: z.string().optional(),
+  poll_data: z.any().optional(),
 })
 
 function normalizeIncoming(body: any) {
@@ -25,7 +32,18 @@ function normalizeIncoming(body: any) {
   const name = body.name || body.sender_name || body.contact_name
   const id = body.id || body.message_id || body.msgId
   const timestamp = body.timestamp || body.time || body.created_at
-  return { sender, message, device, name, id, timestamp }
+  
+  // Poll response data
+  const poll_name = body.poll_name || body.pollname
+  const pollname = body.pollname || body.poll_name
+  const selected_option = body.selected_option || body.poll_response || body.choice
+  const poll_response = body.poll_response || body.selected_option
+  const poll_data = body.poll_data || body.poll || {}
+  
+  return { 
+    sender, message, device, name, id, timestamp,
+    poll_name, pollname, selected_option, poll_response, poll_data
+  }
 }
 
 function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' | 'unsubscribe' | 'other' {
@@ -45,13 +63,170 @@ function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' 
   return 'other'
 }
 
+const whatsappService = new WhatsAppService()
+
 async function sendAck(phoneNumber: string, message: string) {
   try {
-    const to = formatWhatsAppNumber(phoneNumber)
-    await sendWhatsAppMessage({ to, body: message })
+    await whatsappService.sendAck(phoneNumber, message)
   } catch (e) {
     console.warn('Failed to send ACK via WhatsApp:', e)
   }
+}
+
+/**
+ * Process poll responses for verification and medication confirmation
+ */
+async function processPollResponse(
+  pollName: string,
+  selectedOption: string,
+  patient: any
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  logger.info('Processing poll response', { pollName, selectedOption, patientId: patient.id })
+  
+  // Handle verification polls
+  if (pollName === 'Verifikasi PRIMA') {
+    return await handleVerificationPoll(selectedOption, patient)
+  }
+  
+  // Handle medication polls
+  if (pollName === 'Konfirmasi Obat' || pollName === 'Follow-up Obat') {
+    return await handleMedicationPoll(selectedOption, patient)
+  }
+  
+  return { processed: false }
+}
+
+/**
+ * Handle verification poll responses (Ya/Tidak)
+ */
+async function handleVerificationPoll(
+  selectedOption: string,
+  patient: any
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  const option = selectedOption.toLowerCase().trim()
+  
+  if (option === 'ya') {
+    // Accept verification
+    await db.update(patients).set({
+      verificationStatus: 'verified',
+      verificationResponseAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(patients.id, patient.id))
+
+    await db.insert(verificationLogs).values({
+      patientId: patient.id,
+      action: 'responded',
+      patientResponse: selectedOption,
+      verificationResult: 'verified',
+    })
+
+    await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima reminder dari relawan PRIMA.\n\nUntuk berhenti, ketik: BERHENTI`)
+
+    return { processed: true, action: 'verified', message: 'Patient verified via poll' }
+  }
+  
+  if (option === 'tidak') {
+    // Decline verification
+    await db.update(patients).set({
+      verificationStatus: 'declined',
+      verificationResponseAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(patients.id, patient.id))
+
+    await db.insert(verificationLogs).values({
+      patientId: patient.id,
+      action: 'responded',
+      patientResponse: selectedOption,
+      verificationResult: 'declined',
+    })
+
+    await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏`)
+
+    return { processed: true, action: 'declined', message: 'Patient declined verification via poll' }
+  }
+  
+  return { processed: false }
+}
+
+/**
+ * Handle medication poll responses (Sudah/Belum/Butuh Bantuan)
+ */
+async function handleMedicationPoll(
+  selectedOption: string,
+  patient: any
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  // Find the most recent pending reminder for this patient
+  const pendingReminder = await db
+    .select()
+    .from(reminderLogs)
+    .where(
+      and(
+        eq(reminderLogs.patientId, patient.id),
+        eq(reminderLogs.status, 'SENT'), // Assuming SENT means waiting for confirmation
+        isNull(reminderLogs.confirmedAt)
+      )
+    )
+    .orderBy(desc(reminderLogs.sentAt))
+    .limit(1)
+
+  if (!pendingReminder.length) {
+    logger.warn('No pending reminder found for medication poll response', { 
+      patientId: patient.id, 
+      selectedOption 
+    })
+    return { processed: false, message: 'No pending reminder found' }
+  }
+
+  const reminder = pendingReminder[0]
+  const option = selectedOption.toLowerCase().trim()
+  
+  if (option === 'sudah' || option === 'sudah minum') {
+    // Confirm medication taken
+    await db.update(reminderLogs).set({
+      status: 'DELIVERED', // Mark as completed
+      confirmedAt: new Date(),
+      confirmationResponse: selectedOption,
+      updatedAt: new Date()
+    }).where(eq(reminderLogs.id, reminder.id))
+
+    await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`)
+
+    return { processed: true, action: 'confirmed', message: 'Medication confirmed via poll' }
+  }
+  
+  if (option === 'belum' || option === 'belum minum') {
+    // Patient hasn't taken medication yet - extend deadline
+    await db.update(reminderLogs).set({
+      confirmationResponse: selectedOption,
+      updatedAt: new Date()
+      // Keep status as SENT for potential follow-up
+    }).where(eq(reminderLogs.id, reminder.id))
+
+    await sendAck(patient.phoneNumber, `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nRelawan akan menghubungi jika diperlukan.`)
+
+    return { processed: true, action: 'extended', message: 'Medication reminder extended' }
+  }
+  
+  if (option === 'butuh bantuan') {
+    // Patient needs help - escalate to relawan
+    await db.update(reminderLogs).set({
+      confirmationResponse: selectedOption,
+      updatedAt: new Date()
+      // Keep status as SENT but flag for manual intervention
+    }).where(eq(reminderLogs.id, reminder.id))
+
+    await sendAck(patient.phoneNumber, `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!`)
+
+    // TODO: Add notification to relawan dashboard for escalation
+    logger.info('Patient requested help - escalating to relawan', { 
+      patientId: patient.id, 
+      reminderId: reminder.id 
+    })
+
+    return { processed: true, action: 'escalated', message: 'Medication reminder escalated to relawan' }
+  }
+  
+  return { processed: false }
 }
 
 export async function POST(request: NextRequest) {
@@ -80,7 +255,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload', issues: result.error.flatten() }, { status: 400 })
   }
 
-  const { sender, message, device, name, id, timestamp } = result.data
+  const { sender, message, device, name, id, timestamp, poll_name, pollname, selected_option, poll_response, poll_data } = result.data
 
   // idempotency key
   const fallbackId = hashFallbackId([id, sender, String(timestamp || ''), message])
@@ -108,16 +283,54 @@ export async function POST(request: NextRequest) {
     await conv.addMessage(state.id, {
       message,
       direction: 'inbound',
-      messageType: 'general',
+      messageType: poll_name || pollname ? 'confirmation' : 'general',
       intent: undefined,
       confidence: undefined,
       processedAt: new Date()
     })
   } catch {}
 
-  // verification-only handling
+  // PRIORITY 1: Process poll responses first
+  const activePollName = poll_name || pollname
+  const pollOption = selected_option || poll_response
+  
+  if (activePollName && pollOption) {
+    logger.info('Processing poll response', { 
+      pollName: activePollName, 
+      selectedOption: pollOption, 
+      patientId: patient.id 
+    })
+    
+    try {
+      const pollResult = await processPollResponse(activePollName, pollOption, patient)
+      
+      if (pollResult.processed) {
+        logger.info('Poll response processed successfully', {
+          patientId: patient.id,
+          action: pollResult.action,
+          message: pollResult.message
+        })
+        
+        return NextResponse.json({ 
+          ok: true, 
+          processed: true, 
+          action: pollResult.action,
+          source: 'poll_response'
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to process poll response', error as Error, {
+        patientId: patient.id,
+        pollName: activePollName,
+        selectedOption: pollOption
+      })
+      // Continue to text-based processing as fallback
+    }
+  }
+
+  // FALLBACK: Text-based verification handling (for backward compatibility)
   const intent = detectIntentVerificationOnly(message)
-  if (intent === 'other') {
+  if (intent === 'other' && !activePollName) {
     return NextResponse.json({ ok: true, processed: true, action: 'none' })
   }
 

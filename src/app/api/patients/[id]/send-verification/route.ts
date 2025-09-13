@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, verificationLogs } from '@/db'
 import { eq, and } from 'drizzle-orm'
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 // import { addHours } from 'date-fns'
 
 // Send verification message to patient
@@ -38,12 +38,12 @@ export async function POST(
 
     const patient = patientResult[0]
 
-    // Generate simple verification message
-    const verificationMessage = generateVerificationMessage(patient, user)
-    
-    // Send WhatsApp message via standardized Fonnte lib
-    const to = formatWhatsAppNumber(patient.phoneNumber)
-    const whatsappResult = await sendWhatsAppMessage({ to, body: verificationMessage })
+    // Send verification poll with Ya/Tidak options
+    const whatsappService = new WhatsAppService()
+    const whatsappResult = await whatsappService.sendVerificationPoll(
+      patient.phoneNumber,
+      patient.name
+    )
 
     if (!whatsappResult.success) {
       return NextResponse.json(
@@ -61,7 +61,7 @@ export async function POST(
       .set({
         verificationStatus: 'pending_verification',
         verificationSentAt: new Date(),
-        verificationMessage: verificationMessage,
+        verificationMessage: `Poll: Verification request sent to ${patient.name}`,
         verificationAttempts: (currentAttempts + 1).toString(),
         verificationExpiresAt: expiresAt,
         updatedAt: new Date()
@@ -74,16 +74,17 @@ export async function POST(
       .values({
         patientId: patientId,
         action: 'sent',
-        messageSent: verificationMessage,
+        messageSent: `Poll verification sent with Ya/Tidak options`,
         verificationResult: 'pending_verification',
         processedBy: user.id
       })
 
     return NextResponse.json({
       success: true,
-      message: 'Verification message sent successfully',
+      message: 'Verification poll sent successfully with Ya/Tidak options',
       expiresAt: expiresAt.toISOString(),
-      attempt: currentAttempts + 1
+      attempt: currentAttempts + 1,
+      method: 'poll_verification'
     })
 
   } catch (error) {
@@ -94,23 +95,3 @@ export async function POST(
     )
   }
 }
-
-// Helper function to generate verification message
-function generateVerificationMessage(patient: any, volunteer: any): string {
-  return `Halo ${patient.name},
-
-Anda didaftarkan ke dalam sistem PRIMA untuk pengingat kesehatan oleh relawan kami.
-
-Apakah Anda setuju untuk menerima pengingat obat dan kesehatan?
-
-💚 *Balas dengan cara apa saja:*
-• YA / IYA / SETUJU / MAU
-• TIDAK / GA MAU / NANTI
-• BERHENTI (untuk stop selamanya)
-
-Contoh: "Ya saya setuju" atau "Ya mau" atau "Iya boleh"
-
-Terima kasih atas kerjasamanya! 🙏`
-}
-
-// Local sender removed in favor of '@/lib/fonnte'

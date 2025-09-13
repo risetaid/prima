@@ -3,7 +3,10 @@
     "allow": [
       "Bash(dir E:PortfolioWebprimasrcappdashboard)",
       "Bash(bun run lint:*)",
-      "Bash(bun lint:*)"
+      "Bash(bun lint:*)",
+      "WebFetch(domain:docs.fonnte.com)",
+      "WebFetch(domain:fonnte.com)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
