@@ -137,7 +137,7 @@ async function processFollowUpReminders(debugLogs: string[]): Promise<{
 
       try {
         // Send follow-up poll message
-        const result = await whatsappService.sendFollowUpPoll(
+        const result = await whatsappService.sendFollowUpMessage(
           reminder.phoneNumber,
           reminder.patientName
         );
@@ -543,7 +543,7 @@ async function processReminders() {
               medicationName: schedule.medicationName,
             });
 
-            const result = await whatsappService.sendMedicationPoll(
+            const result = await whatsappService.sendMedicationReminder(
               schedule.patientPhoneNumber,
               schedule.patientName!,
               schedule.medicationName || 'obat Anda',

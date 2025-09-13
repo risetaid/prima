@@ -60,21 +60,128 @@ function normalizeIncoming(body: any) {
   return normalized
 }
 
-function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' | 'unsubscribe' | 'other' {
+interface IntentResult {
+  intent: 'accept' | 'decline' | 'unsubscribe' | 'medication_taken' | 'medication_pending' | 'need_help' | 'other'
+  confidence: number
+  matchedWords: string[]
+}
+
+function detectIntentEnhanced(rawMessage: string, context?: 'verification' | 'medication'): IntentResult {
   const msg = (rawMessage || '').toLowerCase().trim()
-  // contains-based matching to support phrases like "Ya saya setuju"
-  const contains = (arr: string[]) => arr.some(w => msg.includes(w))
+  const words = msg.split(/\s+/)
+  
+  // Enhanced Indonesian language patterns with weights
+  const patterns = {
+    accept: [
+      // Direct acceptance
+      { words: ['ya', 'iya', 'yaa', 'iya', 'yes', 'yep', 'yup'], weight: 10 },
+      { words: ['setuju', 'stuju', 'setujuu'], weight: 10 },
+      { words: ['boleh', 'blh', 'bole', 'bolh'], weight: 9 },
+      { words: ['baik', 'bagus', 'good'], weight: 8 },
+      { words: ['ok', 'oke', 'okay', 'okey', 'okeh'], weight: 8 },
+      { words: ['siap', 'ready', 'sip'], weight: 7 },
+      { words: ['mau', 'ingin', 'pengen', 'want'], weight: 7 },
+      { words: ['terima', 'accept', 'trimakasih'], weight: 6 },
+      // Phrases
+      { words: ['ya boleh', 'iya setuju', 'ok siap'], weight: 12 },
+    ],
+    decline: [
+      { words: ['tidak', 'tdk', 'gak', 'ga', 'engga', 'enggak', 'no', 'nope'], weight: 10 },
+      { words: ['tolak', 'refuse', 'nolak'], weight: 10 },
+      { words: ['nanti', 'besok', 'later'], weight: 7 },
+      { words: ['jangan', 'dont', 'stop'], weight: 8 },
+      { words: ['maaf', 'sorry', 'sori'], weight: 6 },
+      // Phrases
+      { words: ['tidak mau', 'ga mau', 'tidak setuju'], weight: 12 },
+    ],
+    unsubscribe: [
+      { words: ['berhenti', 'stop', 'cancel', 'batal'], weight: 10 },
+      { words: ['keluar', 'out', 'exit'], weight: 9 },
+      { words: ['hapus', 'delete', 'remove'], weight: 9 },
+      { words: ['unsubscribe', 'unsub', 'cabut'], weight: 10 },
+    ],
+    medication_taken: [
+      { words: ['sudah', 'udah', 'done', 'selesai'], weight: 10 },
+      { words: ['diminum', 'minum', 'taken'], weight: 9 },
+      { words: ['oke', 'ok', 'siap', 'good'], weight: 7 },
+      // Phrases
+      { words: ['sudah minum', 'udah diminum', 'sudah selesai'], weight: 15 },
+      { words: ['obat sudah', 'sudah makan obat'], weight: 14 },
+    ],
+    medication_pending: [
+      { words: ['belum', 'not yet', 'nanti'], weight: 10 },
+      { words: ['sebentar', 'tunggu', 'wait'], weight: 8 },
+      { words: ['lupa', 'forgot', 'lupaa'], weight: 9 },
+      // Phrases
+      { words: ['belum minum', 'belum diminum'], weight: 14 },
+      { words: ['nanti dulu', 'sebentar lagi'], weight: 12 },
+    ],
+    need_help: [
+      { words: ['bantuan', 'help', 'tolong'], weight: 10 },
+      { words: ['bingung', 'confused', 'susah'], weight: 9 },
+      { words: ['tanya', 'ask', 'pertanyaan'], weight: 8 },
+      { words: ['relawan', 'staff', 'perawat'], weight: 8 },
+      // Phrases
+      { words: ['butuh bantuan', 'perlu bantuan', 'minta tolong'], weight: 15 },
+    ]
+  }
 
-  const unsub = ['berhenti', 'stop', 'cancel', 'batal', 'keluar', 'hapus', 'unsubscribe', 'cabut']
-  if (contains(unsub)) return 'unsubscribe'
+  let bestMatch: IntentResult = { intent: 'other', confidence: 0, matchedWords: [] }
 
-  const accept = ['ya', 'iya', 'yes', 'ok', 'oke', 'setuju', 'boleh', 'baik', 'siap', 'mau', 'ingin', 'terima']
-  if (contains(accept)) return 'accept'
+  for (const [intentKey, patternList] of Object.entries(patterns)) {
+    const intent = intentKey as any
+    let totalScore = 0
+    const matchedWords: string[] = []
 
-  const decline = ['tidak', 'no', 'ga ', ' gak', 'engga', 'enggak', 'tolak', 'nanti', 'besok']
-  if (contains(decline)) return 'decline'
+    for (const pattern of patternList) {
+      const patternWords = pattern.words.join(' ')
+      
+      // Check for full phrase match
+      if (msg.includes(patternWords)) {
+        totalScore += pattern.weight * 1.5 // Bonus for phrase match
+        matchedWords.push(patternWords)
+        continue
+      }
 
-  return 'other'
+      // Check individual words
+      for (const word of pattern.words) {
+        if (words.includes(word) || msg.includes(word)) {
+          totalScore += pattern.weight
+          matchedWords.push(word)
+        }
+      }
+    }
+
+    // Calculate confidence based on score and context
+    let confidence = Math.min(totalScore / 10, 1) // Normalize to 0-1
+
+    // Context bonus
+    if (context === 'verification' && ['accept', 'decline'].includes(intent)) {
+      confidence *= 1.2
+    } else if (context === 'medication' && ['medication_taken', 'medication_pending', 'need_help'].includes(intent)) {
+      confidence *= 1.2
+    }
+
+    if (confidence > bestMatch.confidence) {
+      bestMatch = { intent, confidence, matchedWords: [...new Set(matchedWords)] }
+    }
+  }
+
+  return bestMatch
+}
+
+// Legacy function for backward compatibility
+function detectIntentVerificationOnly(rawMessage: string): 'accept' | 'decline' | 'unsubscribe' | 'other' {
+  const result = detectIntentEnhanced(rawMessage, 'verification')
+  
+  if (result.confidence < 0.3) return 'other'
+  
+  switch (result.intent) {
+    case 'accept': return 'accept'
+    case 'decline': return 'decline'
+    case 'unsubscribe': return 'unsubscribe'
+    default: return 'other'
+  }
 }
 
 const whatsappService = new WhatsAppService()
@@ -87,166 +194,122 @@ async function sendAck(phoneNumber: string, message: string) {
   }
 }
 
-/**
- * Process poll responses for verification and medication confirmation
- */
-async function processPollResponse(
-  pollName: string,
-  selectedOption: string,
-  patient: any
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  logger.info('Processing poll response', { pollName, selectedOption, patientId: patient.id })
-  
-  // Normalize poll name for case-insensitive matching
-  const normalizedPollName = (pollName || '').toLowerCase().trim()
-  
-  // Handle verification polls (case-insensitive matching)
-  if (normalizedPollName === 'verifikasi prima' || normalizedPollName.includes('verifikasi')) {
-    logger.info('Matched verification poll', { originalPollName: pollName, normalizedPollName })
-    return await handleVerificationPoll(selectedOption, patient)
-  }
-  
-  // Handle medication polls (case-insensitive matching)  
-  if (normalizedPollName === 'konfirmasi obat' || 
-      normalizedPollName === 'follow-up obat' ||
-      normalizedPollName.includes('konfirmasi') ||
-      normalizedPollName.includes('obat')) {
-    logger.info('Matched medication poll', { originalPollName: pollName, normalizedPollName })
-    return await handleMedicationPoll(selectedOption, patient)
-  }
-  
-  logger.warn('No matching poll handler found', { 
-    pollName, 
-    normalizedPollName, 
-    patientId: patient.id 
-  })
-  
-  return { processed: false }
-}
 
 /**
- * Handle verification poll responses (Ya/Tidak)
+ * Handle verification text responses using enhanced intent detection
  */
-async function handleVerificationPoll(
-  selectedOption: string,
+async function handleVerificationResponse(
+  message: string,
   patient: any
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
-  const option = (selectedOption || '').toLowerCase().trim()
+  const intentResult = detectIntentEnhanced(message, 'verification')
   
-  logger.info('Processing verification poll option', { 
-    originalOption: selectedOption, 
-    normalizedOption: option,
+  logger.info('Processing verification text response', { 
+    originalMessage: message, 
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    matchedWords: intentResult.matchedWords,
     patientId: patient.id 
   })
   
-  // Accept variations: ya, yes, iya, setuju, etc.
-  if (option === 'ya' || option === 'iya' || option === 'yes' || option.includes('ya') || option.includes('setuju')) {
+  // Only process if confidence is high enough
+  if (intentResult.confidence < 0.4) {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`)
+    return { processed: true, action: 'clarification_requested', message: 'Low confidence response - clarification sent' }
+  }
+
+  if (intentResult.intent === 'accept') {
     try {
       logger.info('Updating patient verification status to verified', { patientId: patient.id })
       
-      // Accept verification
       const updateResult = await db.update(patients).set({
         verificationStatus: 'verified',
         verificationResponseAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(patients.id, patient.id))
 
-      logger.info('Patient verification status updated successfully', { 
-        patientId: patient.id, 
-        updateResult: updateResult 
-      })
-
       const logResult = await db.insert(verificationLogs).values({
         patientId: patient.id,
         action: 'responded',
-        patientResponse: selectedOption,
+        patientResponse: message,
         verificationResult: 'verified',
       })
 
-      logger.info('Verification log inserted successfully', { 
-        patientId: patient.id, 
-        logResult: logResult 
-      })
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat obat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`)
 
-      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima reminder dari relawan PRIMA.\n\nUntuk berhenti, ketik: BERHENTI`)
-
-      logger.info('Verification acceptance processed successfully', { 
-        patientId: patient.id, 
-        selectedOption 
-      })
-
-      return { processed: true, action: 'verified', message: 'Patient verified via poll' }
+      return { processed: true, action: 'verified', message: 'Patient verified via text' }
     } catch (error) {
-      logger.error('Failed to process verification acceptance', error as Error, {
-        patientId: patient.id,
-        selectedOption,
-        phoneNumber: patient.phoneNumber
-      })
+      logger.error('Failed to process verification acceptance', error as Error, { patientId: patient.id })
       throw error
     }
   }
   
-  // Decline variations: tidak, no, ga, gak, engga, etc.
-  if (option === 'tidak' || option === 'no' || option.includes('tidak') || option.includes('ga') || option.includes('engga')) {
+  if (intentResult.intent === 'decline') {
     try {
       logger.info('Updating patient verification status to declined', { patientId: patient.id })
       
-      // Decline verification
       const updateResult = await db.update(patients).set({
         verificationStatus: 'declined',
         verificationResponseAt: new Date(),
         updatedAt: new Date(),
       }).where(eq(patients.id, patient.id))
 
-      logger.info('Patient verification status updated to declined', { 
-        patientId: patient.id, 
-        updateResult: updateResult 
-      })
-
       const logResult = await db.insert(verificationLogs).values({
         patientId: patient.id,
         action: 'responded',
-        patientResponse: selectedOption,
+        patientResponse: message,
         verificationResult: 'declined',
       })
 
-      logger.info('Verification decline log inserted successfully', { 
-        patientId: patient.id, 
-        logResult: logResult 
-      })
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`)
 
-      await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏`)
-
-      logger.info('Verification decline processed successfully', { 
-        patientId: patient.id, 
-        selectedOption 
-      })
-
-      return { processed: true, action: 'declined', message: 'Patient declined verification via poll' }
+      return { processed: true, action: 'declined', message: 'Patient declined verification via text' }
     } catch (error) {
-      logger.error('Failed to process verification decline', error as Error, {
-        patientId: patient.id,
-        selectedOption,
-        phoneNumber: patient.phoneNumber
-      })
+      logger.error('Failed to process verification decline', error as Error, { patientId: patient.id })
       throw error
     }
   }
-  
-  logger.warn('Verification poll response not recognized', { 
-    patientId: patient.id, 
-    selectedOption, 
-    normalizedOption: option 
-  })
+
+  if (intentResult.intent === 'unsubscribe') {
+    try {
+      logger.info('Processing unsubscribe request', { patientId: patient.id })
+      
+      await db.update(patients).set({
+        verificationStatus: 'declined',
+        verificationResponseAt: new Date(),
+        updatedAt: new Date(),
+        isActive: false,
+      }).where(eq(patients.id, patient.id))
+
+      await db.update(reminderSchedules).set({ 
+        isActive: false, 
+        updatedAt: new Date() 
+      }).where(eq(reminderSchedules.patientId, patient.id))
+
+      await db.insert(verificationLogs).values({
+        patientId: patient.id,
+        action: 'responded',
+        patientResponse: message,
+        verificationResult: 'unsubscribed',
+      })
+
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`)
+
+      return { processed: true, action: 'unsubscribed', message: 'Patient unsubscribed' }
+    } catch (error) {
+      logger.error('Failed to process unsubscribe', error as Error, { patientId: patient.id })
+      throw error
+    }
+  }
   
   return { processed: false }
 }
 
 /**
- * Handle medication poll responses (Sudah/Belum/Butuh Bantuan)
+ * Handle medication text responses using enhanced intent detection
  */
-async function handleMedicationPoll(
-  selectedOption: string,
+async function handleMedicationResponse(
+  message: string,
   patient: any
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
   // Find the most recent pending reminder for this patient
@@ -256,7 +319,7 @@ async function handleMedicationPoll(
     .where(
       and(
         eq(reminderLogs.patientId, patient.id),
-        eq(reminderLogs.status, 'SENT'), // Assuming SENT means waiting for confirmation
+        eq(reminderLogs.status, 'SENT'), // Waiting for confirmation
         isNull(reminderLogs.confirmedAt)
       )
     )
@@ -264,105 +327,99 @@ async function handleMedicationPoll(
     .limit(1)
 
   if (!pendingReminder.length) {
-    logger.warn('No pending reminder found for medication poll response', { 
-      patientId: patient.id, 
-      selectedOption 
-    })
+    // No pending reminder, but maybe it's a general medication response
+    const intentResult = detectIntentEnhanced(message, 'medication')
+    
+    if (intentResult.intent !== 'other' && intentResult.confidence > 0.5) {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`)
+      return { processed: true, action: 'no_pending_reminder', message: 'Response without pending reminder' }
+    }
+    
     return { processed: false, message: 'No pending reminder found' }
   }
 
   const reminder = pendingReminder[0]
-  const option = (selectedOption || '').toLowerCase().trim()
+  const intentResult = detectIntentEnhanced(message, 'medication')
   
-  logger.info('Processing medication poll option', { 
-    originalOption: selectedOption, 
-    normalizedOption: option,
+  logger.info('Processing medication text response', { 
+    originalMessage: message, 
+    intent: intentResult.intent,
+    confidence: intentResult.confidence,
+    matchedWords: intentResult.matchedWords,
     patientId: patient.id,
     reminderId: reminder.id
   })
   
-  // Accept variations: sudah, sudah minum, done, selesai, etc.
-  if (option === 'sudah' || option === 'sudah minum' || option.includes('sudah') || option === 'done' || option === 'selesai') {
+  // Low confidence responses get clarification
+  if (intentResult.confidence < 0.4) {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`)
+    return { processed: true, action: 'clarification_requested', message: 'Low confidence response - clarification sent' }
+  }
+
+  if (intentResult.intent === 'medication_taken') {
     try {
-      logger.info('Confirming medication taken', { patientId: patient.id, reminderId: reminder.id })
-      
-      // Confirm medication taken
-      const updateResult = await db.update(reminderLogs).set({
+      await db.update(reminderLogs).set({
         status: 'DELIVERED', // Mark as completed
         confirmedAt: new Date(),
-        confirmationResponse: selectedOption,
+        confirmationResponse: message,
         updatedAt: new Date()
       }).where(eq(reminderLogs.id, reminder.id))
 
-      logger.info('Medication confirmation updated successfully', { 
-        patientId: patient.id, 
-        reminderId: reminder.id,
-        updateResult: updateResult 
-      })
+      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`)
 
-      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}`)
-
-      logger.info('Medication confirmation processed successfully', { 
-        patientId: patient.id, 
-        reminderId: reminder.id,
-        selectedOption 
-      })
-
-      return { processed: true, action: 'confirmed', message: 'Medication confirmed via poll' }
+      return { processed: true, action: 'confirmed', message: 'Medication confirmed via text' }
     } catch (error) {
-      logger.error('Failed to process medication confirmation', error as Error, {
-        patientId: patient.id,
-        reminderId: reminder.id,
-        selectedOption
-      })
+      logger.error('Failed to process medication confirmation', error as Error, { patientId: patient.id })
       throw error
     }
   }
   
-  // Not yet variations: belum, belum minum, not yet, etc.
-  if (option === 'belum' || option === 'belum minum' || option.includes('belum') || option === 'not yet') {
-    // Patient hasn't taken medication yet - extend deadline
-    await db.update(reminderLogs).set({
-      confirmationResponse: selectedOption,
-      updatedAt: new Date()
-      // Keep status as SENT for potential follow-up
-    }).where(eq(reminderLogs.id, reminder.id))
+  if (intentResult.intent === 'medication_pending') {
+    try {
+      await db.update(reminderLogs).set({
+        confirmationResponse: message,
+        updatedAt: new Date()
+        // Keep status as SENT for potential follow-up
+      }).where(eq(reminderLogs.id, reminder.id))
 
-    await sendAck(patient.phoneNumber, `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nRelawan akan menghubungi jika diperlukan.`)
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`)
 
-    return { processed: true, action: 'extended', message: 'Medication reminder extended' }
+      return { processed: true, action: 'extended', message: 'Medication reminder extended' }
+    } catch (error) {
+      logger.error('Failed to process medication pending', error as Error, { patientId: patient.id })
+      throw error
+    }
   }
   
-  // Help variations: butuh bantuan, perlu bantuan, help, etc.
-  if (option === 'butuh bantuan' || option === 'perlu bantuan' || option.includes('bantuan') || option === 'help') {
-    // Patient needs help - escalate to relawan
-    await db.update(reminderLogs).set({
-      confirmationResponse: selectedOption,
-      updatedAt: new Date()
-      // Keep status as SENT but flag for manual intervention
-    }).where(eq(reminderLogs.id, reminder.id))
+  if (intentResult.intent === 'need_help') {
+    try {
+      await db.update(reminderLogs).set({
+        confirmationResponse: message,
+        updatedAt: new Date()
+        // Keep status as SENT but flag for manual intervention
+      }).where(eq(reminderLogs.id, reminder.id))
 
-    await sendAck(patient.phoneNumber, `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!`)
+      await sendAck(patient.phoneNumber, `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!\n\n💙 Tim PRIMA`)
 
-    // TODO: Add notification to relawan dashboard for escalation
-    logger.info('Patient requested help - escalating to relawan', { 
-      patientId: patient.id, 
-      reminderId: reminder.id 
-    })
+      logger.info('Patient requested help - escalating to relawan', { 
+        patientId: patient.id, 
+        reminderId: reminder.id 
+      })
 
-    return { processed: true, action: 'escalated', message: 'Medication reminder escalated to relawan' }
+      return { processed: true, action: 'escalated', message: 'Medication reminder escalated to relawan' }
+    } catch (error) {
+      logger.error('Failed to process help request', error as Error, { patientId: patient.id })
+      throw error
+    }
   }
   
   return { processed: false }
 }
 
 export async function POST(request: NextRequest) {
-  // TEMPORARILY DISABLED for debugging poll responses
-  // TODO: Re-enable after identifying poll response format
-  // const authError = requireWebhookToken(request)
-  // if (authError) return authError
-  
-  logger.info('Webhook auth temporarily disabled for debugging')
+  // Re-enabled webhook authentication - poll debugging complete
+  const authError = requireWebhookToken(request)
+  if (authError) return authError
 
   // parse body as json or form
   let parsed: any = {}
@@ -463,138 +520,93 @@ export async function POST(request: NextRequest) {
     })
   } catch {}
 
-  // PRIORITY 1: Process poll responses first
-  const activePollName = poll_name || pollname
-  const pollOption = selected_option || poll_response
-  
-  logger.info('Checking for poll response', {
-    activePollName,
-    pollOption, 
-    hasPollName: Boolean(activePollName),
-    hasPollOption: Boolean(pollOption),
-    normalizedData: { poll_name, pollname, selected_option, poll_response },
-    patientId: patient.id
-  })
-  
-  if (activePollName && pollOption) {
-    logger.info('Processing poll response', { 
-      pollName: activePollName, 
-      selectedOption: pollOption, 
-      patientId: patient.id 
+  // PRIORITY 1: Check if patient is awaiting verification
+  if (patient.verificationStatus === 'pending_verification') {
+    logger.info('Processing verification response', {
+      patientId: patient.id,
+      hasMessage: Boolean(message),
+      message: message?.substring(0, 100) + (message && message.length > 100 ? '...' : '')
     })
     
     try {
-      const pollResult = await processPollResponse(activePollName, pollOption, patient)
+      const verificationResult = await handleVerificationResponse(message, patient)
       
-      if (pollResult.processed) {
-        logger.info('Poll response processed successfully', {
+      if (verificationResult.processed) {
+        logger.info('Verification response processed successfully', {
           patientId: patient.id,
-          action: pollResult.action,
-          message: pollResult.message
+          action: verificationResult.action,
+          message: verificationResult.message
         })
         
         return NextResponse.json({ 
           ok: true, 
           processed: true, 
-          action: pollResult.action,
-          source: 'poll_response'
-        })
-      } else {
-        logger.warn('Poll response not processed by handler', {
-          patientId: patient.id,
-          pollName: activePollName,
-          selectedOption: pollOption,
-          result: pollResult
+          action: verificationResult.action,
+          source: 'text_verification'
         })
       }
     } catch (error) {
-      logger.error('Failed to process poll response', error as Error, {
+      logger.error('Failed to process verification response', error as Error, {
         patientId: patient.id,
-        pollName: activePollName,
-        selectedOption: pollOption
+        message: message?.substring(0, 100)
       })
-      // Continue to text-based processing as fallback
+      return NextResponse.json({ error: 'Internal error processing verification' }, { status: 500 })
     }
-  } else {
-    logger.info('No poll response detected, checking text-based intent', {
+  }
+
+  // PRIORITY 2: Check for medication responses (if patient is verified)
+  if (patient.verificationStatus === 'verified') {
+    logger.info('Processing potential medication response', {
       patientId: patient.id,
       hasMessage: Boolean(message),
-      message: message?.substring(0, 50) + (message && message.length > 50 ? '...' : ''),
-      activePollName,
-      pollOption
+      message: message?.substring(0, 100) + (message && message.length > 100 ? '...' : '')
     })
+    
+    try {
+      const medicationResult = await handleMedicationResponse(message, patient)
+      
+      if (medicationResult.processed) {
+        logger.info('Medication response processed successfully', {
+          patientId: patient.id,
+          action: medicationResult.action,
+          message: medicationResult.message
+        })
+        
+        return NextResponse.json({ 
+          ok: true, 
+          processed: true, 
+          action: medicationResult.action,
+          source: 'text_medication'
+        })
+      }
+    } catch (error) {
+      logger.error('Failed to process medication response', error as Error, {
+        patientId: patient.id,
+        message: message?.substring(0, 100)
+      })
+      return NextResponse.json({ error: 'Internal error processing medication response' }, { status: 500 })
+    }
   }
 
-  // FALLBACK: Text-based verification handling (for backward compatibility)
-  const intent = detectIntentVerificationOnly(message)
-  if (intent === 'other' && !activePollName) {
-    return NextResponse.json({ ok: true, processed: true, action: 'none' })
-  }
+  // FALLBACK: Handle unrecognized messages
+  logger.info('Message not processed by specific handlers', {
+    patientId: patient.id,
+    verificationStatus: patient.verificationStatus,
+    messageLength: message?.length || 0,
+    message: message?.substring(0, 50) + (message && message.length > 50 ? '...' : '')
+  })
 
-  try {
-    if (intent === 'accept' && patient.verificationStatus === 'pending_verification') {
-      await db.update(patients).set({
-        verificationStatus: 'verified',
-        verificationResponseAt: new Date(),
-        updatedAt: new Date(),
-      }).where(eq(patients.id, patient.id))
-
-      await db.insert(verificationLogs).values({
-        patientId: patient.id,
-        action: 'responded',
-        patientResponse: message,
-        verificationResult: 'verified',
-      })
-
-      await sendAck(patient.phoneNumber, `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima reminder dari relawan PRIMA.\n\nUntuk berhenti, ketik: BERHENTI`)
-
-      return NextResponse.json({ ok: true, processed: true, action: 'verified' })
+  // Send a helpful response for unrecognized messages
+  if (patient.verificationStatus === 'pending_verification') {
+    await sendAck(patient.phoneNumber, `Halo ${patient.name}, mohon balas pesan verifikasi dengan:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`)
+  } else if (patient.verificationStatus === 'verified') {
+    // Check if there are pending reminders
+    const intentResult = detectIntentEnhanced(message)
+    if (intentResult.confidence > 0.3) {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`)
+    } else {
+      await sendAck(patient.phoneNumber, `Halo ${patient.name}, terima kasih atas pesannya.\n\nJika ada pertanyaan tentang obat, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`)
     }
-
-    if (intent === 'decline' && patient.verificationStatus === 'pending_verification') {
-      await db.update(patients).set({
-        verificationStatus: 'declined',
-        verificationResponseAt: new Date(),
-        updatedAt: new Date(),
-      }).where(eq(patients.id, patient.id))
-
-      await db.insert(verificationLogs).values({
-        patientId: patient.id,
-        action: 'responded',
-        patientResponse: message,
-        verificationResult: 'declined',
-      })
-
-      await sendAck(patient.phoneNumber, `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏`)
-
-      return NextResponse.json({ ok: true, processed: true, action: 'declined' })
-    }
-
-    if (intent === 'unsubscribe') {
-      // set declined + deactivate reminders
-      await db.update(patients).set({
-        verificationStatus: 'declined',
-        verificationResponseAt: new Date(),
-        updatedAt: new Date(),
-        isActive: false,
-      }).where(eq(patients.id, patient.id))
-
-      await db.update(reminderSchedules).set({ isActive: false, updatedAt: new Date() }).where(eq(reminderSchedules.patientId, patient.id))
-
-      await db.insert(verificationLogs).values({
-        patientId: patient.id,
-        action: 'responded',
-        patientResponse: message,
-        verificationResult: 'declined',
-      })
-
-      await sendAck(patient.phoneNumber, `Baik ${patient.name}, kami akan berhenti mengirimkan reminder. 🛑\n\nSemua pengingat obat telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`)
-
-      return NextResponse.json({ ok: true, processed: true, action: 'unsubscribed' })
-    }
-  } catch (error) {
-    logger.error('Incoming verification handling failed', error as Error, { patientId: patient.id })
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true, processed: true, action: 'none' })

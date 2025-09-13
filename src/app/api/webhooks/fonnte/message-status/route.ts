@@ -32,11 +32,9 @@ function mapStatusToEnum(status?: string): 'PENDING' | 'SENT' | 'DELIVERED' | 'F
 }
 
 export async function POST(request: NextRequest) {
-  // TEMPORARILY DISABLED for debugging - TODO: Re-enable after poll investigation
-  // const authError = requireWebhookToken(request)
-  // if (authError) return authError
-  
-  logger.info('Message status webhook auth temporarily disabled for debugging')
+  // Re-enabled webhook authentication
+  const authError = requireWebhookToken(request)
+  if (authError) return authError
 
   let parsed: any = {}
   const contentType = request.headers.get('content-type') || ''
@@ -101,9 +99,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // TEMPORARILY DISABLED for debugging
-  // const authError = requireWebhookToken(request)
-  // if (authError) return authError
+  // Re-enabled webhook authentication
+  const authError = requireWebhookToken(request)
+  if (authError) return authError
   const { searchParams } = new URL(request.url)
   const mode = searchParams.get('mode') || 'ping'
   return NextResponse.json({ ok: true, route: 'fonnte/message-status', mode })

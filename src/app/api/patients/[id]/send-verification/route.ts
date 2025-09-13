@@ -38,9 +38,9 @@ export async function POST(
 
     const patient = patientResult[0]
 
-    // Send verification poll with Ya/Tidak options
+    // Send verification message with clear instructions
     const whatsappService = new WhatsAppService()
-    const whatsappResult = await whatsappService.sendVerificationPoll(
+    const whatsappResult = await whatsappService.sendVerificationMessage(
       patient.phoneNumber,
       patient.name
     )
@@ -61,7 +61,7 @@ export async function POST(
       .set({
         verificationStatus: 'pending_verification',
         verificationSentAt: new Date(),
-        verificationMessage: `Poll: Verification request sent to ${patient.name}`,
+        verificationMessage: `Text message: Verification request sent to ${patient.name}`,
         verificationAttempts: (currentAttempts + 1).toString(),
         verificationExpiresAt: expiresAt,
         updatedAt: new Date()
@@ -74,17 +74,17 @@ export async function POST(
       .values({
         patientId: patientId,
         action: 'sent',
-        messageSent: `Poll verification sent with Ya/Tidak options`,
+        messageSent: `Text verification sent with clear response options`,
         verificationResult: 'pending_verification',
         processedBy: user.id
       })
 
     return NextResponse.json({
       success: true,
-      message: 'Verification poll sent successfully with Ya/Tidak options',
+      message: 'Verification message sent successfully with clear response options',
       expiresAt: expiresAt.toISOString(),
       attempt: currentAttempts + 1,
-      method: 'poll_verification'
+      method: 'text_verification'
     })
 
   } catch (error) {
