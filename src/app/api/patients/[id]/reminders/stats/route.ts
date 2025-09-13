@@ -75,7 +75,7 @@ export async function GET(
       .where(
         and(
           eq(reminderLogs.patientId, id),
-          inArray(reminderLogs.status, ["DELIVERED", "FAILED"]),
+          inArray(reminderLogs.status, ["SENT", "DELIVERED", "FAILED"]),
           eq(reminderSchedules.isActive, true),
           isNull(reminderSchedules.deletedAt)
         )

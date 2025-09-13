@@ -160,37 +160,6 @@ export default function CompletedRemindersPage() {
           )}
         </div>
 
-        {/* Statistics */}
-        {reminders.length > 0 && (
-          <div className="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
-            <h3 className="font-semibold text-gray-900 mb-3">Statistik Kepatuhan</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {reminders.filter(r => r.medicationTaken).length}
-                </div>
-                <div className="text-sm text-gray-600">Dipatuhi</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">
-                  {reminders.filter(r => !r.medicationTaken).length}
-                </div>
-                <div className="text-sm text-gray-600">Tidak Dipatuhi</div>
-              </div>
-            </div>
-            <div className="mt-3 pt-3 border-t border-blue-200">
-              <div className="text-center">
-                <div className="text-lg font-bold text-blue-600">
-                  {reminders.length > 0 
-                    ? Math.round((reminders.filter(r => r.medicationTaken).length / reminders.length) * 100)
-                    : 0
-                  }%
-                </div>
-                <div className="text-sm text-gray-600">Tingkat Kepatuhan</div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   )

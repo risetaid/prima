@@ -1,92 +1,139 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, MessageSquare, Clock } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 
 interface AllReminder {
-  id: string
-  medicationName: string
-  scheduledTime: string
-  reminderDate: string
-  customMessage?: string
-  status: 'scheduled' | 'pending' | 'completed_taken' | 'completed_not_taken'
+  id: string;
+  medicationName: string;
+  scheduledTime: string;
+  reminderDate: string;
+  customMessage?: string;
+  status: "scheduled" | "pending" | "completed_taken" | "completed_not_taken";
 }
 
 export default function AllRemindersPage() {
-  const router = useRouter()
-  const params = useParams()
-  const [reminders, setReminders] = useState<AllReminder[]>([])
-  const [loading, setLoading] = useState(true)
+  const router = useRouter();
+  const params = useParams();
+  const [reminders, setReminders] = useState<AllReminder[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
-      fetchAllReminders(params.id as string)
+      fetchAllReminders(params.id as string);
     }
-  }, [params.id])
+  }, [params.id]);
 
   const fetchAllReminders = async (patientId: string) => {
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders/all`)
-      if (response.ok) {
-        const data = await response.json()
-        setReminders(data)
-      } else {
-        console.error('Failed to fetch all reminders')
-        setReminders([])
-      }
+      // Fetch scheduled reminders (same as desktop)
+      const scheduledResponse = await fetch(
+        `/api/patients/${patientId}/reminders/scheduled`
+      );
+      const scheduledData = scheduledResponse.ok
+        ? await scheduledResponse.json()
+        : [];
+
+      // Fetch pending reminders
+      const pendingResponse = await fetch(
+        `/api/patients/${patientId}/reminders/pending`
+      );
+      const pendingData = pendingResponse.ok
+        ? await pendingResponse.json()
+        : [];
+
+      // Fetch completed reminders
+      const completedResponse = await fetch(
+        `/api/patients/${patientId}/reminders/completed`
+      );
+      const completedData = completedResponse.ok
+        ? await completedResponse.json()
+        : [];
+
+      // Transform to unified format
+      const allReminders = [
+        ...scheduledData.map((r: any) => ({ ...r, status: "scheduled" })),
+        ...pendingData.map((r: any) => ({ ...r, status: "pending" })),
+        ...completedData.map((r: any) => ({
+          ...r,
+          status: r.medicationTaken ? "completed_taken" : "completed_not_taken",
+        })),
+      ];
+
+      setReminders(allReminders);
     } catch (error) {
-      console.error('Error fetching all reminders:', error)
-      setReminders([])
+      console.error("Error fetching all reminders:", error);
+      setReminders([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-    
-    const dayName = days[date.getDay()]
-    const day = date.getDate()
-    const month = months[date.getMonth()]
-    const year = date.getFullYear()
-    
-    return `${dayName}, ${day} ${month} ${year}`
-  }
+    const date = new Date(dateString);
+    const days = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+    const months = [
+      "Januari",
+      "Februari",
+      "Maret",
+      "April",
+      "Mei",
+      "Juni",
+      "Juli",
+      "Agustus",
+      "September",
+      "Oktober",
+      "November",
+      "Desember",
+    ];
+
+    const dayName = days[date.getDay()];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+
+    return `${dayName}, ${day} ${month} ${year}`;
+  };
 
   const getCardStyle = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return 'bg-blue-500 text-white'
-      case 'pending':
-        return 'bg-orange-500 text-white'
-      case 'completed_taken':
-        return 'bg-green-500 text-white'
-      case 'completed_not_taken':
-        return 'bg-red-500 text-white'
+      case "scheduled":
+        return "bg-blue-500 text-white";
+      case "pending":
+        return "bg-orange-500 text-white";
+      case "completed_taken":
+        return "bg-green-500 text-white";
+      case "completed_not_taken":
+        return "bg-red-500 text-white";
       default:
-        return 'bg-blue-500 text-white'
+        return "bg-blue-500 text-white";
     }
-  }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return { text: 'Terjadwal', color: 'bg-blue-100 text-blue-800' }
-      case 'pending':
-        return { text: 'Perlu Update', color: 'bg-orange-100 text-orange-800' }
-      case 'completed_taken':
-        return { text: 'Dipatuhi', color: 'bg-green-100 text-green-800' }
-      case 'completed_not_taken':
-        return { text: 'Tidak Dipatuhi', color: 'bg-red-100 text-red-800' }
+      case "scheduled":
+        return { text: "Terjadwal", color: "bg-blue-100 text-blue-800" };
+      case "pending":
+        return { text: "Perlu Update", color: "bg-orange-100 text-orange-800" };
+      case "completed_taken":
+        return { text: "Dipatuhi", color: "bg-green-100 text-green-800" };
+      case "completed_not_taken":
+        return { text: "Tidak Dipatuhi", color: "bg-red-100 text-red-800" };
       default:
-        return { text: 'Unknown', color: 'bg-gray-100 text-gray-800' }
+        return { text: "Unknown", color: "bg-gray-100 text-gray-800" };
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -96,7 +143,7 @@ export default function AllRemindersPage() {
           <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -104,7 +151,7 @@ export default function AllRemindersPage() {
       {/* Header */}
       <header className="bg-white">
         <div className="flex justify-between items-center px-4 py-4">
-          <button 
+          <button
             onClick={() => router.back()}
             className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
           >
@@ -126,63 +173,31 @@ export default function AllRemindersPage() {
         <div className="space-y-8">
           {/* 1. Terjadwal Section */}
           {(() => {
-            const scheduledReminders = reminders.filter(r => r.status === 'scheduled')
-            return scheduledReminders.length > 0 && (
-              <div>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                  <h3 className="text-base font-semibold text-gray-900">
-                    Terjadwal ({scheduledReminders.length})
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                   {scheduledReminders.map((reminder, index) => (
-                     <div key={`${reminder.id}-${reminder.status}-${index}`} className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-semibold mb-1">
-                            {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
-                          </h3>
-                          <p className="text-sm opacity-90">
-                            {formatDate(reminder.reminderDate)}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span className="font-semibold">{reminder.scheduledTime}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* 2. Perlu Diperbarui Section */}
-          {(() => {
-            const pendingReminders = reminders.filter(r => r.status === 'pending')
-            return pendingReminders.length > 0 && (
-              <div>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                  <h3 className="text-base font-semibold text-gray-900">
-                    Perlu Diperbarui ({pendingReminders.length})
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                   {pendingReminders.map((reminder, index) => (
-                     <div key={`${reminder.id}-${reminder.status}-${index}`} className="space-y-2">
-                      <div className="flex justify-start">
-                        <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          Perlu Update
-                        </span>
-                      </div>
-                      <div className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+            const scheduledReminders = reminders.filter(
+              (r) => r.status === "scheduled"
+            );
+            return (
+              scheduledReminders.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-900">
+                      Terjadwal ({scheduledReminders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {scheduledReminders.map((reminder, index) => (
+                      <div
+                        key={`${reminder.id}-${reminder.status}-${index}`}
+                        className={`${getCardStyle(
+                          reminder.status
+                        )} rounded-2xl p-4`}
+                      >
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h3 className="font-semibold mb-1">
-                              {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                              {reminder.customMessage ||
+                                `Minum obat ${reminder.medicationName}`}
                             </h3>
                             <p className="text-sm opacity-90">
                               {formatDate(reminder.reminderDate)}
@@ -190,43 +205,54 @@ export default function AllRemindersPage() {
                           </div>
                           <div className="flex items-center space-x-1">
                             <Clock className="w-4 h-4" />
-                            <span className="font-semibold">{reminder.scheduledTime}</span>
+                            <span className="font-semibold">
+                              {reminder.scheduledTime}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
+              )
+            );
           })()}
 
-          {/* 3. Selesai Section */}
+          {/* 2. Perlu Diperbarui Section */}
           {(() => {
-            const completedReminders = reminders.filter(r => r.status === 'completed_taken' || r.status === 'completed_not_taken')
-            return completedReminders.length > 0 && (
-              <div>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <h3 className="text-base font-semibold text-gray-900">
-                    Selesai ({completedReminders.length})
-                  </h3>
-                </div>
-                <div className="space-y-3">
-                   {completedReminders.map((reminder, index) => {
-                     const statusBadge = getStatusBadge(reminder.status)
-                     return (
-                       <div key={`${reminder.id}-${reminder.status}-${index}`} className="space-y-2">
+            const pendingReminders = reminders.filter(
+              (r) => r.status === "pending"
+            );
+            return (
+              pendingReminders.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-900">
+                      Perlu Diperbarui ({pendingReminders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {pendingReminders.map((reminder, index) => (
+                      <div
+                        key={`${reminder.id}-${reminder.status}-${index}`}
+                        className="space-y-2"
+                      >
                         <div className="flex justify-start">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}>
-                            {statusBadge.text}
+                          <span className="px-3 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                            Perlu Update
                           </span>
                         </div>
-                        <div className={`${getCardStyle(reminder.status)} rounded-2xl p-4`}>
+                        <div
+                          className={`${getCardStyle(
+                            reminder.status
+                          )} rounded-2xl p-4`}
+                        >
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <h3 className="font-semibold mb-1">
-                                {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                                {reminder.customMessage ||
+                                  `Minum obat ${reminder.medicationName}`}
                               </h3>
                               <p className="text-sm opacity-90">
                                 {formatDate(reminder.reminderDate)}
@@ -234,16 +260,81 @@ export default function AllRemindersPage() {
                             </div>
                             <div className="flex items-center space-x-1">
                               <Clock className="w-4 h-4" />
-                              <span className="font-semibold">{reminder.scheduledTime}</span>
+                              <span className="font-semibold">
+                                {reminder.scheduledTime}
+                              </span>
                             </div>
                           </div>
                         </div>
                       </div>
-                    )
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )
+              )
+            );
+          })()}
+
+          {/* 3. Selesai Section */}
+          {(() => {
+            const completedReminders = reminders.filter(
+              (r) =>
+                r.status === "completed_taken" ||
+                r.status === "completed_not_taken"
+            );
+            return (
+              completedReminders.length > 0 && (
+                <div>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-900">
+                      Selesai ({completedReminders.length})
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {completedReminders.map((reminder, index) => {
+                      const statusBadge = getStatusBadge(reminder.status);
+                      return (
+                        <div
+                          key={`${reminder.id}-${reminder.status}-${index}`}
+                          className="space-y-2"
+                        >
+                          <div className="flex justify-start">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}
+                            >
+                              {statusBadge.text}
+                            </span>
+                          </div>
+                          <div
+                            className={`${getCardStyle(
+                              reminder.status
+                            )} rounded-2xl p-4`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <h3 className="font-semibold mb-1">
+                                  {reminder.customMessage ||
+                                    `Minum obat ${reminder.medicationName}`}
+                                </h3>
+                                <p className="text-sm opacity-90">
+                                  {formatDate(reminder.reminderDate)}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Clock className="w-4 h-4" />
+                                <span className="font-semibold">
+                                  {reminder.scheduledTime}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )
+            );
           })()}
 
           {/* Empty State */}
@@ -261,13 +352,13 @@ export default function AllRemindersPage() {
             <div className="grid grid-cols-2 gap-4 text-center">
               <div>
                 <div className="text-lg font-bold text-blue-600">
-                  {reminders.filter(r => r.status === 'scheduled').length}
+                  {reminders.filter((r) => r.status === "scheduled").length}
                 </div>
                 <div className="text-sm text-gray-600">Terjadwal</div>
               </div>
               <div>
                 <div className="text-lg font-bold text-orange-600">
-                  {reminders.filter(r => r.status === 'pending').length}
+                  {reminders.filter((r) => r.status === "pending").length}
                 </div>
                 <div className="text-sm text-gray-600">Perlu Update</div>
               </div>
@@ -275,13 +366,19 @@ export default function AllRemindersPage() {
             <div className="grid grid-cols-2 gap-4 text-center mt-4 pt-4 border-t border-gray-200">
               <div>
                 <div className="text-lg font-bold text-green-600">
-                  {reminders.filter(r => r.status === 'completed_taken').length}
+                  {
+                    reminders.filter((r) => r.status === "completed_taken")
+                      .length
+                  }
                 </div>
                 <div className="text-sm text-gray-600">Dipatuhi</div>
               </div>
               <div>
                 <div className="text-lg font-bold text-red-600">
-                  {reminders.filter(r => r.status === 'completed_not_taken').length}
+                  {
+                    reminders.filter((r) => r.status === "completed_not_taken")
+                      .length
+                  }
                 </div>
                 <div className="text-sm text-gray-600">Tidak Dipatuhi</div>
               </div>
@@ -290,5 +387,5 @@ export default function AllRemindersPage() {
         )}
       </main>
     </div>
-  )
+  );
 }

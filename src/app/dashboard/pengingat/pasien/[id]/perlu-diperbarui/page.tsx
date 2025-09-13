@@ -194,11 +194,11 @@ export default function PendingUpdatePage() {
                 <div className="bg-white text-gray-900 p-4 border-b border-gray-200">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-white mb-1">
+                      <h3 className="font-semibold text-gray-900 mb-1">
                         {reminder.customMessage ||
                           `Minum obat ${reminder.medicationName}`}
                       </h3>
-                      <p className="text-blue-100 text-sm">
+                      <p className="text-gray-600 text-sm">
                         {formatDate(reminder.sentDate)}
                       </p>
                       {/* Automated Confirmation Status */}
@@ -223,7 +223,7 @@ export default function PendingUpdatePage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center space-x-1 text-white">
+                    <div className="flex items-center space-x-1 text-gray-600">
                       <Clock className="w-4 h-4" />
                       <span className="font-semibold">
                         {reminder.scheduledTime}

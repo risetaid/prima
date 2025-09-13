@@ -123,6 +123,9 @@ export default function PatientDetailPage() {
   // Simple Reminder Modal State
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
 
+  // Compliance stats state
+  const [completedReminders, setCompletedReminders] = useState<any[]>([]);
+
   // Ref to track previous verification status for toast notifications
   const prevVerificationStatus = useRef<string | null>(null);
 
@@ -130,6 +133,7 @@ export default function PatientDetailPage() {
     if (params.id) {
       fetchPatient(params.id as string);
       fetchHealthNotes(params.id as string);
+      fetchCompletedReminders(params.id as string);
     }
   }, [params.id]);
 
@@ -231,6 +235,23 @@ export default function PatientDetailPage() {
     } catch (error) {
       console.error("Health notes fetch error:", error);
       toast.error("Gagal memuat catatan kesehatan");
+    }
+  };
+
+  const fetchCompletedReminders = async (patientId: string) => {
+    try {
+      const response = await fetch(
+        `/api/patients/${patientId}/reminders/completed`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCompletedReminders(data);
+      } else {
+        setCompletedReminders([]);
+      }
+    } catch (error) {
+      console.error("Error fetching completed reminders:", error);
+      setCompletedReminders([]);
     }
   };
 
@@ -1133,45 +1154,61 @@ export default function PatientDetailPage() {
                 />
 
                 {/* Statistics */}
-                <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-4 sm:p-6 shadow-sm">
-                  <h4 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                    </div>
-                    <span>Statistik Kepatuhan</span>
-                  </h4>
+                {(() => {
+                  // Calculate compliance stats from completed reminders
+                  const taken = completedReminders.filter(
+                    (r: any) => r.medicationTaken
+                  ).length;
+                  const notTaken = completedReminders.filter(
+                    (r: any) => !r.medicationTaken
+                  ).length;
+                  const total = taken + notTaken;
+                  const complianceRate =
+                    total > 0 ? Math.round((taken / total) * 100) : 0;
 
-                  {/* Compliance Rate Display */}
-                  <div className="text-center mb-6">
-                    <div className="text-3xl sm:text-4xl font-bold text-purple-600 mb-2">
-                      {patient.complianceRate}%
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Tingkat Kepatuhan Pasien
-                    </p>
-                  </div>
+                  return (
+                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-4 sm:p-6 shadow-sm">
+                      <h4 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center space-x-2">
+                        <div className="p-2 bg-purple-100 rounded-lg">
+                          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
+                        </div>
+                        <span>Statistik Kepatuhan</span>
+                      </h4>
 
-                  {/* Chart Visualization */}
-                  <div className="flex justify-center items-end space-x-1 h-24 bg-white rounded-lg p-4">
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <div
-                        key={i}
-                        className="bg-gradient-to-t from-purple-500 to-purple-400 rounded-t w-4 sm:w-6 transition-all duration-300"
-                        style={{
-                          height: `${Math.max(
-                            20,
-                            Math.random() * 60 + patient.complianceRate / 2
-                          )}px`,
-                          opacity: 0.7 + Math.random() * 0.3,
-                        }}
-                        title={`Bulan ${i + 1}`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 text-center mt-2">
-                    Performa 12 bulan terakhir
-                  </p>
-                </div>
+                      {/* Compliance Rate Display */}
+                      <div className="text-center mb-6">
+                        <div className="text-3xl sm:text-4xl font-bold text-purple-600 mb-2">
+                          {complianceRate}%
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          Tingkat Kepatuhan Pasien
+                        </p>
+                      </div>
+
+                      {/* Real Stats Breakdown */}
+                      {total > 0 && (
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              {taken}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Dipatuhi
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-red-600">
+                              {notTaken}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Tidak Dipatuhi
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
