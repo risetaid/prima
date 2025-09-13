@@ -15,6 +15,7 @@ import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { extractMedicationName } from "@/lib/medication-utils";
 import { db, patients, reminderLogs } from "@/db";
+import { ReminderError } from "./reminder.types";
 import { eq } from "drizzle-orm";
 
 export class ReminderService {
@@ -31,6 +32,15 @@ export class ReminderService {
     // Validate patient exists
     const patient = await this.getPatient(dto.patientId);
     if (!patient) throw new NotFoundError("Patient not found");
+
+    if (patient.verificationStatus !== 'verified' || patient.isActive !== true) {
+      throw new ReminderError(
+        'Patient must be verified and active to create reminders',
+        'PATIENT_NOT_VERIFIED',
+        403,
+        { verificationStatus: patient.verificationStatus, isActive: patient.isActive }
+      )
+    }
 
     // Validate and process content attachments
     let validatedContent: ValidatedContent[] = [];
@@ -182,6 +192,8 @@ export class ReminderService {
         id: patients.id,
         name: patients.name,
         phoneNumber: patients.phoneNumber,
+        verificationStatus: patients.verificationStatus,
+        isActive: patients.isActive,
       })
       .from(patients)
       .where(eq(patients.id, patientId))
@@ -296,4 +308,3 @@ export class ReminderService {
     return dates;
   }
 }
-

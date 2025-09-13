@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, verificationLogs } from '@/db'
 import { eq, and } from 'drizzle-orm'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 // import { addHours } from 'date-fns'
 
 // Send verification message to patient
@@ -40,11 +41,9 @@ export async function POST(
     // Generate simple verification message
     const verificationMessage = generateVerificationMessage(patient, user)
     
-    // Send WhatsApp message via Fonnte
-    const whatsappResult = await sendWhatsAppMessage(
-      patient.phoneNumber,
-      verificationMessage
-    )
+    // Send WhatsApp message via standardized Fonnte lib
+    const to = formatWhatsAppNumber(patient.phoneNumber)
+    const whatsappResult = await sendWhatsAppMessage({ to, body: verificationMessage })
 
     if (!whatsappResult.success) {
       return NextResponse.json(
@@ -114,45 +113,4 @@ Contoh: "Ya saya setuju" atau "Ya mau" atau "Iya boleh"
 Terima kasih atas kerjasamanya! 🙏`
 }
 
-// Helper function to send WhatsApp message via Fonnte
-async function sendWhatsAppMessage(phoneNumber: string, message: string) {
-  try {
-    // Format Indonesian phone number
-    let formattedPhone = phoneNumber
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = '62' + formattedPhone.slice(1)
-    } else if (!formattedPhone.startsWith('62')) {
-      formattedPhone = '62' + formattedPhone
-    }
-
-    const fonnte_token = process.env.FONNTE_TOKEN
-    if (!fonnte_token) {
-      throw new Error('FONNTE_TOKEN not configured')
-    }
-
-    const response = await fetch('https://api.fonnte.com/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': fonnte_token,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        target: formattedPhone,
-        message: message,
-        countryCode: '62'
-      })
-    })
-
-    const result = await response.json()
-    
-    if (response.ok && result.status) {
-      return { success: true, data: result }
-    } else {
-      return { success: false, error: result.reason || 'Unknown error' }
-    }
-
-  } catch (error) {
-    console.error('WhatsApp sending error:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to send message' }
-  }
-}
+// Local sender removed in favor of '@/lib/fonnte'

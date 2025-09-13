@@ -713,6 +713,14 @@ export default function PatientDetailPage() {
 
   // Simplified Reminder Functions
   const handleAddReminder = () => {
+    if (!patient) return
+    const allowed = patient.verificationStatus === 'verified' && patient.isActive
+    if (!allowed) {
+      toast.error('Pasien belum terverifikasi', {
+        description: 'Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.'
+      })
+      return
+    }
     setIsReminderModalOpen(true);
   };
 
@@ -1105,13 +1113,23 @@ export default function PatientDetailPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <button
                       onClick={handleAddReminder}
-                      className="cursor-pointer bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      disabled={!(patient.verificationStatus === 'verified' && patient.isActive)}
+                      className={`cursor-pointer py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 transition-all duration-200 ${
+                        patient.verificationStatus === 'verified' && patient.isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
+                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      }`}
                     >
                       <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                       <span className="text-sm sm:text-base">
                         Buat Pengingat
                       </span>
                     </button>
+                    {!(patient.verificationStatus === 'verified' && patient.isActive) && (
+                      <p className="text-xs text-gray-500 sm:col-span-2 text-center">
+                        Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA" untuk mengaktifkan fitur ini.
+                      </p>
+                    )}
                     <button
                       onClick={handleViewReminders}
                       className="cursor-pointer bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 hover:from-indigo-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"

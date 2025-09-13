@@ -183,6 +183,8 @@ export async function POST(
         id: patients.id,
         name: patients.name,
         phoneNumber: patients.phoneNumber,
+        verificationStatus: patients.verificationStatus,
+        isActive: patients.isActive,
       })
       .from(patients)
       .where(eq(patients.id, id))
@@ -198,6 +200,19 @@ export async function POST(
     }
 
     const patient = patientResult[0];
+
+    // Enforce verification before allowing reminder creation
+    if (patient.verificationStatus !== 'verified' || !patient.isActive) {
+      return createErrorResponse(
+        'Patient must be verified and active to create reminders',
+        403,
+        {
+          verificationStatus: patient.verificationStatus,
+          isActive: patient.isActive,
+        },
+        'PATIENT_NOT_VERIFIED'
+      );
+    }
 
     // Validate attached content if provided
     let validatedContent: Array<{
