@@ -1,12 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { VerificationWebhookService } from "@/services/webhook/verification-webhook.service";
+import { MessageProcessorService } from "@/services/message-processor.service";
+import { ConversationStateService } from "@/services/conversation-state.service";
+import { EnhancedVerificationService } from "@/services/verification/enhanced-verification.service";
+import { PatientLookupService } from "@/services/patient/patient-lookup.service";
+import { validateWebhookRequest } from "@/lib/fonnte";
+import { RateLimiter, API_RATE_LIMITS } from "@/lib/rate-limiter";
+import { getClientIP } from "@/lib/rate-limiter";
 
 // Process WhatsApp verification responses from patients
 export async function POST(request: NextRequest) {
   console.log(`🔍 WEBHOOK: Incoming POST request to verification-response`);
 
   try {
+    // Get client IP for rate limiting
+    const clientIP = getClientIP(request);
+
+    // Apply rate limiting to prevent abuse
+    const rateLimitResult = await RateLimiter.rateLimitMiddleware(clientIP, {
+      ...API_RATE_LIMITS.WHATSAPP,
+      keyPrefix: 'webhook:ip'
+    });
+
+    if (!rateLimitResult.allowed) {
+      logger.security('Webhook rate limit exceeded', {
+        ip: clientIP,
+        headers: rateLimitResult.headers
+      });
+
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded",
+          message: "Too many requests. Please try again later."
+        },
+        {
+          status: 429,
+          headers: rateLimitResult.headers
+        }
+      );
+    }
+
     // Check content type
     const contentType = request.headers.get("content-type") || "";
     console.log(`📦 WEBHOOK: Content-Type: "${contentType}"`);
@@ -94,6 +128,55 @@ export async function POST(request: NextRequest) {
     const { device, sender, message, name } = parsedBody;
     console.log(`📱 WEBHOOK: From ${sender}: "${message}" (device: ${device})`);
 
+    // Enhanced webhook security validation
+    const signature = request.headers.get("x-fonnte-signature") || "";
+    const timestamp = request.headers.get("x-fonnte-timestamp") || "";
+
+    const validation = validateWebhookRequest(signature, parsedBody, timestamp);
+    if (!validation.valid) {
+      logger.security('Invalid webhook signature', {
+        ip: clientIP,
+        sender,
+        error: validation.error,
+        signature: signature.substring(0, 10) + '...', // Log partial signature for debugging
+        timestamp
+      });
+
+      return NextResponse.json(
+        {
+          error: "Invalid webhook signature",
+          message: validation.error
+        },
+        { status: 401 }
+      );
+    }
+
+    // Apply phone number specific rate limiting
+    if (sender) {
+      const phoneRateLimit = await RateLimiter.checkRateLimit(sender, {
+        windowMs: 60 * 1000, // 1 minute
+        maxRequests: 10, // 10 messages per minute per phone number
+        keyPrefix: 'webhook:phone'
+      });
+
+      if (!phoneRateLimit.allowed) {
+        logger.security('Phone number rate limit exceeded', {
+          sender,
+          ip: clientIP,
+          totalRequests: phoneRateLimit.totalRequests,
+          remaining: phoneRateLimit.remaining
+        });
+
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded for this phone number",
+            message: "Too many messages from this number. Please wait before sending another message."
+          },
+          { status: 429 }
+        );
+      }
+    }
+
     // Log incoming webhook for debugging
     logger.info("Patient verification response webhook received", {
       api: true,
@@ -104,16 +187,112 @@ export async function POST(request: NextRequest) {
       sender,
       messageLength: message?.length,
       name,
+      ip: clientIP,
+      rateLimitRemaining: rateLimitResult.headers?.['X-RateLimit-Remaining']
     });
 
-    // Use the centralized service to process the webhook
-    const service = new VerificationWebhookService();
-    const result = await service.processWebhook({
+    // Process message with enhanced NLP and conversation state management
+    const messageProcessor = new MessageProcessorService();
+    const conversationService = new ConversationStateService();
+    const enhancedVerificationService = new EnhancedVerificationService();
+    const patientLookupService = new PatientLookupService();
+
+    // Find or create patient by phone number
+    const patientLookup = await patientLookupService.findOrCreatePatientForOnboarding(sender);
+    if (!patientLookup.found || !patientLookup.patient) {
+      logger.error('Failed to find or create patient', new Error(patientLookup.error || 'Unknown error'), {
+        sender,
+        error: patientLookup.error
+      });
+      return NextResponse.json(
+        {
+          error: "Patient lookup failed",
+          message: "Unable to process message for this phone number"
+        },
+        { status: 400 }
+      );
+    }
+
+    const patientId = patientLookup.patient.id;
+
+    // Get or create conversation state
+    const conversationState = await conversationService.getOrCreateConversationState(
+      patientId,
+      sender,
+      'general_inquiry'
+    );
+
+    // Process message with NLP
+    const messageContext = {
+      patientId,
+      phoneNumber: sender,
+      message,
+      timestamp: new Date(),
+      conversationState,
+    };
+
+    const processedMessage = await messageProcessor.processMessage(messageContext);
+
+    // Log the processed message
+    await conversationService.addMessage(conversationState.id, {
+      message,
+      direction: 'inbound',
+      messageType: 'general', // TODO: Map from processedMessage.intent
+      intent: processedMessage.intent.primary,
+      confidence: Math.round((processedMessage.confidence ?? 0) * 100),
+      processedAt: new Date(),
+    });
+
+    // Handle verification responses with enhanced service
+    let verificationResult = null;
+    if (conversationState.currentContext === 'verification') {
+      try {
+        verificationResult = await enhancedVerificationService.processVerificationResponse(
+          conversationState.id,
+          message
+        );
+      } catch (error) {
+        logger.error('Enhanced verification processing failed', error as Error, {
+          conversationStateId: conversationState.id,
+          message
+        });
+      }
+    }
+
+    // Update conversation state based on processed message
+    if (processedMessage.intent.primary !== 'unknown') {
+      await conversationService.updateConversationState(conversationState.id, {
+        currentContext: processedMessage.intent.primary === 'accept' || processedMessage.intent.primary === 'decline'
+          ? 'verification'
+          : processedMessage.intent.primary === 'confirm_taken' || processedMessage.intent.primary === 'confirm_missed' || processedMessage.intent.primary === 'confirm_later'
+          ? 'reminder_confirmation'
+          : processedMessage.intent.primary === 'emergency'
+          ? 'emergency'
+          : 'general_inquiry',
+        expectedResponseType: processedMessage.intent.primary.includes('confirm')
+          ? 'confirmation'
+          : processedMessage.intent.primary === 'accept' || processedMessage.intent.primary === 'decline'
+          ? 'yes_no'
+          : 'text',
+      });
+    }
+
+    // Use the legacy service for backward compatibility while we migrate
+    const legacyService = new VerificationWebhookService();
+    const legacyResult = await legacyService.processWebhook({
       device,
       sender,
       message,
       name,
     });
+
+    // Combine results from both processing methods
+    const result = {
+      ...legacyResult,
+      processedMessage,
+      conversationStateId: conversationState.id,
+      verificationResult,
+    };
 
     console.log(
       `📋 WEBHOOK: Processing result: ${

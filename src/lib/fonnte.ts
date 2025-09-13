@@ -1,4 +1,6 @@
 // Fonnte WhatsApp API integration for PRIMA
+import * as crypto from 'crypto'
+
 // Primary WhatsApp provider for Indonesian healthcare system
 
 const FONNTE_BASE_URL = process.env.FONNTE_BASE_URL || 'https://api.fonnte.com'
@@ -193,17 +195,54 @@ _Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_`
  */
 export const validateFonnteWebhook = (
   signature: string,
-  _body: unknown
+  body: unknown
 ): boolean => {
   if (!FONNTE_TOKEN) return false
-  
+
   try {
-    // Implement Fonnte webhook validation if available
-    // For now, basic token validation
-    return signature === FONNTE_TOKEN
+    // Fonnte uses HMAC-SHA256 for webhook signatures
+    const expectedSignature = crypto
+      .createHmac('sha256', FONNTE_TOKEN)
+      .update(JSON.stringify(body))
+      .digest('hex')
+
+    return signature === expectedSignature
   } catch (error) {
     console.error('Fonnte webhook validation error:', error)
     return false
   }
+}
+
+/**
+ * Enhanced webhook validation with multiple security checks
+ */
+export const validateWebhookRequest = (
+  signature: string,
+  body: unknown,
+  timestamp?: string
+): { valid: boolean; error?: string } => {
+  // Check if token is configured
+  if (!FONNTE_TOKEN) {
+    return { valid: false, error: 'Fonnte token not configured' }
+  }
+
+  // Validate signature
+  if (!validateFonnteWebhook(signature, body)) {
+    return { valid: false, error: 'Invalid webhook signature' }
+  }
+
+  // Check timestamp if provided (prevent replay attacks)
+  if (timestamp) {
+    const now = Date.now()
+    const webhookTime = parseInt(timestamp)
+    const timeDiff = Math.abs(now - webhookTime)
+
+    // Allow 5 minute window for webhook delivery
+    if (timeDiff > 5 * 60 * 1000) {
+      return { valid: false, error: 'Webhook timestamp too old' }
+    }
+  }
+
+  return { valid: true }
 }
 
