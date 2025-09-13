@@ -5,6 +5,7 @@ import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
 import { db, reminderLogs } from '@/db'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
+import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
 
 const StatusSchema = z.object({
   id: z.string().min(1), // message id
@@ -81,6 +82,13 @@ export async function POST(request: NextRequest) {
   if (!mapped) return NextResponse.json({ ok: true, ignored: true })
 
   try {
+    // First get the patientId for cache invalidation
+    const logData = await db
+      .select({ patientId: reminderLogs.patientId })
+      .from(reminderLogs)
+      .where(eq(reminderLogs.fonnteMessageId, id))
+      .limit(1)
+
     const updates: any = { status: mapped }
     // optional: could add deliveredAt/failedAt if columns exist; schema not defined for those explicitly
     if (mapped === 'FAILED' && reason) {
@@ -90,6 +98,11 @@ export async function POST(request: NextRequest) {
 
     const res = await db.update(reminderLogs).set(updates).where(eq(reminderLogs.fonnteMessageId, id))
     logger.info('Updated reminder log status from webhook', { id, mapped })
+
+    // Invalidate cache if we have patientId
+    if (logData.length > 0) {
+      await invalidateCache(CACHE_KEYS.reminderStats(logData[0].patientId))
+    }
   } catch (error) {
     logger.error('Failed to update message status', error as Error, { id, status })
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })

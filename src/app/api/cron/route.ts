@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { isDuplicateEvent } from "@/lib/idempotency";
+import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 // Rate limiter temporarily disabled
 
 const whatsappService = new WhatsAppService();
@@ -434,6 +435,9 @@ Saatnya minum obat:
               errorCount++;
               continue; // Skip to next schedule
             }
+
+            // Invalidate reminder stats cache after creating log
+            await invalidateCache(CACHE_KEYS.reminderStats(schedule.patientId));
 
             if (result.success) {
               sentCount++;

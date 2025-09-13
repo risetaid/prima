@@ -53,7 +53,7 @@ export async function GET(
         )
       )
 
-    // Get all reminder logs for these schedules
+    // Get all reminder logs for these schedules (only for active schedules)
     const allLogs = await db
       .select({
         id: reminderLogs.id,
@@ -62,10 +62,13 @@ export async function GET(
         sentAt: reminderLogs.sentAt
       })
       .from(reminderLogs)
+      .innerJoin(reminderSchedules, eq(reminderLogs.reminderScheduleId, reminderSchedules.id))
       .where(
         and(
           eq(reminderLogs.patientId, id),
-          inArray(reminderLogs.status, ['DELIVERED', 'FAILED'])
+          inArray(reminderLogs.status, ['DELIVERED', 'FAILED']),
+          eq(reminderSchedules.isActive, true),
+          isNull(reminderSchedules.deletedAt)
         )
       )
       .orderBy(desc(reminderLogs.sentAt))
