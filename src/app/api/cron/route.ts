@@ -234,7 +234,7 @@ async function processReminders() {
   const debugLogs: string[] = [];
 
   try {
-    // Debug logging to identify initialization issues
+    // Basic validation checks
     logger.info("🔄 Starting reminder cron job - initialization", {
       api: true,
       cron: true,
@@ -242,6 +242,31 @@ async function processReminders() {
       hasDbConnection: Boolean(db),
       hasWhatsAppService: Boolean(whatsappService),
     });
+
+    // Test basic database connection with a simple query
+    logger.info("Testing database connection", {
+      api: true,
+      cron: true,
+    });
+    
+    try {
+      const connectionTest = await db
+        .select({ count: count() })
+        .from(patients)
+        .limit(1);
+      
+      logger.info("Database connection test successful", {
+        api: true,
+        cron: true,
+        hasResults: connectionTest.length > 0,
+      });
+    } catch (dbTestError) {
+      logger.error("Database connection test failed", dbTestError as Error, {
+        api: true,
+        cron: true,
+      });
+      throw new Error(`Database connection failed: ${(dbTestError as Error).message}`);
+    }
 
     logger.info("🔄 Starting reminder cron job", {
       api: true,
@@ -789,10 +814,11 @@ async function processReminders() {
       {
         success: false,
         error: "Internal server error",
-        details:
-          process.env.NODE_ENV === "development"
-            ? errorMessage
-            : "Check server logs for details",
+        details: errorMessage, // Show error message for debugging
+        debugInfo: {
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          stack: errorStack?.substring(0, 300), // Show partial stack trace
+        },
         timestamp: new Date().toISOString(),
         wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
         stats: {
