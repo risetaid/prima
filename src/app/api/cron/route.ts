@@ -497,7 +497,7 @@ async function processReminders() {
                       confirmationTime.getMinutes() + confirmationDelayMinutes
                     );
 
-                    const confirmationMessage = `Halo ${schedule.patientName}, apakah sudah diminum obat ${schedule.medicationName}? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`;
+                    const confirmationMessage = `Halo ${schedule.patientName}, apakah obatnya sudah diminum?`;
 
                     // Update reminder log with confirmation scheduling info
                     await db
@@ -562,6 +562,7 @@ async function processReminders() {
         patientName: patients.name,
         patientPhoneNumber: patients.phoneNumber,
         reminderScheduleId: reminderLogs.reminderScheduleId,
+        dueAt: reminderLogs.confirmationSentAt,
       })
       .from(reminderLogs)
       .leftJoin(patients, eq(reminderLogs.patientId, patients.id))
@@ -595,21 +596,37 @@ async function processReminders() {
           continue;
         }
 
+        // Claim this confirmation atomically to avoid duplicate sends on concurrent cron runs
+        const claimed = await db
+          .update(reminderLogs)
+          .set({
+            confirmationStatus: "SENT",
+            confirmationSentAt: getWIBTime(), // mark as handled now
+          })
+          .where(
+            and(
+              eq(reminderLogs.id, confirmation.id),
+              eq(reminderLogs.confirmationStatus, "PENDING")
+            )
+          )
+          .returning({ id: reminderLogs.id });
+
+        if (claimed.length === 0) {
+          // Another worker has claimed or already processed it; skip
+          debugLogs.push(
+            `⏭️ Skipped confirmation already claimed for ${confirmation.patientName}`
+          );
+          continue;
+        }
+
         const result = await whatsappService.send(
           confirmation.patientPhoneNumber,
           confirmation.confirmationMessage
         );
 
         if (result.success) {
-          // Update confirmation status to sent
-          await db
-            .update(reminderLogs)
-            .set({
-              confirmationStatus: "SENT",
-              confirmationSentAt: getWIBTime(), // Update to actual sent time
-            })
-            .where(eq(reminderLogs.id, confirmation.id));
-
+          // Already marked as SENT; nothing else to do
+          
           confirmationsSent++;
           debugLogs.push(
             `✅ Confirmation sent to ${confirmation.patientName} (${confirmation.patientPhoneNumber})`
@@ -619,6 +636,13 @@ async function processReminders() {
           debugLogs.push(
             `❌ Confirmation failed for ${confirmation.patientName}: ${result.error}`
           );
+          // Revert status to PENDING and retry in 5 minutes
+          const retryAt = new Date(getWIBTime());
+          retryAt.setMinutes(retryAt.getMinutes() + 5);
+          await db
+            .update(reminderLogs)
+            .set({ confirmationStatus: "PENDING", confirmationSentAt: retryAt })
+            .where(eq(reminderLogs.id, confirmation.id));
         }
       } catch (error) {
         confirmationsFailed++;

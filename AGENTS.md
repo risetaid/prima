@@ -33,6 +33,7 @@
 - PRs: include description, linked issues, UI screenshots, migration notes, and test steps.
 - Call out cache invalidation (keys touched) and security impact (roles/scopes) when relevant.
 - Pre-commit checks: run `bunx tsc --noEmit` and `bun run lint --quiet`; address all errors before commit/push.
+- After checks pass: commit and push to `origin main`. Example: `git add -A && git commit -m "feat(reminders): simplify confirmation message" && git push origin main`.
 
 ## Security & Configuration Tips
 - Secrets in `.env.local` (never commit): `DATABASE_URL`, `REDIS_URL`, `CLERK_*`, `MINIO_*`, `FONNTE_TOKEN`, `CRON_SECRET`.
