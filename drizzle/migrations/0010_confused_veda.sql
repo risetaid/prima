@@ -1,1 +1,0 @@
-ALTER TABLE "patients" ADD COLUMN "last_reactivated_at" timestamp with time zone;

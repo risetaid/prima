@@ -1,1 +1,0 @@
-ALTER TYPE "confirmation_status" ADD VALUE 'SENT';
