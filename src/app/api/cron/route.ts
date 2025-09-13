@@ -5,7 +5,6 @@ import {
   patients,
   reminderLogs,
   reminderContentAttachments,
-  pollResponses,
 } from "@/db";
 import { eq, and, gte, lte, notExists, count, sql, isNull } from "drizzle-orm";
 import {
@@ -116,13 +115,8 @@ async function processFollowUpReminders(debugLogs: string[]): Promise<{
           isNull(reminderLogs.confirmedAt), // Not manually confirmed
           eq(patients.isActive, true), // Patient is active
           eq(patients.verificationStatus, 'verified'), // Patient is verified
-          // Check that no poll response exists for this reminder
-          notExists(
-            db
-              .select()
-              .from(pollResponses)
-              .where(eq(pollResponses.reminderLogId, reminderLogs.id))
-          )
+          // Check that no text response confirmation exists
+          isNull(reminderLogs.confirmationResponse)
         )
       )
       .limit(50); // Limit to prevent overwhelming the system
@@ -136,7 +130,7 @@ async function processFollowUpReminders(debugLogs: string[]): Promise<{
       }
 
       try {
-        // Send follow-up poll message
+        // Send follow-up text message
         const result = await whatsappService.sendFollowUpMessage(
           reminder.phoneNumber,
           reminder.patientName
@@ -369,7 +363,17 @@ async function processReminders() {
           .offset(skip)
           .limit(batchSize)
           .orderBy(reminderSchedules.scheduledTime)
-          .groupBy(reminderSchedules.id, patients.id); // Add GROUP BY for JSON_AGG
+          .groupBy(
+            reminderSchedules.id, 
+            reminderSchedules.patientId,
+            reminderSchedules.medicationName,
+            reminderSchedules.scheduledTime,
+            reminderSchedules.startDate,
+            reminderSchedules.customMessage,
+            patients.id,
+            patients.name,
+            patients.phoneNumber
+          ); // Add GROUP BY for JSON_AGG
 
         // Transform to match expected structure with null checks
         const formattedBatch = batch
@@ -457,7 +461,17 @@ async function processReminders() {
           )
         )
         .orderBy(reminderSchedules.scheduledTime)
-        .groupBy(reminderSchedules.id, patients.id); // Add GROUP BY for JSON_AGG
+        .groupBy(
+          reminderSchedules.id, 
+          reminderSchedules.patientId,
+          reminderSchedules.medicationName,
+          reminderSchedules.scheduledTime,
+          reminderSchedules.startDate,
+          reminderSchedules.customMessage,
+          patients.id,
+          patients.name,
+          patients.phoneNumber
+        ); // Add GROUP BY for JSON_AGG
 
       logger.info("Main query completed successfully", {
         api: true,
@@ -533,8 +547,8 @@ async function processReminders() {
           // Rate limiting temporarily disabled
 
           try {
-            // Send WhatsApp medication poll with confirmation options
-            logger.info("Sending WhatsApp medication reminder poll", {
+            // Send WhatsApp medication reminder with confirmation options
+            logger.info("Sending WhatsApp medication reminder", {
               api: true,
               cron: true,
               patientId: schedule.patientId,
@@ -564,12 +578,11 @@ async function processReminders() {
               patientId: schedule.patientId,
               sentAt: getWIBTime(),
               status: status,
-              message: `Poll: Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
+              message: `Text: Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
               phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId,
               needsFollowup: true, // Enable 15-minute follow-up
-              pollName: 'Konfirmasi Obat',
-              confirmationSource: 'poll_pending',
+              confirmationSource: 'text_pending',
             };
 
             // Create reminder log with error handling
@@ -596,11 +609,10 @@ async function processReminders() {
                     patientId: schedule.patientId,
                     sentAt: getWIBTime(),
                     status: status,
-                    message: `Poll: Medication reminder for ${schedule.medicationName}`,
+                    message: `Text: Medication reminder for ${schedule.medicationName}`,
                     phoneNumber: schedule.patientPhoneNumber,
                     fonnteMessageId: result.messageId,
                     needsFollowup: true,
-                    pollName: 'Konfirmasi Obat',
                   })
                   .returning();
                 reminderLogId = minimalLog[0]?.id;
