@@ -124,13 +124,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Extract Fonnte webhook data
-    const { device, sender, message, name } = parsedBody;
+    // Extract Fonnte webhook data with fallbacks for different providers
+    const device = parsedBody.device || parsedBody.gateway || parsedBody.instance || ''
+    const sender = parsedBody.sender || parsedBody.phone || parsedBody.from || parsedBody.number || parsedBody.wa_number
+    const message = parsedBody.message || parsedBody.text || parsedBody.body
+    const name = parsedBody.name || parsedBody.sender_name || parsedBody.contact_name
     console.log(`📱 WEBHOOK: From ${sender}: "${message}" (device: ${device})`);
 
     // Enhanced webhook security validation
-    const signature = request.headers.get("x-fonnte-signature") || "";
-    const timestamp = request.headers.get("x-fonnte-timestamp") || "";
+    const signature = request.headers.get("x-fonnte-signature") || request.headers.get("x-signature") || "";
+    const timestamp = request.headers.get("x-fonnte-timestamp") || request.headers.get("x-timestamp") || "";
 
     const validation = validateWebhookRequest(signature, parsedBody, timestamp);
     if (!validation.valid) {
@@ -197,19 +200,20 @@ export async function POST(request: NextRequest) {
     const enhancedVerificationService = new EnhancedVerificationService();
     const patientLookupService = new PatientLookupService();
 
-    // Find or create patient by phone number
-    const patientLookup = await patientLookupService.findOrCreatePatientForOnboarding(sender);
+    // Find existing patient by phone number only (do not create on verification webhook)
+    const patientLookup = await patientLookupService.findPatientByPhone(sender);
     if (!patientLookup.found || !patientLookup.patient) {
-      logger.error('Failed to find or create patient', new Error(patientLookup.error || 'Unknown error'), {
+      logger.warn('No matching patient for incoming webhook', {
         sender,
-        error: patientLookup.error
+        webhooks: true,
+        verification: true,
       });
       return NextResponse.json(
         {
-          error: "Patient lookup failed",
-          message: "Unable to process message for this phone number"
+          success: true,
+          message: "No matching patient for this phone number; ignoring",
         },
-        { status: 400 }
+        { status: 200 }
       );
     }
 
@@ -243,21 +247,8 @@ export async function POST(request: NextRequest) {
       processedAt: new Date(),
     });
 
-    // Handle verification responses with enhanced service
+    // Handle verification responses with enhanced service (after we update context below)
     let verificationResult = null;
-    if (conversationState.currentContext === 'verification') {
-      try {
-        verificationResult = await enhancedVerificationService.processVerificationResponse(
-          conversationState.id,
-          message
-        );
-      } catch (error) {
-        logger.error('Enhanced verification processing failed', error as Error, {
-          conversationStateId: conversationState.id,
-          message
-        });
-      }
-    }
 
     // Update conversation state based on processed message
     let updatedConversationState = conversationState

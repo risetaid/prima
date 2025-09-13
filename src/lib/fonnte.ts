@@ -5,6 +5,10 @@ import * as crypto from 'crypto'
 
 const FONNTE_BASE_URL = process.env.FONNTE_BASE_URL || 'https://api.fonnte.com'
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN
+const FONNTE_WEBHOOK_SECRET = process.env.FONNTE_WEBHOOK_SECRET
+const ALLOW_UNSIGNED_WEBHOOKS =
+  (process.env.ALLOW_UNSIGNED_WEBHOOKS || '').toLowerCase() === 'true' ||
+  process.env.NODE_ENV !== 'production'
 
 export interface WhatsAppMessage {
   to: string           // Format: 6281234567890 (no + prefix)
@@ -197,12 +201,14 @@ export const validateFonnteWebhook = (
   signature: string,
   body: unknown
 ): boolean => {
-  if (!FONNTE_TOKEN) return false
+  // Prefer dedicated webhook secret; fallback to API token for backward-compat
+  const secret = FONNTE_WEBHOOK_SECRET || FONNTE_TOKEN
+  if (!secret) return false
 
   try {
     // Fonnte uses HMAC-SHA256 for webhook signatures
     const expectedSignature = crypto
-      .createHmac('sha256', FONNTE_TOKEN)
+      .createHmac('sha256', secret)
       .update(JSON.stringify(body))
       .digest('hex')
 
@@ -221,13 +227,23 @@ export const validateWebhookRequest = (
   body: unknown,
   timestamp?: string
 ): { valid: boolean; error?: string } => {
-  // Check if token is configured
-  if (!FONNTE_TOKEN) {
-    return { valid: false, error: 'Fonnte token not configured' }
+  // Check if secrets are configured
+  if (!FONNTE_WEBHOOK_SECRET && !FONNTE_TOKEN) {
+    return { valid: false, error: 'Fonnte credentials not configured' }
   }
 
   // Validate signature
+  if (!signature) {
+    if (ALLOW_UNSIGNED_WEBHOOKS) {
+      return { valid: true }
+    }
+    return { valid: false, error: 'Missing webhook signature' }
+  }
+
   if (!validateFonnteWebhook(signature, body)) {
+    if (ALLOW_UNSIGNED_WEBHOOKS) {
+      return { valid: true }
+    }
     return { valid: false, error: 'Invalid webhook signature' }
   }
 
