@@ -21,6 +21,29 @@ import { isDuplicateEvent } from "@/lib/idempotency";
 
 const whatsappService = new WhatsAppService();
 
+// Helper function to load content attachments separately
+async function loadContentAttachments(reminderScheduleId: string) {
+  try {
+    const attachments = await db
+      .select({
+        type: reminderContentAttachments.contentType,
+        title: reminderContentAttachments.contentTitle,
+        url: reminderContentAttachments.contentUrl,
+        order: reminderContentAttachments.attachmentOrder,
+      })
+      .from(reminderContentAttachments)
+      .where(eq(reminderContentAttachments.reminderScheduleId, reminderScheduleId))
+      .orderBy(reminderContentAttachments.attachmentOrder);
+    
+    return attachments || [];
+  } catch (error) {
+    logger.error("Failed to load content attachments", error as Error, {
+      reminderScheduleId
+    });
+    return []; // Return empty array on error to prevent blocking reminder
+  }
+}
+
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
   const date = new Date(dateString);
@@ -306,8 +329,26 @@ async function processReminders() {
     }> = [];
     if (totalCount > batchSize) {
       // Process in batches to prevent memory overload
+      logger.info("Starting batch processing", {
+        api: true,
+        cron: true,
+        totalCount,
+        batchSize,
+        totalBatches: Math.ceil(totalCount / batchSize)
+      });
+      
       for (let skip = 0; skip < totalCount; skip += batchSize) {
-        const batch = await db
+        logger.info("Processing batch", {
+          api: true,
+          cron: true,
+          skip,
+          batchSize,
+          currentBatch: Math.floor(skip / batchSize) + 1
+        });
+        
+        let batch;
+        try {
+          batch = await db
           .select({
             // Schedule fields
             id: reminderSchedules.id,
@@ -319,19 +360,9 @@ async function processReminders() {
             // Patient fields
             patientName: patients.name,
             patientPhoneNumber: patients.phoneNumber,
-            // Content attachments as JSON
-            contentAttachments: sql`
-              COALESCE(
-                JSON_AGG(
-                  JSON_BUILD_OBJECT(
-                    'type', ${reminderContentAttachments.contentType},
-                    'title', ${reminderContentAttachments.contentTitle},
-                    'url', ${reminderContentAttachments.contentUrl}
-                  ) ORDER BY ${reminderContentAttachments.attachmentOrder}
-                ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
-                '[]'::json
-              ) as content_attachments
-            `,
+            // Simplified: Load attachments separately to avoid complex JSON aggregation
+            // This reduces query complexity and potential database errors
+            attachmentCount: sql`COUNT(${reminderContentAttachments.id})`,
           })
           .from(reminderSchedules)
           .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
@@ -374,23 +405,58 @@ async function processReminders() {
             patients.name,
             patients.phoneNumber
           ); // Add GROUP BY for JSON_AGG
+        
+        logger.info("Batch query completed successfully", {
+          api: true,
+          cron: true,
+          batchLength: batch.length,
+          skip,
+          batchSize
+        });
+        } catch (batchError) {
+          logger.error("Batch query failed", batchError as Error, {
+            api: true,
+            cron: true,
+            skip,
+            batchSize,
+            totalCount,
+            errorMessage: (batchError as Error).message
+          });
+          throw new Error(`Batch query failed at skip ${skip}: ${(batchError as Error).message}`);
+        }
 
         // Transform to match expected structure with null checks
-        const formattedBatch = batch
-          .map((item) => ({
-            id: item.id,
-            patientId: item.patientId,
-            medicationName: item.medicationName,
-            scheduledTime: item.scheduledTime,
-            startDate: item.startDate,
-            customMessage: item.customMessage,
-            patientName: item.patientName,
-            patientPhoneNumber: item.patientPhoneNumber,
-            contentAttachments: Array.isArray(item.contentAttachments)
-              ? item.contentAttachments
-              : [],
-          }))
-          .filter((item) => item.patientName && item.patientPhoneNumber);
+        // Load content attachments separately for each reminder
+        const formattedBatch: Array<{
+          id: string;
+          patientId: string;
+          medicationName: string;
+          scheduledTime: string;
+          startDate: Date;
+          customMessage: string | null;
+          patientName: string | null;
+          patientPhoneNumber: string | null;
+          contentAttachments: any[];
+        }> = [];
+        
+        for (const item of batch) {
+          if (item.patientName && item.patientPhoneNumber) {
+            // Load content attachments for this specific reminder schedule
+            const contentAttachments = await loadContentAttachments(item.id);
+            
+            formattedBatch.push({
+              id: item.id,
+              patientId: item.patientId,
+              medicationName: item.medicationName,
+              scheduledTime: item.scheduledTime,
+              startDate: item.startDate,
+              customMessage: item.customMessage,
+              patientName: item.patientName,
+              patientPhoneNumber: item.patientPhoneNumber,
+              contentAttachments,
+            });
+          }
+        }
 
         reminderSchedulesToProcess.push(...formattedBatch);
 
@@ -419,19 +485,8 @@ async function processReminders() {
           // Patient fields
           patientName: patients.name,
           patientPhoneNumber: patients.phoneNumber,
-          // Content attachments as JSON
-          contentAttachments: sql`
-            COALESCE(
-              JSON_AGG(
-                JSON_BUILD_OBJECT(
-                  'type', ${reminderContentAttachments.contentType},
-                  'title', ${reminderContentAttachments.contentTitle},
-                  'url', ${reminderContentAttachments.contentUrl}
-                ) ORDER BY ${reminderContentAttachments.attachmentOrder}
-              ) FILTER (WHERE ${reminderContentAttachments.id} IS NOT NULL),
-              '[]'::json
-            ) as content_attachments
-          `,
+          // Simplified: Load attachments separately to avoid complex JSON aggregation
+          attachmentCount: sql`COUNT(${reminderContentAttachments.id})`,
         })
         .from(reminderSchedules)
         .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
@@ -480,21 +535,27 @@ async function processReminders() {
       });
 
       // Transform to match expected structure with null checks
-      reminderSchedulesToProcess = allSchedules
-        .map((item) => ({
-          id: item.id,
-          patientId: item.patientId,
-          medicationName: item.medicationName,
-          scheduledTime: item.scheduledTime,
-          startDate: item.startDate,
-          customMessage: item.customMessage,
-          patientName: item.patientName,
-          patientPhoneNumber: item.patientPhoneNumber,
-          contentAttachments: Array.isArray(item.contentAttachments)
-            ? item.contentAttachments
-            : [],
-        }))
-        .filter((item) => item.patientName && item.patientPhoneNumber);
+      // Load content attachments separately for each reminder
+      reminderSchedulesToProcess = [];
+      
+      for (const item of allSchedules) {
+        if (item.patientName && item.patientPhoneNumber) {
+          // Load content attachments for this specific reminder schedule
+          const contentAttachments = await loadContentAttachments(item.id);
+          
+          reminderSchedulesToProcess.push({
+            id: item.id,
+            patientId: item.patientId,
+            medicationName: item.medicationName,
+            scheduledTime: item.scheduledTime,
+            startDate: item.startDate,
+            customMessage: item.customMessage,
+            patientName: item.patientName,
+            patientPhoneNumber: item.patientPhoneNumber,
+            contentAttachments,
+          });
+        }
+      }
     }
 
     for (const schedule of reminderSchedulesToProcess) {
