@@ -17,6 +17,7 @@ import {
 } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { isDuplicateEvent } from "@/lib/idempotency";
 // Rate limiter temporarily disabled
 
 const whatsappService = new WhatsAppService();
@@ -362,6 +363,16 @@ async function processReminders() {
         }
 
         if (shouldSend) {
+          // Idempotency: ensure we only send once per schedule per WIB day
+          const idempotencyKey = `reminder:sent:${schedule.id}:${getWIBDateString()}`;
+          const alreadySent = await isDuplicateEvent(idempotencyKey, 24 * 60 * 60);
+          if (alreadySent) {
+            debugLogs.push(
+              `⏭️ Skipping duplicate send for ${schedule.patientName} (${schedule.scheduledTime})`
+            );
+            continue;
+          }
+
           // Validate phone number exists
           if (!schedule.patientPhoneNumber) {
             errorCount++;
@@ -428,6 +439,24 @@ async function processReminders() {
                 logError
               );
               console.error(`❌ Log data that failed:`, logData);
+              // Fallback: attempt a minimal log to preserve UI state and stop re-sends
+              try {
+                const minimalLog = await db
+                  .insert(reminderLogs)
+                  .values({
+                    reminderScheduleId: schedule.id,
+                    patientId: schedule.patientId,
+                    sentAt: getWIBTime(),
+                    status: status,
+                    message: baseMessage,
+                    phoneNumber: schedule.patientPhoneNumber,
+                    fonnteMessageId: result.messageId,
+                  })
+                  .returning();
+                reminderLogId = minimalLog[0]?.id;
+              } catch (fallbackError) {
+                console.error("❌ Fallback reminder log insert also failed", fallbackError);
+              }
               errorCount++;
               continue; // Skip to next schedule
             }
