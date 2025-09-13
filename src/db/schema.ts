@@ -371,22 +371,17 @@ export const reminderLogs = pgTable(
       .defaultNow(),
     fonnteMessageId: text("fonnte_message_id"),
     // Confirmation fields
-    confirmationStatus: confirmationStatusEnum("confirmation_status").default("PENDING"),
-    confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
-    confirmationResponseAt: timestamp("confirmation_response_at", { withTimezone: true }),
+    confirmationStatus: confirmationStatusEnum("confirmation_status").default(
+      "PENDING"
+    ),
+    confirmationSentAt: timestamp("confirmation_sent_at", {
+      withTimezone: true,
+    }),
+    confirmationResponseAt: timestamp("confirmation_response_at", {
+      withTimezone: true,
+    }),
     confirmationMessage: text("confirmation_message"),
     confirmationResponse: text("confirmation_response"),
-    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
-    // Follow-up fields for 15-minute follow-up system
-    followupSentAt: timestamp("followup_sent_at", { withTimezone: true }),
-    followupMessageId: text("followup_message_id"),
-    needsFollowup: boolean("needs_followup").default(true),
-    // Poll response tracking
-    pollResponse: jsonb("poll_response"),
-    pollName: text("poll_name"),
-    selectedOption: text("selected_option"),
-    confirmationSource: text("confirmation_source"), // 'poll_response', 'text_response', 'manual'
   },
   (table) => ({
     patientIdIdx: index("reminder_logs_patient_id_idx").on(table.patientId),
@@ -429,10 +424,6 @@ export const reminderLogs = pgTable(
     ),
     confirmationSentAtIdx: index("reminder_logs_confirmation_sent_at_idx").on(
       table.confirmationSentAt
-    ),
-    patientConfirmationStatusIdx: index("reminder_logs_patient_confirmation_idx").on(
-      table.patientId,
-      table.confirmationStatus
     ),
   })
 );
@@ -630,11 +621,19 @@ export const conversationStates = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => ({
-    patientIdIdx: index("conversation_states_patient_id_idx").on(table.patientId),
-    phoneNumberIdx: index("conversation_states_phone_number_idx").on(table.phoneNumber),
-    currentContextIdx: index("conversation_states_current_context_idx").on(table.currentContext),
+    patientIdIdx: index("conversation_states_patient_id_idx").on(
+      table.patientId
+    ),
+    phoneNumberIdx: index("conversation_states_phone_number_idx").on(
+      table.phoneNumber
+    ),
+    currentContextIdx: index("conversation_states_current_context_idx").on(
+      table.currentContext
+    ),
     isActiveIdx: index("conversation_states_is_active_idx").on(table.isActive),
-    expiresAtIdx: index("conversation_states_expires_at_idx").on(table.expiresAt),
+    expiresAtIdx: index("conversation_states_expires_at_idx").on(
+      table.expiresAt
+    ),
     patientActiveIdx: index("conversation_states_patient_active_idx").on(
       table.patientId,
       table.isActive
@@ -643,13 +642,13 @@ export const conversationStates = pgTable(
       table.currentContext,
       table.isActive
     ),
-    deletedAtIdx: index("conversation_states_deleted_at_idx").on(table.deletedAt),
-    // Composite indexes for common queries
-    patientContextActiveIdx: index("conversation_states_patient_context_active_idx").on(
-      table.patientId,
-      table.currentContext,
-      table.isActive
+    deletedAtIdx: index("conversation_states_deleted_at_idx").on(
+      table.deletedAt
     ),
+    // Composite indexes for common queries
+    patientContextActiveIdx: index(
+      "conversation_states_patient_context_active_idx"
+    ).on(table.patientId, table.currentContext, table.isActive),
   })
 );
 
@@ -671,15 +670,22 @@ export const conversationMessages = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    conversationStateIdIdx: index("conversation_messages_conversation_state_id_idx").on(table.conversationStateId),
-    directionIdx: index("conversation_messages_direction_idx").on(table.direction),
-    messageTypeIdx: index("conversation_messages_message_type_idx").on(table.messageType),
-    createdAtIdx: index("conversation_messages_created_at_idx").on(table.createdAt),
-    // Composite indexes
-    conversationDirectionIdx: index("conversation_messages_conversation_direction_idx").on(
-      table.conversationStateId,
+    conversationStateIdIdx: index(
+      "conversation_messages_conversation_state_id_idx"
+    ).on(table.conversationStateId),
+    directionIdx: index("conversation_messages_direction_idx").on(
       table.direction
     ),
+    messageTypeIdx: index("conversation_messages_message_type_idx").on(
+      table.messageType
+    ),
+    createdAtIdx: index("conversation_messages_created_at_idx").on(
+      table.createdAt
+    ),
+    // Composite indexes
+    conversationDirectionIdx: index(
+      "conversation_messages_conversation_direction_idx"
+    ).on(table.conversationStateId, table.direction),
     typeCreatedIdx: index("conversation_messages_type_created_idx").on(
       table.messageType,
       table.createdAt
@@ -873,10 +879,16 @@ export const pollResponses = pgTable(
   },
   (table) => ({
     patientIdIdx: index("poll_responses_patient_id_idx").on(table.patientId),
-    reminderLogIdIdx: index("poll_responses_reminder_log_id_idx").on(table.reminderLogId),
+    reminderLogIdIdx: index("poll_responses_reminder_log_id_idx").on(
+      table.reminderLogId
+    ),
     pollTypeIdx: index("poll_responses_poll_type_idx").on(table.pollType),
-    responseTimeIdx: index("poll_responses_response_time_idx").on(table.responseTime),
-    phoneNumberIdx: index("poll_responses_phone_number_idx").on(table.phoneNumber),
+    responseTimeIdx: index("poll_responses_response_time_idx").on(
+      table.responseTime
+    ),
+    phoneNumberIdx: index("poll_responses_phone_number_idx").on(
+      table.phoneNumber
+    ),
   })
 );
 
@@ -934,70 +946,88 @@ export const reminderSchedulesRelations = relations(
   })
 );
 
-export const conversationStatesRelations = relations(conversationStates, ({ one, many }) => ({
-  patient: one(patients, {
-    fields: [conversationStates.patientId],
-    references: [patients.id],
-  }),
-  messages: many(conversationMessages),
-}));
+export const conversationStatesRelations = relations(
+  conversationStates,
+  ({ one, many }) => ({
+    patient: one(patients, {
+      fields: [conversationStates.patientId],
+      references: [patients.id],
+    }),
+    messages: many(conversationMessages),
+  })
+);
 
-export const conversationMessagesRelations = relations(conversationMessages, ({ one }) => ({
-  conversationState: one(conversationStates, {
-    fields: [conversationMessages.conversationStateId],
-    references: [conversationStates.id],
-  }),
-}));
+export const conversationMessagesRelations = relations(
+  conversationMessages,
+  ({ one }) => ({
+    conversationState: one(conversationStates, {
+      fields: [conversationMessages.conversationStateId],
+      references: [conversationStates.id],
+    }),
+  })
+);
 
-export const reminderContentAttachmentsRelations = relations(reminderContentAttachments, ({ one }) => ({
-  reminderSchedule: one(reminderSchedules, {
-    fields: [reminderContentAttachments.reminderScheduleId],
-    references: [reminderSchedules.id],
-  }),
-  createdByUser: one(users, {
-    fields: [reminderContentAttachments.createdBy],
-    references: [users.id],
-  }),
-}));
+export const reminderContentAttachmentsRelations = relations(
+  reminderContentAttachments,
+  ({ one }) => ({
+    reminderSchedule: one(reminderSchedules, {
+      fields: [reminderContentAttachments.reminderScheduleId],
+      references: [reminderSchedules.id],
+    }),
+    createdByUser: one(users, {
+      fields: [reminderContentAttachments.createdBy],
+      references: [users.id],
+    }),
+  })
+);
 
-export const reminderLogsRelations = relations(reminderLogs, ({ one, many }) => ({
-  reminderSchedule: one(reminderSchedules, {
-    fields: [reminderLogs.reminderScheduleId],
-    references: [reminderSchedules.id],
-  }),
-  patient: one(patients, {
-    fields: [reminderLogs.patientId],
-    references: [patients.id],
-  }),
-  manualConfirmations: many(manualConfirmations),
-  pollResponses: many(pollResponses),
-}));
+export const reminderLogsRelations = relations(
+  reminderLogs,
+  ({ one, many }) => ({
+    reminderSchedule: one(reminderSchedules, {
+      fields: [reminderLogs.reminderScheduleId],
+      references: [reminderSchedules.id],
+    }),
+    patient: one(patients, {
+      fields: [reminderLogs.patientId],
+      references: [patients.id],
+    }),
+    manualConfirmations: many(manualConfirmations),
+    pollResponses: many(pollResponses),
+  })
+);
 
-export const manualConfirmationsRelations = relations(manualConfirmations, ({ one }) => ({
-  patient: one(patients, {
-    fields: [manualConfirmations.patientId],
-    references: [patients.id],
-  }),
-  volunteer: one(users, {
-    fields: [manualConfirmations.volunteerId],
-    references: [users.id],
-  }),
-  reminderSchedule: one(reminderSchedules, {
-    fields: [manualConfirmations.reminderScheduleId],
-    references: [reminderSchedules.id],
-  }),
-  reminderLog: one(reminderLogs, {
-    fields: [manualConfirmations.reminderLogId],
-    references: [reminderLogs.id],
-  }),
-}));
+export const manualConfirmationsRelations = relations(
+  manualConfirmations,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [manualConfirmations.patientId],
+      references: [patients.id],
+    }),
+    volunteer: one(users, {
+      fields: [manualConfirmations.volunteerId],
+      references: [users.id],
+    }),
+    reminderSchedule: one(reminderSchedules, {
+      fields: [manualConfirmations.reminderScheduleId],
+      references: [reminderSchedules.id],
+    }),
+    reminderLog: one(reminderLogs, {
+      fields: [manualConfirmations.reminderLogId],
+      references: [reminderLogs.id],
+    }),
+  })
+);
 
-export const whatsappTemplatesRelations = relations(whatsappTemplates, ({ one }) => ({
-  createdByUser: one(users, {
-    fields: [whatsappTemplates.createdBy],
-    references: [users.id],
-  }),
-}));
+export const whatsappTemplatesRelations = relations(
+  whatsappTemplates,
+  ({ one }) => ({
+    createdByUser: one(users, {
+      fields: [whatsappTemplates.createdBy],
+      references: [users.id],
+    }),
+  })
+);
 
 export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
   patient: one(patients, {
@@ -1010,27 +1040,33 @@ export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
   }),
 }));
 
-export const patientVariablesRelations = relations(patientVariables, ({ one }) => ({
-  patient: one(patients, {
-    fields: [patientVariables.patientId],
-    references: [patients.id],
-  }),
-  createdByUser: one(users, {
-    fields: [patientVariables.createdById],
-    references: [users.id],
-  }),
-}));
+export const patientVariablesRelations = relations(
+  patientVariables,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [patientVariables.patientId],
+      references: [patients.id],
+    }),
+    createdByUser: one(users, {
+      fields: [patientVariables.createdById],
+      references: [users.id],
+    }),
+  })
+);
 
-export const verificationLogsRelations = relations(verificationLogs, ({ one }) => ({
-  patient: one(patients, {
-    fields: [verificationLogs.patientId],
-    references: [patients.id],
-  }),
-  processedByUser: one(users, {
-    fields: [verificationLogs.processedBy],
-    references: [users.id],
-  }),
-}));
+export const verificationLogsRelations = relations(
+  verificationLogs,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [verificationLogs.patientId],
+      references: [patients.id],
+    }),
+    processedByUser: one(users, {
+      fields: [verificationLogs.processedBy],
+      references: [users.id],
+    }),
+  })
+);
 
 export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
   patient: one(patients, {
@@ -1043,20 +1079,23 @@ export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
   }),
 }));
 
-export const patientMedicationsRelations = relations(patientMedications, ({ one }) => ({
-  patient: one(patients, {
-    fields: [patientMedications.patientId],
-    references: [patients.id],
-  }),
-  medication: one(medications, {
-    fields: [patientMedications.medicationId],
-    references: [medications.id],
-  }),
-  createdByUser: one(users, {
-    fields: [patientMedications.createdBy],
-    references: [users.id],
-  }),
-}));
+export const patientMedicationsRelations = relations(
+  patientMedications,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [patientMedications.patientId],
+      references: [patients.id],
+    }),
+    medication: one(medications, {
+      fields: [patientMedications.medicationId],
+      references: [medications.id],
+    }),
+    createdByUser: one(users, {
+      fields: [patientMedications.createdBy],
+      references: [users.id],
+    }),
+  })
+);
 
 export const cmsArticlesRelations = relations(cmsArticles, ({ many }) => ({
   contentAttachments: many(reminderContentAttachments),
