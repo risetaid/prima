@@ -43,6 +43,8 @@ export interface CreatePatientDTO {
 export interface UpdatePatientDTO {
   name?: string
   phoneNumber?: string
+  doctorName?: string | null
+  hospitalName?: string | null
   address?: string | null
   birthDate?: string | null
   diagnosisDate?: string | null

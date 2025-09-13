@@ -139,6 +139,8 @@ export const patients = pgTable(
     assignedVolunteerId: uuid("assigned_volunteer_id").references(
       () => users.id
     ),
+    doctorName: text("doctor_name"),
+    hospitalName: text("hospital_name"),
     emergencyContactName: text("emergency_contact_name"),
     emergencyContactPhone: text("emergency_contact_phone"),
     notes: text("notes"),
@@ -978,6 +980,7 @@ export const reminderContentAttachmentsRelations = relations(
       fields: [reminderContentAttachments.createdBy],
       references: [users.id],
     }),
+    // Note: Content relations (article/video) are handled separately due to polymorphic nature
   })
 );
 
@@ -1098,11 +1101,11 @@ export const patientMedicationsRelations = relations(
 );
 
 export const cmsArticlesRelations = relations(cmsArticles, ({ many }) => ({
-  contentAttachments: many(reminderContentAttachments),
+  // Note: contentAttachments relation removed as it's handled by reminderContentAttachmentsRelations
 }));
 
 export const cmsVideosRelations = relations(cmsVideos, ({ many }) => ({
-  contentAttachments: many(reminderContentAttachments),
+  // Note: contentAttachments relation removed as it's handled by reminderContentAttachmentsRelations
 }));
 
 export const medicationsRelations = relations(medications, ({ many }) => ({

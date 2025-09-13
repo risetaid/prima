@@ -48,6 +48,8 @@ interface Patient {
   birthDate?: string;
   diagnosisDate?: string;
   cancerStage?: string;
+  doctorName?: string;
+  hospitalName?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   notes?: string;
@@ -98,6 +100,8 @@ export default function PatientDetailPage() {
     name: "",
     phoneNumber: "",
     photoUrl: "",
+    doctorName: "",
+    hospitalName: "",
   });
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -183,6 +187,8 @@ export default function PatientDetailPage() {
             name: data.name,
             phoneNumber: data.phoneNumber,
             photoUrl: data.photoUrl || "",
+            doctorName: data.doctorName || "",
+            hospitalName: data.hospitalName || "",
           });
         }
         setError(null);
@@ -549,6 +555,8 @@ export default function PatientDetailPage() {
         name: patient.name,
         phoneNumber: patient.phoneNumber,
         photoUrl: patient.photoUrl || "",
+        doctorName: patient.doctorName || "",
+        hospitalName: patient.hospitalName || "",
       });
     }
   };
@@ -590,6 +598,8 @@ export default function PatientDetailPage() {
         body: JSON.stringify({
           name: editData.name,
           phoneNumber: editData.phoneNumber,
+          doctorName: editData.doctorName,
+          hospitalName: editData.hospitalName,
           address: patient.address,
           birthDate: patient.birthDate,
           diagnosisDate: patient.diagnosisDate,
@@ -657,53 +667,70 @@ export default function PatientDetailPage() {
     const confirmed = await new Promise<boolean>((resolve) => {
       toast.warning(`${actionTitle} ${patient.name}?`, {
         description: patient.isActive
-          ? 'Pasien akan dinonaktifkan (BERHENTI) dan tidak menerima pengingat.'
-          : 'Pasien akan diaktifkan kembali.',
+          ? "Pasien akan dinonaktifkan (BERHENTI) dan tidak menerima pengingat."
+          : "Pasien akan diaktifkan kembali.",
         action: { label: actionTitle, onClick: () => resolve(true) },
-        cancel: { label: 'Batal', onClick: () => resolve(false) },
+        cancel: { label: "Batal", onClick: () => resolve(false) },
         duration: 10000,
-      })
-    })
+      });
+    });
 
-    if (!confirmed) return
+    if (!confirmed) return;
 
     try {
       if (patient.isActive) {
         // Deactivate via BERHENTI flow
-        const resp = await fetch(`/api/patients/${params.id}/deactivate`, { method: 'POST' })
-        const data = await resp.json()
+        const resp = await fetch(`/api/patients/${params.id}/deactivate`, {
+          method: "POST",
+        });
+        const data = await resp.json();
         if (resp.ok) {
-          toast.success('Pasien dinonaktifkan (BERHENTI)', { description: `${patient.name} tidak akan menerima pengingat.` })
-          fetchPatient(params.id as string)
+          toast.success("Pasien dinonaktifkan (BERHENTI)", {
+            description: `${patient.name} tidak akan menerima pengingat.`,
+          });
+          fetchPatient(params.id as string);
         } else {
-          toast.error('Gagal menonaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+          toast.error("Gagal menonaktifkan pasien", {
+            description: data.error || "Terjadi kesalahan",
+          });
         }
       } else {
         // Reactivate via API
-        const resp = await fetch(`/api/patients/${params.id}/reactivate`, { method: 'POST' })
-        const data = await resp.json()
+        const resp = await fetch(`/api/patients/${params.id}/reactivate`, {
+          method: "POST",
+        });
+        const data = await resp.json();
         if (resp.ok) {
-          toast.success('Pasien diaktifkan kembali', { description: data.message || 'Status verifikasi direset ke pending.' })
-          fetchPatient(params.id as string)
+          toast.success("Pasien diaktifkan kembali", {
+            description:
+              data.message || "Status verifikasi direset ke pending.",
+          });
+          fetchPatient(params.id as string);
         } else {
-          toast.error('Gagal mengaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+          toast.error("Gagal mengaktifkan pasien", {
+            description: data.error || "Terjadi kesalahan",
+          });
         }
       }
     } catch (error) {
-      console.error('Error changing patient status:', error)
-      toast.error('Kesalahan Jaringan', { description: 'Tidak dapat mengubah status pasien.' })
+      console.error("Error changing patient status:", error);
+      toast.error("Kesalahan Jaringan", {
+        description: "Tidak dapat mengubah status pasien.",
+      });
     }
   };
 
   // Simplified Reminder Functions
   const handleAddReminder = () => {
-    if (!patient) return
-    const allowed = patient.verificationStatus === 'verified' && patient.isActive
+    if (!patient) return;
+    const allowed =
+      patient.verificationStatus === "verified" && patient.isActive;
     if (!allowed) {
-      toast.error('Pasien belum terverifikasi', {
-        description: 'Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.'
-      })
-      return
+      toast.error("Pasien belum terverifikasi", {
+        description:
+          "Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.",
+      });
+      return;
     }
     setIsReminderModalOpen(true);
   };
@@ -992,43 +1019,52 @@ export default function PatientDetailPage() {
                     />
                   </div>
 
-                  {/* Patient Status Badge */}
                   <div>
                     <label className="block text-gray-600 text-sm mb-2 font-medium">
-                      Status
+                      Nama Dokter
                     </label>
-                    <div
-                      className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-medium ${
-                        patient.isActive
-                          ? "bg-green-100 text-green-800 border border-green-200"
-                          : "bg-red-100 text-red-800 border border-red-200"
+                    <input
+                      type="text"
+                      value={editData.doctorName}
+                      onChange={(e) =>
+                        isEditMode &&
+                        setEditData({
+                          ...editData,
+                          doctorName: e.target.value,
+                        })
+                      }
+                      readOnly={!isEditMode}
+                      placeholder="Masukkan nama dokter"
+                      className={`w-full px-4 py-3 border rounded-xl text-gray-900 font-medium transition-all ${
+                        isEditMode
+                          ? "border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white shadow-sm"
+                          : "border-gray-200 bg-gray-50 cursor-default"
                       }`}
-                    >
-                      <div
-                        className={`w-2 h-2 rounded-full mr-2 ${
-                          patient.isActive ? "bg-green-500" : "bg-red-500"
-                        }`}
-                      ></div>
-                      {patient.isActive ? "Aktif" : "Nonaktif"}
-                    </div>
+                    />
                   </div>
 
-                  {/* Compliance Rate Display */}
                   <div>
                     <label className="block text-gray-600 text-sm mb-2 font-medium">
-                      Tingkat Kepatuhan
+                      Rumah Sakit
                     </label>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-1 bg-gray-200 rounded-full h-3">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all duration-300"
-                          style={{ width: `${patient.complianceRate}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-lg font-bold text-blue-600">
-                        {patient.complianceRate}%
-                      </span>
-                    </div>
+                    <input
+                      type="text"
+                      value={editData.hospitalName}
+                      onChange={(e) =>
+                        isEditMode &&
+                        setEditData({
+                          ...editData,
+                          hospitalName: e.target.value,
+                        })
+                      }
+                      readOnly={!isEditMode}
+                      placeholder="Masukkan nama rumah sakit"
+                      className={`w-full px-4 py-3 border rounded-xl text-gray-900 font-medium transition-all ${
+                        isEditMode
+                          ? "border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white shadow-sm"
+                          : "border-gray-200 bg-gray-50 cursor-default"
+                      }`}
+                    />
                   </div>
                 </div>
 
@@ -1097,11 +1133,17 @@ export default function PatientDetailPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <button
                       onClick={handleAddReminder}
-                      disabled={!(patient.verificationStatus === 'verified' && patient.isActive)}
+                      disabled={
+                        !(
+                          patient.verificationStatus === "verified" &&
+                          patient.isActive
+                        )
+                      }
                       className={`cursor-pointer py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 transition-all duration-200 ${
-                        patient.verificationStatus === 'verified' && patient.isActive
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl'
-                          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        patient.verificationStatus === "verified" &&
+                        patient.isActive
+                          ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
                       }`}
                     >
                       <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -1109,9 +1151,13 @@ export default function PatientDetailPage() {
                         Buat Pengingat
                       </span>
                     </button>
-                    {!(patient.verificationStatus === 'verified' && patient.isActive) && (
+                    {!(
+                      patient.verificationStatus === "verified" &&
+                      patient.isActive
+                    ) && (
                       <p className="text-xs text-gray-500 sm:col-span-2 text-center">
-                        Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan "YA" untuk mengaktifkan fitur ini.
+                        Pasien belum terverifikasi. Kirim verifikasi dan tunggu
+                        balasan "YA" untuk mengaktifkan fitur ini.
                       </p>
                     )}
                     <button

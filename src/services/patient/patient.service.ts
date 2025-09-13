@@ -106,6 +106,8 @@ export class PatientService {
       diagnosisDate: basic.diagnosisDate,
       cancerStage: basic.cancerStage,
       assignedVolunteerId: basic.assignedVolunteerId,
+      doctorName: basic.doctorName,
+      hospitalName: basic.hospitalName || basic.volunteerHospitalName, // Use patient's hospitalName or fallback to volunteer's
       emergencyContactName: basic.emergencyContactName,
       emergencyContactPhone: basic.emergencyContactPhone,
       notes: basic.notes,
@@ -250,6 +252,9 @@ export class PatientService {
       }
       values.phoneNumber = body.phoneNumber;
     }
+    if (body.doctorName !== undefined) values.doctorName = body.doctorName;
+    if (body.hospitalName !== undefined)
+      values.hospitalName = body.hospitalName;
     if (body.address !== undefined) values.address = body.address;
     if (body.birthDate !== undefined)
       values.birthDate = body.birthDate ? new Date(body.birthDate) : null;

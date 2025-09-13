@@ -15,6 +15,13 @@
       "when": 1757739701029,
       "tag": "0001_furry_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1757771710621,
+      "tag": "0002_last_molecule_man",
+      "breakpoints": true
     }
   ]
 }

@@ -413,6 +413,8 @@ export class PatientRepository {
         diagnosisDate: patients.diagnosisDate,
         cancerStage: patients.cancerStage,
         assignedVolunteerId: patients.assignedVolunteerId,
+        doctorName: patients.doctorName,
+        hospitalName: patients.hospitalName,
         emergencyContactName: patients.emergencyContactName,
         emergencyContactPhone: patients.emergencyContactPhone,
         notes: patients.notes,
@@ -432,6 +434,7 @@ export class PatientRepository {
         volunteerLastName: users.lastName,
         volunteerEmail: users.email,
         volunteerRole: users.role,
+        volunteerHospitalName: users.hospitalName,
       })
       .from(patients)
       .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
