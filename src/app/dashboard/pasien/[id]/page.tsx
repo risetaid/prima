@@ -679,8 +679,15 @@ export default function PatientDetailPage() {
           toast.error('Gagal menonaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
         }
       } else {
-        // Use existing reactivation flow modal to proceed
-        setIsReactivateModalOpen(true)
+        // Reactivate via API
+        const resp = await fetch(`/api/patients/${params.id}/reactivate`, { method: 'POST' })
+        const data = await resp.json()
+        if (resp.ok) {
+          toast.success('Pasien diaktifkan kembali', { description: data.message || 'Status verifikasi direset ke pending.' })
+          fetchPatient(params.id as string)
+        } else {
+          toast.error('Gagal mengaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+        }
       }
     } catch (error) {
       console.error('Error changing patient status:', error)
