@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock, ChevronDown } from "lucide-react";
+import { Clock } from "lucide-react";
 
 interface TimePicker24hProps {
   value: string; // HH:MM format
@@ -10,6 +10,7 @@ interface TimePicker24hProps {
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
+  selectedDate?: string; // YYYY-MM-DD format - if provided, only restrict past times for today
 }
 
 export function TimePicker24h({
@@ -19,8 +20,8 @@ export function TimePicker24h({
   placeholder = "Pilih waktu",
   disabled = false,
   required = false,
+  selectedDate,
 }: TimePicker24hProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [selectedHour, setSelectedHour] = useState<string>("");
   const [selectedMinute, setSelectedMinute] = useState<string>("");
 
@@ -48,12 +49,37 @@ export function TimePicker24h({
     }
   }, [selectedHour, selectedMinute, onChange, value]);
 
+  // Get current time for validation
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
   const hours = Array.from({ length: 24 }, (_, i) =>
     i.toString().padStart(2, "0")
   );
   const minutes = Array.from({ length: 60 }, (_, i) =>
     i.toString().padStart(2, "0")
   );
+
+  // Check if a time is in the past
+  const isTimeInPast = (hour: number, minute: number): boolean => {
+    // If no date is selected, allow all times
+    if (!selectedDate) return false;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    // If selected date is before today, allow all times (date picker handles this)
+    if (selectedDate < today) return false;
+
+    // If selected date is after today, allow all times
+    if (selectedDate > today) return false;
+
+    // Selected date is today - restrict based on current time
+    if (hour < currentHour) return true; // Past hour
+    if (hour === currentHour && minute < currentMinute) return true; // Same hour, past minute
+
+    return false; // Current hour with current/later minute, or future hour
+  };
 
   const displayValue =
     selectedHour && selectedMinute
@@ -62,24 +88,16 @@ export function TimePicker24h({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Trigger Button */}
-      <button
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
+      {/* Display Value */}
+      <div
         className={`
-          w-full px-4 py-3 border-2 border-blue-200 rounded-xl
-          focus:border-blue-500 focus:outline-none transition-colors
-          bg-white text-left flex items-center justify-between
-          ${
-            disabled
-              ? "bg-gray-100 cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:border-blue-300"
-          }
-          ${required && !value ? "border-red-300" : ""}
-        `}
+        w-full px-4 py-3 border-2 border-blue-200 rounded-xl
+        bg-white text-left flex items-center
+        ${disabled ? "bg-gray-100 cursor-not-allowed opacity-50" : ""}
+        ${required && !value ? "border-red-300" : ""}
+      `}
       >
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-1">
           <Clock className="w-5 h-5 text-blue-500" />
           <span
             className={
@@ -89,120 +107,77 @@ export function TimePicker24h({
             {displayValue}
           </span>
         </div>
-        <ChevronDown
-          className={`w-4 h-4 text-gray-400 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+      </div>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
-          />
-
-          {/* Dropdown Content */}
-          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 p-4">
-            <div className="flex items-center space-x-4">
-              {/* Hour Selector */}
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-2">
-                  Jam
-                </label>
-                <select
-                  value={selectedHour}
-                  onChange={(e) => setSelectedHour(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+      {/* Time Selectors - Always Visible */}
+      <div className="mt-2 flex items-center space-x-4">
+        {/* Hour Selector */}
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Jam
+          </label>
+          <select
+            value={selectedHour}
+            onChange={(e) => setSelectedHour(e.target.value)}
+            disabled={disabled}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="">--</option>
+            {hours.map((hour) => {
+              const hourNum = parseInt(hour);
+              const isPast = selectedMinute
+                ? isTimeInPast(hourNum, parseInt(selectedMinute))
+                : false;
+              return (
+                <option
+                  key={hour}
+                  value={hour}
+                  disabled={isPast}
+                  className={isPast ? "text-gray-400" : ""}
                 >
-                  <option value="">--</option>
-                  {hours.map((hour) => (
-                    <option key={hour} value={hour}>
-                      {hour}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {hour}
+                </option>
+              );
+            })}
+          </select>
+        </div>
 
-              {/* Separator */}
-              <div className="flex items-center pt-6">
-                <span className="text-lg font-bold text-gray-400">:</span>
-              </div>
+        {/* Separator */}
+        <div className="flex items-center pt-6">
+          <span className="text-lg font-bold text-gray-400">:</span>
+        </div>
 
-              {/* Minute Selector */}
-              <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500 mb-2">
-                  Menit
-                </label>
-                <select
-                  value={selectedMinute}
-                  onChange={(e) => setSelectedMinute(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        {/* Minute Selector */}
+        <div className="flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">
+            Menit
+          </label>
+          <select
+            value={selectedMinute}
+            onChange={(e) => setSelectedMinute(e.target.value)}
+            disabled={disabled}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+          >
+            <option value="">--</option>
+            {minutes.map((minute) => {
+              const minuteNum = parseInt(minute);
+              const isPast = selectedHour
+                ? isTimeInPast(parseInt(selectedHour), minuteNum)
+                : false;
+              return (
+                <option
+                  key={minute}
+                  value={minute}
+                  disabled={isPast}
+                  className={isPast ? "text-gray-400" : ""}
                 >
-                  <option value="">--</option>
-                  {minutes.map((minute) => (
-                    <option key={minute} value={minute}>
-                      {minute}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Quick Time Buttons */}
-            <div className="mt-4 pt-3 border-t border-gray-100">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "Sekarang", value: new Date() },
-                  { label: "08:00", value: "08:00" },
-                  { label: "12:00", value: "12:00" },
-                  { label: "18:00", value: "18:00" },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      if (preset.label === "Sekarang") {
-                        const now = preset.value as Date;
-                        setSelectedHour(
-                          now.getHours().toString().padStart(2, "0")
-                        );
-                        setSelectedMinute(
-                          now.getMinutes().toString().padStart(2, "0")
-                        );
-                      } else {
-                        const [hour, minute] = (preset.value as string).split(
-                          ":"
-                        );
-                        setSelectedHour(hour);
-                        setSelectedMinute(minute);
-                      }
-                      setIsOpen(false);
-                    }}
-                    className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Selesai
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+                  {minute}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
     </div>
   );
 }

@@ -91,6 +91,7 @@ export function AddReminderModal({
     frequency: "week" as "day" | "week" | "month",
     interval: 1,
     daysOfWeek: [] as number[], // 0=Sunday, 1=Monday, etc.
+    daysOfMonth: [] as number[], // For monthly recurrence: 1-31, multiple selection
     endType: "never" as "never" | "on" | "after",
     endDate: "",
     occurrences: 1,
@@ -118,6 +119,7 @@ export function AddReminderModal({
         frequency: "week",
         interval: 1,
         daysOfWeek: [],
+        daysOfMonth: [],
         endType: "never",
         endDate: "",
         occurrences: 1,
@@ -291,6 +293,15 @@ export function AddReminderModal({
         toast.error("Pilih minimal satu hari untuk pengulangan mingguan");
         return;
       }
+      if (
+        customRecurrence.frequency === "month" &&
+        customRecurrence.daysOfMonth.length === 0
+      ) {
+        toast.error(
+          "Pilih minimal satu tanggal untuk pengulangan bulanan"
+        );
+        return;
+      }
       if (customRecurrence.endType === "on" && !customRecurrence.endDate) {
         toast.error("Pilih tanggal berakhir untuk pengulangan");
         return;
@@ -317,6 +328,7 @@ export function AddReminderModal({
                 daysOfWeek: convertNumbersToDayNames(
                   customRecurrence.daysOfWeek
                 ),
+                daysOfMonth: customRecurrence.daysOfMonth,
                 endType: customRecurrence.endType,
                 endDate: customRecurrence.endDate || null,
                 occurrences: customRecurrence.occurrences,
@@ -634,6 +646,9 @@ export function AddReminderModal({
                     onChange={(time) => setFormData({ ...formData, time })}
                     placeholder="Pilih jam pengingat"
                     required
+                    selectedDate={
+                      selectedDates.length > 0 ? selectedDates[0] : undefined
+                    }
                   />
                 </div>
 
@@ -768,6 +783,15 @@ export function AddReminderModal({
                                   .join(", ")}
                               </span>
                             )}
+                          {customRecurrence.frequency === "month" && (
+                            <span>
+                              {" "}
+                              pada tanggal{" "}
+                              {customRecurrence.daysOfMonth
+                                .sort((a, b) => a - b)
+                                .join(", ")}
+                            </span>
+                          )}
                           {customRecurrence.endType === "on" &&
                             ` sampai ${customRecurrence.endDate}`}
                           {customRecurrence.endType === "after" &&
@@ -871,25 +895,60 @@ export function AddReminderModal({
                   Ulangi pada hari
                 </label>
                 <div className="flex space-x-1">
-                  {["S", "S", "R", "K", "J", "S", "M"].map((day, index) => (
+                  {["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"].map(
+                    (day, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          const newDays = customRecurrence.daysOfWeek.includes(
+                            index
+                          )
+                            ? customRecurrence.daysOfWeek.filter(
+                                (d) => d !== index
+                              )
+                            : [...customRecurrence.daysOfWeek, index];
+                          setCustomRecurrence((prev) => ({
+                            ...prev,
+                            daysOfWeek: newDays,
+                          }));
+                        }}
+                        className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
+                          customRecurrence.daysOfWeek.includes(index)
+                            ? "bg-blue-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Repeat on (for monthly) */}
+            {customRecurrence.frequency === "month" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ulangi pada tanggal
+                </label>
+                <div className="grid grid-cols-7 gap-1 max-h-32 overflow-y-auto">
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
                     <button
-                      key={index}
+                      key={day}
                       type="button"
                       onClick={() => {
-                        const newDays = customRecurrence.daysOfWeek.includes(
-                          index
-                        )
-                          ? customRecurrence.daysOfWeek.filter(
-                              (d) => d !== index
-                            )
-                          : [...customRecurrence.daysOfWeek, index];
+                        const newDays = customRecurrence.daysOfMonth.includes(day)
+                          ? customRecurrence.daysOfMonth.filter((d) => d !== day)
+                          : [...customRecurrence.daysOfMonth, day];
                         setCustomRecurrence((prev) => ({
                           ...prev,
-                          daysOfWeek: newDays,
+                          daysOfMonth: newDays,
                         }));
                       }}
                       className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
-                        customRecurrence.daysOfWeek.includes(index)
+                        customRecurrence.daysOfMonth.includes(day)
                           ? "bg-blue-500 text-white"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
@@ -898,6 +957,9 @@ export function AddReminderModal({
                     </button>
                   ))}
                 </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Pilih satu atau lebih tanggal dalam bulan untuk pengulangan bulanan
+                </p>
               </div>
             )}
 

@@ -72,7 +72,15 @@ export default function AllRemindersPage() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString || dateString === "null" || dateString === "undefined") {
+      return "Tanggal tidak tersedia";
+    }
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "Tanggal tidak valid";
+    }
+
     const days = [
       "Minggu",
       "Senin",

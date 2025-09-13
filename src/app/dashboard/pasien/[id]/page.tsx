@@ -464,7 +464,10 @@ export default function PatientDetailPage() {
   const handleDateClick = (day: number) => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
-    const dateString = new Date(year, month, day).toISOString().split("T")[0];
+    // Create date string without timezone conversion to avoid off-by-one errors
+    const dateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
     setSelectedDate(dateString);
     setShowCalendar(false);
   };
@@ -506,7 +509,10 @@ export default function PatientDetailPage() {
   const handleEditDateClick = (day: number) => {
     const year = editCurrentMonth.getFullYear();
     const month = editCurrentMonth.getMonth();
-    const dateString = new Date(year, month, day).toISOString().split("T")[0];
+    // Create date string without timezone conversion to avoid off-by-one errors
+    const dateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
     setEditSelectedDate(dateString);
     setShowEditCalendar(false);
   };
@@ -1558,13 +1564,12 @@ export default function PatientDetailPage() {
                             onClick={() => handleDateClick(day)}
                             className={`w-8 h-8 rounded text-sm font-medium transition-colors cursor-pointer ${
                               selectedDate ===
-                              new Date(
-                                currentMonth.getFullYear(),
-                                currentMonth.getMonth(),
-                                day
-                              )
-                                .toISOString()
-                                .split("T")[0]
+                              `${currentMonth.getFullYear()}-${String(
+                                currentMonth.getMonth() + 1
+                              ).padStart(2, "0")}-${String(day).padStart(
+                                2,
+                                "0"
+                              )}`
                                 ? "bg-blue-500 text-white"
                                 : "text-blue-500 hover:bg-blue-50"
                             }`}
@@ -1689,13 +1694,12 @@ export default function PatientDetailPage() {
                             onClick={() => handleEditDateClick(day)}
                             className={`w-8 h-8 rounded text-sm font-medium transition-colors cursor-pointer ${
                               editSelectedDate ===
-                              new Date(
-                                editCurrentMonth.getFullYear(),
-                                editCurrentMonth.getMonth(),
-                                day
-                              )
-                                .toISOString()
-                                .split("T")[0]
+                              `${editCurrentMonth.getFullYear()}-${String(
+                                editCurrentMonth.getMonth() + 1
+                              ).padStart(2, "0")}-${String(day).padStart(
+                                2,
+                                "0"
+                              )}`
                                 ? "bg-blue-500 text-white"
                                 : "text-blue-500 hover:bg-blue-50"
                             }`}
