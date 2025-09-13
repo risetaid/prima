@@ -651,63 +651,40 @@ export default function PatientDetailPage() {
   const handleToggleStatus = async () => {
     if (!patient) return;
 
-    const action = patient.isActive ? "nonaktifkan" : "aktifkan";
     const actionTitle = patient.isActive ? "Nonaktifkan" : "Aktifkan";
 
-    // Show confirmation toast
+    // Confirm
     const confirmed = await new Promise<boolean>((resolve) => {
       toast.warning(`${actionTitle} ${patient.name}?`, {
-        description: `Pasien akan di${action} dan ${
-          patient.isActive
-            ? "tidak muncul di daftar"
-            : "muncul kembali di daftar"
-        }.`,
-        action: {
-          label: actionTitle,
-          onClick: () => resolve(true),
-        },
-        cancel: {
-          label: "Batal",
-          onClick: () => resolve(false),
-        },
+        description: patient.isActive
+          ? 'Pasien akan dinonaktifkan (BERHENTI) dan tidak menerima pengingat.'
+          : 'Pasien akan diaktifkan kembali.',
+        action: { label: actionTitle, onClick: () => resolve(true) },
+        cancel: { label: 'Batal', onClick: () => resolve(false) },
         duration: 10000,
-      });
-    });
+      })
+    })
 
-    if (!confirmed) return;
+    if (!confirmed) return
 
     try {
-      const response = await fetch(`/api/patients/${params.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...patient,
-          isActive: !patient.isActive,
-        }),
-      });
-
-      if (response.ok) {
-        const updatedPatient = await response.json();
-        setPatient(updatedPatient);
-        toast.success(`Pasien ${action}`, {
-          description: `${patient.name} berhasil di${action}.`,
-        });
+      if (patient.isActive) {
+        // Deactivate via BERHENTI flow
+        const resp = await fetch(`/api/patients/${params.id}/deactivate`, { method: 'POST' })
+        const data = await resp.json()
+        if (resp.ok) {
+          toast.success('Pasien dinonaktifkan (BERHENTI)', { description: `${patient.name} tidak akan menerima pengingat.` })
+          fetchPatient(params.id as string)
+        } else {
+          toast.error('Gagal menonaktifkan pasien', { description: data.error || 'Terjadi kesalahan' })
+        }
       } else {
-        const error = await response.json();
-        toast.error(`Gagal ${actionTitle}`, {
-          description: `Error: ${
-            error.error || "Terjadi kesalahan pada server"
-          }`,
-        });
+        // Use existing reactivation flow modal to proceed
+        setIsReactivateModalOpen(true)
       }
     } catch (error) {
-      console.error("Error toggling patient status:", error);
-      toast.error("Kesalahan Jaringan", {
-        description:
-          "Tidak dapat mengubah status pasien. Periksa koneksi internet Anda.",
-      });
+      console.error('Error changing patient status:', error)
+      toast.error('Kesalahan Jaringan', { description: 'Tidak dapat mengubah status pasien.' })
     }
   };
 
