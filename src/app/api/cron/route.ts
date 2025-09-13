@@ -10,10 +10,12 @@ import {
 } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { isDuplicateEvent } from "@/lib/idempotency";
 // Rate limiter temporarily disabled
 
 const whatsappService = new WhatsAppService();
+const reminderRepository = new ReminderRepository();
 
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
@@ -211,6 +213,35 @@ async function processReminders() {
       schedulesFound: reminderSchedulesToProcess.length,
     });
 
+    // Fetch attachments for all schedules
+    const scheduleIds = reminderSchedulesToProcess.map((s) => s.id);
+    const allAttachments =
+      scheduleIds.length > 0
+        ? await reminderRepository.getAttachments(scheduleIds)
+        : [];
+
+    // Group attachments by reminderScheduleId
+    const attachmentsByScheduleId: Record<
+      string,
+      Array<{
+        type: "article" | "video";
+        title: string;
+        url: string;
+        id: string;
+      }>
+    > = {};
+    for (const attachment of allAttachments) {
+      if (!attachmentsByScheduleId[attachment.reminderScheduleId]) {
+        attachmentsByScheduleId[attachment.reminderScheduleId] = [];
+      }
+      attachmentsByScheduleId[attachment.reminderScheduleId].push({
+        type: attachment.contentType as "article" | "video",
+        title: attachment.contentTitle,
+        url: attachment.contentUrl,
+        id: "", // Not needed for building message
+      });
+    }
+
     for (const schedule of reminderSchedulesToProcess) {
       processedCount++;
 
@@ -260,6 +291,9 @@ async function processReminders() {
           // Validate phone number exists
           if (!schedule.patientPhoneNumber) {
             errorCount++;
+            debugLogs.push(
+              `❌ Missing phone number for ${schedule.patientName}`
+            );
             continue;
           }
 
@@ -273,19 +307,77 @@ async function processReminders() {
               patientId: schedule.patientId,
               reminderId: schedule.id,
               medicationName: schedule.medicationName,
+              hasCustomMessage: Boolean(schedule.customMessage),
             });
 
-            const result = await whatsappService.sendMedicationReminder(
+            // Get attachments for this schedule
+            const attachments = attachmentsByScheduleId[schedule.id] || [];
+
+            // Build message: use customMessage if available, otherwise fallback to template
+            let messageToSend: string;
+            if (schedule.customMessage) {
+              // Use custom message with attachments
+              messageToSend = whatsappService.buildMessage(
+                schedule.customMessage,
+                attachments
+              );
+            } else {
+              // Fallback to template message
+              const templateMessage = `💊 *Pengingat Minum Obat*
+
+Halo ${schedule.patientName}!
+
+Saatnya minum obat:
+🔹 *Obat:* ${schedule.medicationName || "obat Anda"}
+🔹 *Dosis:* sesuai resep
+🔹 *Waktu:* ${schedule.scheduledTime}
+
+*Balas setelah minum obat:*
+✅ SUDAH / SELESAI
+⏰ BELUM (akan diingatkan lagi)
+🆘 BANTUAN (butuh bantuan relawan)
+
+💙 Tim PRIMA`;
+
+              messageToSend =
+                attachments.length > 0
+                  ? whatsappService.buildMessage(templateMessage, attachments)
+                  : templateMessage;
+            }
+
+            const result = await whatsappService.send(
               schedule.patientPhoneNumber,
-              schedule.patientName!,
-              schedule.medicationName || "obat Anda",
-              "sesuai resep", // Default dosage text
-              schedule.scheduledTime,
-              [] // No attachments for simplified version
+              messageToSend
             );
 
             const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
             debugLogs.push(providerLogMessage);
+
+            // Add comprehensive details about the sent reminder
+            if (result.success) {
+              debugLogs.push(`✅ Reminder sent successfully:`);
+              debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
+              debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
+              debugLogs.push(
+                `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+              );
+              debugLogs.push(`   ⏰ Scheduled: ${schedule.scheduledTime}`);
+              debugLogs.push(
+                `   📝 Custom Message: ${
+                  schedule.customMessage ? "Yes" : "No (using template)"
+                }`
+              );
+              debugLogs.push(`   📎 Attachments: ${attachments.length}`);
+              debugLogs.push(`   🆔 Fonnte ID: ${result.messageId}`);
+            } else {
+              debugLogs.push(`❌ Failed to send reminder:`);
+              debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
+              debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
+              debugLogs.push(
+                `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+              );
+              debugLogs.push(`   ❌ Error: ${result.error}`);
+            }
 
             // Create reminder log - SENT means waiting for poll confirmation
             const status: "SENT" | "FAILED" = result.success
@@ -296,7 +388,9 @@ async function processReminders() {
               patientId: schedule.patientId,
               sentAt: getWIBTime(),
               status: status,
-              message: `Text: Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
+              message:
+                schedule.customMessage ||
+                `Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
               phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId,
             };
