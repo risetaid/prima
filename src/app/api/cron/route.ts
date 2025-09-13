@@ -135,7 +135,7 @@ async function processFollowUpReminders(debugLogs: string[]): Promise<{
           eq(reminderLogs.status, 'SENT'), // Only SENT status (waiting for confirmation)
           lte(reminderLogs.sentAt, fifteenMinutesAgo), // Sent more than 15 minutes ago
           isNull(reminderLogs.followupSentAt), // No follow-up sent yet
-          isNull(reminderLogs.confirmedAt), // Not manually confirmed
+          eq(reminderLogs.confirmationStatus, 'PENDING'), // Not confirmed yet
           eq(patients.isActive, true), // Patient is active
           eq(patients.verificationStatus, 'verified'), // Patient is verified
           // Check that no text response confirmation exists
