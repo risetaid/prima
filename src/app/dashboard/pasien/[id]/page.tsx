@@ -100,8 +100,6 @@ export default function PatientDetailPage() {
     name: "",
     phoneNumber: "",
     photoUrl: "",
-    doctorName: "",
-    hospitalName: "",
   });
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -187,8 +185,6 @@ export default function PatientDetailPage() {
             name: data.name,
             phoneNumber: data.phoneNumber,
             photoUrl: data.photoUrl || "",
-            doctorName: data.doctorName || "",
-            hospitalName: data.hospitalName || "",
           });
         }
         setError(null);
@@ -555,8 +551,6 @@ export default function PatientDetailPage() {
         name: patient.name,
         phoneNumber: patient.phoneNumber,
         photoUrl: patient.photoUrl || "",
-        doctorName: patient.doctorName || "",
-        hospitalName: patient.hospitalName || "",
       });
     }
   };
@@ -598,8 +592,6 @@ export default function PatientDetailPage() {
         body: JSON.stringify({
           name: editData.name,
           phoneNumber: editData.phoneNumber,
-          doctorName: editData.doctorName,
-          hospitalName: editData.hospitalName,
           address: patient.address,
           birthDate: patient.birthDate,
           diagnosisDate: patient.diagnosisDate,
@@ -1011,54 +1003,6 @@ export default function PatientDetailPage() {
                         })
                       }
                       readOnly={!isEditMode}
-                      className={`w-full px-4 py-3 border rounded-xl text-gray-900 font-medium transition-all ${
-                        isEditMode
-                          ? "border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white shadow-sm"
-                          : "border-gray-200 bg-gray-50 cursor-default"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-600 text-sm mb-2 font-medium">
-                      Nama Dokter
-                    </label>
-                    <input
-                      type="text"
-                      value={editData.doctorName}
-                      onChange={(e) =>
-                        isEditMode &&
-                        setEditData({
-                          ...editData,
-                          doctorName: e.target.value,
-                        })
-                      }
-                      readOnly={!isEditMode}
-                      placeholder="Masukkan nama dokter"
-                      className={`w-full px-4 py-3 border rounded-xl text-gray-900 font-medium transition-all ${
-                        isEditMode
-                          ? "border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white shadow-sm"
-                          : "border-gray-200 bg-gray-50 cursor-default"
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-gray-600 text-sm mb-2 font-medium">
-                      Rumah Sakit
-                    </label>
-                    <input
-                      type="text"
-                      value={editData.hospitalName}
-                      onChange={(e) =>
-                        isEditMode &&
-                        setEditData({
-                          ...editData,
-                          hospitalName: e.target.value,
-                        })
-                      }
-                      readOnly={!isEditMode}
-                      placeholder="Masukkan nama rumah sakit"
                       className={`w-full px-4 py-3 border rounded-xl text-gray-900 font-medium transition-all ${
                         isEditMode
                           ? "border-blue-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white shadow-sm"
