@@ -255,14 +255,48 @@ async function processReminders() {
     debugLogs.push(logMessage);
 
     // Get all active reminder schedules for today
-    const todayWIB = getWIBDateString();
+    let todayWIB: string;
+    let endOfDay: Date;
+    let todayStart: Date;
+    
+    try {
+      todayWIB = getWIBDateString();
+      logger.info("WIB date string generated successfully", {
+        api: true,
+        cron: true,
+        todayWIB
+      });
+    } catch (error) {
+      logger.error("Failed to get WIB date string", error as Error, {
+        api: true,
+        cron: true
+      });
+      throw new Error(`Timezone calculation failed: ${(error as Error).message}`);
+    }
 
     // Use batch processing for better memory management
     const batchSize = 50; // Process in batches to prevent memory issues
 
     // First, get count to determine if we need batch processing
-    const { endOfDay } = createWIBDateRange(todayWIB);
-    const todayStart = getWIBTodayStart();
+    try {
+      const dateRange = createWIBDateRange(todayWIB);
+      endOfDay = dateRange.endOfDay;
+      todayStart = getWIBTodayStart();
+      
+      logger.info("Timezone calculations completed", {
+        api: true,
+        cron: true,
+        endOfDay: endOfDay.toISOString(),
+        todayStart: todayStart.toISOString(),
+      });
+    } catch (error) {
+      logger.error("Failed to calculate timezone ranges", error as Error, {
+        api: true,
+        cron: true,
+        todayWIB
+      });
+      throw new Error(`Timezone range calculation failed: ${(error as Error).message}`);
+    }
 
     // Count reminder schedules that haven't been delivered today yet
     logger.info("Executing database count query for reminder schedules", {
