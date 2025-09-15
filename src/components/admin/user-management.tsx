@@ -17,6 +17,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface User {
   id: string;
@@ -338,7 +339,7 @@ export default function UserManagement() {
 
       if (profileResponse.ok && profileData.id) setCurrentUser(profileData);
     } catch (error) {
-      console.error("Error fetching users:", error);
+      logger.error("Error fetching users", error as Error);
       toast.error("Failed to fetch users");
     } finally {
       setLoading(false);
@@ -368,7 +369,7 @@ export default function UserManagement() {
         toast.error(data.error || errorMessage);
       }
     } catch (error) {
-      console.error(`Error: ${errorMessage}`, error);
+      logger.error(`Error: ${errorMessage}`, error as Error);
       toast.error(errorMessage);
     } finally {
       setActionLoading(null);
@@ -454,7 +455,7 @@ export default function UserManagement() {
         toast.error("Sync Clerk gagal", { description: data.error || "Terjadi kesalahan pada server" });
       }
     } catch (error) {
-      console.error("Error syncing with Clerk:", error);
+      logger.error("Error syncing with Clerk", error as Error);
       toast.error("Sync Clerk gagal", { description: "Terjadi kesalahan jaringan" });
     } finally {
       setSyncing(false);

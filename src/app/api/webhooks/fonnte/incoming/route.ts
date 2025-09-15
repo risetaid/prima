@@ -266,7 +266,7 @@ async function sendAck(phoneNumber: string, message: string) {
   try {
     await whatsappService.sendAck(phoneNumber, message);
   } catch (e) {
-    console.warn("Failed to send ACK via WhatsApp:", e);
+    logger.warn("Failed to send ACK via WhatsApp", { error: e as Error });
   }
 }
 

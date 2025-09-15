@@ -3,53 +3,54 @@ import { ReminderService } from './reminder.service'
 import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 import { ValidationError, NotFoundError, CustomRecurrence } from './reminder.types'
 import { extractMedicationName } from '@/lib/medication-utils'
+import { logger } from '@/lib/logger'
 
 // Test script to verify the centralized system
 async function runTests() {
-  console.log('🧪 Running Reminder Service Integration Tests...\n')
+  logger.info('🧪 Running Reminder Service Integration Tests...\n')
   
   const whatsappService = new WhatsAppService()
   let testsPassed = 0
   let testsFailed = 0
 
   // Test 1: Message Building
-  console.log('Test 1: WhatsApp Message Building')
+  logger.info('Test 1: WhatsApp Message Building')
   try {
     const baseMessage = 'Halo Test, jangan lupa minum obat Paracetamol'
     const attachments = [
       { id: '1', type: 'article' as const, title: 'Cara Minum Obat', url: 'https://example.com/article' },
       { id: '2', type: 'video' as const, title: 'Video Edukasi', url: 'https://example.com/video' }
     ]
-    
+
     const message = whatsappService.buildMessage(baseMessage, attachments)
-    
+
     if (message.includes('📚 Baca juga:') && message.includes('🎥 Tonton juga:') && message.includes('💙 Tim PRIMA')) {
-      console.log('✅ Message building works correctly')
+      logger.info('✅ Message building works correctly')
       testsPassed++
     } else {
-      console.log('❌ Message building failed')
+      logger.info('❌ Message building failed')
       testsFailed++
     }
   } catch (error) {
-    console.log('❌ Message building error:', error)
+    logger.info('❌ Message building error', { error: error as Error })
     testsFailed++
   }
 
   // Test 2: Content Prefix Generation
-  console.log('\nTest 2: Content Prefix Generation')
+  logger.info('\nTest 2: Content Prefix Generation')
   try {
     const articlePrefix = whatsappService.getContentPrefix('article')
     const videoPrefix = whatsappService.getContentPrefix('video')
-    
+
     if (articlePrefix === '📚 Baca juga:' && videoPrefix === '🎥 Tonton juga:') {
-      console.log('✅ Content prefix generation works correctly')
+      logger.info('✅ Content prefix generation works correctly')
       testsPassed++
     } else {
-      console.log('❌ Content prefix generation failed')
+      logger.info('❌ Content prefix generation failed')
       testsFailed++
     }
   } catch (error) {
-    console.log('❌ Content prefix error:', error)
+    logger.info('❌ Content prefix error', { error: error as Error })
     testsFailed++
   }
 

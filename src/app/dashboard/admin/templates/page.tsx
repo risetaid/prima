@@ -7,6 +7,7 @@ import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 export default function AdminTemplatesPage() {
@@ -34,7 +35,7 @@ export default function AdminTemplatesPage() {
         return;
       }
     } catch (error) {
-      console.error("Error checking admin access:", error);
+      logger.error("Error checking admin access", error as Error);
       router.push("/dashboard");
       return;
     } finally {
@@ -73,7 +74,7 @@ export default function AdminTemplatesPage() {
         toast.error(data.error || "Gagal menambahkan template");
       }
     } catch (error) {
-      console.error("Error seeding templates:", error);
+      logger.error("Error seeding templates", error as Error);
       toast.error("Terjadi kesalahan saat menambahkan template");
     } finally {
       setSeeding(false);

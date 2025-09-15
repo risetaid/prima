@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect } from "react";
 import DashboardClient from "./dashboard-client";
 import { Header } from "@/components/ui/header";
-import { HeaderSkeleton } from "@/components/ui/dashboard-skeleton";
+import { DashboardSkeleton } from "@/components/ui/dashboard-skeleton";
 
 export default function DashboardPage() {
   const { isLoaded } = useUser();
@@ -31,24 +31,8 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Header Skeleton */}
-        <div className="relative z-10">
-          <HeaderSkeleton />
-        </div>
-
-        {/* Loading Content */}
-        <main className="relative z-10">
-          <div className="px-4 sm:px-6 lg:px-8 py-8">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-3 bg-white/80 backdrop-blur-sm px-6 py-4 rounded-lg shadow-sm">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                <span className="text-gray-700 font-medium">
-                  Menginisialisasi sistem...
-                </span>
-              </div>
-            </div>
-          </div>
-        </main>
+        {/* Dashboard Skeleton */}
+        <DashboardSkeleton />
       </div>
     );
   }

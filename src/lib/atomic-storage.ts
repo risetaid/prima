@@ -3,6 +3,8 @@
  * between multiple tabs/windows accessing the same keys
  */
 
+import { logger } from "./logger";
+
 interface StorageLock {
   key: string;
   expiresAt: number;
@@ -44,8 +46,8 @@ async function acquireLock(key: string): Promise<boolean> {
     // No existing lock, acquire it
     localStorage.setItem(lockKey, JSON.stringify(lockData));
     return true;
-  } catch (error) {
-    console.warn("Failed to acquire storage lock:", error);
+   } catch (error) {
+    logger.warn("Failed to acquire storage lock", { error: error as Error });
     return false;
   }
 }
@@ -63,8 +65,8 @@ function releaseLock(key: string): void {
         localStorage.removeItem(lockKey);
       }
     }
-  } catch (error) {
-    console.warn("Failed to release storage lock:", error);
+   } catch (error) {
+    logger.warn("Failed to release storage lock", { error: error as Error });
   }
 }
 
@@ -80,8 +82,8 @@ export async function atomicGet<T>(
       try {
         const value = localStorage.getItem(key);
         return value ? JSON.parse(value) : null;
-      } catch (error) {
-        console.warn(`Atomic get failed for key ${key}:`, error);
+       } catch (error) {
+        logger.warn(`Atomic get failed for key ${key}`, { error: error as Error });
         return null;
       } finally {
         releaseLock(key);
@@ -94,7 +96,7 @@ export async function atomicGet<T>(
     }
   }
 
-  console.warn(
+  logger.warn(
     `Failed to acquire lock for atomic get of key ${key} after ${maxRetries} attempts`
   );
   return null;
@@ -113,8 +115,8 @@ export async function atomicSet<T>(
       try {
         localStorage.setItem(key, JSON.stringify(value));
         return true;
-      } catch (error) {
-        console.warn(`Atomic set failed for key ${key}:`, error);
+       } catch (error) {
+        logger.warn(`Atomic set failed for key ${key}`, { error: error as Error });
         return false;
       } finally {
         releaseLock(key);
@@ -127,7 +129,7 @@ export async function atomicSet<T>(
     }
   }
 
-  console.warn(
+  logger.warn(
     `Failed to acquire lock for atomic set of key ${key} after ${maxRetries} attempts`
   );
   return false;
@@ -145,8 +147,8 @@ export async function atomicRemove(
       try {
         localStorage.removeItem(key);
         return true;
-      } catch (error) {
-        console.warn(`Atomic remove failed for key ${key}:`, error);
+       } catch (error) {
+        logger.warn(`Atomic remove failed for key ${key}`, { error: error as Error });
         return false;
       } finally {
         releaseLock(key);
@@ -159,7 +161,7 @@ export async function atomicRemove(
     }
   }
 
-  console.warn(
+  logger.warn(
     `Failed to acquire lock for atomic remove of key ${key} after ${maxRetries} attempts`
   );
   return false;
@@ -182,8 +184,8 @@ export async function atomicUpdate<T>(
 
         localStorage.setItem(key, JSON.stringify(newValue));
         return newValue;
-      } catch (error) {
-        console.warn(`Atomic update failed for key ${key}:`, error);
+       } catch (error) {
+        logger.warn(`Atomic update failed for key ${key}`, { error: error as Error });
         return null;
       } finally {
         releaseLock(key);
@@ -196,7 +198,7 @@ export async function atomicUpdate<T>(
     }
   }
 
-  console.warn(
+  logger.warn(
     `Failed to acquire lock for atomic update of key ${key} after ${maxRetries} attempts`
   );
   return null;
@@ -225,7 +227,7 @@ export function cleanupExpiredLocks(): void {
       }
     });
   } catch (error) {
-    console.warn("Failed to cleanup expired locks:", error);
+    logger.warn("Failed to cleanup expired locks", { error: error as Error });
   }
 }
 
@@ -252,7 +254,7 @@ if (typeof window !== "undefined") {
         }
       });
     } catch (error) {
-      console.warn("Failed to cleanup locks on unload:", error);
+      logger.warn("Failed to cleanup locks on unload", { error: error as Error });
     }
   });
 

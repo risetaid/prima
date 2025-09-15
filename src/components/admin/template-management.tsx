@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Plus, Edit, Trash2, MessageSquare, Calendar, BookOpen, Eye, Database } from 'lucide-react'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 
 interface WhatsAppTemplate {
@@ -56,8 +57,8 @@ const categoryColors = {
 }
 
 const commonVariables = [
-  '{nama}', '{obat}', '{dosis}', '{waktu}', '{tanggal}', 
-  '{dokter}', '{rumahSakit}', '{volunteer}'
+  '{nama}', '{obat}', '{dosis}', '{waktu}', '{tanggal}',
+  '{dokter}', '{rumahSakit}', '{volunteer}', '{nomor}'
 ]
 
 interface TemplateManagementProps {
@@ -102,7 +103,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         toast.error('Failed to fetch templates')
       }
     } catch (error) {
-      console.error('Error fetching templates:', error)
+      logger.error('Error fetching templates', error as Error)
       toast.error('Failed to fetch templates')
     } finally {
       setLoading(false)
@@ -177,7 +178,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         toast.error(data.error || 'Failed to create template')
       }
     } catch (error) {
-      console.error('Error creating template:', error)
+      logger.error('Error creating template', error as Error)
       toast.error('Failed to create template')
     } finally {
       setActionLoading(null)
@@ -210,7 +211,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         toast.error(data.error || 'Failed to update template')
       }
     } catch (error) {
-      console.error('Error updating template:', error)
+      logger.error('Error updating template', error as Error)
       toast.error('Failed to update template')
     } finally {
       setActionLoading(null)
@@ -240,7 +241,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         toast.error(data.error || 'Failed to deactivate template')
       }
     } catch (error) {
-      console.error('Error deactivating template:', error)
+      logger.error('Error deactivating template', error as Error)
       toast.error('Failed to deactivate template')
     } finally {
       setActionLoading(null)
@@ -352,7 +353,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
          {templates.length === 0 ? (
            <EmptyTemplates onCreate={() => setIsCreateDialogOpen(true)} />
          ) : (
-           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {templates.map((template) => (
               <TemplateCard
                 key={template.id}
@@ -456,7 +457,7 @@ function TemplateCard({
 
   return (
     <Card className="hover:shadow-md transition-shadow h-full">
-      <CardContent className="p-4 sm:p-6 flex flex-col h-full">
+      <CardContent className="p-3 sm:p-4 lg:p-6 flex flex-col h-full">
         <div className="flex flex-col gap-4 flex-1">
           <div className="flex-1">
             <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 mb-3">
@@ -577,7 +578,8 @@ function TemplatePreview({ template }: { template: WhatsAppTemplate }) {
       '{tanggal}': '15 Januari 2024',
       '{dokter}': 'Dr. Ahmad',
       '{rumahSakit}': 'RS Harapan',
-      '{volunteer}': 'Sari (volunteer)'
+      '{volunteer}': 'Sari (volunteer)',
+      '{nomor}': '08123456789'
     }
 
     let previewText = text

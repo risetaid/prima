@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IndonesianDateInput } from "@/components/ui/indonesian-date-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { PatientVariablesManager } from "@/components/patient/patient-variables-manager";
 import { WhatsAppVerificationSection } from "@/components/patient/whatsapp-verification-section";
 import { HealthNotesSection } from "@/components/patient/health-notes-section";
@@ -169,11 +170,11 @@ export default function PatientDetailPage() {
       } else if (response.status === 404) {
         setHealthNotes([]);
       } else {
-        console.error("Health notes fetch error:", response.status, response.statusText);
+        logger.error("Health notes fetch error", undefined, { status: response.status, statusText: response.statusText });
         toast.error("Gagal memuat catatan kesehatan");
       }
     } catch {
-      console.error("Health notes fetch error");
+      logger.error("Health notes fetch error");
       toast.error("Gagal memuat catatan kesehatan");
     }
   }, []);
@@ -192,7 +193,7 @@ export default function PatientDetailPage() {
         setCompletedReminders([]);
       }
     } catch {
-      console.error("Error fetching completed reminders");
+      logger.error("Error fetching completed reminders");
       setCompletedReminders([]);
     }
   }, []);
@@ -244,7 +245,7 @@ export default function PatientDetailPage() {
         toast.error(error.error || "Gagal menambahkan catatan");
       }
     } catch {
-      console.error("Error adding health note");
+      logger.error("Error adding health note");
       toast.error("Gagal menambahkan catatan");
     }
   };

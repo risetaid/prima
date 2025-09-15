@@ -691,6 +691,157 @@ export function PatientListMobileSkeleton() {
   )
 }
 
+// Dashboard Skeleton - matches the exact structure of the dashboard page
+export function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50 relative">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <Skeleton className="absolute inset-0" />
+      </div>
+
+      {/* Mobile Navigation Buttons */}
+      <div className="lg:hidden bg-blue-500 px-6 py-8 relative z-10">
+        <div className="flex space-x-6 justify-center pb-4">
+          {Array.from({ length: 3 }).map((value, i) => (
+            <div key={i} className="text-center flex-shrink-0 min-w-[80px]">
+              <Skeleton className="h-20 w-20 mx-auto mb-3 rounded-lg" />
+              <Skeleton className="h-4 w-16 mx-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop Header */}
+      <div className="hidden lg:block relative z-10">
+        <div className="bg-blue-600 text-white py-6">
+          <div className="px-8">
+            <div className="flex items-center justify-between">
+              {/* Search Bar */}
+              <div className="bg-white rounded-lg">
+                <Skeleton className="h-12 w-80" />
+              </div>
+              {/* Patient Count with Add Button */}
+              <div className="flex items-center space-x-4">
+                <Skeleton className="h-8 w-64 bg-blue-500" />
+                <Skeleton className="h-10 w-10 bg-blue-500 rounded-full" />
+              </div>
+              {/* Filter Buttons */}
+              <div className="flex space-x-3">
+                <Skeleton className="h-12 w-16 bg-blue-500 rounded-full" />
+                <Skeleton className="h-12 w-20 bg-blue-500 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Status Badge */}
+      <div className="lg:hidden mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4 relative z-10">
+        <Skeleton className="h-4 w-48 mx-auto" />
+      </div>
+
+      {/* Instant Send Section */}
+      <div className="px-4 lg:px-8 mt-6 mb-6 relative z-10">
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-orange-400">
+          {/* Desktop Layout */}
+          <div className="hidden lg:flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+            <Skeleton className="h-10 w-32" />
+          </div>
+          {/* Mobile Layout */}
+          <div className="lg:hidden space-y-3">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-4 w-56" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+      </div>
+
+      {/* Patient List Section */}
+      <div className="px-4 lg:px-8 pb-6 relative z-10">
+        {/* Mobile: Title Row */}
+        <div className="lg:hidden mb-4">
+          <Skeleton className="h-6 w-32 mx-auto" />
+        </div>
+
+        {/* Mobile: Controls Row */}
+        <div className="lg:hidden flex items-center space-x-4 mb-6">
+          <Skeleton className="h-12 flex-1 rounded-lg" />
+          <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+        </div>
+
+        {/* Mobile: Filter Buttons */}
+        <div className="lg:hidden flex space-x-4 mb-6">
+          <Skeleton className="h-10 w-16 rounded-full" />
+          <Skeleton className="h-10 w-20 rounded-full" />
+        </div>
+
+        {/* Desktop: Table View */}
+        <div className="hidden lg:block">
+          <SkeletonCard>
+            <SkeletonCardHeader>
+              <div className="flex justify-between items-center">
+                <SkeletonText lines={2} widths={["w-32", "w-48"]} />
+                <Skeleton className="h-9 w-24" />
+              </div>
+            </SkeletonCardHeader>
+            <SkeletonCardContent>
+              <SkeletonTable
+                columns={6}
+                rows={5}
+                headerWidths={["w-16", "w-24", "w-20", "w-18", "w-22", "w-16"]}
+                customRowRenderer={() => (
+                  <>
+                    <div className="flex items-center space-x-2">
+                      <SkeletonAvatar size="h-8 w-8" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-4 w-20" />
+                    <div className="flex space-x-2">
+                      <SkeletonButton width="w-16" height="h-6" />
+                      <SkeletonButton width="w-16" height="h-6" />
+                    </div>
+                  </>
+                )}
+              />
+            </SkeletonCardContent>
+          </SkeletonCard>
+        </div>
+
+        {/* Mobile: Card View */}
+        <div className="lg:hidden">
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((value, i) => (
+              <div key={i} className="bg-white rounded-xl p-5 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <SkeletonAvatar size="h-12 w-12" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-5 w-32" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end space-y-1">
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Reminder Page Skeleton - for reminder page with search + patient cards
 export function ReminderPageSkeleton() {
   return (
@@ -710,7 +861,7 @@ export function ReminderPageSkeleton() {
                 <Skeleton className="h-6 w-24" />
               </div>
               <div className="hidden md:flex space-x-6">
-      {Array.from({ length: 4 }).map((value, i) => (
+                {Array.from({ length: 4 }).map((value, i) => (
                   <Skeleton key={i} className="h-5 w-20" />
                 ))}
               </div>

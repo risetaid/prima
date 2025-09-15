@@ -38,6 +38,7 @@ import { generateRandomString } from "@/lib/slug-utils";
 import { Save, Eye, FileText } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import Image from "next/image";
 
 interface FormData {
@@ -144,7 +145,7 @@ export default function CreateArticlePage() {
         }
       }
     } catch (error) {
-      console.error("Error saving article:", error);
+      logger.error("Error saving article", error as Error);
       toast.error("Terjadi kesalahan saat menyimpan artikel");
     } finally {
       setSaving(false);
@@ -425,7 +426,7 @@ export default function CreateArticlePage() {
                             );
                           }
                         } catch (error) {
-                          console.error("Upload error:", error);
+                          logger.error("Upload error", error as Error);
                           toast.error("Gagal mengupload gambar");
                         }
                       }

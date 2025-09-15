@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patientVariables } from '@/db'
 import { eq, and } from 'drizzle-orm'
 import { PatientQueryBuilder } from '@/services/patient/patient-query-builder'
+import { logger } from '@/lib/logger'
 
 export async function GET(
   request: NextRequest,
@@ -132,7 +133,7 @@ export async function GET(
     })
 
   } catch (error) {
-    console.error('Error getting autofill data:', error)
+    logger.error('Error getting autofill data', error as Error)
     return NextResponse.json(
       { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : undefined },
       { status: 500 }

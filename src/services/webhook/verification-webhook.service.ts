@@ -62,7 +62,7 @@ export class VerificationWebhookService {
    * Process a verification webhook payload
    */
   async processWebhook(payload: WebhookPayload): Promise<VerificationResult> {
-    console.log(
+    logger.info(
       `🔍 WEBHOOK: Processing message from ${payload.sender}: "${payload.message}"`
     );
 
@@ -76,21 +76,21 @@ export class VerificationWebhookService {
       // Step 2: Find patient
       const patient = await this.databaseHandler.findPatientByPhone(payload.sender);
       if (!patient) {
-        console.log(`❌ WEBHOOK: No patient found for ${payload.sender}`);
+        logger.info(`❌ WEBHOOK: No patient found for ${payload.sender}`);
         return this.createErrorResult(
           "No patient found or patient not eligible for this action",
           200
         );
       }
 
-      console.log(
+      logger.info(
         `✅ WEBHOOK: Found patient ${patient.name} (status: ${patient.verificationStatus})`
       );
 
       // Step 3: Process response
       const result = await this.processVerificationResponse(patient, payload.message);
 
-      console.log(`📋 WEBHOOK: Processing result: ${result}`);
+      logger.info(`📋 WEBHOOK: Processing result: ${result}`);
       return {
         success: true,
         message: "Patient response processed successfully",
@@ -104,7 +104,7 @@ export class VerificationWebhookService {
   }
 
   private createErrorResult(message: string, status: number): VerificationResult {
-    console.log(`❌ WEBHOOK: ${message}`);
+    logger.info(`❌ WEBHOOK: ${message}`);
     return { success: false, message, status };
   }
 

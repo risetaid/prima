@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { generateRandomSlug } from '@/lib/slug-utils'
 import { extractYouTubeVideoId, fetchYouTubeVideoData } from '@/lib/youtube-utils'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
+import { logger } from '@/lib/logger'
 
 const categories = [
   { value: 'general', label: 'Umum' },
@@ -57,11 +58,11 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         const resolvedParams = await params
         setVideoId(resolvedParams.id)
         
-        console.log('🔍 Edit Video: Loading video', resolvedParams.id)
+        logger.info('🔍 Edit Video: Loading video', { videoId: resolvedParams.id })
         const response = await fetch(`/api/cms/videos/${resolvedParams.id}`)
-        
+
         if (!response.ok) {
-          console.error('❌ Edit Video: API error:', response.status)
+          logger.error('❌ Edit Video: API error', undefined, { status: response.status })
           if (response.status === 404) {
             toast.error('Video tidak ditemukan')
           } else if (response.status === 401) {
@@ -74,7 +75,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         }
 
         const data = await response.json()
-        console.log('✅ Edit Video: Loaded', data.data)
+        logger.info('✅ Edit Video: Loaded', { data: data.data })
         
         if (data.success) {
           const video = data.data
@@ -90,7 +91,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
           })
         }
       } catch (error) {
-        console.error('❌ Edit Video: Network error:', error)
+        logger.error('❌ Edit Video: Network error', error as Error)
         toast.error('Terjadi kesalahan saat memuat video')
         router.push('/dashboard/cms')
       } finally {
@@ -135,7 +136,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
       
       toast.success('Data video berhasil diperbarui!')
     } catch (error) {
-      console.error('Error fetching video data:', error)
+      logger.error('Error fetching video data', error as Error)
       toast.error('Gagal mengambil data video. Pastikan URL valid.')
     } finally {
       setFetchingVideoData(false)
@@ -160,7 +161,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
     setSaving(true)
 
     try {
-      console.log('💾 Edit Video: Saving changes...')
+      logger.info('💾 Edit Video: Saving changes...')
       const response = await fetch(`/api/cms/videos/${videoId}`, {
         method: 'PUT',
         headers: {
@@ -171,17 +172,17 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ Edit Video: API error:', errorData)
+        logger.error('❌ Edit Video: API error', undefined, { errorData })
         toast.error(errorData.error || 'Gagal menyimpan video')
         return
       }
 
-      console.log('✅ Edit Video: Saved successfully')
+      logger.info('✅ Edit Video: Saved successfully')
 
       toast.success('Video berhasil diperbarui!')
       router.push('/dashboard/cms')
     } catch (error) {
-      console.error('❌ Edit Video: Network error:', error)
+      logger.error('❌ Edit Video: Network error', error as Error)
       toast.error('Terjadi kesalahan. Silakan coba lagi.')
     } finally {
       setSaving(false)
@@ -196,23 +197,23 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
     setDeleting(true)
 
     try {
-      console.log('🗑️ Edit Video: Deleting video...')
+      logger.info('🗑️ Edit Video: Deleting video...')
       const response = await fetch(`/api/cms/videos/${videoId}`, {
         method: 'DELETE'
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('❌ Edit Video: Delete error:', errorData)
+        logger.error('❌ Edit Video: Delete error', undefined, { errorData })
         toast.error(errorData.error || 'Gagal menghapus video')
         return
       }
 
-      console.log('✅ Edit Video: Video deleted successfully')
+      logger.info('✅ Edit Video: Video deleted successfully')
       toast.success('Video berhasil dihapus')
       router.push('/dashboard/cms')
     } catch (error) {
-      console.error('❌ Edit Video: Unexpected error:', error)
+      logger.error('❌ Edit Video: Unexpected error', error as Error)
       toast.error('Terjadi kesalahan saat menghapus video')
     } finally {
       setDeleting(false)

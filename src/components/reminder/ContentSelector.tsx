@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Search, Filter, FileText, Play, ChevronDown, X, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
+import { logger } from '@/lib/logger'
 
 interface ContentItem {
   id: string
@@ -107,7 +108,7 @@ export function ContentSelector({
         }
       }
     } catch (err) {
-      console.warn('Failed to fetch categories:', err)
+      logger.warn('Failed to fetch categories', { error: err as Error })
     }
   }, [])
 
@@ -459,7 +460,7 @@ export function ContentSelector({
       </div>
     )
   } catch (error) {
-    console.error('ContentSelector error:', error)
+    logger.error('ContentSelector error', error as Error)
     return (
       <div className={`bg-white border border-red-200 rounded-2xl p-4 ${className}`}>
         <div className="text-center text-red-600">

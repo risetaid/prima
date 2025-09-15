@@ -8,6 +8,7 @@ import { Header } from '@/components/ui/header'
 import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
 import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
 import Image from 'next/image'
+import { logger } from '@/lib/logger'
 
 interface Patient {
   id: string
@@ -53,7 +54,7 @@ export default function ReminderPage() {
         setPatients(data.patients)
       } else {
         // Fallback to original endpoint if new one fails
-        console.warn('Failed to fetch dashboard overview, falling back to patients endpoint')
+        logger.warn('Failed to fetch dashboard overview, falling back to patients endpoint')
         const fallbackResponse = await fetch('/api/patients')
         if (fallbackResponse.ok) {
           const data = await fallbackResponse.json()
@@ -61,7 +62,7 @@ export default function ReminderPage() {
         }
       }
     } catch (error) {
-      console.error('Error fetching patients:', error)
+      logger.error('Error fetching patients', error as Error)
     } finally {
       setLoading(false)
     }

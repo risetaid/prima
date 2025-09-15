@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import { formatDateTimeWIB } from '@/lib/datetime'
+import { logger } from '@/lib/logger'
 
 interface VerificationHistoryProps {
   patientId: string
@@ -44,7 +45,7 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
         setError(data.error || 'Failed to load history')
       }
     } catch (error) {
-      console.error('Failed to load verification history:', error)
+      logger.error('Failed to load verification history', error as Error)
       setError('Failed to load verification history')
     }
 

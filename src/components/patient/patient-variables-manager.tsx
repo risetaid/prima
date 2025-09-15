@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Settings, Trash2, Zap, Save, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 
 interface PatientVariablesManagerProps {
@@ -58,7 +59,7 @@ export function PatientVariablesManager({
       const data = await response.json();
       setVariables(data.variables || {});
     } catch (error) {
-      console.error("Error loading variables:", error);
+      logger.error("Error loading variables", error as Error);
       toast.error("Gagal memuat variabel pasien");
     } finally {
       setIsLoading(false);
@@ -96,7 +97,7 @@ export function PatientVariablesManager({
       setIsDialogOpen(false);
       toast.success("Variabel pasien berhasil disimpan");
     } catch (error) {
-      console.error("Error saving variables:", error);
+      logger.error("Error saving variables", error as Error);
       toast.error("Gagal menyimpan variabel pasien");
     } finally {
       setIsLoading(false);
@@ -131,7 +132,7 @@ export function PatientVariablesManager({
         toast.error(error.error || "Gagal menghapus variabel");
       }
     } catch (error) {
-      console.error("Error deleting variable:", error);
+      logger.error("Error deleting variable", error as Error);
       toast.error("Terjadi kesalahan saat menghapus variabel");
     } finally {
       setIsLoading(false);
