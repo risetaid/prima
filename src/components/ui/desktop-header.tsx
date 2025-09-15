@@ -34,11 +34,11 @@ function AdminActions() {
     <>
       {/* Admin Panel - Main Entry Point */}
       <button
-        onClick={() => router.push("/dashboard/admin")}
+        onClick={() => router.push("/admin")}
         className={`
           px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer flex items-center space-x-2
           ${
-            pathname.startsWith("/dashboard/admin")
+            pathname.startsWith("/admin")
               ? "bg-purple-100 text-purple-700"
               : "text-gray-600 hover:text-purple-600 hover:bg-gray-50"
           }
@@ -78,13 +78,13 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
         ...baseNavItems,
         {
           label: "Berita",
-          href: "/dashboard/berita",
-          active: pathname.startsWith("/dashboard/berita"),
+          href: "/berita",
+          active: pathname.startsWith("/berita"),
         },
         {
           label: "Video Edukasi",
-          href: "/dashboard/video",
-          active: pathname.startsWith("/dashboard/video"),
+          href: "/video-edukasi",
+          active: pathname.startsWith("/video-edukasi"),
         },
       ];
     }
@@ -94,19 +94,19 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
       ...baseNavItems,
       {
         label: "Pasien",
-        href: "/dashboard",
+        href: "/pasien",
         active:
-          pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien"),
+          pathname === "/pasien" || pathname.startsWith("/pasien"),
       },
       {
         label: "Berita",
-        href: "/dashboard/berita",
-        active: pathname.startsWith("/dashboard/berita"),
+          href: "/berita",
+        active: pathname.startsWith("/berita"),
       },
       {
         label: "Video Edukasi",
-        href: "/dashboard/video",
-        active: pathname.startsWith("/dashboard/video"),
+        href: "/video-edukasi",
+        active: pathname.startsWith("/video-edukasi"),
       },
     ];
   };
@@ -120,8 +120,8 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
       ? [
           {
             label: "CMS",
-            href: "/dashboard/cms",
-            active: pathname.startsWith("/dashboard/cms"),
+            href: "/cms",
+            active: pathname.startsWith("/cms"),
           },
         ]
       : []),
@@ -129,7 +129,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
 
   const handleNavigation = (href: string) => {
     // If user not authenticated and trying to access dashboard, redirect to signin
-    if (!user && href.startsWith("/dashboard")) {
+    if (!user && href.startsWith("/pasien") || href.startsWith("/pengingat") || href.startsWith("/berita") || href.startsWith("/video-edukasi") || href.startsWith("/cms") || href.startsWith("/admin")) {
       router.push("/sign-in");
       return;
     }
@@ -187,11 +187,11 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
               {/* Special Pengingat Button - Prominent button for all users */}
               {isHydrated && user && (
                 <button
-                  onClick={() => handleNavigation("/dashboard/pengingat")}
+                  onClick={() => handleNavigation("/pengingat")}
                   className={`
                     px-4 py-2 rounded-lg font-semibold transition-colors cursor-pointer
                     ${
-                      pathname.startsWith("/dashboard/pengingat")
+                      pathname.startsWith("/pengingat")
                         ? "bg-blue-700 text-white"
                         : "bg-blue-600 text-white hover:bg-blue-700"
                     }

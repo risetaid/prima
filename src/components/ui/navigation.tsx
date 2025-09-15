@@ -54,10 +54,10 @@ export function Navigation() {
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-gray-600">Hi, {user.fullName || user.primaryEmailAddress?.emailAddress}</span>
                 <button
-                  onClick={() => handleNavigation('/dashboard')}
+                  onClick={() => handleNavigation('/pasien')}
                   className="bg-blue-500 text-white px-6 py-2 rounded-full text-sm font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                 >
-                  Dashboard
+                  Pasien
                 </button>
               </div>
             ) : (
@@ -108,10 +108,10 @@ export function Navigation() {
                 <div className="mt-4 space-y-2">
                   <p className="text-center text-sm text-gray-600">Hi, {user.fullName || user.primaryEmailAddress?.emailAddress}</p>
                   <button
-                    onClick={() => handleNavigation('/dashboard')}
+                    onClick={() => handleNavigation('/pasien')}
                     className="w-full bg-blue-500 text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-blue-600 transition-colors duration-200 cursor-pointer"
                   >
-                    Dashboard
+                    Pasien
                   </button>
                 </div>
               ) : (

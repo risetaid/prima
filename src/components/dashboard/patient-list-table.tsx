@@ -28,7 +28,7 @@ export function PatientListTable({ patients, loading }: PatientListTableProps) {
   const router = useRouter();
 
   const handlePatientClick = (patientId: string) => {
-    router.push(`/dashboard/pasien/${patientId}`);
+    router.push(`/pasien/${patientId}`);
   };
 
   if (loading) {

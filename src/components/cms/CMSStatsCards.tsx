@@ -87,7 +87,7 @@ export function CMSStatsCards({ statistics }: CMSStatsCardsProps) {
           <div className="flex flex-col gap-4">
             <Button asChild className="w-full h-12">
               <Link
-                href="/dashboard/cms/articles/create"
+                href="/cms/articles/create"
                 className="flex items-center justify-center text-base"
               >
                 <Plus className="h-5 w-5 mr-2" />
@@ -96,7 +96,7 @@ export function CMSStatsCards({ statistics }: CMSStatsCardsProps) {
             </Button>
             <Button asChild variant="outline" className="w-full h-12">
               <Link
-                href="/dashboard/cms/videos/create"
+                href="/cms/videos/create"
                 className="flex items-center justify-center text-base"
               >
                 <Video className="h-5 w-5 mr-2" />

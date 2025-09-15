@@ -1,7 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
 const isProtectedRoute = createRouteMatcher([
-  '/dashboard(.*)',
+  '/pasien(.*)',
+  '/pengingat(.*)',
+  '/berita(.*)',
+  '/video-edukasi(.*)',
+  '/cms(.*)',
+  '/admin(.*)',
   '/api/patients(.*)',
   '/api/admin(.*)',
   '/api/reminders(.*)',
@@ -12,13 +17,6 @@ const isProtectedRoute = createRouteMatcher([
 ])
 
 export default clerkMiddleware(async (auth, req) => {
-  // Handle legacy route redirects
-  if (req.nextUrl.pathname === '/pengingat') {
-    const url = req.nextUrl.clone()
-    url.pathname = '/dashboard/pengingat'
-    return Response.redirect(url)
-  }
-  
   // Protect routes using Clerk's built-in protection
   if (isProtectedRoute(req)) {
     await auth.protect()

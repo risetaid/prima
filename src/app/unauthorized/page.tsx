@@ -51,8 +51,8 @@ export default function UnauthorizedPage() {
                 Kembali ke Halaman Sebelumnya
               </button>
               
-              <button 
-                onClick={() => router.push('/dashboard')}
+              <button
+                onClick={() => router.push('/pasien')}
                 className="block w-full border border-gray-300 text-gray-700 py-2.5 px-4 rounded-xl hover:bg-gray-50 transition-colors text-sm sm:text-base font-medium cursor-pointer"
               >
                 Ke Dashboard Utama

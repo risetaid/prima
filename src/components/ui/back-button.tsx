@@ -42,12 +42,12 @@ export function BackButton({
       } else if (currentPath.startsWith("/content/articles/")) {
         // For article pages, go to home (since we don't have an articles listing page)
         router.push("/");
-      } else if (currentPath.startsWith("/dashboard/cms/")) {
+      } else if (currentPath.startsWith("/cms/")) {
         // For CMS pages, go to CMS dashboard
-        router.push("/dashboard/cms");
-      } else if (currentPath.startsWith("/dashboard/")) {
-        // For other dashboard pages, go to dashboard home
-        router.push("/dashboard");
+        router.push("/cms");
+      } else if (currentPath.startsWith("/pasien/") || currentPath.startsWith("/pengingat/") || currentPath.startsWith("/berita/") || currentPath.startsWith("/video-edukasi/") || currentPath.startsWith("/admin/")) {
+        // For protected pages, go to pasien home
+        router.push("/pasien");
       } else {
         // Default fallback to home
         router.push("/");

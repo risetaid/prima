@@ -105,7 +105,7 @@ export function PatientList({
     if (onPatientClick) {
       onPatientClick(patient)
     } else {
-      router.push(`/dashboard/pasien/${patient.id}`)
+      router.push(`/pasien/${patient.id}`)
     }
   }
 

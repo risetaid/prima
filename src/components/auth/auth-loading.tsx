@@ -100,7 +100,7 @@ export function AuthLoading({
     // Redirect signed-in users away from auth pages - only if they can access dashboard
     if (isSignedIn && (pathname === "/sign-in" || pathname === "/sign-up")) {
       if (canAccessDashboard || optimisticAccess) {
-        debouncedRedirect("/dashboard");
+        debouncedRedirect("/pasien");
       } else {
         debouncedRedirect("/pending-approval");
       }
@@ -113,7 +113,7 @@ export function AuthLoading({
       pathname === "/pending-approval" &&
       (canAccessDashboard || optimisticAccess)
     ) {
-      debouncedRedirect("/dashboard");
+      debouncedRedirect("/pasien");
       return;
     }
   }, [

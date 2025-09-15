@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuthContext } from "@/lib/auth-context";
+import { routes } from "@/lib/routes";
 
 interface RoleGuardProps {
   allowedRoles: ("RELAWAN" | "ADMIN" | "DEVELOPER")[];
@@ -15,7 +16,7 @@ interface RoleGuardProps {
 export function RoleGuard({
   allowedRoles,
   children,
-  redirectTo = "/dashboard",
+  redirectTo = routes.pasien,
   fallback = null,
 }: RoleGuardProps) {
   const { role: userRole, isLoaded } = useAuthContext();

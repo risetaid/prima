@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArticleStatus } from "@/lib/constants/articles";
+import { routes } from "@/lib/routes";
 
 interface ArticleFormData {
   title: string;
@@ -51,7 +52,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
           } else {
             toast.error("Gagal memuat artikel");
           }
-          router.push("/dashboard/cms");
+          router.push(routes.cms);
           return;
         }
 
@@ -73,7 +74,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
       } catch (error) {
         console.error("❌ Edit Article: Network error:", error);
         toast.error("Terjadi kesalahan saat memuat artikel");
-        router.push("/dashboard/cms");
+        router.push(routes.cms);
       } finally {
         setLoading(false);
       }
@@ -111,7 +112,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
 
       console.log("✅ Edit Article: Saved successfully");
       toast.success("Artikel berhasil diperbarui!");
-      router.push("/dashboard/cms");
+      router.push(routes.cms);
     } catch (error) {
       console.error("❌ Edit Article: Network error:", error);
       toast.error("Terjadi kesalahan. Silakan coba lagi.");
@@ -146,7 +147,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
 
       console.log("✅ Edit Article: Deleted successfully");
       toast.success("Artikel berhasil dihapus!");
-      router.push("/dashboard/cms");
+      router.push(routes.cms);
     } catch (error) {
       console.error("❌ Edit Article: Delete network error:", error);
       toast.error("Terjadi kesalahan saat menghapus artikel");

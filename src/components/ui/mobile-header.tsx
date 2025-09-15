@@ -27,9 +27,9 @@ function MobileNavigationActions() {
       <div className="flex items-center space-x-2">
         {/* Dashboard Button */}
         <button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push("/pasien")}
           className="p-1.5 rounded-full bg-gray-100 hover:bg-blue-50 text-gray-600 hover:text-blue-600 transition-colors touch-manipulation"
-          title="Dashboard"
+          title="Pasien"
         >
           <UserCheck className="w-4 h-4" />
         </button>

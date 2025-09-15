@@ -38,11 +38,11 @@ export function MobileAdminActions({
     return null;
   }
 
-  const isActive = pathname.startsWith("/dashboard/admin");
+  const isActive = pathname.startsWith("/admin");
 
   return (
     <button
-      onClick={() => router.push("/dashboard/admin")}
+      onClick={() => router.push("/admin")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
@@ -79,11 +79,11 @@ export function MobileCMSActions({ className = "" }: MobileAdminActionsProps) {
     return null;
   }
 
-  const isActive = pathname.startsWith("/dashboard/cms");
+  const isActive = pathname.startsWith("/cms");
 
   return (
     <button
-      onClick={() => router.push("/dashboard/cms")}
+      onClick={() => router.push("/cms")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
@@ -106,11 +106,11 @@ export function MobileReminderActions({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isActive = pathname.startsWith("/dashboard/pengingat");
+  const isActive = pathname.startsWith("/pengingat");
 
   return (
     <button
-      onClick={() => router.push("/dashboard/pengingat")}
+      onClick={() => router.push("/pengingat")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
@@ -133,11 +133,11 @@ export function MobileBeritaActions({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isActive = pathname.startsWith("/dashboard/berita");
+  const isActive = pathname.startsWith("/berita");
 
   return (
     <button
-      onClick={() => router.push("/dashboard/berita")}
+      onClick={() => router.push("/berita")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
@@ -160,11 +160,11 @@ export function MobileVideoActions({
   const router = useRouter();
   const pathname = usePathname();
 
-  const isActive = pathname.startsWith("/dashboard/video");
+  const isActive = pathname.startsWith("/video-edukasi");
 
   return (
     <button
-      onClick={() => router.push("/dashboard/video")}
+      onClick={() => router.push("/video-edukasi")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${
@@ -188,11 +188,11 @@ export function MobilePasienActions({
   const pathname = usePathname();
 
   const isActive =
-    pathname === "/dashboard" || pathname.startsWith("/dashboard/pasien");
+    pathname === "/pasien" || pathname.startsWith("/pasien");
 
   return (
     <button
-      onClick={() => router.push("/dashboard")}
+      onClick={() => router.push("/pasien")}
       className={`
         p-1.5 rounded-full transition-colors flex-shrink-0 touch-manipulation
         ${

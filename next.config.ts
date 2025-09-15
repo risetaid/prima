@@ -1,6 +1,47 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Permanent redirects for old /dashboard paths
+  async redirects() {
+    return [
+      {
+        source: '/dashboard',
+        destination: '/pasien',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/pengingat/:path*',
+        destination: '/pengingat/:path*',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/berita/:path*',
+        destination: '/berita/:path*',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/video/:path*',
+        destination: '/video-edukasi/:path*',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/cms/:path*',
+        destination: '/cms/:path*',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/admin/:path*',
+        destination: '/admin/:path*',
+        permanent: true,
+      },
+      {
+        source: '/dashboard/:path*',
+        destination: '/pasien/:path*',
+        permanent: true,
+      },
+    ];
+  },
+
   // Standalone output for faster deployments
   output: 'standalone',
   

@@ -11,7 +11,7 @@ export default function NotFound() {
 
   const quickLinks = [
     {
-      href: '/dashboard',
+      href: '/pasien',
       icon: Home,
       label: 'Dashboard Utama',
       description: 'Kembali ke beranda sistem PRIMA'
@@ -79,7 +79,7 @@ export default function NotFound() {
                 Kembali ke Halaman Sebelumnya
               </Button>
               <Button asChild size="lg">
-                <Link href="/dashboard">
+                <Link href="/pasien">
                   <Home className="h-5 w-5 mr-2" />
                   Dashboard Utama
                 </Link>

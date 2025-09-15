@@ -22,8 +22,8 @@ export default function SignInPage() {
           {/* Sign In Form */}
           <div className="flex justify-center">
             <SignIn
-              afterSignInUrl="/dashboard"
-              redirectUrl="/dashboard"
+              afterSignInUrl="/pasien"
+              redirectUrl="/pasien"
               routing="path"
               path="/sign-in"
               appearance={{

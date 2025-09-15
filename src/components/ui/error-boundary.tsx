@@ -62,10 +62,10 @@ function DefaultErrorFallback({ error, resetError, showDetails }: ErrorFallbackP
             Coba Lagi
           </Button>
           <Button asChild size="sm">
-            <a href="/dashboard">
+            <Link href="/pasien">
               <Home className="h-4 w-4 mr-2" />
-              Kembali ke Dashboard
-            </a>
+              Kembali ke Pasien
+            </Link>
           </Button>
         </div>
       </div>
@@ -172,10 +172,10 @@ export function CMSErrorBoundary({ children }: { children: React.ReactNode }) {
                 Coba Lagi
               </Button>
               <Button asChild size="sm">
-                <a href="/dashboard">
+                <Link href="/pasien">
                   <Home className="h-4 w-4 mr-2" />
-                  Kembali ke Dashboard
-                </a>
+                  Kembali ke Pasien
+                </Link>
               </Button>
             </div>
           </div>

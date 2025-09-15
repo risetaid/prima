@@ -126,7 +126,7 @@ export function CMSContentItem({
         )}
         <Button asChild variant="outline" size="sm" className="w-20">
           <Link
-            href={`/dashboard/cms/${item.type === "article" ? "articles" : "videos"}/${item.id}/edit`}
+            href={`/cms/${item.type === "article" ? "articles" : "videos"}/${item.id}/edit`}
             className="flex items-center justify-center"
           >
             <span>Edit</span>

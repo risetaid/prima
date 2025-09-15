@@ -231,7 +231,7 @@ export function PatientListSection({
             {filteredPatients.length > 8 && (
               <div className="text-center pt-4">
                 <button
-                  onClick={() => router.push("/dashboard/pasien")}
+                  onClick={() => router.push("/pasien")}
                   className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
                 >
                   Lihat Semua Pasien ({filteredPatients.length})

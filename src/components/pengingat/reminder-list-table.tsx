@@ -103,7 +103,7 @@ export const ReminderListTable = memo(
     // Memoized click handler to prevent unnecessary re-renders
     const handlePatientClick = useCallback(
       (patientId: string) => {
-        router.push(`/dashboard/pengingat/pasien/${patientId}`);
+        router.push(`/pengingat/pasien/${patientId}`);
       },
       [router]
     );

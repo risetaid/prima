@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronRight, Home } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { routes } from '@/lib/routes'
 
 interface BreadcrumbItem {
   label: string
@@ -64,17 +65,18 @@ function generateBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   const segments = pathname.split('/').filter(Boolean)
   const breadcrumbs: BreadcrumbItem[] = [
     {
-      label: 'Dashboard',
-      href: '/dashboard',
+      label: 'Pasien',
+      href: '/pasien',
       icon: Home
     }
   ]
 
   // Healthcare-specific path mapping
   const pathMapping: Record<string, string> = {
-    'dashboard': 'Dashboard',
-    'pasien': 'Data Pasien', 
+    'pasien': 'Data Pasien',
     'pengingat': 'Pengingat Obat',
+    'berita': 'Berita',
+    'video-edukasi': 'Video Edukasi',
     'cms': 'Manajemen Konten',
     'articles': 'Artikel',
     'videos': 'Video',
@@ -94,22 +96,22 @@ function generateBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   let currentPath = ''
   
   segments.forEach((segment, index) => {
-    // Skip the first 'dashboard' segment as it's already included
-    if (index === 0 && segment === 'dashboard') {
-      currentPath = '/dashboard'
+    // Skip the first segment if it's one of the main routes
+    if (index === 0 && Object.values(routes).some(route => route === `/${segment}`)) {
+      currentPath = `/${segment}`
       return
     }
-    
+
     currentPath += `/${segment}`
-    
+
     // Handle dynamic routes (like [id])
     if (segment.length > 10 || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segment)) {
       // Skip UUIDs and long segments (likely IDs)
       return
     }
-    
+
     const label = pathMapping[segment] || formatSegment(segment)
-    
+
     breadcrumbs.push({
       label,
       href: currentPath
@@ -132,21 +134,21 @@ export function CMSBreadcrumb() {
   const pathname = usePathname()
   
   const cmsItems: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: Home },
-    { label: 'CMS', href: '/dashboard/cms' }
+    { label: 'Beranda', href: '/', icon: Home },
+    { label: 'Manajemen Konten', href: '/cms' }
   ]
 
   if (pathname.includes('/articles')) {
-    cmsItems.push({ label: 'Artikel', href: '/dashboard/cms/articles' })
-    
+    cmsItems.push({ label: 'Artikel', href: '/cms/articles' })
+
     if (pathname.includes('/create')) {
       cmsItems.push({ label: 'Buat Artikel', href: pathname })
     } else if (pathname.includes('/edit')) {
       cmsItems.push({ label: 'Edit Artikel', href: pathname })
     }
   } else if (pathname.includes('/videos')) {
-    cmsItems.push({ label: 'Video', href: '/dashboard/cms/videos' })
-    
+    cmsItems.push({ label: 'Video', href: '/cms/videos' })
+
     if (pathname.includes('/create')) {
       cmsItems.push({ label: 'Buat Video', href: pathname })
     } else if (pathname.includes('/edit')) {
@@ -161,8 +163,8 @@ export function PatientBreadcrumb() {
   const pathname = usePathname()
   
   const patientItems: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: Home },
-    { label: 'Data Pasien', href: '/dashboard/pasien' }
+    { label: 'Beranda', href: '/', icon: Home },
+    { label: 'Data Pasien', href: '/pasien' }
   ]
 
   if (pathname.includes('/tambah')) {
@@ -180,8 +182,8 @@ export function ReminderBreadcrumb() {
   const pathname = usePathname()
   
   const reminderItems: BreadcrumbItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: Home },
-    { label: 'Pengingat Obat', href: '/dashboard/pengingat' }
+    { label: 'Beranda', href: '/', icon: Home },
+    { label: 'Pengingat Obat', href: '/pengingat' }
   ]
 
   if (pathname.includes('/terjadwal')) {
