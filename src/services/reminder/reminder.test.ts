@@ -1,13 +1,13 @@
 // Integration tests for centralized reminder system
 import { ReminderService } from './reminder.service'
 import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
-import { ValidationError, NotFoundError } from './reminder.types'
+import { ValidationError, NotFoundError, CustomRecurrence } from './reminder.types'
+import { extractMedicationName } from '@/lib/medication-utils'
 
 // Test script to verify the centralized system
 async function runTests() {
   console.log('🧪 Running Reminder Service Integration Tests...\n')
   
-  const reminderService = new ReminderService()
   const whatsappService = new WhatsAppService()
   let testsPassed = 0
   let testsFailed = 0
@@ -56,9 +56,7 @@ async function runTests() {
   // Test 3: Medication Name Extraction
   console.log('\nTest 3: Medication Name Extraction')
   try {
-    const service = new ReminderService()
-    // Access private method through prototype for testing
-    const extractMethod = (service as any).extractMedicationName.bind(service)
+    const extractMethod = extractMedicationName
     
     const test1 = extractMethod('Jangan lupa minum obat paracetamol')
     const test2 = extractMethod('Waktu minum candesartan 8mg')
@@ -100,7 +98,7 @@ async function runTests() {
   console.log('\nTest 5: Recurrence Date Generation')
   try {
     const service = new ReminderService()
-    const generateMethod = (service as any).generateRecurrenceDates.bind(service)
+    const generateMethod = (service as unknown as { generateRecurrenceDates: (recurrence: CustomRecurrence) => string[] }).generateRecurrenceDates.bind(service)
     
     const dates = generateMethod({
       frequency: 'day',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,15 +39,7 @@ export default function BeritaPage() {
     setIsMounted(true)
   }, [])
 
-  useEffect(() => {
-    fetchPublishedArticles()
-  }, [])
-
-  useEffect(() => {
-    filterArticles()
-  }, [articles, searchTerm, selectedCategory])
-
-  const filterArticles = () => {
+  const filterArticles = useCallback(() => {
     let filtered = articles
 
     // Filter by search term
@@ -64,7 +56,15 @@ export default function BeritaPage() {
     }
 
     setFilteredArticles(filtered)
-  }
+  }, [articles, searchTerm, selectedCategory])
+
+  useEffect(() => {
+    fetchPublishedArticles()
+  }, [])
+
+  useEffect(() => {
+    filterArticles()
+  }, [filterArticles])
 
   const getUniqueCategories = () => {
     const categories = articles.map(article => article.category)
@@ -88,7 +88,7 @@ export default function BeritaPage() {
       
       if (data.success && data.data) {
         // Articles are already filtered to published only by the API
-        const publishedArticles = data.data.filter((item: any) => item.type === 'article')
+        const publishedArticles = data.data.filter((item: Article) => 'type' in item && item.type === 'article')
         setArticles(publishedArticles)
         console.log(`✅ Berita: Loaded ${publishedArticles.length} published articles`)
       } else {

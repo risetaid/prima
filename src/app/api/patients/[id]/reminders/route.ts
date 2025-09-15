@@ -19,6 +19,53 @@ import { logger } from "@/lib/logger";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 // Rate limiter temporarily disabled
 
+type Patient = {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  verificationStatus: string;
+  isActive: boolean;
+};
+
+type CustomRecurrence = {
+  frequency: string;
+  interval: number;
+  occurrences?: number;
+  endType?: string;
+  endDate?: string;
+  daysOfWeek?: string[];
+};
+
+type AttachedContent = {
+  id: string;
+  type: "article" | "video" | "ARTICLE" | "VIDEO";
+  title: string;
+};
+
+type ValidatedContent = {
+  id: string;
+  type: "article" | "video";
+  title: string;
+  url: string;
+};
+
+type ReminderSchedule = {
+  id: string;
+  patientId: string;
+  medicationName: string;
+  dosage: string | null;
+  doctorName: string | null;
+  scheduledTime: string;
+  frequency: string;
+  startDate: Date;
+  endDate: Date | null;
+  customMessage: string | null;
+  isActive: boolean;
+  createdById: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -120,62 +167,6 @@ export async function POST(
     );
 
     const requestBody = await request.json();
-    const { message, time, selectedDates, customRecurrence, attachedContent } =
-      requestBody;
-
-    if (!message || !time) {
-      return createErrorResponse(
-        "Missing required fields: message and time",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
-
-    // Validate input based on recurrence type
-    if (customRecurrence) {
-      if (!customRecurrence.frequency || !customRecurrence.interval) {
-        return createErrorResponse(
-          "Invalid custom recurrence configuration",
-          400,
-          undefined,
-          "VALIDATION_ERROR"
-        );
-      }
-
-      // Prevent infinite loop - interval must be positive
-      if (customRecurrence.interval <= 0) {
-        return createErrorResponse(
-          "Recurrence interval must be greater than 0",
-          400,
-          undefined,
-          "VALIDATION_ERROR"
-        );
-      }
-
-      // Prevent excessive occurrences
-      if (customRecurrence.occurrences && customRecurrence.occurrences > 1000) {
-        return createErrorResponse(
-          "Maximum 1000 occurrences allowed",
-          400,
-          undefined,
-          "VALIDATION_ERROR"
-        );
-      }
-    } else {
-      if (
-        !selectedDates ||
-        !Array.isArray(selectedDates) ||
-        selectedDates.length === 0
-      ) {
-        return createErrorResponse(
-          "Missing required field: selectedDates",
-          400,
-          undefined,
-          "VALIDATION_ERROR"
-        );
-      }
-    }
 
     // Verify patient exists and get phone number
     const patientResult = await db
@@ -201,142 +192,23 @@ export async function POST(
 
     const patient = patientResult[0];
 
-    // Enforce verification before allowing reminder creation
-    if (patient.verificationStatus !== 'verified' || !patient.isActive) {
-      return createErrorResponse(
-        'Patient must be verified and active to create reminders',
-        403,
-        {
-          verificationStatus: patient.verificationStatus,
-          isActive: patient.isActive,
-        },
-        'PATIENT_NOT_VERIFIED'
-      );
-    }
+    // Validate input and generate schedules data
+    const { message, time, datesToSchedule, validatedContent, isCustomRecurrence } =
+      await validateReminderInput(requestBody, patient);
 
-    // Validate attached content if provided
-    let validatedContent: Array<{
-      id: string;
-      type: "article" | "video";
-      title: string;
-      url: string;
-    }> = [];
-    if (
-      attachedContent &&
-      Array.isArray(attachedContent) &&
-      attachedContent.length > 0
-    ) {
-      validatedContent = await validateContentAttachments(attachedContent);
-      if (validatedContent.length === 0) {
-        return createErrorResponse(
-          "None of the selected content items are valid or published",
-          400,
-          undefined,
-          "VALIDATION_ERROR"
-        );
-      }
-    }
+    // Create reminder schedules
+    const createdSchedules = await createReminderSchedules(
+      id,
+      message,
+      time,
+      datesToSchedule,
+      validatedContent,
+      user.id,
+      isCustomRecurrence
+    );
 
-    // User is already available from getCurrentUser()
-
-    // Generate dates based on recurrence type
-    let datesToSchedule: string[] = [];
-
-    if (customRecurrence) {
-      datesToSchedule = generateRecurrenceDates(customRecurrence);
-    } else {
-      datesToSchedule = selectedDates;
-    }
-
-    // Create reminder schedules for each date
-    const createdSchedules = [];
-
-    for (const dateString of datesToSchedule) {
-      const reminderDate = new Date(dateString);
-
-      // Validate date is not invalid
-      if (isNaN(reminderDate.getTime())) {
-        continue; // Skip invalid dates
-      }
-
-      const reminderScheduleResult = await db
-        .insert(reminderSchedules)
-        .values({
-          patientId: id,
-          medicationName: extractMedicationName(message),
-          scheduledTime: time,
-          frequency: customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
-          startDate: reminderDate,
-          endDate: reminderDate, // Each schedule has its own single date
-          isActive: true,
-          customMessage: message,
-          createdById: user.id,
-        })
-        .returning();
-
-      const reminderSchedule = reminderScheduleResult[0];
-
-      createdSchedules.push(reminderSchedule);
-
-      // Create content attachments if provided
-      if (validatedContent.length > 0) {
-        for (let i = 0; i < validatedContent.length; i++) {
-          const content = validatedContent[i];
-          await db.insert(reminderContentAttachments).values({
-            reminderScheduleId: reminderSchedule.id,
-            contentType: content.type,
-            contentId: content.id,
-            contentTitle: content.title,
-            contentUrl: content.url,
-            attachmentOrder: i + 1,
-            createdBy: user.id,
-          });
-        }
-      }
-    }
-
-    // Debug logging
-
-    // Check if any of today's reminders should be sent now
-    for (const schedule of createdSchedules) {
-      const scheduleDate = schedule.startDate.toISOString().split("T")[0];
-
-      if (shouldSendReminderNow(scheduleDate, time)) {
-        // Rate limiting temporarily disabled - send message directly
-        // Generate enhanced message with content attachments
-        const enhancedMessage = generateEnhancedMessage(
-          message,
-          validatedContent
-        );
-
-        // Send via Fonnte
-        const result = await sendWhatsAppMessage({
-          to: formatWhatsAppNumber(patient.phoneNumber),
-          body: enhancedMessage,
-        });
-
-        // Log the reminder
-        const status: "DELIVERED" | "FAILED" = result.success
-          ? "DELIVERED"
-          : "FAILED";
-        const logData = {
-          reminderScheduleId: schedule.id,
-          patientId: id,
-          sentAt: getWIBTime(),
-          status: status,
-          message: message,
-          phoneNumber: patient.phoneNumber,
-          fonnteMessageId: result.messageId,
-        };
-
-        await db.insert(reminderLogs).values(logData);
-
-        // Invalidate cache after creating reminder log
-        await invalidateCache(CACHE_KEYS.reminderStats(id));
-
-        break; // Only send one immediate reminder
-      }
-    }
+    // Handle immediate reminders if any should be sent now
+    await sendImmediateReminders(createdSchedules, patient, message, validatedContent, time);
 
     return NextResponse.json({
       message: "Reminders created successfully",
@@ -346,10 +218,208 @@ export async function POST(
         startDate: s.startDate,
         scheduledTime: s.scheduledTime,
       })),
-      recurrenceType: customRecurrence ? "custom" : "manual",
+      recurrenceType: isCustomRecurrence ? "custom" : "manual",
     });
   } catch (error) {
-    return handleApiError(error, "fetching patient reminders");
+    if (error instanceof ValidationError) {
+      return createErrorResponse(
+        error.message,
+        400,
+        error.details,
+        "VALIDATION_ERROR"
+      );
+    }
+    if (error instanceof PatientVerificationError) {
+      return createErrorResponse(
+        error.message,
+        403,
+        error.details,
+        "PATIENT_NOT_VERIFIED"
+      );
+    }
+    return handleApiError(error, "creating patient reminders");
+  }
+}
+
+class ValidationError extends Error {
+  details?: Record<string, unknown>;
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = "ValidationError";
+    this.details = details;
+  }
+}
+
+class PatientVerificationError extends Error {
+  details?: Record<string, unknown>;
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = "PatientVerificationError";
+    this.details = details;
+  }
+}
+
+async function validateReminderInput(requestBody: { message: string; time: string; selectedDates?: string[]; customRecurrence?: CustomRecurrence; attachedContent?: AttachedContent[] }, patient: Patient) {
+  const { message, time, selectedDates, customRecurrence, attachedContent } = requestBody;
+
+  if (!message || !time) {
+    throw new ValidationError("Missing required fields: message and time");
+  }
+
+  let isCustomRecurrence = false;
+  let datesToSchedule: string[] = [];
+
+  // Validate input based on recurrence type
+  if (customRecurrence) {
+    isCustomRecurrence = true;
+    if (!customRecurrence.frequency || !customRecurrence.interval) {
+      throw new ValidationError("Invalid custom recurrence configuration");
+    }
+
+    // Prevent infinite loop - interval must be positive
+    if (customRecurrence.interval <= 0) {
+      throw new ValidationError("Recurrence interval must be greater than 0");
+    }
+
+    // Prevent excessive occurrences
+    if (customRecurrence.occurrences && customRecurrence.occurrences > 1000) {
+      throw new ValidationError("Maximum 1000 occurrences allowed");
+    }
+
+    datesToSchedule = generateRecurrenceDates(customRecurrence);
+  } else {
+    if (!selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0) {
+      throw new ValidationError("Missing required field: selectedDates");
+    }
+    datesToSchedule = selectedDates;
+  }
+
+  // Enforce verification before allowing reminder creation
+  if (patient.verificationStatus !== 'verified' || !patient.isActive) {
+    throw new PatientVerificationError(
+      'Patient must be verified and active to create reminders',
+      {
+        verificationStatus: patient.verificationStatus,
+        isActive: patient.isActive,
+      }
+    );
+  }
+
+  // Validate attached content if provided
+  let validatedContent: Array<{
+    id: string;
+    type: "article" | "video";
+    title: string;
+    url: string;
+  }> = [];
+  if (attachedContent && Array.isArray(attachedContent) && attachedContent.length > 0) {
+    validatedContent = await validateContentAttachments(attachedContent);
+    if (validatedContent.length === 0) {
+      throw new ValidationError("None of the selected content items are valid or published");
+    }
+  }
+
+  return { message, time, datesToSchedule, validatedContent, isCustomRecurrence };
+}
+
+async function createReminderSchedules(
+  patientId: string,
+  message: string,
+  time: string,
+  datesToSchedule: string[],
+  validatedContent: ValidatedContent[],
+  userId: string,
+  isCustomRecurrence: boolean
+) {
+  const createdSchedules = [];
+
+  for (const dateString of datesToSchedule) {
+    const reminderDate = new Date(dateString);
+
+    // Validate date is not invalid
+    if (isNaN(reminderDate.getTime())) {
+      continue; // Skip invalid dates
+    }
+
+    const reminderScheduleResult = await db
+      .insert(reminderSchedules)
+      .values({
+        patientId,
+        medicationName: extractMedicationName(message),
+        scheduledTime: time,
+        frequency: isCustomRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
+        startDate: reminderDate,
+        endDate: reminderDate, // Each schedule has its own single date
+        isActive: true,
+        customMessage: message,
+        createdById: userId,
+      })
+      .returning();
+
+    const reminderSchedule = reminderScheduleResult[0];
+
+    createdSchedules.push(reminderSchedule);
+
+    // Create content attachments if provided
+    if (validatedContent.length > 0) {
+      for (let i = 0; i < validatedContent.length; i++) {
+        const content = validatedContent[i];
+        await db.insert(reminderContentAttachments).values({
+          reminderScheduleId: reminderSchedule.id,
+          contentType: content.type,
+          contentId: content.id,
+          contentTitle: content.title,
+          contentUrl: content.url,
+          attachmentOrder: i + 1,
+          createdBy: userId,
+        });
+      }
+    }
+  }
+
+  return createdSchedules;
+}
+
+async function sendImmediateReminders(
+  createdSchedules: ReminderSchedule[],
+  patient: Patient,
+  message: string,
+  validatedContent: ValidatedContent[],
+  time: string
+) {
+  // Check if any of today's reminders should be sent now
+  for (const schedule of createdSchedules) {
+    const scheduleDate = schedule.startDate.toISOString().split("T")[0];
+
+    if (shouldSendReminderNow(scheduleDate, time)) {
+      // Generate enhanced message with content attachments
+      const enhancedMessage = generateEnhancedMessage(message, validatedContent);
+
+      // Send via Fonnte
+      const result = await sendWhatsAppMessage({
+        to: formatWhatsAppNumber(patient.phoneNumber),
+        body: enhancedMessage,
+      });
+
+      // Log the reminder
+      const status: "DELIVERED" | "FAILED" = result.success ? "DELIVERED" : "FAILED";
+      const logData = {
+        reminderScheduleId: schedule.id,
+        patientId: patient.id,
+        sentAt: getWIBTime(),
+        status,
+        message,
+        phoneNumber: patient.phoneNumber,
+        fonnteMessageId: result.messageId,
+      };
+
+      await db.insert(reminderLogs).values(logData);
+
+      // Invalidate cache after creating reminder log
+      await invalidateCache(CACHE_KEYS.reminderStats(patient.id));
+
+      break; // Only send one immediate reminder
+    }
   }
 }
 
@@ -411,24 +481,9 @@ function extractMedicationName(message: string): string {
   return "Obat"; // Safe default
 }
 
-function calculateEndDate(
-  startDate: string,
-  interval: string,
-  totalReminders: number
-): Date {
-  const start = new Date(startDate);
-  const daysToAdd =
-    interval.toLowerCase() === "harian"
-      ? totalReminders - 1 // Daily: add days
-      : (totalReminders - 1) * 7; // Weekly: add weeks
 
-  const endDate = new Date(start);
-  endDate.setDate(endDate.getDate() + daysToAdd);
 
-  return endDate;
-}
-
-function generateRecurrenceDates(customRecurrence: any): string[] {
+function generateRecurrenceDates(customRecurrence: CustomRecurrence): string[] {
   const dates: string[] = [];
   const today = new Date();
   const startDate = new Date(today);
@@ -459,7 +514,7 @@ function generateRecurrenceDates(customRecurrence: any): string[] {
   // Safe type coercion to prevent string/invalid numbers
   const maxOccurrences =
     customRecurrence.endType === "after"
-      ? Math.max(1, parseInt(customRecurrence.occurrences) || 1) // Ensure positive integer
+      ? Math.max(1, customRecurrence.occurrences || 1) // Ensure positive integer
       : 1000;
 
   // Add safety counter to prevent infinite loops and memory issues
@@ -693,7 +748,7 @@ function generateEnhancedMessage(
   let message = originalMessage;
 
   // Group content by type for better organization
-  const contentByType: { [key: string]: any[] } = {};
+  const contentByType: { [key: string]: ValidatedContent[] } = {};
   contentAttachments.forEach((content) => {
     const type = content.type?.toLowerCase() || "other";
     if (!contentByType[type]) {

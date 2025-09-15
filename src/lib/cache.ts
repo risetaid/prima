@@ -28,7 +28,7 @@ export interface CacheConfig {
   key: string
 }
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   data: T
   timestamp: number
   ttl: number
@@ -66,7 +66,7 @@ export async function getCachedData<T>(key: string): Promise<T | null> {
     if (!data) return null
     
     return JSON.parse(data) as T
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Cache get failed:', error)
     return null
   }
@@ -82,7 +82,7 @@ export async function setCachedData<T>(
 ): Promise<void> {
   try {
     await redis.set(key, JSON.stringify(data), ttl)
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Cache set failed:', error)
   }
 }
@@ -93,7 +93,7 @@ export async function setCachedData<T>(
 export async function invalidateCache(key: string): Promise<void> {
   try {
     await redis.del(key)
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Cache invalidation failed:', error)
   }
 }
@@ -104,7 +104,7 @@ export async function invalidateCache(key: string): Promise<void> {
 export async function invalidateMultipleCache(keys: string[]): Promise<void> {
   try {
     await Promise.all(keys.map(key => redis.del(key)))
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Multiple cache invalidation failed:', error)
   }
 }
@@ -116,7 +116,7 @@ export async function safeInvalidateCache(key: string): Promise<CacheOperationRe
   try {
     const result = await redis.del(key)
     return { success: result }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error(`Cache invalidation failed for key ${key}:`, error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
@@ -164,7 +164,7 @@ export async function safeInvalidatePatientCache(patientId: string): Promise<{ s
 export async function cacheExists(key: string): Promise<boolean> {
   try {
     return await redis.exists(key)
-  } catch (error) {
+  } catch (error: unknown) {
     console.warn('Cache exists check failed:', error)
     return false
   }
@@ -253,7 +253,7 @@ export async function getCacheHealthStatus(): Promise<CacheHealthStatus> {
       message: allOperationsSuccessful ? 'Cache fully operational' : 'Cache operations partially failed',
       cacheOperations
     }
-  } catch (error) {
+  } catch (error: unknown) {
     return {
       redis: false,
       message: 'Cache unavailable - falling back to database',

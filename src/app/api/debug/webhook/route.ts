@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const queryParams = Object.fromEntries(url.searchParams.entries())
   
   // Parse body in multiple ways to ensure we capture everything
-  let body: any = {}
+  let body: Record<string, unknown> = {}
   let rawBody = ''
   const contentType = request.headers.get('content-type') || ''
   
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   })
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({ 
     ok: true, 
     endpoint: 'webhook-debug',
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
   })
 }
 
-function determineMessageType(body: any): string {
+function determineMessageType(body: Record<string, unknown>): string {
   if (body.poll_name || body.pollname || body.poll_title) {
     return 'poll_response'
   }

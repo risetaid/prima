@@ -28,6 +28,7 @@ import {
   extractYouTubeVideoId,
   fetchYouTubeVideoData,
 } from "@/lib/youtube-utils";
+import Image from "next/image";
 
 const categories = [
   { value: "general", label: "Umum", color: "bg-blue-100 text-blue-800" },
@@ -60,6 +61,11 @@ interface FormData {
   durationMinutes: string;
   category: string;
   status: "draft" | "published";
+}
+
+interface ValidationError {
+  path: string[];
+  message: string;
 }
 
 export default function CreateVideoPage() {
@@ -173,10 +179,10 @@ export default function CreateVideoPage() {
       } else {
         if (result.details) {
           // Handle validation errors from API
-          const apiErrors: Record<string, string> = {};
-          result.details.forEach((error: any) => {
-            apiErrors[error.path[0]] = error.message;
-          });
+           const apiErrors: Record<string, string> = {};
+           result.details.forEach((error: ValidationError) => {
+             apiErrors[error.path[0]] = error.message;
+           });
           setErrors(apiErrors);
         } else {
           toast.error(result.error || "Terjadi kesalahan");
@@ -471,13 +477,12 @@ export default function CreateVideoPage() {
                 <CardTitle>Preview</CardTitle>
               </CardHeader>
               <CardContent>
-                <img
+                <Image
                   src={formData.thumbnailUrl}
                   alt="Video thumbnail"
+                  width={400}
+                  height={225}
                   className="w-full rounded-lg"
-                  onError={(e) => {
-                    e.currentTarget.src = "/placeholder-video.jpg";
-                  }}
                 />
               </CardContent>
             </Card>

@@ -5,13 +5,14 @@ import type {
   PatientFilters,
   CreatePatientDTO,
   UpdatePatientDTO,
+  PatientRow,
 } from "./patient.types";
 import { ValidationError, NotFoundError } from "./patient.types";
 import { db, patients } from "@/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 import { validatePhoneWithMessage } from "@/lib/phone-utils";
-import { requirePatientAccess } from "@/lib/patient-access-control";
+import { PatientAccessControl } from "./patient-access-control";
 
 export class PatientService {
   private repo: PatientRepository;
@@ -79,7 +80,7 @@ export class PatientService {
 
     // Check role-based access if user is provided
     if (user) {
-      await requirePatientAccess(
+      await PatientAccessControl.requireAccess(
         user.id,
         user.role,
         patientId,
@@ -87,11 +88,10 @@ export class PatientService {
       );
     }
 
-    const [basic, confirmations, logs, meds, rate] = await Promise.all([
+    const [basic, confirmations, logs, rate] = await Promise.all([
       this.repo.getPatientBasicData(patientId),
       this.repo.getPatientManualConfirmations(patientId),
       this.repo.getPatientReminderLogs(patientId),
-      this.repo.listActiveMedications(patientId),
       this.compliance.getPatientRate(patientId),
     ]);
 
@@ -160,22 +160,12 @@ export class PatientService {
         medicationName: l.medicationName,
         dosage: l.dosage,
       })),
-      patientMedications: meds.map((m) => ({
-        id: m.id,
-        medicationName: m.medicationName,
-        dosage: m.dosage,
-        frequency: m.frequency,
-        instructions: m.instructions,
-        startDate: m.startDate,
-        endDate: m.endDate,
-        isActive: m.isActive,
-        createdAt: m.createdAt,
-      })),
+
       complianceRate: rate,
     };
   }
 
-  async createPatient(body: any, currentUser: { id: string; role: string }) {
+  async createPatient(body: CreatePatientDTO, currentUser: { id: string; role: string }) {
     const name = (body?.name || "").trim();
     const phoneNumber = (body?.phoneNumber || "").trim();
     if (!name || !phoneNumber)
@@ -223,7 +213,7 @@ export class PatientService {
 
     const created = await this.repo.insertPatient(values);
 
-    let assignedVolunteer: any = null;
+    let assignedVolunteer: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null = null;
     if (created.assignedVolunteerId) {
       const v = await this.repo.getUserById(created.assignedVolunteerId);
       if (v)
@@ -241,7 +231,7 @@ export class PatientService {
   async updatePatient(id: string, body: UpdatePatientDTO) {
     await this.verifyPatientExists(id);
 
-    const values: any = {
+    const values: Partial<PatientRow> = {
       updatedAt: new Date(),
     };
     if (body.name !== undefined) values.name = body.name;

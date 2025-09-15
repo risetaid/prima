@@ -14,6 +14,31 @@ interface AllReminder {
   status: "scheduled" | "pending" | "completed_taken" | "completed_not_taken";
 }
 
+interface ScheduledReminder {
+  id: string;
+  medicationName: string;
+  scheduledTime: string;
+  reminderDate: string;
+  customMessage?: string;
+}
+
+interface PendingReminder {
+  id: string;
+  medicationName: string;
+  scheduledTime: string;
+  reminderDate: string;
+  customMessage?: string;
+}
+
+interface CompletedReminder {
+  id: string;
+  medicationName: string;
+  scheduledTime: string;
+  reminderDate: string;
+  customMessage?: string;
+  medicationTaken: boolean;
+}
+
 export default function AllRemindersPage() {
   const router = useRouter();
   const params = useParams();
@@ -54,9 +79,9 @@ export default function AllRemindersPage() {
 
       // Transform to unified format
       const allReminders = [
-        ...scheduledData.map((r: any) => ({ ...r, status: "scheduled" })),
-        ...pendingData.map((r: any) => ({ ...r, status: "pending" })),
-        ...completedData.map((r: any) => ({
+        ...scheduledData.map((r: ScheduledReminder) => ({ ...r, status: "scheduled" })),
+        ...pendingData.map((r: PendingReminder) => ({ ...r, status: "pending" })),
+        ...completedData.map((r: CompletedReminder) => ({
           ...r,
           status: r.medicationTaken ? "completed_taken" : "completed_not_taken",
         })),

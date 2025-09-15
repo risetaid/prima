@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients } from '@/db'
 import { isNull } from 'drizzle-orm'
 import { ComplianceService } from '@/services/patient/compliance.service'
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser()
     if (!user) {

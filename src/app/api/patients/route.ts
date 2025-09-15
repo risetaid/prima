@@ -12,19 +12,18 @@
  * - Medical-grade validation
  */
 
-import { db, patients, users } from "@/db";
-import { eq } from "drizzle-orm";
 import { createApiHandler } from "@/lib/api-handler";
 import { PatientService } from "@/services/patient/patient.service";
 import type { PatientFilters } from "@/services/patient/patient.types";
+import { ValidationError } from "@/services/patient/patient.types";
 
 interface CreatePatientBody {
-  name?: string;
-  phoneNumber?: string;
+  name: string;
+  phoneNumber: string;
   address?: string;
   birthDate?: string;
   diagnosisDate?: string;
-  cancerStage?: string;
+  cancerStage?: 'I' | 'II' | 'III' | 'IV' | null;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   notes?: string;
@@ -49,7 +48,7 @@ export const GET = createApiHandler(
       limit: parseInt(searchParams.get("limit") || "50"),
     };
 
-    // For non-admin users, filter by their assigned patients
+    // For non-admin users, filter by their assigned patients using consolidated access control
     if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
       filters.assignedVolunteerId = user.id;
     }
@@ -65,6 +64,14 @@ export const POST = createApiHandler(
     auth: "required",
   },
   async (body: CreatePatientBody, { user }) => {
+    // Validate required fields
+    if (!body.name || body.name.trim() === "") {
+      throw new ValidationError("Name is required");
+    }
+    if (!body.phoneNumber || body.phoneNumber.trim() === "") {
+      throw new ValidationError("Phone number is required");
+    }
+
     const service = new PatientService();
     return await service.createPatient(body, { id: user.id, role: user.role });
   }

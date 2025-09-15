@@ -6,6 +6,9 @@ import { conversationStates, conversationMessages } from '@/db'
 import { eq, and, desc, gte, lt, sql } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 
+type ConversationStateRow = typeof conversationStates.$inferSelect
+type ConversationMessageRow = typeof conversationMessages.$inferSelect
+
 export interface ConversationStateData {
   id: string
   patientId: string
@@ -14,7 +17,7 @@ export interface ConversationStateData {
   expectedResponseType?: 'yes_no' | 'confirmation' | 'text' | 'number'
   relatedEntityId?: string
   relatedEntityType?: 'reminder_log' | 'verification' | 'general'
-  stateData?: Record<string, any>
+   stateData?: Record<string, unknown>
   lastMessage?: string
   lastMessageAt?: Date
   messageCount: number
@@ -105,21 +108,22 @@ export class ConversationStateService {
     updates: Partial<ConversationStateData>
   ): Promise<ConversationStateData> {
     try {
-      const updateData: any = {
+      const updateData: Partial<ConversationStateData> & { updatedAt: Date } = {
         updatedAt: new Date(),
         ...updates
       }
 
       // Remove undefined values
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) {
-          delete updateData[key]
+      const cleanedUpdateData: Record<string, unknown> = {}
+      Object.entries(updateData).forEach(([key, value]) => {
+        if (value !== undefined) {
+          cleanedUpdateData[key] = value
         }
       })
 
       const updated = await db
         .update(conversationStates)
-        .set(updateData)
+        .set(cleanedUpdateData)
         .where(eq(conversationStates.id, conversationStateId))
         .returning()
 
@@ -129,7 +133,7 @@ export class ConversationStateService {
 
       logger.info('Updated conversation state', {
         conversationStateId,
-        updates: Object.keys(updateData)
+        updates: Object.keys(cleanedUpdateData)
       })
 
       return this.mapConversationState(updated[0])
@@ -324,18 +328,18 @@ export class ConversationStateService {
   /**
    * Map database row to ConversationStateData
    */
-  private mapConversationState(row: any): ConversationStateData {
+  private mapConversationState(row: ConversationStateRow): ConversationStateData {
     return {
       id: row.id,
       patientId: row.patientId,
       phoneNumber: row.phoneNumber,
-      currentContext: row.currentContext,
-      expectedResponseType: row.expectedResponseType,
-      relatedEntityId: row.relatedEntityId,
-      relatedEntityType: row.relatedEntityType,
-      stateData: row.stateData,
-      lastMessage: row.lastMessage,
-      lastMessageAt: row.lastMessageAt,
+      currentContext: row.currentContext as ConversationStateData['currentContext'],
+      expectedResponseType: row.expectedResponseType as ConversationStateData['expectedResponseType'] || undefined,
+      relatedEntityId: row.relatedEntityId || undefined,
+      relatedEntityType: row.relatedEntityType as ConversationStateData['relatedEntityType'] || undefined,
+      stateData: row.stateData as Record<string, unknown> || undefined,
+      lastMessage: row.lastMessage || undefined,
+      lastMessageAt: row.lastMessageAt || undefined,
       messageCount: row.messageCount,
       isActive: row.isActive,
       expiresAt: row.expiresAt,
@@ -347,16 +351,16 @@ export class ConversationStateService {
   /**
    * Map database row to ConversationMessageData
    */
-  private mapConversationMessage(row: any): ConversationMessageData {
+  private mapConversationMessage(row: ConversationMessageRow): ConversationMessageData {
     return {
       id: row.id,
       conversationStateId: row.conversationStateId,
       message: row.message,
-      direction: row.direction,
-      messageType: row.messageType,
-      intent: row.intent,
-      confidence: row.confidence,
-      processedAt: row.processedAt,
+      direction: row.direction as ConversationMessageData['direction'],
+      messageType: row.messageType as ConversationMessageData['messageType'],
+      intent: row.intent || undefined,
+      confidence: row.confidence || undefined,
+      processedAt: row.processedAt || undefined,
       createdAt: row.createdAt,
     }
   }

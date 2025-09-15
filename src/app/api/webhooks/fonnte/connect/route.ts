@@ -4,6 +4,20 @@ import { requireWebhookToken } from '@/lib/webhook-auth'
 import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
 import { logger } from '@/lib/logger'
 
+interface RawConnectBody {
+  device?: string
+  instance?: string
+  gateway?: string
+  status?: string
+  phone_status?: string
+  battery?: string | number
+  signal?: string | number
+  timestamp?: string | number
+  time?: string | number
+  updated_at?: string | number
+  id?: string
+}
+
 const ConnectSchema = z.object({
   device: z.string().optional(),
   status: z.string().optional(),
@@ -14,7 +28,7 @@ const ConnectSchema = z.object({
   id: z.string().optional(),
 })
 
-function normalize(body: any) {
+function normalize(body: RawConnectBody) {
   return {
     device: body.device || body.instance || body.gateway,
     status: body.status,
@@ -30,12 +44,12 @@ export async function POST(request: NextRequest) {
   const authError = requireWebhookToken(request)
   if (authError) return authError
 
-  let parsed: any = {}
+  let parsed: Record<string, unknown> = {}
   const contentType = request.headers.get('content-type') || ''
   try {
     if (contentType.includes('application/json')) parsed = await request.json()
     else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-      const form = await request.formData(); form.forEach((v, k) => { (parsed as any)[k] = v })
+      const form = await request.formData(); form.forEach((v, k) => { (parsed as Record<string, unknown>)[k] = v })
     } else { const text = await request.text(); try { parsed = JSON.parse(text) } catch {} }
   } catch {}
 

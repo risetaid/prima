@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -46,7 +46,7 @@ export function PatientVariablesManager({
   const [variableToDelete, setVariableToDelete] = useState<string | null>(null);
 
   // Load variables
-  const loadVariables = async () => {
+  const loadVariables = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch(`/api/patients/${patientId}/variables`);
@@ -63,7 +63,7 @@ export function PatientVariablesManager({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [patientId]);
 
   // Save variables
   const saveVariables = async () => {
@@ -73,7 +73,7 @@ export function PatientVariablesManager({
       // Filter out empty values
       const cleanedValues = Object.fromEntries(
         Object.entries(editingValues).filter(
-          ([_, value]) => value.trim() !== ""
+          ([, value]) => value.trim() !== ""
         )
       );
 
@@ -124,7 +124,7 @@ export function PatientVariablesManager({
       );
 
       if (response.ok) {
-        toast.success(`Variabel "${variableToDelete}" berhasil dihapus`);
+        toast.success("Variabel \"" + variableToDelete + "\" berhasil dihapus");
         loadVariables();
       } else {
         const error = await response.json();
@@ -156,7 +156,7 @@ export function PatientVariablesManager({
 
   useEffect(() => {
     loadVariables();
-  }, [patientId]);
+  }, [loadVariables]);
 
   const variablesCount = Object.keys(variables).length;
 
@@ -208,7 +208,7 @@ export function PatientVariablesManager({
                     >
                       {label}
                       <span className="text-xs text-muted-foreground block lg:inline lg:ml-2">
-                        {`{${name}}`}
+                        {"{" + name + "}"}
                       </span>
                     </Label>
                     <div className="lg:col-span-2">
@@ -253,7 +253,7 @@ export function PatientVariablesManager({
           <div className="text-center py-4 text-muted-foreground">
             <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Belum ada data pasien</p>
-            <p className="text-xs">Klik "Kelola" untuk mengatur data pasien</p>
+            <p className="text-xs">Klik &quot;Kelola&quot; untuk mengatur data pasien</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -266,7 +266,7 @@ export function PatientVariablesManager({
                 >
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="font-mono text-xs">
-                      {`{${name}}`}
+                      {"{" + name + "}"}
                     </Badge>
                     <span className="text-sm truncate max-w-[200px]">
                       {value}
@@ -301,7 +301,7 @@ export function PatientVariablesManager({
         }}
         onConfirm={confirmDeleteVariable}
         title="Hapus Variabel"
-        description={`Yakin ingin menghapus variabel "${variableToDelete}"?`}
+        description={"Yakin ingin menghapus variabel \"" + variableToDelete + "\"?"}
         confirmText="Ya, Hapus"
         cancelText="Batal"
         variant="destructive"

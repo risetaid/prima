@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, reminderSchedules, patients, reminderLogs } from "@/db";
-import { eq, and, gte, lte, notExists, count, sql, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, notExists, count } from "drizzle-orm";
 import {
   shouldSendReminderNow,
   getWIBTime,
@@ -18,6 +18,27 @@ import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 const whatsappService = new WhatsAppService();
 const reminderRepository = new ReminderRepository();
 
+interface ReminderSchedule {
+  id: string;
+  patientId: string;
+  medicationName: string | null;
+  scheduledTime: string;
+  startDate: Date;
+  customMessage: string | null;
+  patientName: string | null;
+  patientPhoneNumber: string | null;
+}
+
+type AttachmentsByScheduleId = Record<
+  string,
+  Array<{
+    type: "article" | "video";
+    title: string;
+    url: string;
+    id: string;
+  }>
+>;
+
 // Helper function to create date range for WIB timezone (equivalent to createDateRangeQuery)
 function createWIBDateRange(dateString: string) {
   const date = new Date(dateString);
@@ -31,6 +52,407 @@ function createWIBDateRange(dateString: string) {
   endOfDay.setDate(endOfDay.getDate() + 1);
 
   return { startOfDay, endOfDay };
+}
+
+async function validateEnvironment() {
+  // Basic validation checks
+  logger.info("🔄 Starting reminder cron job - initialization", {
+    api: true,
+    cron: true,
+    nodeEnv: process.env.NODE_ENV,
+    hasDbConnection: Boolean(db),
+    hasWhatsAppService: Boolean(whatsappService),
+  });
+
+  // Test basic database connection with a simple query
+  logger.info("Testing database connection", {
+    api: true,
+    cron: true,
+    timestamp: new Date().toISOString(),
+  });
+
+  try {
+    const connectionTest = await db
+      .select({ count: count() })
+      .from(patients)
+      .limit(1);
+
+    logger.info("Database connection test successful", {
+      api: true,
+      cron: true,
+      hasResults: connectionTest.length > 0,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (dbTestError) {
+    logger.error("Database connection test failed", dbTestError as Error, {
+      api: true,
+      cron: true,
+      timestamp: new Date().toISOString(),
+    });
+    throw new Error(
+      `Database connection failed: ${(dbTestError as Error).message}`
+    );
+  }
+
+  logger.info("🔄 Starting reminder cron job", {
+    api: true,
+    cron: true,
+    wibDate: getWIBDateString(),
+    wibTime: getWIBTimeString(),
+    timestamp: new Date().toISOString(),
+  });
+}
+
+async function fetchReminderSchedules(todayWIB: string, endOfDay: Date, todayStart: Date) {
+  // Get all active reminder schedules that haven't been sent today
+  logger.info("Executing reminder schedules query", {
+    api: true,
+    cron: true,
+    todayWIB,
+  });
+
+  const reminderSchedulesToProcess = await db
+    .select({
+      id: reminderSchedules.id,
+      patientId: reminderSchedules.patientId,
+      medicationName: reminderSchedules.medicationName,
+      scheduledTime: reminderSchedules.scheduledTime,
+      startDate: reminderSchedules.startDate,
+      customMessage: reminderSchedules.customMessage,
+      patientName: patients.name,
+      patientPhoneNumber: patients.phoneNumber,
+    })
+    .from(reminderSchedules)
+    .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+    .where(
+      and(
+        eq(reminderSchedules.isActive, true),
+        lte(reminderSchedules.startDate, endOfDay),
+        eq(patients.isActive, true),
+        eq(patients.verificationStatus, "verified"),
+        notExists(
+          db
+            .select()
+            .from(reminderLogs)
+            .where(
+              and(
+                eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
+                eq(reminderLogs.status, "DELIVERED"),
+                gte(reminderLogs.sentAt, todayStart)
+              )
+            )
+        )
+      )
+    )
+    .orderBy(reminderSchedules.scheduledTime);
+
+  logger.info("Query completed successfully", {
+    api: true,
+    cron: true,
+    schedulesFound: reminderSchedulesToProcess.length,
+  });
+
+  return reminderSchedulesToProcess;
+}
+
+async function fetchAttachments(scheduleIds: string[]) {
+  // Fetch attachments for all schedules
+  const allAttachments =
+    scheduleIds.length > 0
+      ? await reminderRepository.getAttachments(scheduleIds)
+      : [];
+
+  // Group attachments by reminderScheduleId
+  const attachmentsByScheduleId: Record<
+    string,
+    Array<{
+      type: "article" | "video";
+      title: string;
+      url: string;
+      id: string;
+    }>
+  > = {};
+  for (const attachment of allAttachments) {
+    if (!attachmentsByScheduleId[attachment.reminderScheduleId]) {
+      attachmentsByScheduleId[attachment.reminderScheduleId] = [];
+    }
+    attachmentsByScheduleId[attachment.reminderScheduleId].push({
+      type: attachment.contentType as "article" | "video",
+      title: attachment.contentTitle,
+      url: attachment.contentUrl,
+      id: "", // Not needed for building message
+    });
+  }
+
+  return attachmentsByScheduleId;
+}
+
+async function processSchedule(schedule: ReminderSchedule, attachmentsByScheduleId: AttachmentsByScheduleId, debugLogs: string[]) {
+  // Check if it's time to send this reminder
+  const scheduleDate = schedule.startDate.toISOString().split("T")[0];
+  const shouldSend = shouldSendReminderNow(
+    scheduleDate,
+    schedule.scheduledTime
+  );
+
+  // Debug logging for manual cron troubleshooting
+  if (shouldSend) {
+    debugLogs.push(
+      `✅ Reminder ${schedule.patientName} (${
+        schedule.scheduledTime
+      }) should be sent - current: ${getWIBTimeString()}, scheduled: ${
+        schedule.scheduledTime
+      }`
+    );
+  } else {
+    debugLogs.push(
+      `❌ Reminder ${schedule.patientName} (${
+        schedule.scheduledTime
+      }) not ready - current: ${getWIBTimeString()}, scheduled: ${
+        schedule.scheduledTime
+      }`
+    );
+  }
+
+  if (shouldSend) {
+    // Idempotency: ensure we only send once per schedule per WIB day
+    const idempotencyKey = `reminder:sent:${
+      schedule.id
+    }:${getWIBDateString()}`;
+    const alreadySent = await isDuplicateEvent(
+      idempotencyKey,
+      24 * 60 * 60
+    );
+    if (alreadySent) {
+      debugLogs.push(
+        `⏭️ Skipping duplicate send for ${schedule.patientName} (${schedule.scheduledTime})`
+      );
+      return { sent: false, error: false };
+    }
+
+    // Validate phone number exists
+    if (!schedule.patientPhoneNumber) {
+      debugLogs.push(
+        `❌ Missing phone number for ${schedule.patientName}`
+      );
+      return { sent: false, error: true };
+    }
+
+    // Rate limiting temporarily disabled
+
+    try {
+      // Send WhatsApp medication reminder
+      logger.info("Sending WhatsApp medication reminder", {
+        api: true,
+        cron: true,
+        patientId: schedule.patientId,
+        reminderId: schedule.id,
+        medicationName: schedule.medicationName,
+        hasCustomMessage: Boolean(schedule.customMessage),
+      });
+
+      // Get attachments for this schedule
+      const attachments = attachmentsByScheduleId[schedule.id] || [];
+
+      // Build message: use customMessage if available, otherwise fallback to template
+      let messageToSend: string;
+      if (schedule.customMessage) {
+        // Use custom message with attachments
+        messageToSend = whatsappService.buildMessage(
+          schedule.customMessage,
+          attachments
+        );
+      } else {
+        // Fallback to template message
+        const templateMessage = `💊 *Pengingat Minum Obat*
+
+Halo ${schedule.patientName}!
+
+Saatnya minum obat:
+🔹 *Obat:* ${schedule.medicationName || "obat Anda"}
+🔹 *Dosis:* sesuai resep
+🔹 *Waktu:* ${schedule.scheduledTime}
+
+*Balas setelah minum obat:*
+✅ SUDAH / SELESAI
+⏰ BELUM (akan diingatkan lagi)
+🆘 BANTUAN (butuh bantuan relawan)
+
+💙 Tim PRIMA`;
+
+        messageToSend =
+          attachments.length > 0
+            ? whatsappService.buildMessage(templateMessage, attachments)
+            : templateMessage;
+      }
+
+      const result = await whatsappService.send(
+        schedule.patientPhoneNumber,
+        messageToSend
+      );
+
+      const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
+      debugLogs.push(providerLogMessage);
+
+      // Add comprehensive details about the sent reminder
+      if (result.success) {
+        debugLogs.push(`✅ Reminder sent successfully:`);
+        debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
+        debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
+        debugLogs.push(
+          `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+        );
+        debugLogs.push(`   ⏰ Scheduled: ${schedule.scheduledTime}`);
+        debugLogs.push(
+          `   📝 Custom Message: ${
+            schedule.customMessage ? "Yes" : "No (using template)"
+          }`
+        );
+        debugLogs.push(`   📎 Attachments: ${attachments.length}`);
+        debugLogs.push(`   🆔 Fonnte ID: ${result.messageId}`);
+      } else {
+        debugLogs.push(`❌ Failed to send reminder:`);
+        debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
+        debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
+        debugLogs.push(
+          `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+        );
+        debugLogs.push(`   ❌ Error: ${result.error}`);
+      }
+
+      // Create reminder log - SENT means waiting for poll confirmation
+      const status: "SENT" | "FAILED" = result.success
+        ? "SENT" // Changed from DELIVERED since we need poll confirmation
+        : "FAILED";
+      const logData = {
+        reminderScheduleId: schedule.id,
+        patientId: schedule.patientId,
+        sentAt: getWIBTime(),
+        status: status,
+        message:
+          schedule.customMessage ||
+          `Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
+        phoneNumber: schedule.patientPhoneNumber,
+        fonnteMessageId: result.messageId,
+      };
+
+      // Create reminder log with error handling
+      try {
+        await db
+          .insert(reminderLogs)
+          .values(logData)
+          .returning();
+        // Log created successfully
+      } catch (logError) {
+        console.error(
+          `❌ Failed to create reminder log for ${schedule.patientName}:`,
+          logError
+        );
+        console.error(`❌ Log data that failed:`, logData);
+        // Fallback: attempt a minimal log to preserve UI state and stop re-sends
+        try {
+          await db
+            .insert(reminderLogs)
+            .values({
+              reminderScheduleId: schedule.id,
+              patientId: schedule.patientId,
+              sentAt: getWIBTime(),
+              status: status,
+              message: `Text: Medication reminder for ${schedule.medicationName}`,
+              phoneNumber: schedule.patientPhoneNumber,
+              fonnteMessageId: result.messageId,
+            })
+            .returning();
+        } catch (fallbackError) {
+          console.error(
+            "❌ Fallback reminder log insert also failed",
+            fallbackError
+          );
+        }
+        return { sent: false, error: true };
+      }
+
+      // Invalidate reminder stats cache after creating log
+      await invalidateCache(CACHE_KEYS.reminderStats(schedule.patientId));
+
+      return { sent: result.success, error: !result.success };
+    } catch {
+      return { sent: false, error: true };
+    }
+  }
+  return { sent: false, error: false };
+}
+
+function buildSummary(startTime: number, processedCount: number, sentCount: number, errorCount: number, reminderSchedulesToProcess: ReminderSchedule[], debugLogs: string[]) {
+  const duration = Date.now() - startTime;
+  const summary = {
+    success: true,
+    message:
+      sentCount > 0
+        ? `✅ Cron completed: ${sentCount} reminders sent successfully`
+        : `📋 Cron completed: No reminders needed at this time`,
+    execution: {
+      timestamp: new Date().toISOString(),
+      wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+      duration: `${duration}ms`,
+      provider: "FONNTE",
+    },
+    results: {
+      schedulesFound: reminderSchedulesToProcess.length,
+      schedulesProcessed: processedCount,
+      messagesSent: sentCount,
+      errors: errorCount,
+      successRate:
+        processedCount > 0 && sentCount >= 0
+          ? `${Math.round((sentCount / processedCount) * 100)}%`
+          : "0%",
+    },
+    details:
+      debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],
+  };
+
+  return summary;
+}
+
+function handleError(error: unknown, processedCount: number, sentCount: number, errorCount: number) {
+  const errorMessage =
+    error instanceof Error ? error.message : "Unknown error";
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  logger.error(
+    "Cron job failed with critical error",
+    error instanceof Error ? error : new Error(errorMessage),
+    {
+      api: true,
+      cron: true,
+      processedCount,
+      sentCount,
+      errorCount,
+      errorMessage,
+      errorStack: errorStack?.substring(0, 500), // Limit stack trace length
+    }
+  );
+
+  return NextResponse.json(
+    {
+      success: false,
+      error: "Internal server error",
+      details: errorMessage, // Show error message for debugging
+      debugInfo: {
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+        stack: errorStack?.substring(0, 300), // Show partial stack trace
+      },
+      timestamp: new Date().toISOString(),
+      wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+      stats: {
+        processed: processedCount,
+        sent: sentCount,
+        errors: errorCount + 1,
+      },
+    },
+    { status: 500 }
+  );
 }
 
 // GET endpoint for Vercel Cron Functions
@@ -82,60 +504,13 @@ async function processReminders() {
   const debugLogs: string[] = [];
 
   try {
-    // Basic validation checks
-    logger.info("🔄 Starting reminder cron job - initialization", {
-      api: true,
-      cron: true,
-      nodeEnv: process.env.NODE_ENV,
-      hasDbConnection: Boolean(db),
-      hasWhatsAppService: Boolean(whatsappService),
-    });
-
-    // Test basic database connection with a simple query
-    logger.info("Testing database connection", {
-      api: true,
-      cron: true,
-      timestamp: new Date().toISOString(),
-    });
-
-    try {
-      const connectionTest = await db
-        .select({ count: count() })
-        .from(patients)
-        .limit(1);
-
-      logger.info("Database connection test successful", {
-        api: true,
-        cron: true,
-        hasResults: connectionTest.length > 0,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (dbTestError) {
-      logger.error("Database connection test failed", dbTestError as Error, {
-        api: true,
-        cron: true,
-        timestamp: new Date().toISOString(),
-      });
-      throw new Error(
-        `Database connection failed: ${(dbTestError as Error).message}`
-      );
-    }
-
-    logger.info("🔄 Starting reminder cron job", {
-      api: true,
-      cron: true,
-      wibDate: getWIBDateString(),
-      wibTime: getWIBTimeString(),
-      timestamp: new Date().toISOString(),
-    });
+    await validateEnvironment();
 
     const logMessage = `🔄 Starting reminder cron job at ${getWIBDateString()} ${getWIBTimeString()}`;
     debugLogs.push(logMessage);
 
     // Get all active reminder schedules for today
     let todayWIB: string;
-    let endOfDay: Date;
-    let todayStart: Date;
 
     try {
       todayWIB = getWIBDateString();
@@ -155,9 +530,8 @@ async function processReminders() {
     }
 
     // Simple timezone calculations
-    const dateRange = createWIBDateRange(todayWIB);
-    endOfDay = dateRange.endOfDay;
-    todayStart = getWIBTodayStart();
+    const { endOfDay } = createWIBDateRange(todayWIB);
+    const todayStart = getWIBTodayStart();
 
     logger.info("Timezone calculations completed", {
       api: true,
@@ -166,360 +540,25 @@ async function processReminders() {
       todayStart: todayStart.toISOString(),
     });
 
-    // Get all active reminder schedules that haven't been sent today
-    logger.info("Executing reminder schedules query", {
-      api: true,
-      cron: true,
-      todayWIB,
-    });
-
-    const reminderSchedulesToProcess = await db
-      .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
-        scheduledTime: reminderSchedules.scheduledTime,
-        startDate: reminderSchedules.startDate,
-        customMessage: reminderSchedules.customMessage,
-        patientName: patients.name,
-        patientPhoneNumber: patients.phoneNumber,
-      })
-      .from(reminderSchedules)
-      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
-      .where(
-        and(
-          eq(reminderSchedules.isActive, true),
-          lte(reminderSchedules.startDate, endOfDay),
-          eq(patients.isActive, true),
-          eq(patients.verificationStatus, "verified"),
-          notExists(
-            db
-              .select()
-              .from(reminderLogs)
-              .where(
-                and(
-                  eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                  eq(reminderLogs.status, "DELIVERED"),
-                  gte(reminderLogs.sentAt, todayStart)
-                )
-              )
-          )
-        )
-      )
-      .orderBy(reminderSchedules.scheduledTime);
-
-    logger.info("Query completed successfully", {
-      api: true,
-      cron: true,
-      schedulesFound: reminderSchedulesToProcess.length,
-    });
-
-    // Fetch attachments for all schedules
+    const reminderSchedulesToProcess = await fetchReminderSchedules(todayWIB, endOfDay, todayStart);
     const scheduleIds = reminderSchedulesToProcess.map((s) => s.id);
-    const allAttachments =
-      scheduleIds.length > 0
-        ? await reminderRepository.getAttachments(scheduleIds)
-        : [];
-
-    // Group attachments by reminderScheduleId
-    const attachmentsByScheduleId: Record<
-      string,
-      Array<{
-        type: "article" | "video";
-        title: string;
-        url: string;
-        id: string;
-      }>
-    > = {};
-    for (const attachment of allAttachments) {
-      if (!attachmentsByScheduleId[attachment.reminderScheduleId]) {
-        attachmentsByScheduleId[attachment.reminderScheduleId] = [];
-      }
-      attachmentsByScheduleId[attachment.reminderScheduleId].push({
-        type: attachment.contentType as "article" | "video",
-        title: attachment.contentTitle,
-        url: attachment.contentUrl,
-        id: "", // Not needed for building message
-      });
-    }
+    const attachmentsByScheduleId = await fetchAttachments(scheduleIds);
 
     for (const schedule of reminderSchedulesToProcess) {
       processedCount++;
 
       try {
-        // Check if it's time to send this reminder
-        const scheduleDate = schedule.startDate.toISOString().split("T")[0];
-        const shouldSend = shouldSendReminderNow(
-          scheduleDate,
-          schedule.scheduledTime
-        );
-
-        // Debug logging for manual cron troubleshooting
-        if (shouldSend) {
-          debugLogs.push(
-            `✅ Reminder ${schedule.patientName} (${
-              schedule.scheduledTime
-            }) should be sent - current: ${getWIBTimeString()}, scheduled: ${
-              schedule.scheduledTime
-            }`
-          );
-        } else {
-          debugLogs.push(
-            `❌ Reminder ${schedule.patientName} (${
-              schedule.scheduledTime
-            }) not ready - current: ${getWIBTimeString()}, scheduled: ${
-              schedule.scheduledTime
-            }`
-          );
-        }
-
-        if (shouldSend) {
-          // Idempotency: ensure we only send once per schedule per WIB day
-          const idempotencyKey = `reminder:sent:${
-            schedule.id
-          }:${getWIBDateString()}`;
-          const alreadySent = await isDuplicateEvent(
-            idempotencyKey,
-            24 * 60 * 60
-          );
-          if (alreadySent) {
-            debugLogs.push(
-              `⏭️ Skipping duplicate send for ${schedule.patientName} (${schedule.scheduledTime})`
-            );
-            continue;
-          }
-
-          // Validate phone number exists
-          if (!schedule.patientPhoneNumber) {
-            errorCount++;
-            debugLogs.push(
-              `❌ Missing phone number for ${schedule.patientName}`
-            );
-            continue;
-          }
-
-          // Rate limiting temporarily disabled
-
-          try {
-            // Send WhatsApp medication reminder
-            logger.info("Sending WhatsApp medication reminder", {
-              api: true,
-              cron: true,
-              patientId: schedule.patientId,
-              reminderId: schedule.id,
-              medicationName: schedule.medicationName,
-              hasCustomMessage: Boolean(schedule.customMessage),
-            });
-
-            // Get attachments for this schedule
-            const attachments = attachmentsByScheduleId[schedule.id] || [];
-
-            // Build message: use customMessage if available, otherwise fallback to template
-            let messageToSend: string;
-            if (schedule.customMessage) {
-              // Use custom message with attachments
-              messageToSend = whatsappService.buildMessage(
-                schedule.customMessage,
-                attachments
-              );
-            } else {
-              // Fallback to template message
-              const templateMessage = `💊 *Pengingat Minum Obat*
-
-Halo ${schedule.patientName}!
-
-Saatnya minum obat:
-🔹 *Obat:* ${schedule.medicationName || "obat Anda"}
-🔹 *Dosis:* sesuai resep
-🔹 *Waktu:* ${schedule.scheduledTime}
-
-*Balas setelah minum obat:*
-✅ SUDAH / SELESAI
-⏰ BELUM (akan diingatkan lagi)
-🆘 BANTUAN (butuh bantuan relawan)
-
-💙 Tim PRIMA`;
-
-              messageToSend =
-                attachments.length > 0
-                  ? whatsappService.buildMessage(templateMessage, attachments)
-                  : templateMessage;
-            }
-
-            const result = await whatsappService.send(
-              schedule.patientPhoneNumber,
-              messageToSend
-            );
-
-            const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
-            debugLogs.push(providerLogMessage);
-
-            // Add comprehensive details about the sent reminder
-            if (result.success) {
-              debugLogs.push(`✅ Reminder sent successfully:`);
-              debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
-              debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
-              debugLogs.push(
-                `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
-              );
-              debugLogs.push(`   ⏰ Scheduled: ${schedule.scheduledTime}`);
-              debugLogs.push(
-                `   📝 Custom Message: ${
-                  schedule.customMessage ? "Yes" : "No (using template)"
-                }`
-              );
-              debugLogs.push(`   📎 Attachments: ${attachments.length}`);
-              debugLogs.push(`   🆔 Fonnte ID: ${result.messageId}`);
-            } else {
-              debugLogs.push(`❌ Failed to send reminder:`);
-              debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
-              debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
-              debugLogs.push(
-                `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
-              );
-              debugLogs.push(`   ❌ Error: ${result.error}`);
-            }
-
-            // Create reminder log - SENT means waiting for poll confirmation
-            const status: "SENT" | "FAILED" = result.success
-              ? "SENT" // Changed from DELIVERED since we need poll confirmation
-              : "FAILED";
-            const logData = {
-              reminderScheduleId: schedule.id,
-              patientId: schedule.patientId,
-              sentAt: getWIBTime(),
-              status: status,
-              message:
-                schedule.customMessage ||
-                `Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
-              phoneNumber: schedule.patientPhoneNumber,
-              fonnteMessageId: result.messageId,
-            };
-
-            // Create reminder log with error handling
-            let reminderLogId: string | undefined;
-            try {
-              const createdLog = await db
-                .insert(reminderLogs)
-                .values(logData)
-                .returning();
-              reminderLogId = createdLog[0]?.id;
-              // Log created successfully
-            } catch (logError) {
-              console.error(
-                `❌ Failed to create reminder log for ${schedule.patientName}:`,
-                logError
-              );
-              console.error(`❌ Log data that failed:`, logData);
-              // Fallback: attempt a minimal log to preserve UI state and stop re-sends
-              try {
-                const minimalLog = await db
-                  .insert(reminderLogs)
-                  .values({
-                    reminderScheduleId: schedule.id,
-                    patientId: schedule.patientId,
-                    sentAt: getWIBTime(),
-                    status: status,
-                    message: `Text: Medication reminder for ${schedule.medicationName}`,
-                    phoneNumber: schedule.patientPhoneNumber,
-                    fonnteMessageId: result.messageId,
-                  })
-                  .returning();
-                reminderLogId = minimalLog[0]?.id;
-              } catch (fallbackError) {
-                console.error(
-                  "❌ Fallback reminder log insert also failed",
-                  fallbackError
-                );
-              }
-              errorCount++;
-              continue; // Skip to next schedule
-            }
-
-            // Invalidate reminder stats cache after creating log
-            await invalidateCache(CACHE_KEYS.reminderStats(schedule.patientId));
-
-            if (result.success) {
-              sentCount++;
-            } else {
-              errorCount++;
-            }
-          } catch {
-            errorCount++;
-            continue;
-          }
-        }
+        const result = await processSchedule(schedule, attachmentsByScheduleId, debugLogs);
+        if (result.sent) sentCount++;
+        if (result.error) errorCount++;
       } catch {
         errorCount++;
       }
     }
 
-    const duration = Date.now() - startTime;
-    const summary = {
-      success: true,
-      message:
-        sentCount > 0
-          ? `✅ Cron completed: ${sentCount} reminders sent successfully`
-          : `📋 Cron completed: No reminders needed at this time`,
-      execution: {
-        timestamp: new Date().toISOString(),
-        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
-        duration: `${duration}ms`,
-        provider: "FONNTE",
-      },
-      results: {
-        schedulesFound: reminderSchedulesToProcess.length,
-        schedulesProcessed: processedCount,
-        messagesSent: sentCount,
-        errors: errorCount,
-        successRate:
-          processedCount > 0 && sentCount >= 0
-            ? `${Math.round((sentCount / processedCount) * 100)}%`
-            : "0%",
-      },
-      details:
-        debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],
-    };
-
+    const summary = buildSummary(startTime, processedCount, sentCount, errorCount, reminderSchedulesToProcess, debugLogs);
     return NextResponse.json(summary);
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    logger.error(
-      "Cron job failed with critical error",
-      error instanceof Error ? error : new Error(errorMessage),
-      {
-        api: true,
-        cron: true,
-        processedCount,
-        sentCount,
-        errorCount,
-        errorMessage,
-        errorStack: errorStack?.substring(0, 500), // Limit stack trace length
-      }
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Internal server error",
-        details: errorMessage, // Show error message for debugging
-        debugInfo: {
-          errorType:
-            error instanceof Error ? error.constructor.name : typeof error,
-          stack: errorStack?.substring(0, 300), // Show partial stack trace
-        },
-        timestamp: new Date().toISOString(),
-        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
-        stats: {
-          processed: processedCount,
-          sent: sentCount,
-          errors: errorCount + 1,
-        },
-      },
-      { status: 500 }
-    );
+    return handleError(error, processedCount, sentCount, errorCount);
   }
 }

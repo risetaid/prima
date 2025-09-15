@@ -291,7 +291,7 @@ describe("getUserIdentifier", () => {
       }),
     } as Request;
 
-    const identifier = getUserIdentifier(mockRequest, null as any);
+    const identifier = getUserIdentifier(mockRequest, null);
     expect(identifier).toBe("ip:192.168.1.100");
   });
 });

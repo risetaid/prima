@@ -3,13 +3,6 @@
  * between multiple tabs/windows accessing the same keys
  */
 
-interface StorageOperation<T = any> {
-  key: string;
-  operation: "get" | "set" | "remove";
-  value?: T;
-  timestamp: number;
-}
-
 interface StorageLock {
   key: string;
   expiresAt: number;
@@ -226,7 +219,7 @@ export function cleanupExpiredLocks(): void {
             localStorage.removeItem(lockKey);
           }
         }
-      } catch (error) {
+      } catch {
         // Remove corrupted lock data
         localStorage.removeItem(lockKey);
       }
@@ -252,7 +245,7 @@ if (typeof window !== "undefined") {
                 localStorage.removeItem(key);
               }
             }
-          } catch (error) {
+          } catch {
             // Remove corrupted lock data
             localStorage.removeItem(key);
           }

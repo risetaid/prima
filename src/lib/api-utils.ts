@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { ZodError, ZodIssue } from "zod";
 import { logger } from "@/lib/logger";
 
 /**
@@ -7,14 +7,14 @@ import { logger } from "@/lib/logger";
  */
 export interface ApiError {
   error: string;
-  details?: any;
+  details?: unknown;
   code?: string;
 }
 
 /**
  * Standard API success response types
  */
-export interface ApiSuccess<T = any> {
+export interface ApiSuccess<T = unknown> {
   data?: T;
   message?: string;
   meta?: {
@@ -30,12 +30,12 @@ export interface ApiSuccess<T = any> {
 export function createErrorResponse(
   message: string,
   status: number = 500,
-  details?: any,
+  details?: unknown,
   code?: string
 ): NextResponse<ApiError> {
   const errorResponse: ApiError = {
     error: message,
-    ...(details && { details }),
+    ...(details !== undefined && { details }),
     ...(code && { code }),
   };
 
@@ -45,7 +45,7 @@ export function createErrorResponse(
 /**
  * Creates a standardized success response
  */
-export function createSuccessResponse<T = any>(
+export function createSuccessResponse<T = unknown>(
   data?: T,
   message?: string,
   status: number = 200,
@@ -86,7 +86,7 @@ export function handleApiError(
     return createErrorResponse(
       "Validation failed",
       400,
-      error.issues.map((err: any) => ({
+      error.issues.map((err: ZodIssue) => ({
         field: err.path.join("."),
         message: err.message,
       })),
@@ -149,7 +149,7 @@ export function handleApiError(
  * Validates required parameters and returns error response if missing
  */
 export function validateRequiredParams(
-  params: Record<string, any>,
+  params: Record<string, unknown>,
   requiredFields: string[]
 ): NextResponse<ApiError> | null {
   const missingFields = requiredFields.filter((field) => {
@@ -172,7 +172,7 @@ export function validateRequiredParams(
 /**
  * Safely parses JSON with error handling
  */
-export function safeJsonParse<T = any>(jsonString: string, fallback: T): T {
+export function safeJsonParse<T = unknown>(jsonString: string, fallback: T): T {
   try {
     return JSON.parse(jsonString) as T;
   } catch (error) {

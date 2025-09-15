@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, whatsappTemplates } from "@/db";
 import { eq } from "drizzle-orm";
@@ -171,13 +171,13 @@ async function templateExists(templateName: string): Promise<boolean> {
       .limit(1);
 
     return existing.length > 0;
-  } catch (error) {
+  } catch {
     console.warn(`⚠️  Error checking if template exists: ${templateName}`);
     return false;
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     const user = await getCurrentUser();
 

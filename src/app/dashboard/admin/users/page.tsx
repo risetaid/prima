@@ -2,12 +2,12 @@
 
 import UserManagement from "@/components/admin/user-management";
 import { Header } from "@/components/ui/header";
-import { useRouter } from "next/navigation";
+
 import { Users } from "lucide-react";
 import { BackButton } from '@/components/ui/back-button';
 
 export default function AdminUsersPage() {
-  const router = useRouter();
+
 
   return (
     <div className="min-h-screen bg-gray-50 relative">

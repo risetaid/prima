@@ -37,6 +37,25 @@ export interface ReminderAnalytics {
   recommendations: string[]
 }
 
+interface ReminderLogEntry {
+  sentAt: Date
+  confirmationStatus: string | null
+  confirmationResponseAt: Date | null
+  scheduledTime: string | null
+}
+
+interface AnalyticsData {
+  totalSent: number
+  totalConfirmed: number
+  totalMissed: number
+  avgResponseTime: string | null
+}
+
+interface TimePerformanceEntry {
+  scheduledTime: string | null
+  confirmationStatus: string | null
+}
+
 export class SmartReminderService {
   /**
    * Analyze patient reminder patterns
@@ -289,7 +308,7 @@ export class SmartReminderService {
     }, {} as Record<string, number>)
   }
 
-  private analyzeDayPerformance(logs: any[]): Record<string, number> {
+  private analyzeDayPerformance(logs: ReminderLogEntry[]): Record<string, number> {
     const dayStats: Record<string, { total: number; confirmed: number }> = {}
 
     logs.forEach(log => {
@@ -319,8 +338,8 @@ export class SmartReminderService {
     return Math.min(100, responseRate + timeBonus)
   }
 
-  private findCommonMissedTimes(missedLogs: any[]): string[] {
-    const missedTimes = missedLogs.map(log => log.scheduledTime)
+  private findCommonMissedTimes(missedLogs: ReminderLogEntry[]): string[] {
+    const missedTimes = missedLogs.map(log => log.scheduledTime).filter((time): time is string => time !== null)
     const timeCounts = this.countTimeSlots(missedTimes)
 
     return Object.entries(timeCounts)
@@ -382,7 +401,7 @@ export class SmartReminderService {
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const timeData = await db
+    const timeData: TimePerformanceEntry[] = await db
       .select({
         scheduledTime: reminderSchedules.scheduledTime,
         confirmationStatus: reminderLogs.confirmationStatus
@@ -418,7 +437,7 @@ export class SmartReminderService {
   }
 
   private generateAnalyticsRecommendations(
-    data: any,
+    data: AnalyticsData,
     bestTimes: string[]
   ): string[] {
     const recommendations: string[] = []
@@ -431,7 +450,7 @@ export class SmartReminderService {
       recommendations.push(`Best performing times: ${bestTimes.join(', ')}`)
     }
 
-    if (data.avgResponseTime > 60) {
+    if (data.avgResponseTime && Number(data.avgResponseTime) > 60) {
       recommendations.push('Consider sending reminders earlier to allow more response time')
     }
 

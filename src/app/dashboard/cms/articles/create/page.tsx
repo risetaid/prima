@@ -38,6 +38,7 @@ import { generateRandomString } from "@/lib/slug-utils";
 import { Save, Eye, FileText } from "lucide-react";
 import { BackButton } from "@/components/ui/back-button";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface FormData {
   title: string;
@@ -47,6 +48,11 @@ interface FormData {
   featuredImageUrl: string;
   category: string;
   status: "draft" | "published" | "archived";
+}
+
+interface ValidationError {
+  path: string[];
+  message: string;
 }
 
 export default function CreateArticlePage() {
@@ -126,13 +132,13 @@ export default function CreateArticlePage() {
         );
         router.push("/dashboard/cms");
       } else {
-        if (result.details) {
-          // Handle validation errors from API
-          const apiErrors: Record<string, string> = {};
-          result.details.forEach((error: any) => {
-            apiErrors[error.path[0]] = error.message;
-          });
-          setErrors(apiErrors);
+          if (result.details) {
+            // Handle validation errors from API
+            const apiErrors: Record<string, string> = {};
+            result.details.forEach((error: ValidationError) => {
+              apiErrors[error.path[0]] = error.message;
+            });
+            setErrors(apiErrors);
         } else {
           toast.error(result.error || "Terjadi kesalahan");
         }
@@ -232,30 +238,30 @@ export default function CreateArticlePage() {
                 )}
               </div>
 
-              <div>
-                <Label htmlFor="slug">Slug URL *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="slug"
-                    value={formData.slug}
-                    onChange={(e) => handleInputChange("slug", e.target.value)}
-                    placeholder="Random slug"
-                    className={errors.slug ? "border-red-500 mt-2" : "mt-2"}
-                    readOnly
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        slug: generateNewSlug(),
-                      }))
-                    }
-                  >
-                    Generate
-                  </Button>
-                </div>
+               <div>
+                 <Label htmlFor="slug">Slug URL *</Label>
+                 <div className="flex gap-2 mt-2">
+                   <Input
+                     id="slug"
+                     value={formData.slug}
+                     onChange={(e) => handleInputChange("slug", e.target.value)}
+                     placeholder="Random slug"
+                     className={errors.slug ? "border-red-500" : ""}
+                     readOnly
+                   />
+                   <Button
+                     type="button"
+                     variant="outline"
+                     onClick={() =>
+                       setFormData((prev) => ({
+                         ...prev,
+                         slug: generateNewSlug(),
+                       }))
+                     }
+                   >
+                     Generate
+                   </Button>
+                 </div>
                 {errors.slug && (
                   <p className="text-sm text-red-600 mt-1">{errors.slug}</p>
                 )}
@@ -428,11 +434,14 @@ export default function CreateArticlePage() {
 
                   {formData.featuredImageUrl ? (
                     <div className="space-y-3">
-                      <img
-                        src={formData.featuredImageUrl}
-                        alt="Thumbnail preview"
-                        className="mx-auto max-h-32 rounded-lg border"
-                      />
+                      <div className="relative mx-auto max-h-32 w-full">
+                        <Image
+                          src={formData.featuredImageUrl}
+                          alt="Thumbnail preview"
+                          fill
+                          className="rounded-lg border object-cover"
+                        />
+                      </div>
                       <div className="flex gap-2 justify-center">
                         <Button
                           type="button"

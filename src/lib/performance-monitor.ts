@@ -38,15 +38,15 @@ export class PerformanceMonitor {
   /**
    * Monitor a database query execution
    */
-  static async monitorQuery<T>(
+  static async monitorQuery(
     queryName: string,
-    queryFn: () => Promise<T>,
+    queryFn: () => Promise<unknown>,
     options: {
       logSlowQueries?: boolean
       slowQueryThreshold?: number
       includeRowCount?: boolean
     } = {}
-  ): Promise<T> {
+  ): Promise<unknown> {
     const startTime = Date.now()
     const {
       logSlowQueries = true,
@@ -55,7 +55,7 @@ export class PerformanceMonitor {
     } = options
 
     try {
-      const result = await queryFn()
+      const result: unknown = await queryFn()
       const duration = Date.now() - startTime
 
       const metrics: QueryMetrics = {
@@ -63,7 +63,7 @@ export class PerformanceMonitor {
         duration,
         timestamp: new Date(),
         success: true,
-        rowCount: includeRowCount && Array.isArray(result) ? result.length : undefined
+        rowCount: includeRowCount && Array.isArray(result) ? (result as unknown[]).length : undefined
       }
 
       this.recordMetrics(metrics)
@@ -266,14 +266,14 @@ export function monitorQuery(
     includeRowCount?: boolean
   } = {}
 ) {
-  return function <T extends (...args: any[]) => Promise<any>>(
-    target: any,
-    propertyKey: string,
+  return function (
+    target: object,
+    propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ) {
-    const originalMethod = descriptor.value
+    const originalMethod = descriptor.value as (...args: unknown[]) => Promise<unknown>
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       return PerformanceMonitor.monitorQuery(
         queryName,
         () => originalMethod.apply(this, args),

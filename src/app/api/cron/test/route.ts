@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger";
 import { sql } from "drizzle-orm";
 
 // Simple test endpoint to isolate cron issues
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     logger.info("Testing cron endpoint components", { api: true, test: true });
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     // Test 3: Simple table existence check
     let tableTest = "❌ Failed";
     try {
-      const result = await db.execute(
+      await db.execute(
         sql`SELECT COUNT(*) FROM reminder_schedules`
       );
       tableTest = "✅ Tables accessible";
@@ -96,6 +96,6 @@ export async function POST(request: NextRequest) {
   }
 
   // If auth passes, run the same test as GET
-  return GET(request);
+  return GET();
 }
 

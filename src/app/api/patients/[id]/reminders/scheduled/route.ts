@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
 import { eq, and, desc, asc, gte, lte, inArray, isNull } from 'drizzle-orm'
-import { getWIBTodayStart, getWIBTime } from '@/lib/timezone'
+import { getWIBTime } from '@/lib/timezone'
 import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
 
 export async function GET(
@@ -146,19 +146,15 @@ export async function GET(
     })
 
     // DEBUG: Log the filter criteria first
-    const todayWIBStart = getWIBTodayStart()
 
     // Filter out reminders that have already been sent (SENT or DELIVERED)
     const filteredReminders = scheduledReminders.filter(reminder => {
       const logs = logsMap.get(reminder.id) || []
-      const hasSentOrDeliveredLog = logs.some((log: any) => ['SENT', 'DELIVERED'].includes(log.status))
+      const hasSentOrDeliveredLog = logs.some((log: { status: string }) => ['SENT', 'DELIVERED'].includes(log.status))
       return !hasSentOrDeliveredLog
     })
 
     // DEBUG: Log what we found after filtering
-    filteredReminders.forEach(reminder => {
-      const logs = logsMap.get(reminder.id) || []
-    })
 
     // Transform to match frontend interface
     const formattedReminders = filteredReminders.map(reminder => ({
@@ -173,7 +169,7 @@ export async function GET(
     }))
 
     return NextResponse.json(formattedReminders)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -223,7 +219,7 @@ export async function DELETE(
       message: 'Reminders berhasil dihapus',
       deletedCount: deleteResult.length
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -21,18 +21,28 @@ interface Patient {
 export default function ReminderPage() {
   const router = useRouter()
   const [patients, setPatients] = useState<Patient[]>([])
-  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
 
+  const filteredPatients = (() => {
+    let filtered = patients
+    if (searchQuery) {
+      filtered = filtered.filter(patient =>
+        patient.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+    if (activeFilters.includes('active') && !activeFilters.includes('inactive')) {
+      filtered = filtered.filter(patient => patient.isActive)
+    } else if (activeFilters.includes('inactive') && !activeFilters.includes('active')) {
+      filtered = filtered.filter(patient => !patient.isActive)
+    }
+    return filtered
+  })()
+
   useEffect(() => {
     fetchPatients()
   }, [])
-
-  useEffect(() => {
-    filterPatients()
-  }, [patients, searchQuery, activeFilters])
 
   const fetchPatients = async () => {
     try {
@@ -57,28 +67,7 @@ export default function ReminderPage() {
     }
   }
 
-  const filterPatients = () => {
-    let filtered = patients
 
-    if (searchQuery.trim()) {
-      filtered = filtered.filter((patient) =>
-        patient.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    }
-
-    // Apply multiple status filters
-    if (activeFilters.length > 0) {
-      filtered = filtered.filter((patient) => {
-        const isActive = patient.isActive
-        return (
-          (activeFilters.includes('active') && isActive) ||
-          (activeFilters.includes('inactive') && !isActive)
-        )
-      })
-    }
-
-    setFilteredPatients(filtered)
-  }
 
   const toggleFilter = (filterType: string) => {
     setActiveFilters((prev) => {

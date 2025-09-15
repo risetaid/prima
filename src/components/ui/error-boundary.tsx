@@ -156,7 +156,7 @@ export function withErrorBoundary<P extends object>(
 export function CMSErrorBoundary({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary
-      fallback={({ error: _error, resetError }) => (
+      fallback={({ resetError }) => (
         <div className="min-h-[400px] flex items-center justify-center p-6">
           <div className="text-center max-w-md mx-auto">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
@@ -196,7 +196,7 @@ export function CMSErrorBoundary({ children }: { children: React.ReactNode }) {
 export function DashboardErrorBoundary({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary
-      fallback={({ error: _error, resetError }) => (
+      fallback={({ resetError }) => (
         <div className="min-h-[400px] flex items-center justify-center p-6">
           <div className="text-center max-w-md mx-auto">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />

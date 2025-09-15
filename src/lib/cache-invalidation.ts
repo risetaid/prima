@@ -6,11 +6,9 @@
  */
 
 import {
-  invalidateCache,
   invalidateMultipleCache,
   safeInvalidateCache,
   CACHE_KEYS,
-  CACHE_TTL,
 } from "./cache";
 import { logger } from "./logger";
 

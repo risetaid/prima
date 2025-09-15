@@ -8,7 +8,6 @@ import {
   getComplianceLabel,
   formatIndonesianPhone,
   getStatusLabel,
-  createLoadingState,
 } from "@/lib/ui-utils";
 
 interface Patient {

@@ -3,8 +3,16 @@
 
 import { db } from '@/db'
 import { reminderLogs } from '@/db'
-import { eq, and, desc, gte } from 'drizzle-orm'
+import { eq, and, desc, gte, sql, count, avg } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
+
+interface PendingConfirmation {
+  id: string
+  reminderScheduleId: string | null
+  sentAt: Date
+  confirmationMessage: string | null
+  message: string | null
+}
 
 export interface LinkedConfirmation {
   id: string
@@ -14,7 +22,7 @@ export interface LinkedConfirmation {
   responseType: 'confirmed' | 'missed' | 'later' | 'unknown'
   confidence: number
   linkedAt: Date
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
 }
 
 export interface ConfirmationLinkResult {
@@ -73,8 +81,7 @@ export class LinkedConfirmationService {
       await this.updateReminderLogConfirmation(
         pendingLog.id,
         responseAnalysis.responseType,
-        response,
-        responseAnalysis.confidence
+        response
       )
 
       // Create linked confirmation record
@@ -97,8 +104,7 @@ export class LinkedConfirmationService {
 
       // Handle follow-up actions based on response type
       const followUpResult = await this.handleConfirmationFollowUp(
-        linkedConfirmation,
-        pendingLog
+        linkedConfirmation
       )
 
       logger.info('Linked confirmation to reminder', {
@@ -129,7 +135,7 @@ export class LinkedConfirmationService {
   /**
    * Find pending confirmations for a patient
    */
-  async findPendingConfirmations(patientId: string): Promise<any[]> {
+  async findPendingConfirmations(patientId: string): Promise<PendingConfirmation[]> {
     try {
       const pendingConfirmations = await db
         .select({
@@ -295,8 +301,7 @@ export class LinkedConfirmationService {
   private async updateReminderLogConfirmation(
     reminderLogId: string,
     responseType: LinkedConfirmation['responseType'],
-    response: string,
-    confidence: number
+    response: string
   ): Promise<void> {
     const status = this.mapResponseTypeToStatus(responseType)
 
@@ -362,8 +367,7 @@ export class LinkedConfirmationService {
    * Handle follow-up actions based on confirmation type
    */
   private async handleConfirmationFollowUp(
-    confirmation: LinkedConfirmation,
-    reminderLog: any
+    confirmation: LinkedConfirmation
   ): Promise<{ requiresFollowUp: boolean; actions?: string[] }> {
     switch (confirmation.responseType) {
       case 'missed':
@@ -447,5 +451,3 @@ export class LinkedConfirmationService {
   }
 }
 
-// Import sql for raw SQL operations
-import { sql, count, avg } from 'drizzle-orm'

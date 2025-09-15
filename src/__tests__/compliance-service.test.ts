@@ -38,10 +38,9 @@ describe("ComplianceService", () => {
       const mockDeliveredResult = [{ count: 10 }];
       const mockConfirmedResult = [{ count: 8 }];
 
-      // Mock database calls
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockFrom = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn();
+       // Mock database calls
+       const mockFrom = jest.fn().mockReturnThis() as jest.Mock;
+       const mockWhere = jest.fn() as jest.Mock<Promise<Array<{ count: number }>>, []>;
 
       (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
@@ -65,9 +64,9 @@ describe("ComplianceService", () => {
       const mockDeliveredResult = [{ count: 0 }];
       const mockConfirmedResult = [{ count: 0 }];
 
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockFrom = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn();
+
+      const mockFrom = jest.fn().mockReturnThis() as jest.Mock;
+      const mockWhere = jest.fn() as jest.Mock<Promise<Array<{ count: number }>>, []>;
 
       (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
@@ -87,9 +86,9 @@ describe("ComplianceService", () => {
     });
 
     it("should handle database errors gracefully", async () => {
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockFrom = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn();
+
+      const mockFrom = jest.fn().mockReturnThis() as jest.Mock;
+      const mockWhere = jest.fn() as jest.Mock<Promise<Array<{ count: number }>>, []>;
 
       (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
@@ -127,12 +126,12 @@ describe("ComplianceService", () => {
         .spyOn(complianceService, "calculatePatientCompliance")
         .mockResolvedValue(mockCompliance);
 
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockFrom = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn();
-      const mockLeftJoin = jest.fn().mockReturnThis();
-      const mockOrderBy = jest.fn().mockReturnThis();
-      const mockLimit = jest.fn();
+
+      const mockFrom = jest.fn().mockReturnThis() as jest.Mock;
+      const mockWhere = jest.fn() as jest.Mock<Promise<Array<{ count?: number; avgResponseTime?: number }>>, []>;
+      const mockLeftJoin = jest.fn().mockReturnThis() as jest.Mock;
+      const mockOrderBy = jest.fn().mockReturnThis() as jest.Mock;
+      const mockLimit = jest.fn() as jest.Mock<Promise<Array<unknown>>, []>;
 
       (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,
@@ -216,10 +215,10 @@ describe("ComplianceService", () => {
         },
       ];
 
-      const mockSelect = jest.fn().mockReturnThis();
-      const mockFrom = jest.fn().mockReturnThis();
-      const mockWhere = jest.fn();
-      const mockOrderBy = jest.fn();
+
+      const mockFrom = jest.fn().mockReturnThis() as jest.Mock;
+      const mockWhere = jest.fn() as jest.Mock<Promise<Array<{ sentAt?: Date; id?: string; reminderLogId?: string; confirmedAt?: Date }>>, []>;
+      const mockOrderBy = jest.fn() as jest.Mock;
 
       (db.select as jest.Mock).mockImplementation(() => ({
         from: mockFrom,

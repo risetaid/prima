@@ -1,25 +1,25 @@
 'use client'
 
 import { formatDateTimeWIB } from '@/lib/datetime'
+import type { Patient } from '@/db/schema'
 
 interface VerificationInfoPanelProps {
-  status: string
-  patient: any
+   patient: Patient
 }
 
-export default function VerificationInfoPanel({ status, patient }: VerificationInfoPanelProps) {
+export default function VerificationInfoPanel({ patient }: VerificationInfoPanelProps) {
   // Simple status derivation based on patient verification status
-  const getPatientDisplayStatus = (patient: any) => {
-    if (patient.verificationStatus === 'BERHENTI') {
+  const getPatientDisplayStatus = (patient: Patient) => {
+    if (!patient.isActive || patient.verificationStatus === 'unsubscribed') {
       return { displayStatus: 'BERHENTI' }
     }
-    if (patient.verificationStatus === 'VERIFIED') {
+    if (patient.verificationStatus === 'verified') {
       return { displayStatus: 'Terverifikasi' }
     }
-    if (patient.verificationStatus === 'DECLINED') {
+    if (patient.verificationStatus === 'declined') {
       return { displayStatus: 'Menolak' }
     }
-    if (patient.verificationStatus === 'EXPIRED') {
+    if (patient.verificationStatus === 'expired') {
       return { displayStatus: 'Kedaluwarsa' }
     }
     return { displayStatus: 'Menunggu Verifikasi' }

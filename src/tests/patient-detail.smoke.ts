@@ -19,7 +19,6 @@ async function main() {
     console.log('complianceRate:', detail.complianceRate)
     console.log('manualConfirmations:', detail.manualConfirmations?.length || 0)
     console.log('reminderLogs:', detail.reminderLogs?.length || 0)
-    console.log('patientMedications:', detail.patientMedications?.length || 0)
     process.exit(0)
   } catch (err) {
     console.error('Error:', err instanceof Error ? err.message : String(err))

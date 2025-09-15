@@ -2,10 +2,10 @@
 
 // Patient status utilities temporarily inlined
 
-type VerificationStatus = 'pending_verification' | 'verified' | 'declined' | 'expired' | 'unsubscribed'
+
 
 interface PatientStatusInput {
-  verificationStatus?: string
+  verificationStatus: string
   isActive?: boolean
 }
 
@@ -69,9 +69,9 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
 }
 
 interface PatientObject {
-  verificationStatus?: string
+  verificationStatus: string
   isActive?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface VerificationBadgeProps {
@@ -91,8 +91,8 @@ export default function VerificationBadge({
   patient
 }: VerificationBadgeProps) {
   // Use new centralized status logic
-  const statusInfo = patient 
-    ? getPatientDisplayStatus(patient)
+  const statusInfo = patient
+    ? getPatientDisplayStatus({ verificationStatus: patient.verificationStatus, isActive: patient.isActive })
     : getPatientDisplayStatus({ verificationStatus: status, isActive })
 
   const sizeClasses = size === 'large' 
@@ -111,7 +111,7 @@ export default function VerificationBadge({
 
 export function getVerificationStatusTitle(status: string, isActive: boolean = true): string {
   const statusInfo = getPatientDisplayStatus({ verificationStatus: status, isActive })
-  
+
   // Map display status to detailed titles
   const titleMap: Record<string, string> = {
     'BERHENTI': 'Berhenti dari Layanan',
@@ -120,7 +120,7 @@ export function getVerificationStatusTitle(status: string, isActive: boolean = t
     'Kedaluwarsa': 'Tidak Ada Respon',
     'Menunggu Verifikasi': 'Menunggu Persetujuan'
   }
-  
+
   return titleMap[statusInfo.displayStatus] || 'Status Tidak Dikenal'
 }
 

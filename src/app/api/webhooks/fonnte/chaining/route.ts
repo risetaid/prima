@@ -8,33 +8,31 @@ const ChainingSchema = z.object({
   sender: z.string().min(6).optional(),
   message: z.string().min(1).optional(),
   device: z.string().optional(),
-  name: z.string().optional(),
   id: z.string().optional(),
   parent_id: z.string().optional(),
   timestamp: z.union([z.string(), z.number()]).optional(),
 })
 
-function normalize(body: any) {
+function normalize(body: Record<string, unknown>) {
   const sender = body.sender || body.phone || body.from || body.number || body.wa_number
   const message = body.message || body.text || body.body
   const device = body.device || body.gateway || body.instance
-  const name = body.name || body.sender_name || body.contact_name
   const id = body.id || body.message_id || body.msgId
   const parent_id = body.parent_id || body.source_id
   const timestamp = body.timestamp || body.time || body.created_at
-  return { sender, message, device, name, id, parent_id, timestamp }
+  return { sender, message, device, id, parent_id, timestamp }
 }
 
 export async function POST(request: NextRequest) {
   const authError = requireWebhookToken(request)
   if (authError) return authError
 
-  let parsed: any = {}
+  let parsed: Record<string, unknown> = {}
   const contentType = request.headers.get('content-type') || ''
   try {
     if (contentType.includes('application/json')) parsed = await request.json()
     else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-      const form = await request.formData(); form.forEach((v, k) => { (parsed as any)[k] = v })
+      const form = await request.formData(); form.forEach((v, k) => { (parsed as Record<string, unknown>)[k] = v })
     } else { const text = await request.text(); try { parsed = JSON.parse(text) } catch {} }
   } catch {}
 
@@ -44,7 +42,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payload', issues: result.error.flatten() }, { status: 400 })
   }
 
-  const { sender, message, device, name, id, parent_id, timestamp } = result.data
+  const { sender, message, device, id, parent_id, timestamp } = result.data
 
   const idemKey = `webhook:fonnte:chaining:${hashFallbackId([id, parent_id, String(timestamp || '')])}`
   if (await isDuplicateEvent(idemKey)) {

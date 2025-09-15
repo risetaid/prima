@@ -4,12 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Send, Settings } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
-import { Button } from '@/components/ui/button'
+
+
+type TestResult = {
+  success: boolean;
+  error?: string;
+};
 
 export default function TestWhatsAppPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<TestResult | null>(null)
   const [formData, setFormData] = useState({
     phoneNumber: '081234567890', // Default test number
     patientName: 'Testing User',
@@ -31,39 +36,6 @@ export default function TestWhatsAppPage() {
     setResult(null)
 
     try {
-      const currentHour = new Date().toLocaleTimeString('id-ID', { 
-        timeZone: 'Asia/Jakarta', 
-        hour: '2-digit', 
-        minute: '2-digit'
-      })
-
-      const greeting = (() => {
-        const hour = new Date().getHours()
-        if (hour < 12) return 'Selamat Pagi'
-        if (hour < 15) return 'Selamat Siang' 
-        if (hour < 18) return 'Selamat Sore'
-        return 'Selamat Malam'
-      })()
-
-      const testMessage = `🏥 *PRIMA Reminder*
-
-${greeting}, ${formData.patientName}! 👋
-
-⏰ Waktunya minum obat:
-💊 ${formData.medicationName}
-📝 Dosis: ${formData.dosage}
-🕐 Jam: ${currentHour} WIB
-
-📌 Catatan Penting:
-Minum setelah makan dengan air putih
-
-✅ Balas "MINUM" jika sudah minum obat
-❓ Balas "BANTUAN" untuk bantuan
-📞 Darurat: 0341-550171
-
-Semangat sembuh! 💪
-Tim PRIMA - Berbagi Kasih`
-
       // Use test endpoint
       const response = await fetch('/api/test?type=whatsapp', {
         method: 'POST',

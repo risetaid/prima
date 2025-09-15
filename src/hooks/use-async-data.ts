@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+ import { useState, useEffect, useCallback, type DependencyList } from 'react'
 import { logger } from '@/lib/logger'
 
 export interface AsyncDataState<T> {
@@ -8,9 +8,9 @@ export interface AsyncDataState<T> {
   refetch: () => Promise<void>
 }
 
-export interface UseAsyncDataOptions {
+export interface UseAsyncDataOptions<T> {
   enabled?: boolean
-  onSuccess?: (data: any) => void
+  onSuccess?: (data: T) => void
   onError?: (error: Error) => void
   retryCount?: number
   retryDelay?: number
@@ -21,8 +21,8 @@ export interface UseAsyncDataOptions {
  */
 export function useAsyncData<T>(
   asyncFn: () => Promise<T>,
-  dependencies: any[] = [],
-  options: UseAsyncDataOptions = {}
+  dependencies: DependencyList = [],
+  options: UseAsyncDataOptions<T> = {}
 ): AsyncDataState<T> {
   const {
     enabled = true,
@@ -80,7 +80,7 @@ export function useAsyncData<T>(
 
   useEffect(() => {
     execute()
-  }, dependencies)
+  }, [execute, dependencies])
 
   return {
     data,
@@ -93,8 +93,8 @@ export function useAsyncData<T>(
 /**
  * Hook for managing form submissions with loading states
  */
-export function useAsyncSubmit<T = any>(
-  submitFn: (data: any) => Promise<T>,
+export function useAsyncSubmit<T = unknown, U = unknown>(
+  submitFn: (data: U) => Promise<T>,
   options: {
     onSuccess?: (result: T) => void
     onError?: (error: Error) => void
@@ -106,7 +106,7 @@ export function useAsyncSubmit<T = any>(
   const [error, setError] = useState<Error | null>(null)
   const [success, setSuccess] = useState(false)
 
-  const submit = useCallback(async (data: any) => {
+  const submit = useCallback(async (data: U) => {
     setLoading(true)
     setError(null)
     setSuccess(false)

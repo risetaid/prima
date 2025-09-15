@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Save } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
@@ -40,19 +40,13 @@ export default function EditPatientPage() {
     isActive: true
   })
 
-  useEffect(() => {
-    if (params.id) {
-      fetchPatient(params.id as string)
-    }
-  }, [params.id])
-
-  const fetchPatient = async (id: string) => {
+  const fetchPatient = useCallback(async (id: string) => {
     try {
       const response = await fetch(`/api/patients/${id}`)
       if (response.ok) {
         const data = await response.json()
         setPatient(data)
-        
+
         // Populate form with existing data using WIB timezone
         setFormData({
           name: data.name || '',
@@ -76,7 +70,13 @@ export default function EditPatientPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    if (params.id) {
+      fetchPatient(params.id as string)
+    }
+  }, [params.id, fetchPatient])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target

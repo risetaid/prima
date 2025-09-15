@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Filter, FileText, Play, ChevronDown, X, Eye, ExternalLink } from 'lucide-react'
+import { Search, Filter, FileText, Play, ChevronDown, X, ExternalLink } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
 
@@ -62,7 +62,7 @@ export function ContentSelector({
   const fetchContent = useCallback(async (reset = false) => {
     setLoading(true)
     setError(null)
-    
+
     try {
       const params = new URLSearchParams({
         page: reset ? '1' : page.toString(),
@@ -116,7 +116,7 @@ export function ContentSelector({
     if (isExpanded) {
       fetchContent(true)
     }
-  }, [isExpanded, searchQuery, selectedCategory, selectedType])
+  }, [isExpanded, searchQuery, selectedCategory, selectedType, fetchContent])
 
   // Load categories when expanded
   useEffect(() => {

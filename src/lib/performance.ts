@@ -19,7 +19,7 @@ export function reportWebVitals(metric: NextWebVitalsMetric) {
   // Example: sendToAnalytics(metric)
 
   // For now, we'll just log the metrics
-  const { name, value, id } = metric
+  const { name, value } = metric
 
   switch (name) {
     case 'FCP':
@@ -99,9 +99,15 @@ export function measureDatabaseQuery(queryName: string, startTime: number) {
 /**
  * Memory usage monitoring (client-side only)
  */
+interface PerformanceMemory {
+  usedJSHeapSize: number
+  totalJSHeapSize: number
+  jsHeapSizeLimit: number
+}
+
 export function logMemoryUsage(label: string = 'Memory Usage') {
   if (typeof window !== 'undefined' && 'memory' in performance) {
-    const memory = (performance as any).memory
+    const memory = (performance as typeof performance & { memory: PerformanceMemory }).memory
     console.log(`${label}:`, {
       used: `${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`,
       total: `${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB`,

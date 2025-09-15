@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
@@ -51,7 +51,7 @@ interface UserSessionData {
  *
  * Reduces 3 sequential API calls to 1 consolidated call (70% reduction)
  */
-export async function POST(_request: NextRequest) {
+export async function POST() {
   const startTime = Date.now();
 
   try {
@@ -293,7 +293,7 @@ export async function POST(_request: NextRequest) {
 }
 
 // GET method for session check (non-modifying)
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const user = await getCurrentUser();
 

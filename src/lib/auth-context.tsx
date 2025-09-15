@@ -1,9 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
 import type { UserResource } from "@clerk/types";
 import { atomicGet, atomicSet, atomicRemove } from "@/lib/atomic-storage";
+
+interface UserStatusData {
+  role?: "DEVELOPER" | "ADMIN" | "RELAWAN";
+  canAccessDashboard?: boolean;
+  needsApproval?: boolean;
+}
 
 interface AuthContextState {
   user: UserResource | null;
@@ -31,14 +37,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [canAccessDashboard, setCanAccessDashboard] = useState(false);
   const [needsApproval, setNeedsApproval] = useState(true);
   const [dbUserLoaded, setDbUserLoaded] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isBackgroundFetchRunning, setIsBackgroundFetchRunning] =
-    useState(false);
+  const isBackgroundFetchRunningRef = useRef(false);
 
   const isLoaded = userLoaded && authLoaded && dbUserLoaded;
 
   // Helper function to get cached data
-  const getCachedUserData = () => {
+  const getCachedUserData = useCallback(() => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
@@ -51,10 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Failed to read cached user data:", error);
     }
     return null;
-  };
+  }, []);
 
   // Helper function to cache user data
-  const setCachedUserData = async (data: any) => {
+  const setCachedUserData = useCallback(async (data: UserStatusData) => {
     try {
       await atomicSet(CACHE_KEY, {
         data,
@@ -63,19 +67,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.warn("Failed to cache user data:", error);
     }
-  };
+  }, []);
 
   // Helper function to clear cache
-  const clearCachedUserData = async () => {
+  const clearCachedUserData = useCallback(async () => {
     try {
       await atomicRemove(CACHE_KEY);
     } catch (error) {
       console.warn("Failed to clear cached user data:", error);
     }
-  };
+  }, []);
 
   // Helper function to fetch user status with retry logic
-  const fetchUserStatus = async (attempt = 1): Promise<any> => {
+  const fetchUserStatus = useCallback(async (attempt = 1): Promise<UserStatusData> => {
     try {
       const response = await fetch("/api/user/status", {
         headers: {
@@ -110,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       throw error;
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Don't set any state until Clerk auth is fully loaded
@@ -141,8 +145,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Still fetch fresh data in the background to ensure accuracy
       // Only run background fetch if not already running
-      if (!isBackgroundFetchRunning) {
-        setIsBackgroundFetchRunning(true);
+      if (!isBackgroundFetchRunningRef.current) {
+        isBackgroundFetchRunningRef.current = true;
         fetchUserStatus()
           .then((data) => {
             // Only update if data has changed and component is still mounted
@@ -163,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             );
           })
           .finally(() => {
-            setIsBackgroundFetchRunning(false);
+            isBackgroundFetchRunningRef.current = false;
           });
       }
 
@@ -172,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // No cached data, fetch fresh data
     // Only run main fetch if background fetch is not running
-    if (!isBackgroundFetchRunning) {
+    if (!isBackgroundFetchRunningRef.current) {
       fetchUserStatus()
         .then((data) => {
           setRole(data.role || "RELAWAN");
@@ -181,7 +185,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCachedUserData(data).catch((error) => {
             console.warn("Failed to update cached user data:", error);
           });
-          setRetryCount(0);
 
           // Store successful login timestamp for optimistic UI
           if (data.canAccessDashboard) {
@@ -220,7 +223,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setNeedsApproval(true);
               }
 
-              setRetryCount((prev) => prev + 1);
               setDbUserLoaded(true);
             })
             .catch((error) => {
@@ -230,7 +232,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setRole("RELAWAN");
               setCanAccessDashboard(false);
               setNeedsApproval(true);
-              setRetryCount((prev) => prev + 1);
               setDbUserLoaded(true);
             });
         })
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Background fetch is running, just mark as loaded
       setDbUserLoaded(true);
     }
-  }, [user, userLoaded, authLoaded]);
+  }, [user, userLoaded, authLoaded, getCachedUserData, setCachedUserData, clearCachedUserData, fetchUserStatus]);
 
   const value: AuthContextState = {
     user: user ?? null,

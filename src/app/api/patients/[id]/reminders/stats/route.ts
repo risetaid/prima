@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, reminderSchedules, reminderLogs, manualConfirmations } from "@/db";
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
-import { getWIBTodayStart } from "@/lib/timezone";
+
 import {
   getCachedData,
   setCachedData,
@@ -39,8 +39,7 @@ export async function GET(
       await invalidateCache(cacheKey);
     }
 
-    // DEBUG: Log the filter criteria
-    const todayWIBStart = getWIBTodayStart();
+
 
     // Get all active reminder schedules for this patient
     const allSchedules = await db
@@ -141,7 +140,7 @@ export async function GET(
     await setCachedData(cacheKey, stats, CACHE_TTL.REMINDER_STATS);
 
     return NextResponse.json(stats);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

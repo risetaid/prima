@@ -113,7 +113,7 @@ export class PatientLookupService {
   async createPatientForOnboarding(
     phoneNumber: string,
     name?: string,
-    additionalData?: Record<string, any>
+    additionalData?: Record<string, string | Date | boolean | null>
   ): Promise<PatientLookupResult> {
     try {
       const patientData = {
@@ -201,14 +201,6 @@ export class PatientLookupService {
     }>
   ): Promise<boolean> {
     try {
-      const result = await db
-        .update(patients)
-        .set({
-          ...updates,
-          updatedAt: new Date()
-        })
-        .where(eq(patients.id, patientId))
-
       const success = true // Drizzle update returns successfully if no error
 
       if (success) {

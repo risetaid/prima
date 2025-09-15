@@ -1,7 +1,7 @@
 // Reminder Repository - Database access layer for reminders
-import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
-import { and, eq, inArray, isNull, sql, desc, gte, lte, notExists, count } from 'drizzle-orm'
-import { ReminderFilters, ReminderSchedule, ReminderScheduleInsert, ValidatedContent } from './reminder.types'
+import { db, reminderSchedules, patients, reminderContentAttachments } from '@/db'
+import { eq, inArray, desc } from 'drizzle-orm'
+import { ReminderSchedule, ReminderScheduleInsert, ValidatedContent } from './reminder.types'
 import { validateContentAttachments } from '@/lib/content-validation'
 
 export class ReminderRepository {

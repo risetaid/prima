@@ -217,7 +217,7 @@ export default function PendingUpdatePage() {
                           </div>
                           {reminder.confirmationResponse && (
                             <span className="text-xs text-blue-200">
-                              Response: "{reminder.confirmationResponse}"
+                              Response: &quot;{reminder.confirmationResponse}&quot;
                             </span>
                           )}
                         </div>
@@ -284,8 +284,8 @@ export default function PendingUpdatePage() {
         {reminders.length > 0 && (
           <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
             <p className="text-sm text-gray-600">
-              <strong>Petunjuk:</strong> Tekan "Ya" jika pasien sudah minum obat
-              setelah dikunjungi, atau "Tidak" jika pasien belum minum obat.
+              <strong>Petunjuk:</strong> Tekan &quot;Ya&quot; jika pasien sudah minum obat
+              setelah dikunjungi, atau &quot;Tidak&quot; jika pasien belum minum obat.
               Status ini akan membantu menghitung tingkat kepatuhan pasien.
             </p>
           </div>

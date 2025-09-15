@@ -123,7 +123,7 @@ export class ReminderError extends Error {
     message: string,
     public code: string,
     public statusCode: number = 500,
-    public details?: any
+    public details?: Record<string, unknown>
   ) {
     super(message)
     this.name = 'ReminderError'
@@ -131,21 +131,21 @@ export class ReminderError extends Error {
 }
 
 export class ValidationError extends ReminderError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, 'VALIDATION_ERROR', 400, details)
     this.name = 'ValidationError'
   }
 }
 
 export class NotFoundError extends ReminderError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, 'NOT_FOUND', 404, details)
     this.name = 'NotFoundError'
   }
 }
 
 export class UnauthorizedError extends ReminderError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super(message, 'UNAUTHORIZED', 401, details)
     this.name = 'UnauthorizedError'
   }

@@ -264,28 +264,6 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
     setIsPreviewDialogOpen(true)
   }
 
-  const renderPreviewText = (text: string, variables: string[]) => {
-    const sampleData: Record<string, string> = {
-      '{nama}': 'Ibu Sari',
-      '{obat}': 'Paracetamol',
-      '{dosis}': '500mg',
-      '{waktu}': '08:00',
-      '{tanggal}': '15 Januari 2024',
-      '{dokter}': 'Dr. Ahmad',
-      '{rumahSakit}': 'RS Harapan',
-      '{volunteer}': 'Sari (volunteer)'
-    }
-
-    let previewText = text
-    variables.forEach(variable => {
-      if (sampleData[variable]) {
-        previewText = previewText.replace(new RegExp(variable.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), sampleData[variable])
-      }
-    })
-
-    return previewText
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -370,138 +348,23 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         </div>
       </div>
 
-      {/* Templates Grid */}
-      {templates.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-12">
-            <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Belum ada template
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Buat template pertama untuk mempermudah pengiriman pesan WhatsApp
-            </p>
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="cursor-pointer">
-              <Plus className="w-4 h-4 mr-2" />
-              Buat Template
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:gap-6">
-          {templates.map((template) => {
-            const CategoryIcon = categoryIcons[template.category]
-            return (
-              <Card key={template.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    <div className="flex-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
-                          <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                            {template.templateName}
-                          </h3>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={`${categoryColors[template.category]} border text-xs`}>
-                            {categoryLabels[template.category]}
-                          </Badge>
-                          {!template.isActive && (
-                            <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-xs">
-                              Nonaktif
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-4">
-                        <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap">
-                          {template.templateText.length > (window.innerWidth < 640 ? 150 : 200)
-                            ? template.templateText.substring(0, window.innerWidth < 640 ? 150 : 200) + '...' 
-                            : template.templateText
-                          }
-                        </p>
-                      </div>
-
-                      {template.variables.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-xs font-medium text-gray-500 mb-2">
-                            Variabel tersedia:
-                          </p>
-                          <div className="flex flex-wrap gap-1">
-                            {template.variables.map((variable) => (
-                              <Badge key={variable} variant="outline" className="text-xs">
-                                {variable}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex flex-col sm:flex-row sm:items-center text-xs text-gray-500 gap-1 sm:gap-0">
-                        <span>
-                          Dibuat oleh {template.createdByUser.firstName} {template.createdByUser.lastName}
-                        </span>
-                        <span className="hidden sm:inline mx-2">•</span>
-                        <span>
-                          {new Date(template.createdAt).toLocaleDateString('id-ID', {
-                            day: 'numeric',
-                            month: window.innerWidth < 640 ? 'short' : 'long',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-center lg:justify-start gap-2 lg:ml-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openPreviewDialog(template)}
-                        className="cursor-pointer flex-1 lg:flex-none"
-                      >
-                        <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="ml-1 sm:hidden">Lihat</span>
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEditDialog(template)}
-                        disabled={actionLoading === template.id}
-                        className="cursor-pointer flex-1 lg:flex-none"
-                      >
-                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="ml-1 sm:hidden">Edit</span>
-                      </Button>
-                      
-                      {template.isActive && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeactivateTemplate(template.id)}
-                          disabled={actionLoading === template.id}
-                          className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 lg:flex-none"
-                        >
-                          {actionLoading === template.id ? (
-                            <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                          ) : (
-                            <>
-                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                              <span className="ml-1 sm:hidden">Hapus</span>
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+        {/* Templates Grid */}
+         {templates.length === 0 ? (
+           <EmptyTemplates onCreate={() => setIsCreateDialogOpen(true)} />
+         ) : (
+           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                onPreview={openPreviewDialog}
+                onEdit={openEditDialog}
+                onDeactivate={handleDeactivateTemplate}
+                loading={actionLoading === template.id}
+              />
+            ))}
+          </div>
+        )}
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -525,62 +388,15 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         </DialogContent>
       </Dialog>
 
-      {/* Preview Dialog */}
-      <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Preview Template</DialogTitle>
-          </DialogHeader>
-          {previewTemplate && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Nama Template</Label>
-                <p className="text-sm text-gray-700">{previewTemplate.templateName}</p>
-              </div>
-              
-              <div>
-                <Label className="text-sm font-medium">Kategori</Label>
-                <Badge className={`${categoryColors[previewTemplate.category]} border ml-2`}>
-                  {categoryLabels[previewTemplate.category]}
-                </Badge>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">Template Asli</Label>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {previewTemplate.templateText}
-                  </p>
-                </div>
-              </div>
-
-              {previewTemplate.variables.length > 0 && (
-                <div>
-                  <Label className="text-sm font-medium">Preview dengan Data Contoh</Label>
-                  <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                    <p className="text-sm text-green-800 whitespace-pre-wrap">
-                      {renderPreviewText(previewTemplate.templateText, previewTemplate.variables)}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {previewTemplate.variables.length > 0 && (
-                <div>
-                  <Label className="text-sm font-medium">Variabel Tersedia</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {previewTemplate.variables.map((variable) => (
-                      <Badge key={variable} variant="outline">
-                        {variable}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+       {/* Preview Dialog */}
+       <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+         <DialogContent className="max-w-2xl">
+           <DialogHeader>
+             <DialogTitle>Preview Template</DialogTitle>
+           </DialogHeader>
+           {previewTemplate && <TemplatePreview template={previewTemplate} />}
+         </DialogContent>
+       </Dialog>
 
       {/* Delete Confirmation Modal */}
       <ConfirmationModal
@@ -597,6 +413,229 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         variant="destructive"
         loading={actionLoading === templateToDelete}
       />
+    </div>
+  )
+}
+
+// Empty Templates Component
+function EmptyTemplates({ onCreate }: { onCreate: () => void }) {
+  return (
+    <Card>
+      <CardContent className="text-center py-12">
+        <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Belum ada template
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Buat template pertama untuk mempermudah pengiriman pesan WhatsApp
+        </p>
+        <Button onClick={onCreate} className="cursor-pointer">
+          <Plus className="w-4 h-4 mr-2" />
+          Buat Template
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Template Card Component
+function TemplateCard({
+  template,
+  onPreview,
+  onEdit,
+  onDeactivate,
+  loading
+}: {
+  template: WhatsAppTemplate
+  onPreview: (template: WhatsAppTemplate) => void
+  onEdit: (template: WhatsAppTemplate) => void
+  onDeactivate: (id: string) => void
+  loading: boolean
+}) {
+  const CategoryIcon = categoryIcons[template.category]
+
+  return (
+    <Card className="hover:shadow-md transition-shadow h-full">
+      <CardContent className="p-4 sm:p-6 flex flex-col h-full">
+        <div className="flex flex-col gap-4 flex-1">
+          <div className="flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-3 mb-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                <CategoryIcon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0" />
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+                  {template.templateName}
+                </h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                <Badge className={`${categoryColors[template.category]} border text-xs whitespace-nowrap`}>
+                  {categoryLabels[template.category]}
+                </Badge>
+                {!template.isActive && (
+                  <Badge variant="secondary" className="bg-gray-100 text-gray-600 text-xs whitespace-nowrap">
+                    Nonaktif
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-4">
+              <p className="text-xs sm:text-sm text-gray-700 whitespace-pre-wrap break-words overflow-hidden"
+                 style={{
+                   display: '-webkit-box',
+                   WebkitLineClamp: 4,
+                   WebkitBoxOrient: 'vertical'
+                 }}>
+                {template.templateText}
+              </p>
+            </div>
+
+            {template.variables.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-medium text-gray-500 mb-2">
+                  Variabel tersedia:
+                </p>
+                <div className="flex flex-wrap gap-1 max-h-16 overflow-hidden">
+                  {template.variables.map((variable) => (
+                    <Badge key={variable} variant="outline" className="text-xs whitespace-nowrap">
+                      {variable}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center text-xs text-gray-500 gap-1 sm:gap-0 mt-auto">
+              <span className="truncate">
+                Dibuat oleh {template.createdByUser.firstName} {template.createdByUser.lastName}
+              </span>
+              <span className="hidden sm:inline mx-2">•</span>
+              <span className="whitespace-nowrap">
+                {new Date(template.createdAt).toLocaleDateString('id-ID', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPreview(template)}
+              className="cursor-pointer flex-1 min-w-0"
+            >
+              <Eye className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="ml-1 hidden sm:inline">Lihat</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onEdit(template)}
+              disabled={loading}
+              className="cursor-pointer flex-1 min-w-0"
+            >
+              <Edit className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+              <span className="ml-1 hidden sm:inline">Edit</span>
+            </Button>
+
+            {template.isActive && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDeactivate(template.id)}
+                disabled={loading}
+                className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50 flex-1 min-w-0"
+              >
+                {loading ? (
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent flex-shrink-0" />
+                ) : (
+                  <>
+                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                    <span className="ml-1 hidden sm:inline">Hapus</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// Template Preview Component
+function TemplatePreview({ template }: { template: WhatsAppTemplate }) {
+  const renderPreviewText = (text: string, variables: string[]) => {
+    const sampleData: Record<string, string> = {
+      '{nama}': 'Ibu Sari',
+      '{obat}': 'Paracetamol',
+      '{dosis}': '500mg',
+      '{waktu}': '08:00',
+      '{tanggal}': '15 Januari 2024',
+      '{dokter}': 'Dr. Ahmad',
+      '{rumahSakit}': 'RS Harapan',
+      '{volunteer}': 'Sari (volunteer)'
+    }
+
+    let previewText = text
+    variables.forEach(variable => {
+      if (sampleData[variable]) {
+        previewText = previewText.replace(new RegExp(variable.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), sampleData[variable])
+      }
+    })
+
+    return previewText
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label className="text-sm font-medium">Nama Template</Label>
+        <p className="text-sm text-gray-700">{template.templateName}</p>
+      </div>
+
+      <div>
+        <Label className="text-sm font-medium">Kategori</Label>
+        <Badge className={`${categoryColors[template.category]} border ml-2`}>
+          {categoryLabels[template.category]}
+        </Badge>
+      </div>
+
+      <div>
+        <Label className="text-sm font-medium">Template Asli</Label>
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {template.templateText}
+          </p>
+        </div>
+      </div>
+
+      {template.variables.length > 0 && (
+        <div>
+          <Label className="text-sm font-medium">Preview dengan Data Contoh</Label>
+          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+            <p className="text-sm text-green-800 whitespace-pre-wrap">
+              {renderPreviewText(template.templateText, template.variables)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {template.variables.length > 0 && (
+        <div>
+          <Label className="text-sm font-medium">Variabel Tersedia</Label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {template.variables.map((variable) => (
+              <Badge key={variable} variant="outline">
+                {variable}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients, reminderSchedules, verificationLogs } from '@/db'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { invalidateAfterPatientOperation } from '@/lib/cache-invalidation'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 

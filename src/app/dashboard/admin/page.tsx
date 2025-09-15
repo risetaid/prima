@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { Shield, Users, MessageSquareText, Settings, ChevronRight, AlertCircle } from "lucide-react";
 import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
-import { getCurrentUser } from "@/lib/auth-utils";
+import { Patient } from "@/db/schema";
+
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function AdminPanelPage() {
       const patientsResponse = await fetch("/api/patients");
       if (patientsResponse.ok) {
         const patientsData = await patientsResponse.json();
-        const activePatients = patientsData.patients?.filter((p: any) => p.isActive)?.length || 0;
+        const activePatients = patientsData.patients?.filter((p: Patient) => p.isActive)?.length || 0;
         setStats(prev => ({ 
           ...prev, 
           activePatients

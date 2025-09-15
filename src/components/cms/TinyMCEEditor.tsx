@@ -4,16 +4,30 @@ import dynamic from 'next/dynamic'
 import { useRef } from 'react'
 
 // TinyMCE type definitions
+interface TinyMCEBlobInfoData {
+  id: string
+  name: string
+  filename: string
+  blob: Blob
+  base64: string
+}
+
 interface TinyMCEBlobInfo {
   blob(): Blob
   filename(): string
+  blobUri(): string
+  id(): string
+  name(): string
+  base64(): string
+  uri(): string | undefined
 }
 
 interface TinyMCEEditorInstance {
   editorUpload?: {
     blobCache: {
-      create(id: string, file: File, base64: string): any
-      add(blobInfo: any): void
+      create(o: TinyMCEBlobInfoData): TinyMCEBlobInfo
+      create(id: string, blob: Blob, base64: string, name?: string, filename?: string): TinyMCEBlobInfo
+      add(blobInfo: TinyMCEBlobInfo): void
     }
   }
 }

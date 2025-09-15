@@ -1,12 +1,12 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Plus, Search, FileText, Eye, Edit, Trash2, Filter } from 'lucide-react'
 import { BackButton } from '@/components/ui/back-button'
 import Link from 'next/link'
@@ -57,7 +57,7 @@ export default function ArticlesPage() {
     { value: 'testimoni', label: 'Testimoni' }
   ]
 
-  const fetchArticles = async (page = 1) => {
+  const fetchArticles = useCallback(async (page = 1) => {
     setLoading(true)
     try {
       const params = new URLSearchParams({
@@ -89,7 +89,7 @@ export default function ArticlesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [searchQuery, categoryFilter, statusFilter])
 
   const handleDelete = async () => {
     if (!deleteId) return
@@ -130,7 +130,7 @@ export default function ArticlesPage() {
 
   useEffect(() => {
     fetchArticles()
-  }, [])
+  }, [fetchArticles])
 
   const getStatusColor = (status: string) => {
     switch (status) {

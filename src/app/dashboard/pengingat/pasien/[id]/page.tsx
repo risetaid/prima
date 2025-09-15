@@ -22,6 +22,10 @@ interface ReminderStats {
   semua: number;
 }
 
+interface CompletedReminder {
+  medicationTaken: boolean;
+}
+
 export default function PatientReminderPage() {
   const router = useRouter();
   const params = useParams();
@@ -35,7 +39,7 @@ export default function PatientReminderPage() {
   const [patientName, setPatientName] = useState("");
   const [canAddReminders, setCanAddReminders] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [completedReminders, setCompletedReminders] = useState<any[]>([]);
+  const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
 
   useEffect(() => {
     if (params.id) {
@@ -200,10 +204,10 @@ export default function PatientReminderPage() {
             <span>Tambah Pengingat Baru</span>
           </button>
           {!canAddReminders && (
-            <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
-              Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
-              "YA".
-            </p>
+             <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
+               Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
+               &quot;YA&quot;.
+             </p>
           )}
 
           {/* Add Reminder Modal */}
@@ -279,10 +283,10 @@ export default function PatientReminderPage() {
           {(() => {
             // Calculate compliance stats from completed reminders
             const taken = completedReminders.filter(
-              (r: any) => r.medicationTaken
+              (r: CompletedReminder) => r.medicationTaken
             ).length;
             const notTaken = completedReminders.filter(
-              (r: any) => !r.medicationTaken
+              (r: CompletedReminder) => !r.medicationTaken
             ).length;
             const total = taken + notTaken;
             const complianceRate =

@@ -55,7 +55,7 @@ export class RateLimiter {
       if (currentData) {
         try {
           requestData = JSON.parse(currentData)
-        } catch (parseError) {
+        } catch {
           // Reset data if parsing fails
           requestData = { requests: [], windowStart: now }
         }
@@ -205,7 +205,7 @@ export class RateLimiter {
                 totalRequests: requestCount,
                 averageRequestsPerKey: requestCount
               }
-            } catch (parseError) {
+            } catch {
               // Invalid data format
             }
           }
@@ -293,7 +293,7 @@ export function getClientIP(request: Request): string {
 }
 
 // Helper function to get user identifier for rate limiting
-export function getUserIdentifier(request: Request, userId?: string): string {
+export function getUserIdentifier(request: Request, userId?: string | null): string {
   if (userId) {
     return `user:${userId}`
   }

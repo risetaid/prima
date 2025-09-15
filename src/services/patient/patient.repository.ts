@@ -1,4 +1,5 @@
 // Patient repository: DB access for patient variables and basic patient checks
+// Refactored to split long methods into smaller, focused functions
 import {
   db,
   patients,
@@ -7,17 +8,19 @@ import {
   users,
   reminderLogs,
   manualConfirmations,
-  medications,
-  patientMedications,
+
   verificationLogs,
   reminderSchedules,
 } from "@/db";
-import { and, eq, isNull, inArray, desc, count, sql } from "drizzle-orm";
+import type { NewVerificationLog } from "@/db";
+import { and, eq, isNull, inArray, desc, count, sql, SQL } from "drizzle-orm";
+import type { InferInsertModel } from "drizzle-orm";
 import type {
   PatientVariableRow,
   NewPatientVariableRow,
   PatientFilters,
 } from "./patient.types";
+import { PatientQueryBuilder } from "./patient-query-builder";
 
 export class PatientRepository {
   async patientExists(patientId: string): Promise<boolean> {
@@ -60,7 +63,7 @@ export class PatientRepository {
       );
 
     const existingSet = new Set(existing.map((v) => v.variableName));
-    const ops: Promise<any>[] = [];
+    const ops: Promise<unknown>[] = [];
 
     for (const [name, value] of Object.entries(variables)) {
       const val = String(value || "").trim();
@@ -263,10 +266,10 @@ export class PatientRepository {
       page = 1,
       limit = 50,
       orderBy = "createdAt",
-      orderDirection = "asc",
     } = filters || {};
 
-    const conditions: any[] = [];
+    // Build filter conditions
+    const conditions: SQL<unknown>[] = [];
     if (!includeDeleted) conditions.push(isNull(patients.deletedAt));
     if (status === "active") conditions.push(eq(patients.isActive, true));
     if (status === "inactive") conditions.push(eq(patients.isActive, false));
@@ -278,10 +281,8 @@ export class PatientRepository {
     }
 
     const whereClause = conditions.length ? and(...conditions) : undefined;
-
     const offset = (Math.max(1, page) - 1) * Math.max(1, limit);
     const orderColumn = orderBy === "name" ? patients.name : patients.createdAt;
-    const orderSql = orderDirection === "desc" ? sql`DESC` : sql`ASC`;
 
     // Drizzle doesn't support dynamic order direction without sql template, so use raw sql order
     const rows = await db
@@ -294,16 +295,17 @@ export class PatientRepository {
         createdAt: patients.createdAt,
       })
       .from(patients)
-      .where(whereClause as any)
+      .where(whereClause)
       .offset(offset)
       .limit(Math.max(1, limit))
-      .orderBy(orderColumn as any);
+      .orderBy(orderColumn);
 
     // Note: orderDirection is not applied due to Drizzle limitation in this context; acceptable for now.
     return rows;
   }
 
   // ===== Simplified Compliance counts - Only count "Selesai" (completed) reminders =====
+  // Refactored to use helper functions for better readability
   async getCompletedComplianceCounts(patientIds: string[]) {
     if (!patientIds.length)
       return [] as Array<{
@@ -312,135 +314,87 @@ export class PatientRepository {
         takenCount: number;
       }>;
 
-    // Get compliance data for each patient
+    const countManualTaken = async (patientId: string): Promise<number> => {
+      const result = await db
+        .select({ count: count() })
+        .from(manualConfirmations)
+        .where(
+          and(
+            eq(manualConfirmations.patientId, patientId),
+            eq(manualConfirmations.medicationsTaken, true)
+          )
+        );
+      return Number(result[0]?.count || 0);
+    };
+
+    const countAutomatedTaken = async (patientId: string): Promise<number> => {
+      const result = await db
+        .select({ count: count() })
+        .from(reminderLogs)
+        .where(
+          and(
+            eq(reminderLogs.patientId, patientId),
+            eq(reminderLogs.confirmationStatus, "CONFIRMED"),
+            eq(reminderLogs.confirmationResponse, "SUDAH")
+          )
+        );
+      return Number(result[0]?.count || 0);
+    };
+
+    const countTotalManual = async (patientId: string): Promise<number> => {
+      const result = await db
+        .select({ count: count() })
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.patientId, patientId));
+      return Number(result[0]?.count || 0);
+    };
+
+    const countTotalAutomated = async (patientId: string): Promise<number> => {
+      const result = await db
+        .select({ count: count() })
+        .from(reminderLogs)
+        .where(
+          and(
+            eq(reminderLogs.patientId, patientId),
+            eq(reminderLogs.confirmationStatus, "CONFIRMED")
+          )
+        );
+      return Number(result[0]?.count || 0);
+    };
+
+    const getPatientData = async (patientId: string) => {
+      const [
+        manualTaken,
+        automatedTaken,
+        totalManual,
+        totalAutomated,
+      ] = await Promise.all([
+        countManualTaken(patientId),
+        countAutomatedTaken(patientId),
+        countTotalManual(patientId),
+        countTotalAutomated(patientId),
+      ]);
+
+      return {
+        patientId,
+        totalConfirmed: totalManual + totalAutomated,
+        takenCount: manualTaken + automatedTaken,
+      };
+    };
+
     const results = await Promise.all(
-      patientIds.map(async (patientId) => {
-        // Count manual confirmations where medication was taken
-        const manualTakenResult = await db
-          .select({ count: count() })
-          .from(manualConfirmations)
-          .where(
-            and(
-              eq(manualConfirmations.patientId, patientId),
-              eq(manualConfirmations.medicationsTaken, true)
-            )
-          );
-
-        // Count automated confirmations where response was "SUDAH"
-        const automatedTakenResult = await db
-          .select({ count: count() })
-          .from(reminderLogs)
-          .where(
-            and(
-              eq(reminderLogs.patientId, patientId),
-              eq(reminderLogs.confirmationStatus, "CONFIRMED"),
-              eq(reminderLogs.confirmationResponse, "SUDAH")
-            )
-          );
-
-        // Count total manual confirmations (regardless of taken status)
-        const totalManualResult = await db
-          .select({ count: count() })
-          .from(manualConfirmations)
-          .where(eq(manualConfirmations.patientId, patientId));
-
-        // Count total automated confirmations (regardless of response)
-        const totalAutomatedResult = await db
-          .select({ count: count() })
-          .from(reminderLogs)
-          .where(
-            and(
-              eq(reminderLogs.patientId, patientId),
-              eq(reminderLogs.confirmationStatus, "CONFIRMED")
-            )
-          );
-
-        const manualTaken = Number(manualTakenResult[0]?.count || 0);
-        const automatedTaken = Number(automatedTakenResult[0]?.count || 0);
-        const totalManual = Number(totalManualResult[0]?.count || 0);
-        const totalAutomated = Number(totalAutomatedResult[0]?.count || 0);
-
-        return {
-          patientId,
-          totalConfirmed: totalManual + totalAutomated,
-          takenCount: manualTaken + automatedTaken,
-        };
-      })
+      patientIds.map(patientId => getPatientData(patientId))
     );
 
     return results;
   }
 
-  // ===== Medications =====
-  async listActiveMedications(patientId: string) {
-    return await db
-      .select({
-        id: patientMedications.id,
-        patientId: patientMedications.patientId,
-        medicationId: patientMedications.medicationId,
-        dosage: patientMedications.dosage,
-        frequency: patientMedications.frequency,
-        instructions: patientMedications.instructions,
-        startDate: patientMedications.startDate,
-        endDate: patientMedications.endDate,
-        isActive: patientMedications.isActive,
-        createdAt: patientMedications.createdAt,
-        medicationName: medications.name,
-      })
-      .from(patientMedications)
-      .leftJoin(
-        medications,
-        eq(patientMedications.medicationId, medications.id)
-      )
-      .where(
-        and(
-          eq(patientMedications.patientId, patientId),
-          eq(patientMedications.isActive, true)
-        )
-      )
-      .orderBy(desc(patientMedications.createdAt));
-  }
+
 
   // ===== Patient detail building blocks =====
   async getPatientBasicData(patientId: string) {
-    const rows = await db
-      .select({
-        id: patients.id,
-        name: patients.name,
-        phoneNumber: patients.phoneNumber,
-        address: patients.address,
-        birthDate: patients.birthDate,
-        diagnosisDate: patients.diagnosisDate,
-        cancerStage: patients.cancerStage,
-        assignedVolunteerId: patients.assignedVolunteerId,
-        doctorName: patients.doctorName,
-        hospitalName: patients.hospitalName,
-        emergencyContactName: patients.emergencyContactName,
-        emergencyContactPhone: patients.emergencyContactPhone,
-        notes: patients.notes,
-        isActive: patients.isActive,
-        deletedAt: patients.deletedAt,
-        createdAt: patients.createdAt,
-        updatedAt: patients.updatedAt,
-        photoUrl: patients.photoUrl,
-        verificationStatus: patients.verificationStatus,
-        verificationSentAt: patients.verificationSentAt,
-        verificationResponseAt: patients.verificationResponseAt,
-        verificationMessage: patients.verificationMessage,
-        verificationAttempts: patients.verificationAttempts,
-        verificationExpiresAt: patients.verificationExpiresAt,
-        volunteerId: users.id,
-        volunteerFirstName: users.firstName,
-        volunteerLastName: users.lastName,
-        volunteerEmail: users.email,
-        volunteerRole: users.role,
-        volunteerHospitalName: users.hospitalName,
-      })
-      .from(patients)
-      .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
-      .where(eq(patients.id, patientId))
-      .limit(1);
-    return rows[0] || null;
+    // Use the consolidated query builder for consistency
+    return await PatientQueryBuilder.getPatientWithVolunteer(patientId);
   }
 
   async getPatientManualConfirmations(patientId: string) {
@@ -485,12 +439,12 @@ export class PatientRepository {
   }
 
   // ===== Verification History =====
-  async insertPatient(values: any) {
+  async insertPatient(values: InferInsertModel<typeof patients>) {
     const inserted = await db.insert(patients).values(values).returning();
     return inserted[0];
   }
 
-  async updatePatient(id: string, values: any) {
+  async updatePatient(id: string, values: Partial<InferInsertModel<typeof patients>>) {
     const updated = await db
       .update(patients)
       .set(values)
@@ -513,13 +467,7 @@ export class PatientRepository {
       .where(eq(reminderSchedules.patientId, patientId));
   }
 
-  async insertVerificationLog(values: {
-    patientId: string;
-    action: string;
-    patientResponse?: string | null;
-    verificationResult?: any;
-    processedBy?: string | null;
-  }) {
+  async insertVerificationLog(values: NewVerificationLog) {
     await db.insert(verificationLogs).values(values);
   }
 

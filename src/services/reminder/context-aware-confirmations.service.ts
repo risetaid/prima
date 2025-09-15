@@ -4,7 +4,7 @@
 import { db } from '@/db'
 import { reminderLogs, patients, reminderSchedules } from '@/db'
 import { eq, and, gte, desc } from 'drizzle-orm'
-import { logger } from '@/lib/logger'
+
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 import { SmartReminderService } from '@/services/reminder/smart-reminder.service'
 import { LinkedConfirmationService } from '@/services/reminder/linked-confirmation.service'
@@ -27,6 +27,13 @@ export interface AdaptiveConfirmation {
   followUpDelay: number // minutes
   escalationLevel: number
   personalizedElements: string[]
+}
+
+type ConfirmationAnalysis = {
+  personalizationElements: string[]
+  urgencyLevel: number
+  encouragementNeeded: boolean
+  reminderType: 'gentle' | 'standard' | 'urgent' | 'celebration'
 }
 
 export class ContextAwareConfirmationsService {
@@ -66,11 +73,10 @@ export class ContextAwareConfirmationsService {
         escalationLevel,
         personalizedElements: analysis.personalizationElements
       }
-    } catch (error) {
-      // console.error('Failed to generate adaptive confirmation', error, { reminderLogId })
-      // Return default confirmation
-      return this.getDefaultConfirmation()
-    }
+     } catch {
+       // Return default confirmation
+       return this.getDefaultConfirmation()
+     }
   }
 
   /**
@@ -125,13 +131,10 @@ export class ContextAwareConfirmationsService {
         // })
       }
 
-      return result.success
-    } catch (error) {
-      // logger.error('Failed to send adaptive confirmation', error as Error, {
-      //   reminderLogId
-      // })
-      return false
-    }
+       return result.success
+      } catch {
+        return false
+      }
   }
 
   /**
@@ -195,12 +198,7 @@ export class ContextAwareConfirmationsService {
   /**
    * Analyze confirmation context for personalization
    */
-  private async analyzeConfirmationContext(context: ConfirmationContext): Promise<{
-    personalizationElements: string[]
-    urgencyLevel: number
-    encouragementNeeded: boolean
-    reminderType: 'gentle' | 'standard' | 'urgent' | 'celebration'
-  }> {
+  private async analyzeConfirmationContext(context: ConfirmationContext): Promise<ConfirmationAnalysis> {
     const elements: string[] = []
 
     // Time-based personalization
@@ -258,7 +256,7 @@ export class ContextAwareConfirmationsService {
    */
   private buildPersonalizedMessage(
     context: ConfirmationContext,
-    analysis: any
+    analysis: ConfirmationAnalysis
   ): string {
     const baseMessage = `Halo! Sudah minum ${context.medicationName} yang dijadwalkan pukul ${context.scheduledTime}?`
 
@@ -298,7 +296,7 @@ export class ContextAwareConfirmationsService {
    */
   private calculatePriority(
     context: ConfirmationContext,
-    analysis: any
+    analysis: ConfirmationAnalysis
   ): 'low' | 'medium' | 'high' | 'urgent' {
     if (context.emergencyMode) return 'urgent'
     if (context.timeSinceSent > 120) return 'high'
@@ -312,7 +310,7 @@ export class ContextAwareConfirmationsService {
    */
   private calculateFollowUpDelay(
     context: ConfirmationContext,
-    analysis: any
+    analysis: ConfirmationAnalysis
   ): number {
     // Base delay of 15 minutes
     let delay = 15
@@ -337,7 +335,7 @@ export class ContextAwareConfirmationsService {
    */
   private calculateEscalationLevel(
     context: ConfirmationContext,
-    analysis: any
+    analysis: ConfirmationAnalysis
   ): number {
     let level = 1
 
@@ -380,10 +378,9 @@ export class ContextAwareConfirmationsService {
       }
 
       return streak
-    } catch (error) {
-      // logger.error('Failed to calculate adherence streak', error as Error, { patientId })
-      return 0
-    }
+     } catch {
+       return 0
+     }
   }
 
   /**
@@ -413,11 +410,10 @@ export class ContextAwareConfirmationsService {
         )
       )
 
-      return hasEmergency
-    } catch (error) {
-      // logger.error('Failed to check emergency mode', error as Error, { patientId })
-      return false
-    }
+       return hasEmergency
+      } catch {
+        return false
+      }
   }
 
   /**

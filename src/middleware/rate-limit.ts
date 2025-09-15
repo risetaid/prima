@@ -56,12 +56,6 @@ export async function rateLimitMiddleware(
       return { allowed: false, response }
     }
 
-    // Return modified request with rate limit headers
-    const modifiedRequest = new NextRequest(request.url, {
-      ...request,
-      headers: requestHeaders
-    })
-
     return { allowed: true, response: undefined }
   } catch (error) {
     logger.error('Rate limit middleware error', error instanceof Error ? error : new Error(String(error)), {
@@ -78,10 +72,10 @@ export async function rateLimitMiddleware(
  * Higher-order function to apply rate limiting to API routes
  */
 export function withRateLimit(
-  handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
+  handler: (request: NextRequest, context: { params: Promise<Record<string, string | string[]>> }) => Promise<NextResponse>,
   endpoint: keyof typeof API_RATE_LIMITS = 'GENERAL'
 ) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+  return async (request: NextRequest, context: { params: Promise<Record<string, string | string[]>> }): Promise<NextResponse> => {
     const rateLimitResult = await rateLimitMiddleware(request, endpoint)
 
     if (!rateLimitResult.allowed && rateLimitResult.response) {
@@ -96,10 +90,10 @@ export function withRateLimit(
  * Rate limiting for specific HTTP methods
  */
 export function withMethodRateLimit(
-  handler: (request: NextRequest, context?: any) => Promise<NextResponse>,
+  handler: (request: NextRequest, context: { params: Promise<Record<string, string | string[]>> }) => Promise<NextResponse>,
   methodLimits: Partial<Record<string, keyof typeof API_RATE_LIMITS>> = {}
 ) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+  return async (request: NextRequest, context: { params: Promise<Record<string, string | string[]>> }): Promise<NextResponse> => {
     const method = request.method.toUpperCase()
     const endpoint = methodLimits[method] || 'GENERAL'
 

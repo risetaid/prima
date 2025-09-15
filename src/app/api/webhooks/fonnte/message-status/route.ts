@@ -15,12 +15,12 @@ const StatusSchema = z.object({
   timestamp: z.union([z.string(), z.number()]).optional(),
 })
 
-function normalizeStatus(body: any) {
-  const id = body.id || body.message_id || body.msgId
-  const status = body.status || body.state
-  const reason = body.reason
-  const timestamp = body.timestamp || body.time || body.updated_at
-  return { id, status, state: body.state, reason, timestamp }
+function normalizeStatus(body: Record<string, unknown>) {
+  const id = String((body.id as string) || (body.message_id as string) || (body.msgId as string) || '')
+  const status = (body.status as string) || (body.state as string)
+  const reason = body.reason as string
+  const timestamp = (body.timestamp as string | number) || (body.time as string | number) || (body.updated_at as string | number)
+  return { id, status, state: body.state as string, reason, timestamp }
 }
 
 function mapStatusToEnum(status?: string): 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null {
@@ -37,14 +37,14 @@ export async function POST(request: NextRequest) {
   const authError = requireWebhookToken(request)
   if (authError) return authError
 
-  let parsed: any = {}
+  let parsed: Record<string, unknown> = {}
   const contentType = request.headers.get('content-type') || ''
   try {
     if (contentType.includes('application/json')) {
       parsed = await request.json()
     } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
       const form = await request.formData()
-      form.forEach((v, k) => { (parsed as any)[k] = v })
+      form.forEach((v, k) => { parsed[k] = v })
     } else {
       const text = await request.text()
       try { parsed = JSON.parse(text) } catch { parsed = {} }
@@ -89,14 +89,14 @@ export async function POST(request: NextRequest) {
       .where(eq(reminderLogs.fonnteMessageId, id))
       .limit(1)
 
-    const updates: any = { status: mapped }
+    const updates = { status: mapped! }
     // optional: could add deliveredAt/failedAt if columns exist; schema not defined for those explicitly
     if (mapped === 'FAILED' && reason) {
       // store reason in confirmationResponse temporarily? Skip; just log.
       logger.warn('Fonnte message failed', { id, reason })
     }
 
-    const res = await db.update(reminderLogs).set(updates).where(eq(reminderLogs.fonnteMessageId, id))
+    await db.update(reminderLogs).set(updates).where(eq(reminderLogs.fonnteMessageId, id))
     logger.info('Updated reminder log status from webhook', { id, mapped })
 
     // Invalidate cache if we have patientId

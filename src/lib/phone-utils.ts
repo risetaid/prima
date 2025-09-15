@@ -42,7 +42,7 @@ export function formatPhoneWithAlternatives(
       isValid: true,
       alternatives,
     };
-  } catch (error) {
+  } catch {
     return {
       original: phoneNumber,
       formatted: phoneNumber,

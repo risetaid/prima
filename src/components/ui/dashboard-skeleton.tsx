@@ -1,21 +1,94 @@
 import { Skeleton } from "./skeleton"
 import { Card, CardContent, CardHeader } from "./card"
 
+// Helper Components
+function SkeletonCard({ children, className = "bg-white" }: { children: React.ReactNode; className?: string }) {
+  return <Card className={className}>{children}</Card>
+}
+
+function SkeletonCardHeader({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <CardHeader className={className}>{children}</CardHeader>
+}
+
+function SkeletonCardContent({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <CardContent className={className}>{children}</CardContent>
+}
+
+function SkeletonAvatar({ size = "h-8 w-8" }: { size?: string }) {
+  return <Skeleton className={`${size} rounded-full`} />
+}
+
+function SkeletonButton({ width = "w-24", height = "h-10" }: { width?: string; height?: string }) {
+  return <Skeleton className={`${height} ${width} rounded`} />
+}
+
+function SkeletonText({ lines = 1, widths = ["w-32"] }: { lines?: number; widths?: string[] }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: lines }).map((value, i) => (
+        <Skeleton key={i} className={`h-4 ${widths[i % widths.length]}`} />
+      ))}
+    </div>
+  )
+}
+
+function SkeletonFormField({ labelWidth = "w-24", inputWidth = "w-full" }: { labelWidth?: string; inputWidth?: string }) {
+  return (
+    <div className="space-y-2">
+      <Skeleton className={`h-4 ${labelWidth}`} />
+      <Skeleton className={`h-10 ${inputWidth}`} />
+    </div>
+  )
+}
+
+function SkeletonTable({
+  columns = 4,
+  rows = 5,
+  headerWidths = [],
+  rowWidths = [],
+  customRowRenderer
+}: {
+  columns?: number;
+  rows?: number;
+  headerWidths?: string[];
+  rowWidths?: string[];
+  customRowRenderer?: () => React.ReactNode;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 py-3 border-b">
+        {Array.from({ length: columns }).map((value, i) => (
+          <Skeleton key={i} className={`h-4 ${headerWidths[i] || "w-20"}`} />
+        ))}
+      </div>
+      {Array.from({ length: rows }).map((value, i) => (
+        <div key={i} className="grid gap-4 py-3 border-b last:border-0">
+          {customRowRenderer ? customRowRenderer() : (
+            Array.from({ length: columns }).map((value, j) => (
+              <Skeleton key={j} className={`h-4 ${rowWidths[j] || "w-24"}`} />
+            ))
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Dashboard Stats Cards Skeleton
 export function DashboardStatsCardsSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Card key={i} className="bg-white">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      {Array.from({ length: 4 }).map((value, i) => (
+        <SkeletonCard key={i}>
+          <SkeletonCardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-4 w-4 rounded" />
-          </CardHeader>
-          <CardContent>
+          </SkeletonCardHeader>
+          <SkeletonCardContent>
             <Skeleton className="h-8 w-12 mb-2" />
             <Skeleton className="h-3 w-32" />
-          </CardContent>
-        </Card>
+          </SkeletonCardContent>
+        </SkeletonCard>
       ))}
     </div>
   )
@@ -25,9 +98,9 @@ export function DashboardStatsCardsSkeleton() {
 export function DashboardNavigationSkeleton() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <Card key={i} className="bg-white hover:shadow-md transition-shadow cursor-pointer">
-          <CardContent className="p-6">
+      {Array.from({ length: 6 }).map((value, i) => (
+        <SkeletonCard key={i} className="bg-white hover:shadow-md transition-shadow cursor-pointer">
+          <SkeletonCardContent className="p-6">
             <div className="flex items-center space-x-4">
               <Skeleton className="h-12 w-12 rounded-lg" />
               <div className="flex-1 space-y-2">
@@ -36,8 +109,8 @@ export function DashboardNavigationSkeleton() {
               </div>
               <Skeleton className="h-4 w-4" />
             </div>
-          </CardContent>
-        </Card>
+          </SkeletonCardContent>
+        </SkeletonCard>
       ))}
     </div>
   )
@@ -46,33 +119,22 @@ export function DashboardNavigationSkeleton() {
 // Patient List Table Skeleton
 export function PatientListTableSkeleton() {
   return (
-    <Card className="bg-white">
-      <CardHeader>
+    <SkeletonCard>
+      <SkeletonCardHeader>
         <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-4 w-48" />
-          </div>
+          <SkeletonText lines={2} widths={["w-32", "w-48"]} />
           <Skeleton className="h-9 w-24" />
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Table Header */}
-          <div className="grid grid-cols-6 gap-4 py-3 border-b">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-18" />
-            <Skeleton className="h-4 w-22" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-          
-          {/* Table Rows */}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-6 gap-4 py-3 border-b last:border-0">
+      </SkeletonCardHeader>
+      <SkeletonCardContent>
+        <SkeletonTable
+          columns={6}
+          rows={5}
+          headerWidths={["w-16", "w-24", "w-20", "w-18", "w-22", "w-16"]}
+          customRowRenderer={() => (
+            <>
               <div className="flex items-center space-x-2">
-                <Skeleton className="h-8 w-8 rounded-full" />
+                <SkeletonAvatar size="h-8 w-8" />
                 <Skeleton className="h-4 w-20" />
               </div>
               <Skeleton className="h-4 w-24" />
@@ -80,41 +142,38 @@ export function PatientListTableSkeleton() {
               <Skeleton className="h-6 w-16 rounded-full" />
               <Skeleton className="h-4 w-20" />
               <div className="flex space-x-2">
-                <Skeleton className="h-6 w-16 rounded" />
-                <Skeleton className="h-6 w-16 rounded" />
+                <SkeletonButton width="w-16" height="h-6" />
+                <SkeletonButton width="w-16" height="h-6" />
               </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            </>
+          )}
+        />
+      </SkeletonCardContent>
+    </SkeletonCard>
   )
 }
 
 // Form Skeleton for Create/Edit pages
 export function FormSkeleton() {
   return (
-    <Card className="bg-white">
-      <CardHeader>
+    <SkeletonCard>
+      <SkeletonCardHeader>
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-64" />
-      </CardHeader>
-      <CardContent className="space-y-6">
+      </SkeletonCardHeader>
+      <SkeletonCardContent className="space-y-6">
         {/* Form Fields */}
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="space-y-2">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+        {Array.from({ length: 6 }).map((value, i) => (
+          <SkeletonFormField key={i} />
         ))}
-        
+
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-10 w-32" />
+          <SkeletonButton width="w-24" />
+          <SkeletonButton width="w-32" />
         </div>
-      </CardContent>
-    </Card>
+      </SkeletonCardContent>
+    </SkeletonCard>
   )
 }
 
@@ -122,11 +181,11 @@ export function FormSkeleton() {
 export function MobilePatientCardSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <Card key={i} className="bg-white">
-          <CardContent className="p-4">
+      {Array.from({ length: 3 }).map((value, i) => (
+        <SkeletonCard key={i}>
+          <SkeletonCardContent className="p-4">
             <div className="flex items-start space-x-3">
-              <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+              <SkeletonAvatar size="h-12 w-12" />
               <div className="flex-1 space-y-2">
                 <div className="flex justify-between items-start">
                   <Skeleton className="h-5 w-32" />
@@ -135,13 +194,13 @@ export function MobilePatientCardSkeleton() {
                 <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-3 w-40" />
                 <div className="flex gap-2 pt-2">
-                  <Skeleton className="h-8 w-16 rounded" />
-                  <Skeleton className="h-8 w-20 rounded" />
+                  <SkeletonButton width="w-16" height="h-8" />
+                  <SkeletonButton width="w-20" height="h-8" />
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </SkeletonCardContent>
+        </SkeletonCard>
       ))}
     </div>
   )
@@ -158,17 +217,17 @@ export function HeaderSkeleton() {
             <Skeleton className="h-8 w-8 rounded" />
             <Skeleton className="h-6 w-24" />
           </div>
-          
+
           {/* Navigation */}
           <div className="hidden md:flex space-x-6">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((value, i) => (
               <Skeleton key={i} className="h-5 w-20" />
             ))}
           </div>
-          
+
           {/* User Menu */}
           <div className="flex items-center space-x-3">
-            <Skeleton className="h-8 w-8 rounded-full" />
+            <SkeletonAvatar size="h-8 w-8" />
             <div className="hidden sm:block space-y-1">
               <Skeleton className="h-4 w-20" />
               <Skeleton className="h-3 w-16" />
@@ -184,7 +243,7 @@ export function HeaderSkeleton() {
 export function CMSContentListSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((value, i) => (
         <div key={i} className="border rounded-lg p-4 hover:bg-gray-50">
           <div className="flex justify-between items-start">
             <div className="flex-1 space-y-3">
@@ -201,8 +260,8 @@ export function CMSContentListSkeleton() {
               <Skeleton className="h-3 w-40" />
             </div>
             <div className="flex gap-2">
-              <Skeleton className="h-8 w-16 rounded" />
-              <Skeleton className="h-8 w-16 rounded" />
+              <SkeletonButton width="w-16" height="h-8" />
+              <SkeletonButton width="w-16" height="h-8" />
             </div>
           </div>
         </div>
@@ -216,11 +275,11 @@ export function PatientDetailSkeleton() {
   return (
     <div className="space-y-6">
       {/* Patient Info Card */}
-      <Card className="bg-white">
-        <CardHeader className="pb-4">
+      <SkeletonCard>
+        <SkeletonCardHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
-              <Skeleton className="h-16 w-16 rounded-full" />
+              <SkeletonAvatar size="h-16 w-16" />
               <div className="space-y-2">
                 <Skeleton className="h-6 w-48" />
                 <Skeleton className="h-4 w-32" />
@@ -228,28 +287,28 @@ export function PatientDetailSkeleton() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Skeleton className="h-9 w-24 rounded" />
-              <Skeleton className="h-9 w-20 rounded" />
+              <SkeletonButton width="w-24" height="h-9" />
+              <SkeletonButton width="w-20" height="h-9" />
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </SkeletonCardHeader>
+        <SkeletonCardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
+            {Array.from({ length: 6 }).map((value, i) => (
               <div key={i} className="space-y-2">
                 <Skeleton className="h-4 w-20" />
                 <Skeleton className="h-5 w-32" />
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </SkeletonCardContent>
+      </SkeletonCard>
 
       {/* Action Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="bg-white cursor-pointer hover:shadow-md">
-            <CardContent className="p-6">
+        {Array.from({ length: 4 }).map((value, i) => (
+          <SkeletonCard key={i} className="bg-white cursor-pointer hover:shadow-md">
+            <SkeletonCardContent className="p-6">
               <div className="flex items-center space-x-3">
                 <Skeleton className="h-8 w-8 rounded" />
                 <div className="space-y-1">
@@ -257,19 +316,19 @@ export function PatientDetailSkeleton() {
                   <Skeleton className="h-6 w-8" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </SkeletonCardContent>
+          </SkeletonCard>
         ))}
       </div>
 
       {/* Recent Activity */}
-      <Card className="bg-white">
-        <CardHeader>
+      <SkeletonCard>
+        <SkeletonCardHeader>
           <Skeleton className="h-5 w-32" />
-        </CardHeader>
-        <CardContent>
+        </SkeletonCardHeader>
+        <SkeletonCardContent>
           <div className="space-y-4">
-            {Array.from({ length: 3 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((value, i) => (
               <div key={i} className="flex items-start space-x-3 p-3 rounded-lg border">
                 <Skeleton className="h-8 w-8 rounded" />
                 <div className="flex-1 space-y-2">
@@ -280,8 +339,8 @@ export function PatientDetailSkeleton() {
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </SkeletonCardContent>
+      </SkeletonCard>
     </div>
   )
 }
@@ -289,99 +348,76 @@ export function PatientDetailSkeleton() {
 // Reminder Form Skeleton
 export function ReminderFormSkeleton() {
   return (
-    <Card className="bg-white">
-      <CardHeader>
+    <SkeletonCard>
+      <SkeletonCardHeader>
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-64" />
-      </CardHeader>
-      <CardContent className="space-y-6">
+      </SkeletonCardHeader>
+      <SkeletonCardContent className="space-y-6">
         {/* Template Selection */}
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-10 w-full" />
-        </div>
-        
+        <SkeletonFormField labelWidth="w-32" />
+
         {/* Message Preview */}
         <div className="space-y-2">
           <Skeleton className="h-4 w-24" />
           <div className="border rounded-lg p-4 bg-gray-50">
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-3/4 mb-2" />
-            <Skeleton className="h-4 w-1/2" />
+            <SkeletonText lines={3} widths={["w-full", "w-3/4", "w-1/2"]} />
           </div>
         </div>
 
         {/* Schedule Settings */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-10 w-full" />
-          </div>
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <SkeletonFormField labelWidth="w-20" />
+          <SkeletonFormField labelWidth="w-16" />
         </div>
 
         {/* Recurrence Pattern */}
         <div className="space-y-4">
           <Skeleton className="h-4 w-32" />
           <div className="flex gap-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-9 w-20 rounded" />
+            {Array.from({ length: 4 }).map((value, i) => (
+              <SkeletonButton key={i} width="w-20" height="h-9" />
             ))}
           </div>
           <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 7 }).map((_, i) => (
+            {Array.from({ length: 7 }).map((value, i) => (
               <Skeleton key={i} className="h-8 w-8 rounded" />
             ))}
           </div>
         </div>
-        
+
         {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-10 w-32" />
+          <SkeletonButton width="w-24" />
+          <SkeletonButton width="w-32" />
         </div>
-      </CardContent>
-    </Card>
+      </SkeletonCardContent>
+    </SkeletonCard>
   )
 }
 
 // Admin Users Table Skeleton
 export function AdminUsersTableSkeleton() {
   return (
-    <Card className="bg-white">
-      <CardHeader>
+    <SkeletonCard>
+      <SkeletonCardHeader>
         <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-4 w-56" />
-          </div>
+          <SkeletonText lines={2} widths={["w-40", "w-56"]} />
           <div className="flex gap-2">
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-9 w-24" />
+            <SkeletonButton width="w-28" height="h-9" />
+            <SkeletonButton width="w-24" height="h-9" />
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Table Header */}
-          <div className="grid grid-cols-7 gap-4 py-3 border-b font-medium">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-          
-          {/* Table Rows */}
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-7 gap-4 py-3 border-b last:border-0">
+      </SkeletonCardHeader>
+      <SkeletonCardContent>
+        <SkeletonTable
+          columns={7}
+          rows={6}
+          headerWidths={["w-16", "w-20", "w-24", "w-16", "w-20", "w-28", "w-16"]}
+          customRowRenderer={() => (
+            <>
               <div className="flex items-center space-x-2">
-                <Skeleton className="h-8 w-8 rounded-full" />
+                <SkeletonAvatar size="h-8 w-8" />
                 <Skeleton className="h-4 w-20" />
               </div>
               <Skeleton className="h-4 w-32" />
@@ -390,15 +426,15 @@ export function AdminUsersTableSkeleton() {
               <Skeleton className="h-6 w-18 rounded-full" />
               <Skeleton className="h-4 w-24" />
               <div className="flex gap-1">
-                <Skeleton className="h-6 w-16 rounded" />
-                <Skeleton className="h-6 w-20 rounded" />
+                <SkeletonButton width="w-16" height="h-6" />
+                <SkeletonButton width="w-20" height="h-6" />
                 <Skeleton className="h-6 w-6 rounded" />
               </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+            </>
+          )}
+        />
+      </SkeletonCardContent>
+    </SkeletonCard>
   )
 }
 
@@ -408,18 +444,15 @@ export function TemplateManagementSkeleton() {
     <div className="space-y-6">
       {/* Header Actions */}
       <div className="flex justify-between items-center">
-        <div className="space-y-1">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <Skeleton className="h-10 w-32" />
+        <SkeletonText lines={2} widths={["w-48", "w-64"]} />
+        <SkeletonButton width="w-32" />
       </div>
 
       {/* Template Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i} className="bg-white">
-            <CardHeader className="pb-3">
+        {Array.from({ length: 6 }).map((value, i) => (
+          <SkeletonCard key={i}>
+            <SkeletonCardHeader className="pb-3">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <Skeleton className="h-5 w-32" />
@@ -430,65 +463,60 @@ export function TemplateManagementSkeleton() {
                   <Skeleton className="h-6 w-6 rounded" />
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
+            </SkeletonCardHeader>
+            <SkeletonCardContent>
               <div className="space-y-3">
                 <div className="bg-gray-50 p-3 rounded text-sm">
-                  <Skeleton className="h-3 w-full mb-2" />
-                  <Skeleton className="h-3 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-1/2" />
+                  <SkeletonText lines={3} widths={["w-full", "w-3/4", "w-1/2"]} />
                 </div>
                 <div className="flex justify-between items-center text-xs text-gray-500">
                   <Skeleton className="h-3 w-24" />
                   <Skeleton className="h-3 w-20" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </SkeletonCardContent>
+          </SkeletonCard>
         ))}
       </div>
     </div>
   )
 }
 
-// Settings Page Skeleton  
+// Settings Page Skeleton
 export function SettingsPageSkeleton() {
   return (
     <div className="space-y-6">
       {/* Profile Section */}
-      <Card className="bg-white">
-        <CardHeader>
+      <SkeletonCard>
+        <SkeletonCardHeader>
           <Skeleton className="h-6 w-32" />
           <Skeleton className="h-4 w-48" />
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </SkeletonCardHeader>
+        <SkeletonCardContent className="space-y-4">
           <div className="flex items-center space-x-4">
-            <Skeleton className="h-16 w-16 rounded-full" />
+            <SkeletonAvatar size="h-16 w-16" />
             <div className="space-y-2">
               <Skeleton className="h-5 w-40" />
               <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-9 w-24" />
+              <SkeletonButton width="w-24" height="h-9" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-full" />
-              </div>
+            {Array.from({ length: 4 }).map((value, i) => (
+              <SkeletonFormField key={i} />
             ))}
           </div>
-        </CardContent>
-      </Card>
+        </SkeletonCardContent>
+      </SkeletonCard>
 
       {/* Preferences Section */}
-      <Card className="bg-white">
-        <CardHeader>
+      <SkeletonCard>
+        <SkeletonCardHeader>
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-4 w-56" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+        </SkeletonCardHeader>
+        <SkeletonCardContent className="space-y-4">
+          {Array.from({ length: 5 }).map((value, i) => (
             <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
               <div className="space-y-1">
                 <Skeleton className="h-4 w-32" />
@@ -497,17 +525,17 @@ export function SettingsPageSkeleton() {
               <Skeleton className="h-6 w-11 rounded-full" />
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </SkeletonCardContent>
+      </SkeletonCard>
 
       {/* Notification Settings */}
-      <Card className="bg-white">
-        <CardHeader>
+      <SkeletonCard>
+        <SkeletonCardHeader>
           <Skeleton className="h-6 w-40" />
           <Skeleton className="h-4 w-64" />
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
+        </SkeletonCardHeader>
+        <SkeletonCardContent className="space-y-4">
+          {Array.from({ length: 3 }).map((value, i) => (
             <div key={i} className="space-y-3 p-4 border rounded-lg">
               <div className="flex items-center justify-between">
                 <Skeleton className="h-5 w-36" />
@@ -515,14 +543,14 @@ export function SettingsPageSkeleton() {
               </div>
               <Skeleton className="h-3 w-full" />
               <div className="flex gap-2">
-                <Skeleton className="h-8 w-16 rounded" />
-                <Skeleton className="h-8 w-20 rounded" />
-                <Skeleton className="h-8 w-18 rounded" />
+                <SkeletonButton width="w-16" height="h-8" />
+                <SkeletonButton width="w-20" height="h-8" />
+                <SkeletonButton width="w-18" height="h-8" />
               </div>
             </div>
           ))}
-        </CardContent>
-      </Card>
+        </SkeletonCardContent>
+      </SkeletonCard>
     </div>
   )
 }
@@ -531,12 +559,12 @@ export function SettingsPageSkeleton() {
 export function ReminderListSkeleton() {
   return (
     <div className="space-y-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Card key={i} className="bg-white">
-          <CardContent className="p-4">
+      {Array.from({ length: 5 }).map((value, i) => (
+        <SkeletonCard key={i}>
+          <SkeletonCardContent className="p-4">
             <div className="flex items-start justify-between">
               <div className="flex items-start space-x-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
+                <SkeletonAvatar size="h-10 w-10" />
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2">
                     <Skeleton className="h-5 w-48" />
@@ -557,12 +585,12 @@ export function ReminderListSkeleton() {
                 </div>
               </div>
               <div className="flex gap-1">
-                <Skeleton className="h-8 w-16 rounded" />
+                <SkeletonButton width="w-16" height="h-8" />
                 <Skeleton className="h-8 w-8 rounded" />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </SkeletonCardContent>
+        </SkeletonCard>
       ))}
     </div>
   )
@@ -573,17 +601,14 @@ export function HealthNotesSkeleton() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <div className="space-y-1">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-48" />
-        </div>
-        <Skeleton className="h-9 w-28" />
+        <SkeletonText lines={2} widths={["w-32", "w-48"]} />
+        <SkeletonButton width="w-28" height="h-9" />
       </div>
-      
+
       <div className="space-y-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} className="bg-white">
-            <CardContent className="p-4">
+        {Array.from({ length: 4 }).map((value, i) => (
+          <SkeletonCard key={i}>
+            <SkeletonCardContent className="p-4">
               <div className="flex justify-between items-start">
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-2">
@@ -591,8 +616,7 @@ export function HealthNotesSkeleton() {
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-5 w-16 rounded-full" />
                   </div>
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
+                  <SkeletonText lines={2} widths={["w-full", "w-3/4"]} />
                   <div className="flex items-center gap-4 text-sm pt-2">
                     <Skeleton className="h-3 w-24" />
                     <Skeleton className="h-3 w-20" />
@@ -603,8 +627,8 @@ export function HealthNotesSkeleton() {
                   <Skeleton className="h-7 w-7 rounded" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </SkeletonCardContent>
+          </SkeletonCard>
         ))}
       </div>
     </div>
@@ -622,7 +646,7 @@ export function PatientListMobileSkeleton() {
             <Skeleton className="h-6 w-6 rounded-full" />
             <Skeleton className="h-6 w-16" />
           </div>
-          <Skeleton className="h-8 w-8 rounded-full" />
+          <SkeletonAvatar size="h-8 w-8" />
         </div>
       </div>
 
@@ -635,8 +659,8 @@ export function PatientListMobileSkeleton() {
 
         {/* Filter Buttons Skeleton */}
         <div className="flex gap-3 overflow-x-auto">
-          <Skeleton className="h-10 w-32 rounded-lg flex-shrink-0" />
-          <Skeleton className="h-10 w-40 rounded-lg flex-shrink-0" />
+          <SkeletonButton width="w-32" height="h-10" />
+          <SkeletonButton width="w-40" height="h-10" />
         </div>
 
         {/* Results Count */}
@@ -644,11 +668,11 @@ export function PatientListMobileSkeleton() {
 
         {/* Patient Cards */}
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((value, i) => (
             <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <Skeleton className="h-12 w-12 rounded-full" />
+                  <SkeletonAvatar size="h-12 w-12" />
                   <div className="space-y-1">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-3 w-24" />
@@ -667,7 +691,7 @@ export function PatientListMobileSkeleton() {
   )
 }
 
-// Reminder Page Skeleton - for reminder page with search + patient cards  
+// Reminder Page Skeleton - for reminder page with search + patient cards
 export function ReminderPageSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -686,11 +710,11 @@ export function ReminderPageSkeleton() {
                 <Skeleton className="h-6 w-24" />
               </div>
               <div className="hidden md:flex space-x-6">
-                {Array.from({ length: 4 }).map((_, i) => (
+      {Array.from({ length: 4 }).map((value, i) => (
                   <Skeleton key={i} className="h-5 w-20" />
                 ))}
               </div>
-              <Skeleton className="h-8 w-8 rounded-full" />
+              <SkeletonAvatar size="h-8 w-8" />
             </div>
           </div>
         </div>
@@ -702,7 +726,7 @@ export function ReminderPageSkeleton() {
           <div className="flex justify-between items-center px-4 py-4">
             <Skeleton className="h-6 w-6 rounded-full" />
             <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-8 w-8 rounded-full" />
+            <SkeletonAvatar size="h-8 w-8" />
           </div>
         </div>
       </div>
@@ -730,33 +754,27 @@ export function ReminderPageSkeleton() {
 
       {/* Desktop Table Skeleton */}
       <div className="hidden lg:block px-4 lg:px-8 py-8 relative z-10">
-        <Card className="bg-white">
-          <CardContent className="p-6">
-            <div className="space-y-4">
-              {/* Table Header */}
-              <div className="grid grid-cols-5 gap-4 py-3 border-b">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-18" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-              {/* Table Rows */}
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="grid grid-cols-5 gap-4 py-3 border-b last:border-0">
+        <SkeletonCard>
+          <SkeletonCardContent className="p-6">
+            <SkeletonTable
+              columns={5}
+              rows={6}
+              headerWidths={["w-16", "w-24", "w-20", "w-18", "w-16"]}
+          customRowRenderer={() => (
+                <>
                   <div className="flex items-center space-x-2">
-                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <SkeletonAvatar size="h-10 w-10" />
                     <Skeleton className="h-4 w-24" />
                   </div>
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-6 w-16 rounded-full" />
                   <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-8 w-20 rounded" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  <SkeletonButton width="w-20" height="h-8" />
+                </>
+              )}
+            />
+          </SkeletonCardContent>
+        </SkeletonCard>
       </div>
 
       {/* Mobile Patient Cards Skeleton */}
@@ -765,7 +783,7 @@ export function ReminderPageSkeleton() {
           {/* Mobile Controls */}
           <div className="flex justify-between items-center mb-4">
             <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-8 w-32" />
+            <SkeletonButton width="w-32" height="h-8" />
           </div>
 
           {/* Filter Buttons */}
@@ -776,11 +794,11 @@ export function ReminderPageSkeleton() {
 
           {/* Patient Cards */}
           <div className="space-y-3">
-            {Array.from({ length: 4 }).map((_, i) => (
+            {Array.from({ length: 4 }).map((value, i) => (
               <div key={i} className="bg-white rounded-xl p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
-                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <SkeletonAvatar size="h-12 w-12" />
                     <div className="space-y-1">
                       <Skeleton className="h-4 w-32" />
                       <Skeleton className="h-3 w-24" />

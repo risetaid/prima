@@ -23,7 +23,7 @@ async function run() {
   let unauthorizedFailed = false
   try {
     await svc.delete(patientId, created.healthNote.id, { id: 'someone-else', role: 'ADMIN' })
-  } catch (e) {
+  } catch {
     unauthorizedFailed = true
     console.log('Unauthorized delete blocked as expected')
   }

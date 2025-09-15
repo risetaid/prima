@@ -22,6 +22,13 @@
       "when": 1757771710621,
       "tag": "0002_last_molecule_man",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1757771710622,
+      "tag": "0003_drop_patient_medications",
+      "breakpoints": true
     }
   ]
 }

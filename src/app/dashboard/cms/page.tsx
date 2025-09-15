@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -9,9 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, FileText, Video, TrendingUp, Clock, Eye } from "lucide-react";
+import { FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -19,7 +18,8 @@ import {
   CMSContentListSkeleton,
 } from "@/components/ui/dashboard-skeleton";
 import { RoleGuard } from "@/components/auth/role-guard";
-import Image from "next/image";
+import { CMSStatsCards } from "@/components/cms/CMSStatsCards";
+import { CMSContentItem } from "@/components/cms/CMSContentItem";
 
 interface ContentItem {
   id: string;
@@ -63,7 +63,7 @@ function CMSPageContent() {
   const [activeTab, setActiveTab] = useState("all");
 
   // Progressive loading: Statistics first, then content
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       console.log("🔍 CMS: Starting content fetch, activeTab:", activeTab);
 
@@ -117,7 +117,7 @@ function CMSPageContent() {
       setContentLoading(false);
       setLoading(false);
     }
-  };
+  }, [activeTab]);
 
   // Load statistics only once on mount
   useEffect(() => {
@@ -155,7 +155,7 @@ function CMSPageContent() {
       // Only fetch content after statistics are loaded
       fetchContent();
     }
-  }, [activeTab, statistics]);
+  }, [activeTab, statistics, fetchContent]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -241,119 +241,11 @@ function CMSPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* Combined Layout: 2x3 Grid with Cards and Buttons */}
+      {/* Statistics Cards */}
       {statsLoading ? (
         <DashboardStatsCardsSkeleton />
       ) : statistics ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Row 1 */}
-          <Card className="h-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-base font-semibold">
-                Total Konten
-              </CardTitle>
-              <FileText className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="text-3xl font-bold">
-                {statistics.total.content}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {statistics.articles.total} artikel, {statistics.videos.total}{" "}
-                video
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="h-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-base font-semibold">
-                Terpublish
-              </CardTitle>
-              <Eye className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="text-3xl font-bold text-green-600">
-                {statistics.total.published}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Dapat dilihat publik
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="h-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-base font-semibold">Draft</CardTitle>
-              <Clock className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="text-3xl font-bold text-yellow-600">
-                {statistics.total.draft}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Belum dipublikasikan
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Row 2 */}
-          <Card className="h-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-base font-semibold">Artikel</CardTitle>
-              <TrendingUp className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="text-3xl font-bold">
-                {statistics.articles.total}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {statistics.articles.published} published
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="h-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <CardTitle className="text-base font-semibold">Video</CardTitle>
-              <Video className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="pt-2">
-              <div className="text-3xl font-bold">
-                {statistics.videos.total}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                {statistics.videos.published} published
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Action Buttons Card */}
-          <Card className="h-auto flex flex-col justify-center">
-            <CardContent className="pt-6 pb-6">
-              <div className="flex flex-col gap-4">
-                <Button asChild className="w-full h-12">
-                  <Link
-                    href="/dashboard/cms/articles/create"
-                    className="flex items-center justify-center text-base"
-                  >
-                    <Plus className="h-5 w-5 mr-2" />
-                    Artikel Baru
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full h-12">
-                  <Link
-                    href="/dashboard/cms/videos/create"
-                    className="flex items-center justify-center text-base"
-                  >
-                    <Video className="h-5 w-5 mr-2" />
-                    Video Baru
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <CMSStatsCards statistics={statistics} />
       ) : null}
 
       {/* Content Tabs */}
@@ -421,144 +313,17 @@ function CMSPageContent() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {content.map((item) => {
-                    const thumbnailUrl =
-                      item.type === "article"
-                        ? item.featuredImageUrl
-                        : item.thumbnailUrl;
-
-                    // Validate thumbnail URL
-                    const isValidThumbnail =
-                      thumbnailUrl &&
-                      typeof thumbnailUrl === "string" &&
-                      thumbnailUrl.trim() !== "";
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="border rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition-colors relative"
-                      >
-                        <div className="flex gap-3 sm:gap-4 pr-24">
-                          {/* Thumbnail */}
-                          <div className="flex-shrink-0">
-                            {isValidThumbnail ? (
-                              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg overflow-hidden border border-gray-200">
-                                <Image
-                                  src={thumbnailUrl}
-                                  alt={item.title}
-                                  width={80}
-                                  height={80}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    // Hide broken images
-                                    e.currentTarget.style.display = "none";
-                                  }}
-                                />
-                              </div>
-                            ) : (
-                              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
-                                {item.type === "article" ? (
-                                  <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
-                                ) : (
-                                  <Video className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
-                              {item.type === "article" ? (
-                                <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                              ) : (
-                                <Video className="h-4 w-4 text-red-500 flex-shrink-0" />
-                              )}
-                              <h3 className="text-base sm:text-lg font-medium text-gray-900 line-clamp-2">
-                                {item.title}
-                              </h3>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 mb-3">
-                              <Badge
-                                className={`${getStatusColor(
-                                  item.status
-                                )} text-xs`}
-                              >
-                                {item.status === "published" && "Published"}
-                                {item.status === "draft" && "Draft"}
-                                {item.status === "archived" && "Archived"}
-                              </Badge>
-                              <Badge
-                                variant="outline"
-                                className={`${getCategoryColor(
-                                  item.category
-                                )} text-xs`}
-                              >
-                                {item.category}
-                              </Badge>
-                            </div>
-
-                            <div className="text-xs sm:text-sm text-gray-500 space-y-1">
-                              <div>Dibuat: {formatDate(item.createdAt)}</div>
-                              {item.updatedAt !== item.createdAt && (
-                                <div>Diubah: {formatDate(item.updatedAt)}</div>
-                              )}
-                              {item.status === "published" &&
-                                item.publishedAt && (
-                                  <div>
-                                    Dipublish: {formatDate(item.publishedAt)}
-                                  </div>
-                                )}
-                              <div>Penulis: {item.authorName}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Buttons - Absolutely positioned at right */}
-                        <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex flex-col gap-2">
-                          {item.status === "published" && (
-                            <Button
-                              asChild
-                              variant="outline"
-                              size="sm"
-                              className="w-20"
-                            >
-                              <Link
-                                href={`/content/${
-                                  item.type === "article"
-                                    ? "articles"
-                                    : "videos"
-                                }/${item.slug}`}
-                                target="_blank"
-                                className="flex items-center justify-center"
-                              >
-                                <Eye className="h-4 w-4 sm:mr-0 mr-2" />
-                                <span className="sm:hidden">Lihat</span>
-                              </Link>
-                            </Button>
-                          )}
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="w-20"
-                          >
-                            <Link
-                              href={`/dashboard/cms/${
-                                item.type === "article" ? "articles" : "videos"
-                              }/${item.id}/edit`}
-                              className="flex items-center justify-center"
-                            >
-                              <span>Edit</span>
-                            </Link>
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                 <div className="space-y-4">
+                   {content.map((item) => (
+                     <CMSContentItem
+                       key={item.id}
+                       item={item}
+                       getStatusColor={getStatusColor}
+                       getCategoryColor={getCategoryColor}
+                       formatDate={formatDate}
+                     />
+                   ))}
+                 </div>
               )}
             </TabsContent>
           </Tabs>

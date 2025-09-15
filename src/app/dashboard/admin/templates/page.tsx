@@ -182,7 +182,7 @@ export default function AdminTemplatesPage() {
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl my-4 lg:my-8 mx-auto relative z-10 px-4 sm:px-6 lg:px-8">
+       <main className="max-w-7xl my-4 lg:my-8 relative z-10 px-4 sm:px-6 lg:px-8">
         <TemplateManagement
           onSeedTemplates={handleSeedTemplates}
           seeding={seeding}

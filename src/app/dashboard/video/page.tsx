@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,21 @@ interface VideoContent {
   thumbnailUrl?: string;
 }
 
+interface ApiContentItem {
+  id: string;
+  type: string;
+  title: string;
+  slug: string;
+  description?: string;
+  category: string;
+  status: string;
+  publishedAt: string;
+  createdAt: string;
+  author?: string;
+  durationMinutes?: string;
+  thumbnailUrl?: string;
+}
+
 export default function VideoPage() {
   const [videos, setVideos] = useState<VideoContent[]>([]);
   const [filteredVideos, setFilteredVideos] = useState<VideoContent[]>([]);
@@ -53,19 +68,7 @@ export default function VideoPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    fetchPublishedVideos();
-  }, []);
-
-  useEffect(() => {
-    filterVideos();
-  }, [videos, searchTerm, selectedCategory]);
-
-  const filterVideos = () => {
+  const filterVideos = useCallback(() => {
     let filtered = videos;
 
     // Filter by search term
@@ -86,7 +89,20 @@ export default function VideoPage() {
     }
 
     setFilteredVideos(filtered);
-  };
+  }, [videos, searchTerm, selectedCategory]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    fetchPublishedVideos();
+  }, []);
+
+  useEffect(() => {
+    filterVideos();
+  }, [videos, searchTerm, selectedCategory, filterVideos]);
+
 
   const getUniqueCategories = () => {
     const categories = videos.map((video) => video.category);
@@ -111,7 +127,7 @@ export default function VideoPage() {
       if (data.success && data.data) {
         // Videos are already filtered to published only by the API
         const publishedVideos = data.data.filter(
-          (item: any) => item.type === "video"
+          (item: ApiContentItem) => item.type === "video"
         );
         setVideos(publishedVideos);
         console.log(
@@ -181,419 +197,308 @@ export default function VideoPage() {
     return `${duration}`; // Just append for now
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 relative">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div
-            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-            style={{
-              backgroundImage: "url(/bg_desktop.png)",
+  const Background = () => (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+        style={{
+          backgroundImage: "url(/bg_desktop.png)",
+        }}
+      />
+    </div>
+  );
+
+  const VideoCard = ({ video, viewMode }: { video: VideoContent; viewMode: "grid" | "list" }) => {
+    const isValidThumbnail =
+      video.thumbnailUrl &&
+      typeof video.thumbnailUrl === "string" &&
+      video.thumbnailUrl.trim() !== "";
+
+    const Thumbnail = () => (
+      <div className={`relative ${viewMode === "grid" ? "aspect-video" : "w-full sm:w-48 aspect-video"} bg-gray-100 ${viewMode === "list" ? "rounded-lg overflow-hidden flex-shrink-0" : ""} ${viewMode === "grid" ? "" : "flex items-center justify-center"}`}>
+        {isValidThumbnail ? (
+          <Image
+            src={video.thumbnailUrl!}
+            alt={video.title}
+            fill
+            className={`object-cover ${viewMode === "grid" ? "group-hover:scale-105" : "hover:scale-105"} transition-transform duration-200`}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
             }}
           />
-        </div>
-
-        <Header showNavigation={true} className="relative z-10" />
-
-        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
-          <CMSContentListSkeleton />
-        </main>
+        ) : (
+          <Video className={`h-${viewMode === "grid" ? "12" : "8"} w-${viewMode === "grid" ? "12" : "8"} text-gray-400`} />
+        )}
+        {video.durationMinutes && (
+          <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            <span>{formatDuration(video.durationMinutes)}</span>
+          </div>
+        )}
       </div>
+    );
+
+    if (viewMode === "grid") {
+      return (
+        <Card className="bg-white hover:shadow-xl transition-all duration-200 border-0 shadow-md overflow-hidden group">
+          <Thumbnail />
+          <CardHeader className="pb-3">
+            <div className="flex items-start justify-between mb-3">
+              <Badge className={`${getCategoryColor(video.category)} text-xs font-medium border`}>
+                {getCategoryLabel(video.category)}
+              </Badge>
+              <Video className="h-5 w-5 text-red-500 group-hover:text-red-600 transition-colors" />
+            </div>
+            <CardTitle className="text-lg leading-tight line-clamp-2 group-hover:text-red-600 transition-colors">
+              {video.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {video.description && (
+              <p className="text-gray-600 text-sm mb-4 line-clamp-3">{video.description}</p>
+            )}
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
+              <div className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                <span>{formatDate(video.publishedAt)}</span>
+              </div>
+              {video.author && (
+                <div className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  <span className="truncate max-w-20">{video.author}</span>
+                </div>
+              )}
+            </div>
+            <Button asChild className="w-full bg-red-600 hover:bg-red-700 text-white">
+              <Link href={`/content/videos/${video.slug}`} target="_blank" className="flex items-center justify-center gap-2">
+                <Play className="h-4 w-4" />
+                <span>Tonton Video</span>
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card className="bg-white hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
+        <CardContent className="p-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Thumbnail />
+            <div className="flex-1">
+              <div className="flex items-start gap-3 mb-3">
+                <Video className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-2">{video.title}</h3>
+                    <Badge className={`${getCategoryColor(video.category)} text-xs ml-3 flex-shrink-0`}>
+                      {getCategoryLabel(video.category)}
+                    </Badge>
+                  </div>
+                  {video.description && (
+                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">{video.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>{formatDate(video.publishedAt)}</span>
+                    </div>
+                    {video.durationMinutes && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatDuration(video.durationMinutes)}</span>
+                      </div>
+                    )}
+                    {video.author && (
+                      <div className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        <span>{video.author}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex-shrink-0 self-start">
+              <Button asChild size="sm" className="bg-red-600 hover:bg-red-700 text-white">
+                <Link href={`/content/videos/${video.slug}`} target="_blank" className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  <span>Tonton</span>
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const Controls = ({ searchTerm, setSearchTerm, selectedCategory, setSelectedCategory, viewMode, setViewMode, isMounted, getUniqueCategories }: {
+    searchTerm: string;
+    setSearchTerm: (value: string) => void;
+    selectedCategory: string;
+    setSelectedCategory: (value: string) => void;
+    viewMode: "grid" | "list";
+    setViewMode: (mode: "grid" | "list") => void;
+    isMounted: boolean;
+    getUniqueCategories: () => string[];
+  }) => (
+    <div className="flex flex-col sm:flex-row gap-4 min-w-0 sm:min-w-96">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          placeholder="Cari video..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10 bg-gray-50 border-gray-200"
+        />
+      </div>
+      <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+        <SelectTrigger className="w-full sm:w-48 bg-gray-50 border-gray-200">
+          <Filter className="h-4 w-4 mr-2" />
+          <SelectValue placeholder="Kategori" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua Kategori</SelectItem>
+          {getUniqueCategories().map((category) => (
+            <SelectItem key={category} value={category}>
+              {getCategoryLabel(category)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isMounted && (
+        <div className="flex border rounded-lg bg-gray-50">
+          <button
+            onClick={() => setViewMode("grid")}
+            className={`p-2 rounded-l-lg transition-colors ${
+              viewMode === "grid" ? "bg-red-100 text-red-600" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <Grid className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode("list")}
+            className={`p-2 rounded-r-lg transition-colors ${
+              viewMode === "list" ? "bg-red-100 text-red-600" : "text-gray-400 hover:text-gray-600"
+            }`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
+  const EducationalFooter = () => (
+    <div className="mt-12 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-8 border border-red-100">
+      <div className="text-center max-w-3xl mx-auto">
+        <div className="text-4xl mb-4">🎯</div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-3">Tips Menonton Video Edukasi</h3>
+        <p className="text-gray-700 leading-relaxed">
+          Video-video ini telah dirancang khusus oleh tim medis berpengalaman untuk memberikan motivasi dan edukasi praktis dalam perawatan kesehatan.
+          <strong className="text-red-700"> Tonton dengan tenang</strong> dan terapkan tips yang sesuai dengan kondisi kesehatan Anda.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Konten Profesional</span>
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Motivasi Positif</span>
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Mudah Dipraktikkan</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const Layout = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen bg-gray-50 relative">
+      <Background />
+      <Header showNavigation={true} className="relative z-10" />
+      <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+    </div>
+  );
+
+  if (loading) {
+    return (
+      <Layout>
+        <CMSContentListSkeleton />
+      </Layout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 relative">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div
-            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-            style={{
-              backgroundImage: "url(/bg_desktop.png)",
-            }}
-          />
+      <Layout>
+        <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
+          <Video className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Gagal Memuat Video</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => fetchPublishedVideos()} className="mt-4">Coba Lagi</Button>
         </div>
-
-        <Header showNavigation={true} className="relative z-10" />
-
-        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
-            <Video className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-xl font-semibold text-gray-900 mb-2">
-              Gagal Memuat Video
-            </h1>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => fetchPublishedVideos()} className="mt-4">
-              Coba Lagi
-            </Button>
-          </div>
-        </main>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-          style={{
-            backgroundImage: "url(/bg_desktop.png)",
-          }}
-        />
-      </div>
-
-      {/* Responsive Header */}
-      <Header showNavigation={true} className="relative z-10" />
-
-      <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-6">
-        {videos.length === 0 && !loading ? (
-          // Empty State
-          <div className="text-center py-16">
-            <div className="text-6xl mb-6">🎥</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Belum Ada Video
-            </h2>
-            <p className="text-gray-600 max-w-md mx-auto">
-              Video edukasi kesehatan akan ditampilkan di sini ketika tersedia.
-              Silakan cek kembali nanti.
-            </p>
+    <Layout>
+      {videos.length === 0 && !loading ? (
+        <div className="text-center py-16">
+          <div className="text-6xl mb-6">🎥</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Belum Ada Video</h2>
+          <p className="text-gray-600 max-w-md mx-auto">
+            Video edukasi kesehatan akan ditampilkan di sini ketika tersedia. Silakan cek kembali nanti.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="flex items-center space-x-4">
+                <div className="p-3 bg-red-50 rounded-lg">
+                  <Video className="h-8 w-8 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {filteredVideos.length} Video Tersedia
+                  </h3>
+                  <p className="text-gray-600">
+                    {filteredVideos.length < videos.length
+                      ? `Menampilkan ${filteredVideos.length} dari ${videos.length} video`
+                      : "Semua video edukasi terkini"}
+                  </p>
+                </div>
+              </div>
+              <Controls
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                viewMode={viewMode}
+                setViewMode={setViewMode}
+                isMounted={isMounted}
+                getUniqueCategories={getUniqueCategories}
+              />
+            </div>
           </div>
-        ) : (
-          <>
-            {/* Stats & Controls */}
-            <div className="bg-white rounded-xl shadow-sm border p-6 mb-8">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <Video className="h-8 w-8 text-red-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-900">
-                      {filteredVideos.length} Video Tersedia
-                    </h3>
-                    <p className="text-gray-600">
-                      {filteredVideos.length < videos.length
-                        ? `Menampilkan ${filteredVideos.length} dari ${videos.length} video`
-                        : "Semua video edukasi terkini"}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Search & Filter Controls */}
-                <div className="flex flex-col sm:flex-row gap-4 min-w-0 sm:min-w-96">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Cari video..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-gray-50 border-gray-200"
-                    />
-                  </div>
-
-                  <Select
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                  >
-                    <SelectTrigger className="w-full sm:w-48 bg-gray-50 border-gray-200">
-                      <Filter className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="Kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Kategori</SelectItem>
-                      {getUniqueCategories().map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {getCategoryLabel(category)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {isMounted && (
-                    <div className="flex border rounded-lg bg-gray-50">
-                      <button
-                        onClick={() => setViewMode("grid")}
-                        className={`p-2 rounded-l-lg transition-colors ${
-                          viewMode === "grid"
-                            ? "bg-red-100 text-red-600"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        <Grid className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setViewMode("list")}
-                        className={`p-2 rounded-r-lg transition-colors ${
-                          viewMode === "list"
-                            ? "bg-red-100 text-red-600"
-                            : "text-gray-400 hover:text-gray-600"
-                        }`}
-                      >
-                        <List className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {filteredVideos.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl border">
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada video ditemukan</h3>
+              <p className="text-gray-600">Coba ubah kata kunci pencarian atau filter kategori</p>
             </div>
-
-            {/* Videos Display */}
-            {filteredVideos.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-xl border">
-                <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Tidak ada video ditemukan
-                </h3>
-                <p className="text-gray-600">
-                  Coba ubah kata kunci pencarian atau filter kategori
-                </p>
-              </div>
-            ) : (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "space-y-4"
-                }
-              >
-                {filteredVideos.map((video) => {
-                  // Validate thumbnail URL like CMS page
-                  const isValidThumbnail =
-                    video.thumbnailUrl &&
-                    typeof video.thumbnailUrl === "string" &&
-                    video.thumbnailUrl.trim() !== "";
-
-                  return viewMode === "grid" ? (
-                    <Card
-                      key={video.id}
-                      className="bg-white hover:shadow-xl transition-all duration-200 border-0 shadow-md overflow-hidden group"
-                    >
-                      {/* Video Thumbnail */}
-                      {isValidThumbnail ? (
-                        <div className="relative aspect-video bg-gray-100">
-                          <Image
-                            src={video.thumbnailUrl!}
-                            alt={video.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-200"
-                            onError={(e) => {
-                              // Hide broken images like CMS page
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                          {video.durationMinutes && (
-                            <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span>
-                                {formatDuration(video.durationMinutes)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        // Fallback placeholder like CMS page
-                        <div className="relative aspect-video bg-gray-100 flex items-center justify-center">
-                          <Video className="h-12 w-12 text-gray-400" />
-                        </div>
-                      )}
-
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between mb-3">
-                          <Badge
-                            className={`${getCategoryColor(
-                              video.category
-                            )} text-xs font-medium border`}
-                          >
-                            {getCategoryLabel(video.category)}
-                          </Badge>
-                          <Video className="h-5 w-5 text-red-500 group-hover:text-red-600 transition-colors" />
-                        </div>
-                        <CardTitle className="text-lg leading-tight line-clamp-2 group-hover:text-red-600 transition-colors">
-                          {video.title}
-                        </CardTitle>
-                      </CardHeader>
-
-                      <CardContent className="pt-0">
-                        {video.description && (
-                          <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                            {video.description}
-                          </p>
-                        )}
-
-                        <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatDate(video.publishedAt)}</span>
-                          </div>
-                          {video.author && (
-                            <div className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              <span className="truncate max-w-20">
-                                {video.author}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <Button
-                          asChild
-                          className="w-full bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          <Link
-                            href={`/content/videos/${video.slug}`}
-                            target="_blank"
-                            className="flex items-center justify-center gap-2"
-                          >
-                            <Play className="h-4 w-4" />
-                            <span>Tonton Video</span>
-                            <ExternalLink className="h-3 w-3" />
-                          </Link>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card
-                      key={video.id}
-                      className="bg-white hover:shadow-lg transition-all duration-200 border-0 shadow-sm"
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          {/* Thumbnail */}
-                          {isValidThumbnail ? (
-                            <div className="relative w-full sm:w-48 aspect-video bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                              <Image
-                                src={video.thumbnailUrl!}
-                                alt={video.title}
-                                fill
-                                className="object-cover hover:scale-105 transition-transform duration-200"
-                                onError={(e) => {
-                                  // Hide broken images like CMS page
-                                  e.currentTarget.style.display = "none";
-                                }}
-                              />
-                              {video.durationMinutes && (
-                                <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  <span>
-                                    {formatDuration(video.durationMinutes)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            // Fallback placeholder like CMS page
-                            <div className="relative w-full sm:w-48 aspect-video bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center">
-                              <Video className="h-8 w-8 text-gray-400" />
-                            </div>
-                          )}
-
-                          <div className="flex-1">
-                            <div className="flex items-start gap-3 mb-3">
-                              <Video className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
-                              <div className="flex-1">
-                                <div className="flex items-start justify-between mb-2">
-                                  <h3 className="font-semibold text-lg text-gray-900 line-clamp-2">
-                                    {video.title}
-                                  </h3>
-                                  <Badge
-                                    className={`${getCategoryColor(
-                                      video.category
-                                    )} text-xs ml-3 flex-shrink-0`}
-                                  >
-                                    {getCategoryLabel(video.category)}
-                                  </Badge>
-                                </div>
-                                {video.description && (
-                                  <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                                    {video.description}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="h-3 w-3" />
-                                    <span>{formatDate(video.publishedAt)}</span>
-                                  </div>
-                                  {video.durationMinutes && (
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      <span>
-                                        {formatDuration(video.durationMinutes)}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {video.author && (
-                                    <div className="flex items-center gap-1">
-                                      <User className="h-3 w-3" />
-                                      <span>{video.author}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 self-start">
-                            <Button
-                              asChild
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                            >
-                              <Link
-                                href={`/content/videos/${video.slug}`}
-                                target="_blank"
-                                className="flex items-center gap-2"
-                              >
-                                <Play className="h-4 w-4" />
-                                <span>Tonton</span>
-                                <ExternalLink className="h-3 w-3" />
-                              </Link>
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Educational Footer */}
-            <div className="mt-12 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-8 border border-red-100">
-              <div className="text-center max-w-3xl mx-auto">
-                <div className="text-4xl mb-4">🎯</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                  Tips Menonton Video Edukasi
-                </h3>
-                <p className="text-gray-700 leading-relaxed">
-                  Video-video ini telah dirancang khusus oleh tim medis
-                  berpengalaman untuk memberikan motivasi dan edukasi praktis
-                  dalam perawatan kesehatan.
-                  <strong className="text-red-700">
-                    {" "}
-                    Tonton dengan tenang
-                  </strong>{" "}
-                  dan terapkan tips yang sesuai dengan kondisi kesehatan Anda.
-                </p>
-                <div className="mt-6 flex flex-wrap justify-center gap-2">
-                  <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-                    ✓ Konten Profesional
-                  </span>
-                  <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-                    ✓ Motivasi Positif
-                  </span>
-                  <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-                    ✓ Mudah Dipraktikkan
-                  </span>
-                </div>
-              </div>
+          ) : (
+            <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+              {filteredVideos.map((video) => (
+                <VideoCard key={video.id} video={video} viewMode={viewMode} />
+              ))}
             </div>
-          </>
-        )}
-      </main>
-    </div>
+          )}
+
+          <EducationalFooter />
+        </>
+      )}
+    </Layout>
   );
 }
 

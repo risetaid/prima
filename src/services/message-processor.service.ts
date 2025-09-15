@@ -23,7 +23,7 @@ export interface ConversationState {
   currentContext: 'verification' | 'reminder_confirmation' | 'general_inquiry' | 'emergency'
   expectedResponseType?: 'yes_no' | 'confirmation' | 'text' | 'number'
   relatedEntityId?: string // reminder_log_id, verification_id, etc.
-  stateData?: Record<string, any>
+  stateData?: Record<string, unknown>
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -61,7 +61,7 @@ export interface RecommendedResponse {
 
 export interface ResponseAction {
   type: 'update_patient_status' | 'log_confirmation' | 'send_followup' | 'notify_volunteer' | 'create_manual_confirmation'
-  data: Record<string, any>
+  data: Record<string, unknown>
 }
 
 export class MessageProcessorService {
@@ -126,7 +126,7 @@ export class MessageProcessorService {
     const response = this.generateResponse(intent, entities, conversationContext)
 
     // Check if human intervention is needed
-    const requiresHumanIntervention = this.requiresHumanIntervention(intent, entities, conversationContext)
+    const requiresHumanIntervention = this.requiresHumanIntervention(intent, entities)
 
     return {
       intent,
@@ -162,26 +162,17 @@ export class MessageProcessorService {
    * Detect message intent with confidence scoring
    */
   private detectIntent(message: string): MessageIntent {
-    const scores = {
-      accept: this.calculateKeywordScore(message, this.ACCEPT_KEYWORDS),
-      decline: this.calculateKeywordScore(message, this.DECLINE_KEYWORDS),
-      confirm_taken: this.calculateKeywordScore(message, this.CONFIRMATION_TAKEN_KEYWORDS),
-      confirm_missed: this.calculateKeywordScore(message, this.CONFIRMATION_MISSED_KEYWORDS),
-      confirm_later: this.calculateKeywordScore(message, this.CONFIRMATION_LATER_KEYWORDS),
-      unsubscribe: this.calculateKeywordScore(message, this.UNSUBSCRIBE_KEYWORDS),
-      emergency: this.calculateKeywordScore(message, this.EMERGENCY_KEYWORDS),
-      inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS)
-    }
+    const scores = this.calculateIntentScores(message)
 
     // Find highest scoring intent
     const maxScore = Math.max(...Object.values(scores))
-    const primaryIntent = Object.keys(scores).find(key => scores[key as keyof typeof scores] === maxScore) as MessageIntent['primary']
+    const primaryIntent = this.selectPrimaryIntent(scores)
 
     // Determine sentiment
     const sentiment = this.determineSentiment(message, primaryIntent)
 
     // Calculate confidence based on score and message length
-    const confidence = Math.min(maxScore / message.length * 100, 1.0)
+    const confidence = this.calculateIntentConfidence(maxScore, message)
 
     return {
       primary: primaryIntent || 'unknown',
@@ -266,29 +257,13 @@ export class MessageProcessorService {
    * Determine sentiment of the message
    */
   private determineSentiment(message: string, intent: MessageIntent['primary']): MessageIntent['sentiment'] {
-    const positiveWords = ['baik', 'bagus', 'senang', 'terima kasih', 'makasih', 'thanks', 'good']
-    const negativeWords = ['buruk', 'jelek', 'marah', 'kesal', 'kecewa', 'tidak suka', 'bad']
+    const { positive, negative } = this.calculateWordBasedSentiment(message)
 
-    const positiveScore = positiveWords.reduce((score, word) =>
-      score + (message.includes(word) ? 1 : 0), 0)
-    const negativeScore = negativeWords.reduce((score, word) =>
-      score + (message.includes(word) ? 1 : 0), 0)
-
-    if (positiveScore > negativeScore) return 'positive'
-    if (negativeScore > positiveScore) return 'negative'
+    if (positive > negative) return 'positive'
+    if (negative > positive) return 'negative'
 
     // Default sentiment based on intent
-    switch (intent) {
-      case 'accept':
-      case 'confirm_taken':
-        return 'positive'
-      case 'decline':
-      case 'confirm_missed':
-      case 'unsubscribe':
-        return 'negative'
-      default:
-        return 'neutral'
-    }
+    return this.getDefaultSentimentForIntent(intent)
   }
 
   /**
@@ -297,38 +272,10 @@ export class MessageProcessorService {
   private extractEntities(message: string): MessageEntity[] {
     const entities: MessageEntity[] = []
 
-    // Extract medication names (common Indonesian medication terms)
-    const medicationPattern = /\b(?:obat|pil|kapsul|tablet|syrup|salep)\s+([a-zA-Z\s]+)/gi
-    let match
-    while ((match = medicationPattern.exec(message)) !== null) {
-      entities.push({
-        type: 'medication',
-        value: match[1].trim(),
-        confidence: 0.8,
-        position: { start: match.index, end: match.index + match[0].length }
-      })
-    }
-
-    // Extract time expressions
-    const timePattern = /\b(\d{1,2}):(\d{2})\b/g
-    while ((match = timePattern.exec(message)) !== null) {
-      entities.push({
-        type: 'time',
-        value: `${match[1]}:${match[2]}`,
-        confidence: 0.9,
-        position: { start: match.index, end: match.index + match[0].length }
-      })
-    }
-
-    // Extract emergency indicators
-    if (this.EMERGENCY_KEYWORDS.some(keyword => message.includes(keyword))) {
-      entities.push({
-        type: 'emergency_level',
-        value: 'high',
-        confidence: 0.7,
-        position: { start: 0, end: message.length }
-      })
-    }
+    // Extract different types of entities
+    entities.push(...this.extractMedicationEntities(message))
+    entities.push(...this.extractTimeEntities(message))
+    entities.push(...this.extractEmergencyEntities(message))
 
     return entities
   }
@@ -401,105 +348,21 @@ export class MessageProcessorService {
     entities: MessageEntity[],
     context: MessageContext
   ): RecommendedResponse {
-    const actions: ResponseAction[] = []
-
     switch (intent.primary) {
       case 'accept':
-        actions.push({
-          type: 'update_patient_status',
-          data: { status: 'verified' }
-        })
-        return {
-          type: 'auto_reply',
-          message: 'Terima kasih atas konfirmasinya! Anda akan menerima pengingat obat secara otomatis.',
-          actions,
-          priority: 'low'
-        }
-
+        return this.generateAcceptResponse()
       case 'decline':
-        actions.push({
-          type: 'update_patient_status',
-          data: { status: 'declined' }
-        })
-        return {
-          type: 'auto_reply',
-          message: 'Baik, terima kasih atas responsnya. Jika berubah pikiran, Anda bisa menghubungi relawan PRIMA.',
-          actions,
-          priority: 'low'
-        }
-
+        return this.generateDeclineResponse()
       case 'confirm_taken':
-        actions.push({
-          type: 'log_confirmation',
-          data: { status: 'CONFIRMED', response: context.message }
-        })
-        return {
-          type: 'auto_reply',
-          message: 'Bagus! Terus jaga kesehatan ya. 💊❤️',
-          actions,
-          priority: 'low'
-        }
-
+        return this.generateConfirmTakenResponse(context)
       case 'confirm_missed':
-        actions.push({
-          type: 'log_confirmation',
-          data: { status: 'MISSED', response: context.message }
-        })
-        actions.push({
-          type: 'send_followup',
-          data: { type: 'reminder', delay: 2 * 60 * 60 * 1000 } // 2 hours
-        })
-        return {
-          type: 'auto_reply',
-          message: 'Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙',
-          actions,
-          priority: 'medium'
-        }
-
+        return this.generateConfirmMissedResponse(context)
       case 'emergency':
-        actions.push({
-          type: 'notify_volunteer',
-          data: { priority: 'urgent', message: context.message }
-        })
-        return {
-          type: 'human_intervention',
-          message: 'Kami mendeteksi ini sebagai situasi darurat. Relawan akan segera menghubungi Anda.',
-          actions,
-          priority: 'urgent'
-        }
-
+        return this.generateEmergencyResponse(context)
       case 'unsubscribe':
-        actions.push({
-          type: 'update_patient_status',
-          data: { status: 'unsubscribed' }
-        })
-        return {
-          type: 'auto_reply',
-          message: 'Baik, kami akan berhenti mengirim pengingat. Semoga sehat selalu! 🙏',
-          actions,
-          priority: 'low'
-        }
-
+        return this.generateUnsubscribeResponse()
       default:
-        if ((intent.confidence ?? 0.5) < 0.3) {
-          actions.push({
-            type: 'notify_volunteer',
-            data: { priority: 'low', reason: 'unclear_message' }
-          })
-          return {
-            type: 'human_intervention',
-            message: 'Maaf, pesan Anda kurang jelas. Relawan akan segera membantu Anda.',
-            actions,
-            priority: 'low'
-          }
-        }
-
-        return {
-          type: 'auto_reply',
-          message: 'Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.',
-          actions: [],
-          priority: 'low'
-        }
+        return this.generateLowConfidenceResponse(intent)
     }
   }
 
@@ -508,8 +371,7 @@ export class MessageProcessorService {
    */
   private requiresHumanIntervention(
     intent: MessageIntent,
-    entities: MessageEntity[],
-    context: MessageContext
+    entities: MessageEntity[]
   ): boolean {
     // Emergency situations always require human intervention
     if (intent.primary === 'emergency') return true
@@ -527,5 +389,252 @@ export class MessageProcessorService {
     if (intent.sentiment === 'negative') return true
 
     return false
+  }
+
+  /**
+   * Generate response for accept intent
+   */
+  private generateAcceptResponse(): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'update_patient_status',
+      data: { status: 'verified' }
+    })
+    return {
+      type: 'auto_reply',
+      message: 'Terima kasih atas konfirmasinya! Anda akan menerima pengingat obat secara otomatis.',
+      actions,
+      priority: 'low'
+    }
+  }
+
+  /**
+   * Generate response for decline intent
+   */
+  private generateDeclineResponse(): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'update_patient_status',
+      data: { status: 'declined' }
+    })
+    return {
+      type: 'auto_reply',
+      message: 'Baik, terima kasih atas responsnya. Jika berubah pikiran, Anda bisa menghubungi relawan PRIMA.',
+      actions,
+      priority: 'low'
+    }
+  }
+
+  /**
+   * Generate response for confirm_taken intent
+   */
+  private generateConfirmTakenResponse(context: MessageContext): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'log_confirmation',
+      data: { status: 'CONFIRMED', response: context.message }
+    })
+    return {
+      type: 'auto_reply',
+      message: 'Bagus! Terus jaga kesehatan ya. 💊❤️',
+      actions,
+      priority: 'low'
+    }
+  }
+
+  /**
+   * Generate response for confirm_missed intent
+   */
+  private generateConfirmMissedResponse(context: MessageContext): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'log_confirmation',
+      data: { status: 'MISSED', response: context.message }
+    })
+    actions.push({
+      type: 'send_followup',
+      data: { type: 'reminder', delay: 2 * 60 * 60 * 1000 } // 2 hours
+    })
+    return {
+      type: 'auto_reply',
+      message: 'Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙',
+      actions,
+      priority: 'medium'
+    }
+  }
+
+  /**
+   * Generate response for emergency intent
+   */
+  private generateEmergencyResponse(context: MessageContext): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'notify_volunteer',
+      data: { priority: 'urgent', message: context.message }
+    })
+    return {
+      type: 'human_intervention',
+      message: 'Kami mendeteksi ini sebagai situasi darurat. Relawan akan segera menghubungi Anda.',
+      actions,
+      priority: 'urgent'
+    }
+  }
+
+  /**
+   * Generate response for unsubscribe intent
+   */
+  private generateUnsubscribeResponse(): RecommendedResponse {
+    const actions: ResponseAction[] = []
+    actions.push({
+      type: 'update_patient_status',
+      data: { status: 'unsubscribed' }
+    })
+    return {
+      type: 'auto_reply',
+      message: 'Baik, kami akan berhenti mengirim pengingat. Semoga sehat selalu! 🙏',
+      actions,
+      priority: 'low'
+    }
+  }
+
+  /**
+   * Generate response for low confidence or unknown intent
+   */
+  private generateLowConfidenceResponse(intent: MessageIntent): RecommendedResponse {
+    if ((intent.confidence ?? 0.5) < 0.3) {
+      const actions: ResponseAction[] = []
+      actions.push({
+        type: 'notify_volunteer',
+        data: { priority: 'low', reason: 'unclear_message' }
+      })
+      return {
+        type: 'human_intervention',
+        message: 'Maaf, pesan Anda kurang jelas. Relawan akan segera membantu Anda.',
+        actions,
+        priority: 'low'
+      }
+    }
+
+    return {
+      type: 'auto_reply',
+      message: 'Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.',
+      actions: [],
+      priority: 'low'
+    }
+  }
+
+  /**
+   * Extract medication entities from message
+   */
+  private extractMedicationEntities(message: string): MessageEntity[] {
+    const entities: MessageEntity[] = []
+    const medicationPattern = /\b(?:obat|pil|kapsul|tablet|syrup|salep)\s+([a-zA-Z\s]+)/gi
+    let match
+    while ((match = medicationPattern.exec(message)) !== null) {
+      entities.push({
+        type: 'medication',
+        value: match[1].trim(),
+        confidence: 0.8,
+        position: { start: match.index, end: match.index + match[0].length }
+      })
+    }
+    return entities
+  }
+
+  /**
+   * Extract time entities from message
+   */
+  private extractTimeEntities(message: string): MessageEntity[] {
+    const entities: MessageEntity[] = []
+    const timePattern = /\b(\d{1,2}):(\d{2})\b/g
+    let match
+    while ((match = timePattern.exec(message)) !== null) {
+      entities.push({
+        type: 'time',
+        value: `${match[1]}:${match[2]}`,
+        confidence: 0.9,
+        position: { start: match.index, end: match.index + match[0].length }
+      })
+    }
+    return entities
+  }
+
+  /**
+   * Extract emergency entities from message
+   */
+  private extractEmergencyEntities(message: string): MessageEntity[] {
+    const entities: MessageEntity[] = []
+    if (this.EMERGENCY_KEYWORDS.some(keyword => message.includes(keyword))) {
+      entities.push({
+        type: 'emergency_level',
+        value: 'high',
+        confidence: 0.7,
+        position: { start: 0, end: message.length }
+      })
+    }
+    return entities
+  }
+
+  /**
+   * Calculate scores for all intents
+   */
+  private calculateIntentScores(message: string): Record<string, number> {
+    return {
+      accept: this.calculateKeywordScore(message, this.ACCEPT_KEYWORDS),
+      decline: this.calculateKeywordScore(message, this.DECLINE_KEYWORDS),
+      confirm_taken: this.calculateKeywordScore(message, this.CONFIRMATION_TAKEN_KEYWORDS),
+      confirm_missed: this.calculateKeywordScore(message, this.CONFIRMATION_MISSED_KEYWORDS),
+      confirm_later: this.calculateKeywordScore(message, this.CONFIRMATION_LATER_KEYWORDS),
+      unsubscribe: this.calculateKeywordScore(message, this.UNSUBSCRIBE_KEYWORDS),
+      emergency: this.calculateKeywordScore(message, this.EMERGENCY_KEYWORDS),
+      inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS)
+    }
+  }
+
+  /**
+   * Select primary intent from scores
+   */
+  private selectPrimaryIntent(scores: Record<string, number>): MessageIntent['primary'] {
+    const maxScore = Math.max(...Object.values(scores))
+    return Object.keys(scores).find(key => scores[key] === maxScore) as MessageIntent['primary'] || 'unknown'
+  }
+
+  /**
+   * Calculate confidence for intent
+   */
+  private calculateIntentConfidence(maxScore: number, message: string): number {
+    return Math.min(maxScore / message.length * 100, 1.0) || 0.5
+  }
+
+  /**
+   * Calculate sentiment score based on positive/negative words
+   */
+  private calculateWordBasedSentiment(message: string): { positive: number; negative: number } {
+    const positiveWords = ['baik', 'bagus', 'senang', 'terima kasih', 'makasih', 'thanks', 'good']
+    const negativeWords = ['buruk', 'jelek', 'marah', 'kesal', 'kecewa', 'tidak suka', 'bad']
+
+    const positiveScore = positiveWords.reduce((score, word) =>
+      score + (message.includes(word) ? 1 : 0), 0)
+    const negativeScore = negativeWords.reduce((score, word) =>
+      score + (message.includes(word) ? 1 : 0), 0)
+
+    return { positive: positiveScore, negative: negativeScore }
+  }
+
+  /**
+   * Get default sentiment based on intent
+   */
+  private getDefaultSentimentForIntent(intent: MessageIntent['primary']): MessageIntent['sentiment'] {
+    switch (intent) {
+      case 'accept':
+      case 'confirm_taken':
+        return 'positive'
+      case 'decline':
+      case 'confirm_missed':
+      case 'unsubscribe':
+        return 'negative'
+      default:
+        return 'neutral'
+    }
   }
 }

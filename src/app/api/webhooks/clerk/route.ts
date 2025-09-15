@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
       "svix-timestamp": svix_timestamp,
       "svix-signature": svix_signature,
     }) as WebhookEvent;
-  } catch (err) {
-    return new Response("Error occured", {
-      status: 400,
-    });
-  }
+   } catch {
+     return new Response("Error occured", {
+       status: 400,
+     });
+   }
 
   // Handle the webhook
   if (evt.type === "user.created") {

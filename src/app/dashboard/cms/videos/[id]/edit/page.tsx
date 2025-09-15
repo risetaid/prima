@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,6 +39,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
   const [deleting, setDeleting] = useState(false)
   const [fetchingVideoData, setFetchingVideoData] = useState(false)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [thumbnailSrc, setThumbnailSrc] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     slug: '',
@@ -98,6 +100,10 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
 
     loadVideo()
   }, [params, router])
+
+  useEffect(() => {
+    setThumbnailSrc(formData.thumbnailUrl || '/placeholder-video.jpg')
+  }, [formData.thumbnailUrl])
 
   const generateNewSlug = () => {
     return generateRandomSlug()
@@ -170,9 +176,8 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         return
       }
 
-      const data = await response.json()
       console.log('✅ Edit Video: Saved successfully')
-      
+
       toast.success('Video berhasil diperbarui!')
       router.push('/dashboard/cms')
     } catch (error) {
@@ -326,7 +331,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
                     </Button>
                   </div>
                   <p className="text-sm text-gray-500 mt-1">
-                    Klik "Auto-fetch" untuk mengambil data video terbaru
+                    Klik &quot;Auto-fetch&quot; untuk mengambil data video terbaru
                   </p>
                 </div>
 
@@ -337,7 +342,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
                     id="title"
                     value={formData.title}
                     onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Contoh: Latihan Pernapasan untuk Pasien Kanker"
+                     placeholder="Contoh: Latihan Pernapasan untuk Pasien Kanker"
                     className="mt-2"
                     required
                   />
@@ -428,7 +433,7 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
             <CardContent className="space-y-4">
               <div>
                 <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}>
+                <Select value={formData.status} onValueChange={(value: 'draft' | 'published' | 'archived') => setFormData(prev => ({ ...prev, status: value }))}>
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Pilih status..." />
                   </SelectTrigger>
@@ -467,13 +472,13 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
                 <CardTitle>Preview</CardTitle>
               </CardHeader>
               <CardContent>
-                <img 
-                  src={formData.thumbnailUrl} 
+                <Image
+                  src={thumbnailSrc}
                   alt="Video thumbnail"
+                  width={320}
+                  height={180}
                   className="w-full rounded-lg"
-                  onError={(e) => {
-                    e.currentTarget.src = '/placeholder-video.jpg'
-                  }}
+                  onError={() => setThumbnailSrc('/placeholder-video.jpg')}
                 />
               </CardContent>
             </Card>

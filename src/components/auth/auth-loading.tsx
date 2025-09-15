@@ -2,7 +2,7 @@
 
 import { useAuthContext } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 
 interface AuthLoadingProps {
   children: React.ReactNode;
@@ -31,7 +31,7 @@ export function AuthLoading({
   const REDIRECT_DEBOUNCE_MS = 500; // 500ms debounce
 
   // Debounced redirect function
-  const debouncedRedirect = (path: string) => {
+  const debouncedRedirect = useCallback((path: string) => {
     const now = Date.now();
     const lastRedirect = lastRedirectRef.current;
 
@@ -50,7 +50,7 @@ export function AuthLoading({
 
     console.log(`Redirecting to ${path}`);
     router.replace(path);
-  };
+  }, [router]);
 
   useEffect(() => {
     // Check if user had successful login recently for optimistic UI
@@ -127,6 +127,7 @@ export function AuthLoading({
     router,
     pathname,
     optimisticAccess,
+    debouncedRedirect,
   ]);
 
   // Show loading spinner while auth is loading

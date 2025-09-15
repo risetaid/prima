@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+
 import { formatDateTimeWIB } from '@/lib/datetime'
 
 interface VerificationHistoryProps {
@@ -28,16 +28,16 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
   const [showHistory, setShowHistory] = useState(false)
   const [error, setError] = useState('')
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     if (!showHistory || history.length > 0) return
-    
+
     setLoading(true)
     setError('')
-    
+
     try {
       const response = await fetch(`/api/patients/${patientId}/verification-history`)
       const data = await response.json()
-      
+
       if (response.ok) {
         setHistory(data.history || [])
       } else {
@@ -47,21 +47,21 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
       console.error('Failed to load verification history:', error)
       setError('Failed to load verification history')
     }
-    
+
     setLoading(false)
-  }
+  }, [showHistory, history.length, patientId])
 
   useEffect(() => {
     if (showHistory) {
       loadHistory()
     }
-  }, [showHistory, patientId])
+  }, [showHistory, loadHistory])
 
   const handleToggle = () => {
     setShowHistory(!showHistory)
   }
 
-  const getActionIcon = (action: string, result?: string) => {
+  const getActionIcon = (action: string) => {
     if (action.includes('📱')) return '📱'
     if (action.includes('✅')) return '✅'  
     if (action.includes('❌')) return '❌'
@@ -133,7 +133,7 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
                     {/* Action icon */}
                     <div className="flex-shrink-0 w-12 h-12 bg-white rounded-full border-2 border-gray-200 flex items-center justify-center">
                       <span className="text-lg">
-                        {getActionIcon(entry.action, entry.result)}
+                        {getActionIcon(entry.action)}
                       </span>
                     </div>
                     
@@ -178,9 +178,9 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
                       
                       {/* Patient response */}
                       {entry.response && (
-                        <div className="mt-2 p-2 bg-green-50 rounded text-xs text-green-900">
-                          <strong>Respon pasien:</strong> "{entry.response}"
-                        </div>
+                         <div className="mt-2 p-2 bg-green-50 rounded text-xs text-green-900">
+                           <strong>Respon pasien:</strong> &quot;{entry.response}&quot;
+                         </div>
                       )}
                     </div>
                   </div>

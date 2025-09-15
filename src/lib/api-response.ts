@@ -15,11 +15,17 @@ import { ZodError } from "zod";
 
 // ===== TYPES =====
 
+export interface ValidationError {
+  field: string;
+  message: string;
+  code: string;
+}
+
 export interface ApiResponseOptions {
   status?: number;
   message?: string;
   logLevel?: "debug" | "info" | "warn" | "error";
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   requestId?: string;
   userId?: string;
   operation?: string;
@@ -29,9 +35,14 @@ export interface ApiResponseOptions {
 
 export interface ApiErrorDetails {
   code?: string;
-  details?: any;
-  validationErrors?: any[];
+  details?: Record<string, unknown>;
+  validationErrors?: ValidationError[];
   originalError?: string;
+}
+
+export interface ApiHandlerContext {
+  user?: { id?: string };
+  [key: string]: unknown;
 }
 
 // ===== RESPONSE WRAPPER FUNCTIONS =====
@@ -39,14 +50,13 @@ export interface ApiErrorDetails {
 /**
  * Creates a standardized success response with logging
  */
-export function apiSuccess<T = any>(
+export function apiSuccess<T = unknown>(
   data: T,
   options: ApiResponseOptions = {}
 ): NextResponse {
   const {
     status = 200,
     message = "Request completed successfully",
-    logLevel = "info",
     context = {},
     requestId = crypto.randomUUID().slice(0, 8),
     userId,
@@ -165,7 +175,7 @@ export function apiError(
  * Creates a validation error response
  */
 export function apiValidationError(
-  errors: any[],
+  errors: ValidationError[],
   options: ApiResponseOptions = {}
 ): NextResponse {
   return apiError("Validation failed", {
@@ -244,7 +254,7 @@ export function apiRateLimitError(
 export function extractRequestContext(
   request: NextRequest,
   userId?: string
-): Record<string, any> {
+): Record<string, unknown> {
   const url = new URL(request.url);
 
   return {
@@ -282,8 +292,8 @@ export function handleZodError(
 /**
  * Wraps an async handler with error handling and logging
  */
-export function withApiHandler<TInput = any, TOutput = any>(
-  handler: (input: TInput, context: any) => Promise<TOutput>,
+export function withApiHandler<TInput = unknown, TOutput = unknown>(
+  handler: (input: TInput, context: Record<string, unknown>) => Promise<TOutput>,
   options: {
     operation?: string;
     logSuccess?: boolean;
@@ -296,7 +306,7 @@ export function withApiHandler<TInput = any, TOutput = any>(
     logErrors = true,
   } = options;
 
-  return async (input: TInput, context: any): Promise<TOutput> => {
+  return async (input: TInput, context: Record<string, unknown>): Promise<TOutput> => {
     const startTime = Date.now();
     const requestId = crypto.randomUUID().slice(0, 8);
 
@@ -308,7 +318,7 @@ export function withApiHandler<TInput = any, TOutput = any>(
           operation,
           requestId,
           duration: Date.now() - startTime,
-          userId: context?.user?.id,
+          userId: (context as { user?: { id?: string } })?.user?.id,
         });
       }
 
@@ -319,7 +329,7 @@ export function withApiHandler<TInput = any, TOutput = any>(
           operation,
           requestId,
           duration: Date.now() - startTime,
-          userId: context?.user?.id,
+          userId: (context as { user?: { id?: string } })?.user?.id,
         });
       }
 
@@ -335,7 +345,7 @@ export function withApiHandler<TInput = any, TOutput = any>(
  * This allows gradual migration
  */
 export function createLegacyResponse(
-  data: any,
+  data: unknown,
   options: { status?: number } = {}
 ): NextResponse {
   const { status = 200 } = options;

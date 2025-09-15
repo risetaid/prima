@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
+import { Patient } from '@/db/schema'
 
 interface VerificationActionsPanelProps {
-  patient: any
+  patient: Patient
   onUpdate: () => void
 }
 
@@ -139,7 +140,7 @@ export default function VerificationActionsPanel({
             </button>
             <div className="sm:ml-2 text-xs text-gray-500 sm:self-center">
               Balasan pasien via WhatsApp diproses otomatis.<br />
-              Contoh: "YA" untuk setuju, "TIDAK" untuk menolak, "BERHENTI" untuk berhenti.
+              Contoh: &quot;YA&quot; untuk setuju, &quot;TIDAK&quot; untuk menolak, &quot;BERHENTI&quot; untuk berhenti.
             </div>
           </div>
         )}

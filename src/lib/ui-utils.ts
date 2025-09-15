@@ -1,3 +1,5 @@
+import React from 'react';
+
 /**
  * Centralized UI utility functions for PRIMA system
  * Handles common UI patterns like avatars, labels, and formatting
@@ -129,11 +131,11 @@ export function createLoadingState(
 /**
  * Table utilities
  */
-export interface TableColumn<T = any> {
+export interface TableColumn<T> {
   key: keyof T | string;
   label: string;
   className?: string;
-  render?: (value: any, item: T) => React.ReactNode;
+  render?: (value: unknown, item: T) => React.ReactNode;
 }
 
 export function createTableColumns<T>(
@@ -141,7 +143,7 @@ export function createTableColumns<T>(
     key: keyof T | string;
     label: string;
     className?: string;
-    render?: (value: any, item: T) => React.ReactNode;
+    render?: (value: unknown, item: T) => React.ReactNode;
   }>
 ): TableColumn<T>[] {
   return columns;

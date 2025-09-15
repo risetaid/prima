@@ -15,8 +15,6 @@ interface MobileHeaderProps {
   showNavigation?: boolean;
 }
 
-type UserRole = "DEVELOPER" | "ADMIN" | "RELAWAN";
-
 // Role-based mobile navigation component
 function MobileNavigationActions() {
   const { role: userRole } = useAuthContext();

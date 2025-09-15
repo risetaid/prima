@@ -5,7 +5,6 @@ import {
   CreateReminderDTO,
   UpdateReminderDTO,
   CustomRecurrence,
-  ReminderWithPatient,
   ValidationError,
   NotFoundError,
   ValidatedContent,

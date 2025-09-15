@@ -53,7 +53,7 @@ function AdminActions() {
 }
 
 export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
-  const { user, role: userRole, isLoaded } = useAuthContext();
+  const { user, role: userRole } = useAuthContext();
   const router = useRouter();
   const pathname = usePathname();
   const [isHydrated, setIsHydrated] = useState(false);

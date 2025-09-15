@@ -253,7 +253,7 @@ export const ensure24HourFormat = (timeString: string): string => {
   const match = timeString.match(twelveHourRegex);
 
   if (match) {
-    let [, hoursStr, minutesStr, period] = match;
+    const [, hoursStr, minutesStr, period] = match;
     let hours = parseInt(hoursStr, 10);
 
     // Convert to 24-hour format

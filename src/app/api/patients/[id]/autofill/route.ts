@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, users, patientMedications, medications, reminderSchedules, medicalRecords, patientVariables } from '@/db'
-import { eq, and, desc } from 'drizzle-orm'
+import { db, patientVariables } from '@/db'
+import { eq, and } from 'drizzle-orm'
+import { PatientQueryBuilder } from '@/services/patient/patient-query-builder'
 
 export async function GET(
   request: NextRequest,
@@ -15,28 +16,12 @@ export async function GET(
 
     const { id: patientId } = await params
 
-    // Get patient with assigned volunteer (simplified)
-    const patientResult = await db
-      .select({
-        id: patients.id,
-        name: patients.name,
-        phoneNumber: patients.phoneNumber,
-        assignedVolunteerId: patients.assignedVolunteerId,
-        volunteerId: users.id,
-        volunteerFirstName: users.firstName,
-        volunteerLastName: users.lastName,
-        volunteerHospitalName: users.hospitalName
-      })
-      .from(patients)
-      .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
-      .where(eq(patients.id, patientId))
-      .limit(1)
+    // Get patient with assigned volunteer using consolidated query
+    const patient = await PatientQueryBuilder.getPatientWithVolunteer(patientId)
 
-    if (patientResult.length === 0) {
+    if (!patient) {
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
-
-    const patient = patientResult[0]
 
     // Get custom patient variables (highest priority)
     const customVariables = await db
@@ -55,59 +40,13 @@ export async function GET(
       return acc
     }, {} as Record<string, string>)
 
-    // Get latest active medication
-    const latestMedication = await db
-      .select({
-        medicationName: medications.name,
-        dosage: patientMedications.dosage,
-        prescriberId: users.id,
-        prescriberFirstName: users.firstName,
-        prescriberLastName: users.lastName,
-        prescriberHospitalName: users.hospitalName
-      })
-      .from(patientMedications)
-      .leftJoin(medications, eq(patientMedications.medicationId, medications.id))
-      .leftJoin(users, eq(patientMedications.createdBy, users.id))
-      .where(and(
-        eq(patientMedications.patientId, patientId),
-        eq(patientMedications.isActive, true)
-      ))
-      .orderBy(desc(patientMedications.createdAt))
-      .limit(1)
-
-    // Get recent reminder schedules
-    const recentReminders = await db
-      .select({
-        medicationName: reminderSchedules.medicationName,
-        dosage: reminderSchedules.dosage,
-        doctorName: reminderSchedules.doctorName,
-        createdById: users.id,
-        createdByFirstName: users.firstName,
-        createdByLastName: users.lastName,
-        createdByHospitalName: users.hospitalName
-      })
-      .from(reminderSchedules)
-      .leftJoin(users, eq(reminderSchedules.createdById, users.id))
-      .where(and(
-        eq(reminderSchedules.patientId, patientId),
-        eq(reminderSchedules.isActive, true)
-      ))
-      .orderBy(desc(reminderSchedules.createdAt))
-      .limit(3)
-
-    // Get latest medical record
-    const latestMedicalRecord = await db
-      .select({
-        recordedById: users.id,
-        recordedByFirstName: users.firstName,
-        recordedByLastName: users.lastName,
-        recordedByHospitalName: users.hospitalName
-      })
-      .from(medicalRecords)
-      .leftJoin(users, eq(medicalRecords.recordedBy, users.id))
-      .where(eq(medicalRecords.patientId, patientId))
-      .orderBy(desc(medicalRecords.recordedDate))
-      .limit(1)
+    // Get patient-related data using consolidated queries
+    const [reminders, medicalRecords] = await Promise.all([
+      PatientQueryBuilder.getPatientRemindersWithCreator(patientId, 3),
+      PatientQueryBuilder.getPatientMedicalRecordsWithRecorder(patientId, 1),
+    ])
+    const recentReminders = reminders
+    const latestMedicalRecord = medicalRecords
 
     // Mock current user data for now (since we bypassed auth)
     const mockCurrentUser = {
@@ -123,34 +62,31 @@ export async function GET(
       nama: customVariablesMap.nama || patient.name || '',
       nomor: customVariablesMap.nomor || patient.phoneNumber || '',
 
-      // Medication data (priority: custom > latest active medication > reminder schedule)
-      obat: customVariablesMap.obat || 
-            latestMedication[0]?.medicationName || 
+      // Medication data (priority: custom > reminder schedule)
+      obat: customVariablesMap.obat ||
             recentReminders[0]?.medicationName || '',
-      
-      // Dosage data (priority: custom > patient medication > reminder schedule)
+
+      // Dosage data (priority: custom > reminder schedule)
       dosis: customVariablesMap.dosis ||
-             latestMedication[0]?.dosage || 
              recentReminders[0]?.dosage || '',
 
-      // Doctor data (priority: custom > current user > assigned volunteer > medication prescriber > medical record recorder)
+      // Doctor data (priority: custom > current user > assigned volunteer > medical record recorder)
       dokter: customVariablesMap.dokter ||
-              (mockCurrentUser.firstName && mockCurrentUser.lastName 
+              (mockCurrentUser.firstName && mockCurrentUser.lastName
                 ? `${mockCurrentUser.firstName} ${mockCurrentUser.lastName}`
                 : patient.volunteerFirstName && patient.volunteerLastName
                 ? `${patient.volunteerFirstName} ${patient.volunteerLastName}`
-                : latestMedication[0]?.prescriberFirstName && latestMedication[0]?.prescriberLastName
-                ? `${latestMedication[0].prescriberFirstName} ${latestMedication[0].prescriberLastName}`
-                : latestMedicalRecord[0]?.recordedByFirstName && latestMedicalRecord[0]?.recordedByLastName
-                ? `${latestMedicalRecord[0].recordedByFirstName} ${latestMedicalRecord[0].recordedByLastName}`
-                : recentReminders[0]?.doctorName || ''),
+                 : latestMedicalRecord[0]?.recorderFirstName && latestMedicalRecord[0]?.recorderLastName
+                 ? `${latestMedicalRecord[0].recorderFirstName} ${latestMedicalRecord[0].recorderLastName}`
+                                 : (recentReminders[0]?.creatorFirstName && recentReminders[0]?.creatorLastName
+                   ? `${recentReminders[0].creatorFirstName} ${recentReminders[0].creatorLastName}`
+                   : '') || ''),
 
-      // Hospital data (priority: custom > current user > assigned volunteer > medication prescriber > medical record recorder)
+      // Hospital data (priority: custom > current user > assigned volunteer > medical record recorder)
       rumahSakit: customVariablesMap.rumahSakit ||
                   mockCurrentUser.hospitalName ||
                   patient.volunteerHospitalName ||
-                  latestMedication[0]?.prescriberHospitalName ||
-                  latestMedicalRecord[0]?.recordedByHospitalName || '',
+                                     latestMedicalRecord[0]?.recorderHospitalName || '',
 
       // Volunteer data (priority: custom > current user)
       volunteer: customVariablesMap.volunteer ||
@@ -164,7 +100,7 @@ export async function GET(
 
       // Additional context for better UX
       dataContext: {
-        hasActiveMedications: latestMedication.length > 0,
+        hasActiveMedications: false, // Medications removed
         hasRecentReminders: recentReminders.length > 0,
         hasMedicalRecords: latestMedicalRecord.length > 0,
         hasCustomVariables: customVariables.length > 0,

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
-import { db, patients } from "@/db";
-import { eq } from "drizzle-orm";
+
+
 import {
   getCachedData,
   setCachedData,
   CACHE_KEYS,
   CACHE_TTL,
-  invalidatePatientCache,
 } from "@/lib/cache";
 import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 import { withRateLimit } from "@/middleware/rate-limit";
@@ -15,7 +14,7 @@ import { PatientService } from "@/services/patient/patient.service";
 
 export const GET = withRateLimit(async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<Record<string, string | string[]>> }
 ) {
   try {
     const user = await getAuthUser();
@@ -28,7 +27,17 @@ export const GET = withRateLimit(async function GET(
       );
     }
 
-    const { id } = await params;
+    const paramsResolved = await params;
+    const id = paramsResolved.id;
+    // Validate patient ID
+    if (!id || typeof id !== "string") {
+      return createErrorResponse(
+        "Invalid patient ID",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
+      );
+    }
 
     // Validate patient ID
     if (!id || typeof id !== "string") {
@@ -76,7 +85,7 @@ export const GET = withRateLimit(async function GET(
 
 export const PUT = withRateLimit(async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<Record<string, string | string[]>> }
 ) {
   try {
     const user = await getAuthUser();
@@ -89,7 +98,17 @@ export const PUT = withRateLimit(async function PUT(
       );
     }
 
-    const { id } = await params;
+    const paramsResolved = await params;
+    const id = paramsResolved.id;
+    // Validate patient ID
+    if (!id || typeof id !== "string") {
+      return createErrorResponse(
+        "Invalid patient ID",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
+      );
+    }
     const body = await request.json();
 
     const service = new PatientService();
@@ -103,7 +122,7 @@ export const PUT = withRateLimit(async function PUT(
 
 export const DELETE = withRateLimit(async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<Record<string, string | string[]>> }
 ) {
   try {
     const user = await getAuthUser();
@@ -116,7 +135,17 @@ export const DELETE = withRateLimit(async function DELETE(
       );
     }
 
-    const { id } = await params;
+    const paramsResolved = await params;
+    const id = paramsResolved.id;
+    // Validate patient ID
+    if (!id || typeof id !== "string") {
+      return createErrorResponse(
+        "Invalid patient ID",
+        400,
+        undefined,
+        "VALIDATION_ERROR"
+      );
+    }
     const service = new PatientService();
     const result = await service.deletePatient(id);
     return NextResponse.json(result);

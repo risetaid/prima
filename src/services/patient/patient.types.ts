@@ -101,7 +101,7 @@ export class PatientError extends Error {
     message: string,
     public code: string,
     public statusCode: number = 500,
-    public details?: any
+    public details?: unknown
   ) {
     super(message)
     this.name = 'PatientError'
@@ -109,21 +109,21 @@ export class PatientError extends Error {
 }
 
 export class ValidationError extends PatientError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 'VALIDATION_ERROR', 400, details)
     this.name = 'ValidationError'
   }
 }
 
 export class NotFoundError extends PatientError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 'NOT_FOUND', 404, details)
     this.name = 'NotFoundError'
   }
 }
 
 export class UnauthorizedError extends PatientError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 'UNAUTHORIZED', 401, details)
     this.name = 'UnauthorizedError'
   }

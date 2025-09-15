@@ -7,16 +7,28 @@ import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { ConversationStateService } from '@/services/conversation-state.service'
 
+export interface VerificationStep {
+  id: string
+  name: string
+  message: string
+  expectedResponse: 'yes_no' | 'text' | 'confirmation'
+  timeoutMinutes: number
+  nextStep?: string
+  onSuccess?: (response: string) => Promise<void>
+  onTimeout?: () => Promise<void>
+  validation?: (response: string) => boolean
+}
+
 export interface VerificationFlow {
   id: string
   patientId: string
   currentStep: string
-  steps: Record<string, any>
+  steps: Record<string, VerificationStep>
   startedAt: Date
   expiresAt: Date
   completedAt?: Date
   status: 'active' | 'completed' | 'expired' | 'failed'
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
 }
 
 export class VerificationFlowService {
@@ -32,7 +44,7 @@ export class VerificationFlowService {
   async createVerificationFlow(
     patientId: string,
     phoneNumber: string,
-    steps: Record<string, any>
+    steps: Record<string, VerificationStep>
   ): Promise<VerificationFlow> {
     try {
       // Get patient info

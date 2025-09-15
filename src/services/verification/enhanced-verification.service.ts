@@ -6,32 +6,8 @@ import { patients, verificationLogs } from '@/db'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { ConversationStateService } from '@/services/conversation-state.service'
-import { VerificationFlowService } from '@/services/verification/verification-flow.service'
+import { VerificationFlowService, VerificationFlow, VerificationStep } from '@/services/verification/verification-flow.service'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
-
-export interface VerificationStep {
-  id: string
-  name: string
-  message: string
-  expectedResponse: 'yes_no' | 'text' | 'confirmation'
-  timeoutMinutes: number
-  nextStep?: string
-  onSuccess?: (response: string) => Promise<void>
-  onTimeout?: () => Promise<void>
-  validation?: (response: string) => boolean
-}
-
-export interface VerificationFlow {
-  id: string
-  patientId: string
-  currentStep: string
-  steps: Record<string, VerificationStep>
-  startedAt: Date
-  expiresAt: Date
-  completedAt?: Date
-  status: 'active' | 'completed' | 'expired' | 'failed'
-  metadata: Record<string, any>
-}
 
 export interface VerificationResponse {
   success: boolean
@@ -130,7 +106,7 @@ Untuk berhenti, ketik: *BERHENTI*
 Semoga lekas sembuh! 🙏💙`,
       expectedResponse: 'confirmation',
       timeoutMinutes: 5,
-      validation: (response) => true, // Any response is fine here
+      validation: () => true, // Any response is fine here
       onSuccess: async () => {
         await this.completeVerification()
       }
@@ -261,7 +237,7 @@ Semoga lekas sembuh! 🙏💙`,
     const personalizedMessage = this.personalizeMessage(step.message, flow.metadata)
 
     try {
-      const formattedNumber = formatWhatsAppNumber(flow.metadata.phoneNumber)
+      const formattedNumber = formatWhatsAppNumber(flow.metadata.phoneNumber as string)
       await sendWhatsAppMessage({
         to: formattedNumber,
         body: personalizedMessage
@@ -292,9 +268,9 @@ Semoga lekas sembuh! 🙏💙`,
   /**
    * Personalize message with patient data
    */
-  private personalizeMessage(message: string, metadata: Record<string, any>): string {
+  private personalizeMessage(message: string, metadata: Record<string, unknown>): string {
     return message.replace(/\{(\w+)\}/g, (match, key) => {
-      return metadata[key] || match
+      return (metadata[key] as string) || match
     })
   }
 
