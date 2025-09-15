@@ -28,6 +28,7 @@ import Link from "next/link";
 import { CMSContentListSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
 import Image from "next/image";
+import { logger } from "@/lib/logger";
 
 interface VideoContent {
   id: string;
@@ -111,7 +112,7 @@ export default function VideoPage() {
 
   const fetchPublishedVideos = async () => {
     try {
-      console.log("🎥 Video: Fetching published videos...");
+      logger.info("Fetching published videos");
 
       const response = await fetch("/api/content/public?type=videos&limit=20");
 
@@ -130,14 +131,12 @@ export default function VideoPage() {
           (item: ApiContentItem) => item.type === "video"
         );
         setVideos(publishedVideos);
-        console.log(
-          `✅ Video: Loaded ${publishedVideos.length} published videos`
-        );
+        logger.info(`Loaded ${publishedVideos.length} published videos`);
       } else {
         throw new Error(data.error || "Invalid response format");
       }
     } catch (error) {
-      console.error("❌ Video: Failed to load videos:", error);
+      logger.error("Failed to load videos", error instanceof Error ? error : new Error(String(error)));
       setError(
         error instanceof Error ? error.message : "Gagal memuat video edukasi"
       );

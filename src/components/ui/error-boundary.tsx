@@ -132,7 +132,7 @@ export function useErrorHandler() {
     })
 
     // In a real app, you might want to show a toast or modal here
-    console.error('Error handled by useErrorHandler:', error)
+    logger.error('Error handled by useErrorHandler', error)
   }
 }
 

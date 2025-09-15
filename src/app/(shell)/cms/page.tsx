@@ -20,6 +20,7 @@ import {
 import { RoleGuard } from "@/components/auth/role-guard";
 import { CMSStatsCards } from "@/components/cms/CMSStatsCards";
 import { CMSContentItem } from "@/components/cms/CMSContentItem";
+import { logger } from "@/lib/logger";
 
 interface ContentItem {
   id: string;
@@ -65,19 +66,15 @@ function CMSPageContent() {
   // Progressive loading: Statistics first, then content
   const fetchContent = useCallback(async () => {
     try {
-      console.log("🔍 CMS: Starting content fetch, activeTab:", activeTab);
+      logger.info("Starting content fetch", { activeTab });
 
       // Only fetch content, not statistics (statistics should remain static)
       setContentLoading(true);
       const contentResponse = await fetch(`/api/cms/content?type=${activeTab}`);
-      console.log("🔍 CMS: Content response status:", contentResponse.status);
+      logger.info("Content response received", { status: contentResponse.status });
 
       if (!contentResponse.ok) {
-        console.error(
-          "❌ CMS: Content API request failed:",
-          contentResponse.status,
-          contentResponse.statusText
-        );
+        logger.error("Content API request failed", new Error(`HTTP ${contentResponse.status}: ${contentResponse.statusText}`), { status: contentResponse.status });
 
         if (contentResponse.status === 401) {
           toast.error("Tidak memiliki akses ke CMS. Hubungi administrator.");
@@ -94,7 +91,7 @@ function CMSPageContent() {
       }
 
       const contentData = await contentResponse.json();
-      console.log("✅ CMS: Content data received:", {
+      logger.info("Content data received", {
         success: contentData.success,
         contentCount: contentData.data?.length,
       });
@@ -102,11 +99,11 @@ function CMSPageContent() {
       if (contentData.success) {
         setContent(contentData.data || []);
       } else {
-        console.error("❌ CMS: Content API returned error:", contentData.error);
+        logger.error("Content API returned error", new Error(contentData.error || "Unknown error"));
         toast.error(contentData.error || "Gagal memuat konten");
       }
     } catch (error) {
-      console.error("❌ CMS: Content loading error:", error);
+      logger.error("Content loading error", error instanceof Error ? error : new Error(String(error)));
 
       if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Koneksi bermasalah. Periksa internet Anda.");
@@ -123,7 +120,7 @@ function CMSPageContent() {
   useEffect(() => {
     const fetchStatistics = async () => {
       try {
-        console.log("🔍 CMS: Loading statistics (one-time)");
+        logger.info("Loading statistics (one-time)");
         setStatsLoading(true);
         const response = await fetch(
           "/api/cms/content?type=all&limit=0&stats_only=true"
@@ -133,14 +130,11 @@ function CMSPageContent() {
           const data = await response.json();
           if (data.success && data.statistics) {
             setStatistics(data.statistics);
-            console.log(
-              "✅ CMS: Statistics loaded (one-time)",
-              data.statistics
-            );
+            logger.info("Statistics loaded (one-time)", { statistics: data.statistics });
           }
         }
       } catch (error) {
-        console.error("❌ CMS: Statistics loading error:", error);
+        logger.error("Statistics loading error", error instanceof Error ? error : new Error(String(error)));
       } finally {
         setStatsLoading(false);
       }
@@ -260,13 +254,7 @@ function CMSPageContent() {
           <Tabs
             value={activeTab}
             onValueChange={(value) => {
-              console.log(
-                "🔄 CMS: Tab changed to:",
-                value,
-                "(current:",
-                activeTab,
-                ")"
-              );
+              logger.info("Tab changed", { from: activeTab, to: value });
               if (value !== activeTab) {
                 setActiveTab(value);
               }

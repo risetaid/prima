@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { useUser, useAuth } from "@clerk/nextjs";
 import type { UserResource } from "@clerk/types";
 import { atomicGet, atomicSet, atomicRemove } from "@/lib/atomic-storage";
+import { logger } from "@/lib/logger";
 
 interface UserStatusData {
   role?: "DEVELOPER" | "ADMIN" | "RELAWAN";
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (error) {
-      console.warn("Failed to read cached user data:", error);
+      logger.warn("Failed to read cached user data", { error: error instanceof Error ? error.message : String(error) });
     }
     return null;
   }, []);
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         timestamp: Date.now(),
       });
     } catch (error) {
-      console.warn("Failed to cache user data:", error);
+      logger.warn("Failed to cache user data", { error: error instanceof Error ? error.message : String(error) });
     }
   }, []);
 
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await atomicRemove(CACHE_KEY);
     } catch (error) {
-      console.warn("Failed to clear cached user data:", error);
+      logger.warn("Failed to clear cached user data", { error: error instanceof Error ? error.message : String(error) });
     }
   }, []);
 
@@ -100,13 +101,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return data;
     } catch (error) {
-      console.error(`Auth fetch attempt ${attempt} failed:`, error);
+      logger.error(`Auth fetch attempt ${attempt} failed`, error instanceof Error ? error : new Error(String(error)), { attempt, maxRetries: MAX_RETRIES });
 
       if (attempt < MAX_RETRIES) {
-        console.log(
-          `Retrying in ${RETRY_DELAY}ms... (attempt ${
-            attempt + 1
-          }/${MAX_RETRIES})`
+        logger.info(
+          `Retrying auth fetch in ${RETRY_DELAY}ms`,
+          { attempt: attempt + 1, maxRetries: MAX_RETRIES }
         );
         await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
         return fetchUserStatus(attempt + 1);
@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setNeedsApproval(true);
       setDbUserLoaded(true);
       clearCachedUserData().catch((error) => {
-        console.warn("Failed to clear cached user data:", error);
+        logger.warn("Failed to clear cached user data", { error: error instanceof Error ? error.message : String(error) });
       });
       return;
     }
@@ -137,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Try to use cached data first for faster loading
     const cachedData = getCachedUserData();
     if (cachedData) {
-      console.log("Using cached auth data for faster loading");
+      logger.info("Using cached auth data for faster loading");
       setRole(cachedData.role || "RELAWAN");
       setCanAccessDashboard(cachedData.canAccessDashboard || false);
       setNeedsApproval(cachedData.needsApproval !== false);
@@ -151,19 +151,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .then((data) => {
             // Only update if data has changed and component is still mounted
             if (JSON.stringify(cachedData) !== JSON.stringify(data)) {
-              console.log("Updating auth state with fresh data");
+              logger.info("Updating auth state with fresh data");
               setRole(data.role || "RELAWAN");
               setCanAccessDashboard(data.canAccessDashboard || false);
               setNeedsApproval(data.needsApproval !== false);
               setCachedUserData(data).catch((error) => {
-                console.warn("Failed to cache user data:", error);
+                logger.warn("Failed to cache user data", { error: error instanceof Error ? error.message : String(error) });
               });
             }
           })
           .catch((error) => {
-            console.warn(
-              "Background auth refresh failed, using cached data:",
-              error
+            logger.warn(
+              "Background auth refresh failed, using cached data",
+              { error: error instanceof Error ? error.message : String(error) }
             );
           })
           .finally(() => {
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setCanAccessDashboard(data.canAccessDashboard || false);
           setNeedsApproval(data.needsApproval !== false);
           setCachedUserData(data).catch((error) => {
-            console.warn("Failed to update cached user data:", error);
+            logger.warn("Failed to update cached user data", { error: error instanceof Error ? error.message : String(error) });
           });
 
           // Store successful login timestamp for optimistic UI
@@ -192,14 +192,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               "prima_last_successful_login",
               Date.now().toString()
             ).catch((error) => {
-              console.warn("Failed to store login timestamp:", error);
+              logger.warn("Failed to store login timestamp", { error: error instanceof Error ? error.message : String(error) });
             });
           }
         })
         .catch((error) => {
-          console.error(
-            "Failed to fetch user status after all retries:",
-            error
+          logger.error(
+            "Failed to fetch user status after all retries",
+            error instanceof Error ? error : new Error(String(error))
           );
 
           // Check if user had successful login recently for graceful degradation
@@ -211,13 +211,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 Date.now() - parseInt(lastLogin) < 24 * 60 * 60 * 1000; // 24 hours
 
               if (recentLogin) {
-                console.log("Using graceful degradation for recent user");
+                logger.info("Using graceful degradation for recent user");
                 setRole("RELAWAN");
                 setCanAccessDashboard(true);
                 setNeedsApproval(false);
               } else {
                 // Fallback to safe defaults for new users
-                console.log("Using safe defaults for failed auth");
+                logger.info("Using safe defaults for failed auth");
                 setRole("RELAWAN");
                 setCanAccessDashboard(false);
                 setNeedsApproval(true);
@@ -226,9 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setDbUserLoaded(true);
             })
             .catch((error) => {
-              console.warn("Failed to read login timestamp:", error);
+              logger.warn("Failed to read login timestamp", { error: error instanceof Error ? error.message : String(error) });
               // Fallback to safe defaults
-              console.log("Using safe defaults for failed auth");
+              logger.info("Using safe defaults for failed auth");
               setRole("RELAWAN");
               setCanAccessDashboard(false);
               setNeedsApproval(true);

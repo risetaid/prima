@@ -128,8 +128,8 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
   ];
 
   const handleNavigation = (href: string) => {
-    // If user not authenticated and trying to access dashboard, redirect to signin
-    if (!user && href.startsWith("/pasien") || href.startsWith("/pengingat") || href.startsWith("/berita") || href.startsWith("/video-edukasi") || href.startsWith("/cms") || href.startsWith("/admin")) {
+    // If user not authenticated and trying to access protected routes, redirect to signin
+    if (!user && (href.startsWith("/pasien") || href.startsWith("/pengingat") || href.startsWith("/berita") || href.startsWith("/video-edukasi") || href.startsWith("/cms") || href.startsWith("/admin"))) {
       router.push("/sign-in");
       return;
     }

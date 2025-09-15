@@ -11,6 +11,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { Header } from '@/components/ui/header'
+import { logger } from '@/lib/logger'
 
 interface Article {
   id: string
@@ -73,10 +74,10 @@ export default function BeritaPage() {
 
   const fetchPublishedArticles = async () => {
     try {
-      console.log('📰 Berita: Fetching published articles...')
-      
+      logger.info('Fetching published articles')
+
       const response = await fetch('/api/content/public?type=articles&limit=20')
-      
+
       if (!response.ok) {
         if (response.status === 401) {
           throw new Error('Silakan login untuk mengakses konten artikel')
@@ -85,17 +86,17 @@ export default function BeritaPage() {
       }
 
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         // Articles are already filtered to published only by the API
         const publishedArticles = data.data.filter((item: Article) => 'type' in item && item.type === 'article')
         setArticles(publishedArticles)
-        console.log(`✅ Berita: Loaded ${publishedArticles.length} published articles`)
+        logger.info(`Loaded ${publishedArticles.length} published articles`)
       } else {
         throw new Error(data.error || 'Invalid response format')
       }
     } catch (error) {
-      console.error('❌ Berita: Failed to load articles:', error)
+      logger.error('Failed to load articles', error instanceof Error ? error : new Error(String(error)))
       setError(error instanceof Error ? error.message : 'Gagal memuat artikel kesehatan')
     } finally {
       setLoading(false)

@@ -3,6 +3,7 @@
 import { useAuthContext } from "@/lib/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, useRef } from "react";
+import { logger } from "@/lib/logger";
 
 interface AuthLoadingProps {
   children: React.ReactNode;
@@ -41,14 +42,14 @@ export function AuthLoading({
       lastRedirect.path === path &&
       now - lastRedirect.timestamp < REDIRECT_DEBOUNCE_MS
     ) {
-      console.log(`Skipping duplicate redirect to ${path} (debounced)`);
+      logger.info(`Skipping duplicate redirect to ${path} (debounced)`);
       return;
     }
 
     // Update last redirect tracking
     lastRedirectRef.current = { path, timestamp: now };
 
-    console.log(`Redirecting to ${path}`);
+    logger.info(`Redirecting to ${path}`);
     router.replace(path);
   }, [router]);
 
@@ -60,7 +61,7 @@ export function AuthLoading({
         lastLogin && Date.now() - parseInt(lastLogin) < 24 * 60 * 60 * 1000; // 24 hours
 
       if (recentLogin) {
-        console.log("Using optimistic access for recent user");
+        logger.info("Using optimistic access for recent user");
         setOptimisticAccess(true);
       }
     }
