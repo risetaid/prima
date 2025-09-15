@@ -4,50 +4,30 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Header } from "@/components/ui/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { IndonesianDateInput } from "@/components/ui/indonesian-date-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import { PatientVariablesManager } from "@/components/patient/patient-variables-manager";
-import { WhatsAppVerificationSection } from "@/components/patient/whatsapp-verification-section";
-import { HealthNotesSection } from "@/components/patient/health-notes-section";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
+import { PatientHeaderCard } from "@/components/patient/patient-header-card";
+import { PatientProfileTab } from "@/components/patient/patient-profile-tab";
+import { PatientHealthTab } from "@/components/patient/patient-health-tab";
+import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
+import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
 import { Patient as SchemaPatient } from "@/db/schema";
-import {
-  User,
-  Phone,
-  MapPin,
-  Stethoscope,
-  AlertTriangle,
-  FileText,
-  CheckCircle,
-  Clock,
-  XCircle,
-  UserX,
-  Plus,
-  Eye,
-  Edit,
-  Save,
-  X
-} from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 interface Patient extends SchemaPatient {
   complianceRate: number;
-  assignedVolunteer?: {
+  assignedVolunteer: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-    role?: string;
-  };
+    role: string | null;
+  } | null;
 }
 
 interface HealthNote {
@@ -324,30 +304,9 @@ export default function PatientDetailPage() {
   };
 
   // Edit mode handlers
-  const handleEditBasicInfo = () => {
-    if (!patient) return;
-    setBasicInfoForm({
-      name: patient.name,
-      phoneNumber: patient.phoneNumber,
-      address: patient.address || "",
-      birthDate: patient.birthDate ? patient.birthDate.toISOString().split('T')[0] : "",
-      diagnosisDate: patient.diagnosisDate ? patient.diagnosisDate.toISOString().split('T')[0] : ""
-    });
-    setIsEditingBasicInfo(true);
-  };
 
-  const handleEditMedicalInfo = () => {
-    if (!patient) return;
-    setMedicalInfoForm({
-      cancerStage: patient.cancerStage || "",
-      doctorName: patient.doctorName || "",
-      hospitalName: patient.hospitalName || "",
-      emergencyContactName: patient.emergencyContactName || "",
-      emergencyContactPhone: patient.emergencyContactPhone || "",
-      notes: patient.notes || ""
-    });
-    setIsEditingMedicalInfo(true);
-  };
+
+
 
   const handleCancelBasicInfo = () => {
     setIsEditingBasicInfo(false);
@@ -418,26 +377,7 @@ export default function PatientDetailPage() {
     }
   };
 
-  const getVerificationStatusBadge = (status: string) => {
-    switch (status) {
-      case "verified":
-        return <Badge variant="default" className="bg-green-100 text-green-800"><CheckCircle className="w-3 h-3 mr-1" />Terverifikasi</Badge>;
-      case "pending_verification":
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800"><Clock className="w-3 h-3 mr-1" />Menunggu</Badge>;
-      case "declined":
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Ditolak</Badge>;
-      case "unsubscribed":
-        return <Badge variant="outline"><UserX className="w-3 h-3 mr-1" />Berhenti</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
 
-  const getStatusBadge = (isActive: boolean) => {
-    return isActive ?
-      <Badge variant="default" className="bg-green-100 text-green-800">Aktif</Badge> :
-      <Badge variant="secondary" className="bg-red-100 text-red-800">Tidak Aktif</Badge>;
-  };
 
   if (loading) {
     return (
@@ -605,55 +545,12 @@ export default function PatientDetailPage() {
       <main className="relative z-10 pt-4 pb-12">
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
 
-          {/* Patient Header Card */}
-          <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                <div className="flex items-center space-x-4">
-                  <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-white/20">
-                    <AvatarImage src={patient.photoUrl || ""} alt={patient.name} />
-                    <AvatarFallback className="bg-white/20 text-white text-2xl font-bold">
-                      {patient.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold mb-1">{patient.name}</h1>
-                    <div className="flex items-center space-x-2 text-blue-100 mb-2">
-                      <Phone className="w-4 h-4" />
-                      <span>{patient.phoneNumber}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      {getStatusBadge(patient.isActive)}
-                      {getVerificationStatusBadge(patient.verificationStatus)}
-                    </div>
-                    {patient.assignedVolunteer && (
-                      <p className="text-blue-200 text-sm mt-2">
-                        Dikelola oleh: {patient.assignedVolunteer.firstName} {patient.assignedVolunteer.lastName}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    variant="secondary"
-                    onClick={handleAddReminder}
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Tambah Pengingat
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={handleViewReminders}
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Lihat Pengingat
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+           {/* Patient Header Card */}
+           <PatientHeaderCard
+             patient={patient}
+             onAddReminder={handleAddReminder}
+             onViewReminders={handleViewReminders}
+           />
 
           {/* Main Content Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -664,386 +561,54 @@ export default function PatientDetailPage() {
               <TabsTrigger value="verification">Verifikasi</TabsTrigger>
             </TabsList>
 
-            {/* Profile Tab */}
-            <TabsContent value="profile" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <User className="w-5 h-5 mr-2" />
-                        Informasi Dasar
-                      </div>
-                      {!isEditingBasicInfo ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleEditBasicInfo}
-                          className="h-8 px-2"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCancelBasicInfo}
-                            className="h-8 px-2"
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Batal
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveBasicInfo}
-                            className="h-8 px-2"
-                          >
-                            <Save className="w-4 h-4 mr-1" />
-                            Simpan
-                          </Button>
-                        </div>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {isEditingBasicInfo ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Nama Lengkap</label>
-                          <Input
-                            value={basicInfoForm.name}
-                            onChange={(e) => setBasicInfoForm(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Masukkan nama lengkap"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Nomor Telepon</label>
-                          <Input
-                            value={basicInfoForm.phoneNumber}
-                            onChange={(e) => setBasicInfoForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
-                            placeholder="Masukkan nomor telepon"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Tanggal Lahir</label>
-                          <IndonesianDateInput
-                            value={basicInfoForm.birthDate}
-                            onChange={(value) => setBasicInfoForm(prev => ({ ...prev, birthDate: value }))}
-                            placeholder="hh/bb/tttt"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Tanggal Diagnosis</label>
-                          <IndonesianDateInput
-                            value={basicInfoForm.diagnosisDate}
-                            onChange={(value) => setBasicInfoForm(prev => ({ ...prev, diagnosisDate: value }))}
-                            placeholder="hh/bb/tttt"
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Nama Lengkap</label>
-                          <p className="text-gray-900">{patient.name}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Nomor Telepon</label>
-                          <p className="text-gray-900">{patient.phoneNumber}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Tanggal Lahir</label>
-                          <p className="text-gray-900">
-                            {patient.birthDate ? new Date(patient.birthDate).toLocaleDateString('id-ID') : 'Tidak tersedia'}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Tanggal Diagnosis</label>
-                          <p className="text-gray-900">
-                            {patient.diagnosisDate ? new Date(patient.diagnosisDate).toLocaleDateString('id-ID') : 'Tidak tersedia'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {isEditingBasicInfo ? (
-                      <>
-                        <Separator />
-                        <div>
-                          <label className="text-sm font-medium text-gray-500 flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            Alamat
-                          </label>
-                          <Input
-                            value={basicInfoForm.address}
-                            onChange={(e) => setBasicInfoForm(prev => ({ ...prev, address: e.target.value }))}
-                            placeholder="Masukkan alamat"
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      patient.address && (
-                        <>
-                          <Separator />
-                          <div>
-                            <label className="text-sm font-medium text-gray-500 flex items-center">
-                              <MapPin className="w-4 h-4 mr-1" />
-                              Alamat
-                            </label>
-                            <p className="text-gray-900">{patient.address}</p>
-                          </div>
-                        </>
-                      )
-                    )}
-                  </CardContent>
-                </Card>
+             {/* Profile Tab */}
+             <TabsContent value="profile">
+               <PatientProfileTab
+                 patient={patient}
+                 isEditingBasicInfo={isEditingBasicInfo}
+                 setIsEditingBasicInfo={setIsEditingBasicInfo}
+                 basicInfoForm={basicInfoForm}
+                 setBasicInfoForm={setBasicInfoForm}
+                 handleSaveBasicInfo={handleSaveBasicInfo}
+                 handleCancelBasicInfo={handleCancelBasicInfo}
+                 isEditingMedicalInfo={isEditingMedicalInfo}
+                 setIsEditingMedicalInfo={setIsEditingMedicalInfo}
+                 medicalInfoForm={medicalInfoForm}
+                 setMedicalInfoForm={setMedicalInfoForm}
+                 handleSaveMedicalInfo={handleSaveMedicalInfo}
+                 handleCancelMedicalInfo={handleCancelMedicalInfo}
+                 patientId={params.id as string}
+               />
+             </TabsContent>
 
-                {/* Medical Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Stethoscope className="w-5 h-5 mr-2" />
-                        Informasi Medis
-                      </div>
-                      {!isEditingMedicalInfo ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleEditMedicalInfo}
-                          className="h-8 px-2"
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Edit
-                        </Button>
-                      ) : (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCancelMedicalInfo}
-                            className="h-8 px-2"
-                          >
-                            <X className="w-4 h-4 mr-1" />
-                            Batal
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={handleSaveMedicalInfo}
-                            className="h-8 px-2"
-                          >
-                            <Save className="w-4 h-4 mr-1" />
-                            Simpan
-                          </Button>
-                        </div>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {isEditingMedicalInfo ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Stadium Kanker</label>
-                          <Select
-                            value={medicalInfoForm.cancerStage}
-                            onValueChange={(value) => setMedicalInfoForm(prev => ({ ...prev, cancerStage: value }))}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Pilih stadium kanker" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="I">Stadium I</SelectItem>
-                              <SelectItem value="II">Stadium II</SelectItem>
-                              <SelectItem value="III">Stadium III</SelectItem>
-                              <SelectItem value="IV">Stadium IV</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Dokter</label>
-                          <Input
-                            value={medicalInfoForm.doctorName}
-                            onChange={(e) => setMedicalInfoForm(prev => ({ ...prev, doctorName: e.target.value }))}
-                            placeholder="Masukkan nama dokter"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Rumah Sakit</label>
-                          <Input
-                            value={medicalInfoForm.hospitalName}
-                            onChange={(e) => setMedicalInfoForm(prev => ({ ...prev, hospitalName: e.target.value }))}
-                            placeholder="Masukkan nama rumah sakit"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Kontak Darurat</label>
-                          <div className="space-y-2">
-                            <Input
-                              value={medicalInfoForm.emergencyContactName}
-                              onChange={(e) => setMedicalInfoForm(prev => ({ ...prev, emergencyContactName: e.target.value }))}
-                              placeholder="Nama kontak darurat"
-                            />
-                            <Input
-                              value={medicalInfoForm.emergencyContactPhone}
-                              onChange={(e) => setMedicalInfoForm(prev => ({ ...prev, emergencyContactPhone: e.target.value }))}
-                              placeholder="Nomor telepon kontak darurat"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Stadium Kanker</label>
-                          <p className="text-gray-900">{patient.cancerStage || 'Tidak tersedia'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Dokter</label>
-                          <p className="text-gray-900">{patient.doctorName || 'Tidak tersedia'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Rumah Sakit</label>
-                          <p className="text-gray-900">{patient.hospitalName || 'Tidak tersedia'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-500">Kontak Darurat</label>
-                          <p className="text-gray-900">
-                            {patient.emergencyContactName && patient.emergencyContactPhone
-                              ? `${patient.emergencyContactName} (${patient.emergencyContactPhone})`
-                              : 'Tidak tersedia'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {isEditingMedicalInfo ? (
-                      <>
-                        <Separator />
-                        <div>
-                          <label className="text-sm font-medium text-gray-500 flex items-center">
-                            <FileText className="w-4 h-4 mr-1" />
-                            Catatan
-                          </label>
-                          <Textarea
-                            value={medicalInfoForm.notes}
-                            onChange={(e) => setMedicalInfoForm(prev => ({ ...prev, notes: e.target.value }))}
-                            placeholder="Masukkan catatan medis"
-                            rows={3}
-                          />
-                        </div>
-                      </>
-                    ) : (
-                      patient.notes && (
-                        <>
-                          <Separator />
-                          <div>
-                            <label className="text-sm font-medium text-gray-500 flex items-center">
-                              <FileText className="w-4 h-4 mr-1" />
-                              Catatan
-                            </label>
-                            <p className="text-gray-900">{patient.notes}</p>
-                          </div>
-                        </>
-                      )
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+             {/* Health Notes Tab */}
+             <TabsContent value="health">
+               <PatientHealthTab
+                 healthNotes={healthNotes}
+                 patientId={params.id as string}
+                 onAddNote={handleAddNote}
+                 onEditNote={handleEditNote}
+                 onDeleteNotes={handleDeleteSelectedNotes}
+               />
+             </TabsContent>
 
-              {/* Patient Variables */}
-              <PatientVariablesManager
-                patientId={Array.isArray(params.id) ? params.id[0] : params.id!}
-                patientName={patient.name}
-              />
-            </TabsContent>
+             {/* Reminders Tab */}
+             <TabsContent value="reminders">
+               <PatientRemindersTab
+                 patient={patient}
+                 completedReminders={completedReminders}
+                 onAddReminder={handleAddReminder}
+                 onViewReminders={handleViewReminders}
+               />
+             </TabsContent>
 
-            {/* Health Notes Tab */}
-            <TabsContent value="health">
-              <HealthNotesSection
-                healthNotes={healthNotes}
-                patientId={params.id as string}
-                onAddNote={handleAddNote}
-                onEditNote={handleEditNote}
-                onDeleteNotes={handleDeleteSelectedNotes}
-              />
-            </TabsContent>
-
-            {/* Reminders Tab */}
-            <TabsContent value="reminders" className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Aksi Cepat</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Button onClick={handleAddReminder} className="w-full" disabled={!patient.isActive || patient.verificationStatus !== 'verified'}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Tambah Pengingat Baru
-                    </Button>
-                    <Button variant="outline" onClick={handleViewReminders} className="w-full">
-                      <Eye className="w-4 h-4 mr-2" />
-                      Lihat Semua Pengingat
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Compliance Stats */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Statistik Kepatuhan</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-blue-600 mb-2">
-                        {patient.complianceRate}%
-                      </div>
-                      <p className="text-gray-600">Tingkat Kepatuhan</p>
-                      <div className="mt-4">
-                         <div className="text-sm text-gray-500 mb-1">
-                           Total Pengingat Selesai: {completedReminders.filter(r => r.medicationTaken).length}
-                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Recent Completed Reminders */}
-              {completedReminders.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Pengingat Terbaru</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {completedReminders.slice(0, 5).map((reminder) => (
-                        <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{reminder.customMessage || reminder.medicationName}</p>
-                            <p className="text-sm text-gray-500">
-                              {new Date(reminder.completedDate).toLocaleDateString('id-ID')} • {reminder.scheduledTime}
-                            </p>
-                          </div>
-                          <Badge variant={reminder.medicationTaken ? "default" : "secondary"}>
-                            {reminder.medicationTaken ? "Dikonfirmasi" : "Tidak Dikonfirmasi"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            {/* Verification Tab */}
-            <TabsContent value="verification">
-              <WhatsAppVerificationSection
-                patient={patient}
-                onUpdate={() => fetchPatient(params.id as string)}
-              />
-            </TabsContent>
+             {/* Verification Tab */}
+             <TabsContent value="verification">
+               <PatientVerificationTab
+                 patient={patient}
+                 onUpdate={() => fetchPatient(params.id as string)}
+               />
+             </TabsContent>
           </Tabs>
         </div>
       </main>

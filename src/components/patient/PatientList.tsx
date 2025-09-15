@@ -10,7 +10,7 @@ interface Patient {
   phoneNumber: string
   complianceRate: number
   isActive: boolean
-  assignedVolunteerId?: string
+  assignedVolunteerId: string | null
 }
 
 interface PatientListProps {

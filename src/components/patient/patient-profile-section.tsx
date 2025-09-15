@@ -9,13 +9,13 @@ interface Patient {
   phoneNumber: string;
   photoUrl: string | null;
   isActive: boolean;
-  assignedVolunteer?: {
+  assignedVolunteer: {
     id: string;
     firstName: string;
     lastName: string;
     email: string;
-    role?: string;
-  };
+    role: string | null;
+  } | null;
   volunteerFirstName: string | null;
   volunteerLastName: string | null;
   volunteerEmail: string | null;
