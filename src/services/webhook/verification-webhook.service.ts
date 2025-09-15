@@ -519,7 +519,7 @@ Semoga sehat selalu! 🙏`;
     } else if (status === "unsubscribed") {
       return `Baik ${patient.name}, kami akan berhenti mengirimkan reminder. 🛑
 
-Semua pengingat obat telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.
+Semua pengingat kesehatan telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.
 
 Jika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.
 
@@ -538,15 +538,15 @@ Semoga sehat selalu! 🙏💙`;
     if (responseType === "confirmation_taken") {
       return `${baseMessage}
 
-Bagus! Terus jaga kesehatan ya. 💊❤️`;
+Bagus! Terus jaga kesehatan ya. 💚❤️`;
     } else if (responseType === "confirmation_missed") {
       return `${baseMessage}
 
-Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙`;
+Jangan lupa rutinitas kesehatan berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙`;
     } else if (responseType === "confirmation_later") {
       return `${baseMessage}
 
-Baik, jangan lupa minum obatnya ya. Semoga sehat selalu! 💊`;
+Baik, jangan lupa rutinitas kesehatan ya. Semoga sehat selalu! 💚`;
     }
 
     return "";

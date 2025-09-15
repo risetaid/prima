@@ -30,7 +30,6 @@ export async function GET(
         sentAt: reminderLogs.sentAt,
         message: reminderLogs.message,
         // Join with schedule data
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
         customMessage: reminderSchedules.customMessage
@@ -53,8 +52,7 @@ export async function GET(
       .select({
         id: manualConfirmations.id,
         reminderLogId: manualConfirmations.reminderLogId,
-        visitDate: manualConfirmations.visitDate,
-        medicationsTaken: manualConfirmations.medicationsTaken
+        visitDate: manualConfirmations.visitDate
       })
       .from(manualConfirmations)
       .where(inArray(manualConfirmations.reminderLogId, logIds)) : []
@@ -71,7 +69,7 @@ export async function GET(
 
       if (confirmation) {
         // This specific log has been confirmed
-        status = confirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
+        status = 'completed'
         reminderDate = confirmation.visitDate ? confirmation.visitDate.toISOString().split('T')[0] : reminderDate
         id_suffix = `completed-${confirmation.id}`
       } else if (log.status === 'DELIVERED') {
@@ -86,7 +84,6 @@ export async function GET(
 
       return {
         id: `${status}-${id_suffix}`,
-        medicationName: log.medicationName || 'Obat',
         scheduledTime: log.scheduledTime || '12:00',
         reminderDate,
         customMessage: log.customMessage || log.message,

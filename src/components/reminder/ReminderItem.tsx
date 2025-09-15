@@ -22,7 +22,6 @@ interface ContentItem {
 
 interface ScheduledReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   nextReminderDate: string;
   customMessage?: string;
@@ -66,10 +65,9 @@ export function ReminderItem({
       >
         <div className="flex justify-between items-start">
           <div className="flex-1">
-            <h3 className="font-semibold text-white mb-1">
-              {reminder.customMessage ||
-                `Minum obat ${reminder.medicationName}`}
-            </h3>
+             <h3 className="font-semibold text-white mb-1">
+               {reminder.customMessage || "Pengingat obat"}
+             </h3>
             <p className="text-blue-100 text-sm">
               {formatDate(reminder.nextReminderDate)}
             </p>

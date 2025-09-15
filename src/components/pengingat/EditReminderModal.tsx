@@ -22,7 +22,6 @@ interface ContentItem {
 
 interface Reminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -165,10 +164,7 @@ export function EditReminderModal({
                 </h4>
                 <div className="bg-white p-3 rounded border text-sm text-gray-800 whitespace-pre-line max-h-40 overflow-y-auto">
                   {generatePreviewMessage(
-                    editFormData.message.trim() ||
-                      `Minum obat ${
-                        editingReminder?.medicationName || "obat"
-                      }`,
+                    editFormData.message.trim() || "Pengingat obat",
                     selectedContent
                   )}
                 </div>

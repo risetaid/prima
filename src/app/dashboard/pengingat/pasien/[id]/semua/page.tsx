@@ -7,7 +7,6 @@ import { UserButton } from "@clerk/nextjs";
 
 interface AllReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -16,7 +15,6 @@ interface AllReminder {
 
 interface ScheduledReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -24,7 +22,6 @@ interface ScheduledReminder {
 
 interface PendingReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -32,7 +29,6 @@ interface PendingReminder {
 
 interface CompletedReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -230,7 +226,7 @@ export default function AllRemindersPage() {
                           <div className="flex-1">
                             <h3 className="font-semibold mb-1">
                               {reminder.customMessage ||
-                                `Minum obat ${reminder.medicationName}`}
+                                `Minum obat`}
                             </h3>
                             <p className="text-sm opacity-90">
                               {formatDate(reminder.reminderDate)}
@@ -285,7 +281,7 @@ export default function AllRemindersPage() {
                             <div className="flex-1">
                               <h3 className="font-semibold mb-1">
                                 {reminder.customMessage ||
-                                  `Minum obat ${reminder.medicationName}`}
+                                  `Minum obat`}
                               </h3>
                               <p className="text-sm opacity-90">
                                 {formatDate(reminder.reminderDate)}
@@ -347,7 +343,7 @@ export default function AllRemindersPage() {
                               <div className="flex-1">
                                 <h3 className="font-semibold mb-1">
                                   {reminder.customMessage ||
-                                    `Minum obat ${reminder.medicationName}`}
+                                    `Minum obat`}
                                 </h3>
                                 <p className="text-sm opacity-90">
                                   {formatDate(reminder.reminderDate)}

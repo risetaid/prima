@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminderLogs, reminderSchedules, manualConfirmations } from "@/db";
+import { db, reminderLogs, manualConfirmations } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
@@ -29,16 +29,16 @@ export async function PUT(
       );
     }
 
-    const { medicationTaken, reminderLogId } = requestBody;
-    console.log("📥 Request body:", { medicationTaken, reminderLogId });
+    const { confirmed, reminderLogId } = requestBody;
+    console.log("📥 Request body:", { confirmed, reminderLogId });
 
-    if (typeof medicationTaken !== "boolean") {
+    if (typeof confirmed !== "boolean") {
       console.error(
-        "❌ VALIDATION ERROR: medicationTaken is not boolean:",
-        typeof medicationTaken
+        "❌ VALIDATION ERROR: confirmed is not boolean:",
+        typeof confirmed
       );
       return NextResponse.json(
-        { error: "medicationTaken must be boolean" },
+        { error: "confirmed must be boolean" },
         { status: 400 }
       );
     }
@@ -58,7 +58,7 @@ export async function PUT(
       rawReminderId,
       reminderId,
       logId,
-      medicationTaken,
+      confirmed,
     });
 
     // Get the reminder log using separate queries
@@ -92,22 +92,7 @@ export async function PUT(
     console.log("✅ Reminder log found:", logData);
 
     // Get reminder schedule details (if reminderScheduleId exists)
-    let reminderSchedule: {
-      id: string;
-      medicationName: string;
-      dosage: string | null;
-    }[] = [];
-    if (logData.reminderScheduleId) {
-      reminderSchedule = await db
-        .select({
-          id: reminderSchedules.id,
-          medicationName: reminderSchedules.medicationName,
-          dosage: reminderSchedules.dosage,
-        })
-        .from(reminderSchedules)
-        .where(eq(reminderSchedules.id, logData.reminderScheduleId))
-        .limit(1);
-    }
+    // Reminder schedule details not needed for confirmation
 
     // Check if this ReminderLog is already manually confirmed
     console.log("🔍 Checking for existing manual confirmation:", { logId });
@@ -183,7 +168,7 @@ export async function PUT(
       patientId: id,
       volunteerId: user.id,
       reminderLogId: logId,
-      medicationTaken,
+      confirmed,
     });
 
     try {
@@ -196,20 +181,12 @@ export async function PUT(
           reminderLogId: logId, // Link to specific ReminderLog
           visitDate: new Date(),
           visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
-          medicationsTaken: medicationTaken,
-          medicationsMissed: medicationTaken
-            ? []
-            : [
-                reminderSchedule && reminderSchedule.length > 0
-                  ? reminderSchedule[0].medicationName
-                  : "Obat",
-              ],
           patientCondition: "FAIR", // Default, could be made dynamic
           symptomsReported: [],
-          followUpNeeded: !medicationTaken,
-          followUpNotes: medicationTaken
+          followUpNeeded: !confirmed,
+          followUpNotes: confirmed
             ? null
-            : "Patient did not take medication as scheduled",
+            : "Patient did not complete scheduled health routine",
         })
         .returning({
           id: manualConfirmations.id,
@@ -219,8 +196,6 @@ export async function PUT(
           reminderLogId: manualConfirmations.reminderLogId,
           visitDate: manualConfirmations.visitDate,
           visitTime: manualConfirmations.visitTime,
-          medicationsTaken: manualConfirmations.medicationsTaken,
-          medicationsMissed: manualConfirmations.medicationsMissed,
           patientCondition: manualConfirmations.patientCondition,
           symptomsReported: manualConfirmations.symptomsReported,
           notes: manualConfirmations.notes,

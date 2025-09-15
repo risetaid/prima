@@ -69,7 +69,7 @@ export class WhatsAppService {
 
 Halo ${patientName}!
 
-Apakah Anda bersedia menerima pengingat minum obat dari PRIMA melalui WhatsApp?
+Apakah Anda bersedia menerima pengingat kesehatan dari PRIMA melalui WhatsApp?
 
 *Balas dengan salah satu:*
 ✅ YA / SETUJU / BOLEH
@@ -82,50 +82,17 @@ Terima kasih! 💙 Tim PRIMA`
     return await this.send(phoneNumber, message)
   }
 
-  /**
-   * Send medication reminder (text-based, not poll)
-   */
-  async sendMedicationReminder(
-    phoneNumber: string, 
-    patientName: string, 
-    medicationName: string, 
-    dosage: string, 
-    time: string,
-    attachments?: ValidatedContent[]
-  ): Promise<WhatsAppMessageResult> {
-    let message = `💊 *Pengingat Minum Obat*
 
-Halo ${patientName}!
-
-Saatnya minum obat:
-🔹 *Obat:* ${medicationName}
-🔹 *Dosis:* ${dosage}
-🔹 *Waktu:* ${time}
-
-*Balas setelah minum obat:*
-✅ SUDAH / SELESAI
-⏰ BELUM (akan diingatkan lagi)
-🆘 BANTUAN (butuh bantuan relawan)
-
-💙 Tim PRIMA`
-    
-    // Add content attachments if provided
-    if (attachments && attachments.length > 0) {
-      message = this.buildMessage(message, attachments)
-    }
-    
-    return await this.send(phoneNumber, message)
-  }
 
   /**
    * Send follow-up message (15 minutes after initial reminder)
    */
   async sendFollowUpMessage(phoneNumber: string, patientName: string): Promise<WhatsAppMessageResult> {
-    const message = `⏰ *Follow-up: Pengingat Minum Obat*
+    const message = `⏰ *Follow-up: Pengingat Kesehatan*
 
 Halo ${patientName}!
 
-Apakah sudah diminum obatnya?
+Apakah sudah menyelesaikan rutinitas kesehatan?
 
 *Balas dengan:*
 ✅ SUDAH / SELESAI

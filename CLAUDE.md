@@ -38,7 +38,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 - **Caching**: Redis with ioredis client (3min sessions, 15min patient data)
 - **UI**: Tailwind CSS 4 + shadcn/ui components + Lucide React icons
 - **WhatsApp**: Fonnte WhatsApp Business API for messaging
-- **File Storage**: Vercel Blob for patient photos and content
+- **File Storage**: Cloud storage for patient photos and content
 - **Rich Text**: TinyMCE with image upload support
 
 ### Key Service Layer Architecture
@@ -159,7 +159,7 @@ Essential environment variables (never commit actual values):
 - `REDIS_URL` - Redis cache connection
 - `CLERK_SECRET_KEY` - Clerk authentication
 - `FONNTE_TOKEN` - WhatsApp Business API
-- `BLOB_READ_WRITE_TOKEN` - Vercel Blob storage
+- `BLOB_READ_WRITE_TOKEN` - Cloud storage
 - `TINYMCE_API_KEY` - Rich text editor
 - `CRON_SECRET` - Automated reminder system security
 

@@ -2,7 +2,7 @@ import { createApiHandler } from "@/lib/api-handler";
 import { db, reminderSchedules, reminderContentAttachments } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
-import { extractMedicationName } from "@/lib/medication-utils";
+
 import { validateContentAttachments } from "@/lib/content-validation";
 import { invalidateAfterReminderOperation } from "@/lib/cache-invalidation";
 import { z } from "zod";
@@ -65,7 +65,6 @@ export const PUT = createApiHandler(
         patientId: reminderSchedules.patientId,
         scheduledTime: reminderSchedules.scheduledTime,
         customMessage: reminderSchedules.customMessage,
-        medicationName: reminderSchedules.medicationName,
       })
       .from(reminderSchedules)
       .where(eq(reminderSchedules.id, id))
@@ -76,7 +75,6 @@ export const PUT = createApiHandler(
     }
 
     const patientId = reminderScheduleResult[0].patientId;
-    const reminderSchedule = reminderScheduleResult[0];
 
     // Update the reminder schedule
     const updatedReminderResult = await db
@@ -84,10 +82,6 @@ export const PUT = createApiHandler(
       .set({
         scheduledTime: reminderTime,
         customMessage: customMessage,
-        medicationName: extractMedicationName(
-          customMessage,
-          reminderSchedule.medicationName
-        ),
         updatedAt: getWIBTime(),
       })
       .where(eq(reminderSchedules.id, id))
@@ -95,7 +89,6 @@ export const PUT = createApiHandler(
         id: reminderSchedules.id,
         scheduledTime: reminderSchedules.scheduledTime,
         customMessage: reminderSchedules.customMessage,
-        medicationName: reminderSchedules.medicationName,
       });
 
     const updatedReminder = updatedReminderResult[0];
@@ -132,7 +125,6 @@ export const PUT = createApiHandler(
         id: updatedReminder.id,
         scheduledTime: updatedReminder.scheduledTime,
         customMessage: updatedReminder.customMessage,
-        medicationName: updatedReminder.medicationName,
         attachedContent: validatedContent,
       },
     };
@@ -152,7 +144,6 @@ export const DELETE = createApiHandler(
       .select({
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
       })
       .from(reminderSchedules)
@@ -183,7 +174,6 @@ export const DELETE = createApiHandler(
       message: "Reminder berhasil dihapus",
       deletedReminder: {
         id: reminder.id,
-        medicationName: reminder.medicationName,
         scheduledTime: reminder.scheduledTime,
       },
     };

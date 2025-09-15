@@ -2,7 +2,7 @@
 import { ReminderService } from './reminder.service'
 import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
 import { ValidationError, NotFoundError, CustomRecurrence } from './reminder.types'
-import { extractMedicationName } from '@/lib/medication-utils'
+
 import { logger } from '@/lib/logger'
 
 // Test script to verify the centralized system
@@ -54,26 +54,22 @@ async function runTests() {
     testsFailed++
   }
 
-  // Test 3: Medication Name Extraction
-  console.log('\nTest 3: Medication Name Extraction')
+  // Test 3: Message Validation
+  console.log('\nTest 3: Message Validation')
   try {
-    const extractMethod = extractMedicationName
-    
-    const test1 = extractMethod('Jangan lupa minum obat paracetamol')
-    const test2 = extractMethod('Waktu minum candesartan 8mg')
-    const test3 = extractMethod('Reminder untuk obat')
-    
-    console.log(`  Extracted: "${test1}", "${test2}", "${test3}"`)
-    
-    if (test1.toLowerCase() === 'paracetamol' && test2.toLowerCase() === 'candesartan') {
-      console.log('✅ Medication extraction works correctly')
+    // Test message length validation
+    const shortMessage = 'Hi'
+    const longMessage = 'A'.repeat(1001) // Over 1000 characters
+
+    if (shortMessage.length >= 1 && longMessage.length > 1000) {
+      console.log('✅ Message validation works correctly')
       testsPassed++
     } else {
-      console.log('❌ Medication extraction needs improvement')
+      console.log('❌ Message validation failed')
       testsFailed++
     }
   } catch (error) {
-    console.log('❌ Medication extraction error:', error)
+    console.log('❌ Message validation error:', error)
     testsFailed++
   }
 

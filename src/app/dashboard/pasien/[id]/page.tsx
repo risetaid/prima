@@ -46,7 +46,6 @@ interface ApiHealthNote {
 
 interface CompletedReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;

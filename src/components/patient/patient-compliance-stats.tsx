@@ -4,7 +4,6 @@ import { Calendar } from "lucide-react";
 
 interface CompletedReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;

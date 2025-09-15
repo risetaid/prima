@@ -140,7 +140,7 @@ export class PatientService {
         id: c.id,
         visitDate: c.visitDate,
         visitTime: c.visitTime,
-        medicationsTaken: c.medicationsTaken,
+
         patientCondition: c.patientCondition,
         notes: c.notes,
         confirmedAt: c.confirmedAt,
@@ -157,8 +157,7 @@ export class PatientService {
         message: l.message,
         sentAt: l.sentAt,
         status: l.status,
-        medicationName: l.medicationName,
-        dosage: l.dosage,
+
       })),
 
       complianceRate: rate,

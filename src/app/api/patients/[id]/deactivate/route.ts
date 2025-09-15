@@ -54,7 +54,7 @@ export async function POST(
     // Send WhatsApp ACK
     try {
       const to = formatWhatsAppNumber(patient.phoneNumber)
-      const body = `Baik ${patient.name}, kami akan berhenti mengirimkan reminder. 🛑\n\nSemua pengingat obat telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
+      const body = `Baik ${patient.name}, kami akan berhenti mengirimkan reminder. 🛑\n\nSemua pengingat kesehatan telah dinonaktifkan. Kami tetap mendoakan kesehatan Anda.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
       await sendWhatsAppMessage({ to, body })
     } catch {}
 

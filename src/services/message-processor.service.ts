@@ -46,7 +46,7 @@ export interface MessageIntent {
 }
 
 export interface MessageEntity {
-  type: 'medication' | 'time' | 'date' | 'symptom' | 'emergency_level'
+  type: 'time' | 'date' | 'symptom' | 'emergency_level'
   value: string
   confidence: number
   position: { start: number; end: number }
@@ -77,14 +77,13 @@ export class MessageProcessorService {
   ]
 
   private readonly CONFIRMATION_TAKEN_KEYWORDS = [
-    'sudah', 'udh', 'sudah minum', 'udh minum', 'sudah diminum', 'udh diminum',
-    'minum', 'telah minum', 'sudah ambil', 'ambil obat', 'sudah makan',
-    'makan obat', 'done', 'selesai', 'sudah selesai'
+    'sudah', 'udh', 'sudah selesai', 'udh selesai', 'sudah lakukan', 'udh lakukan',
+    'selesai', 'telah selesai', 'sudah lakukan', 'done', 'selesai', 'sudah selesai'
   ]
 
   private readonly CONFIRMATION_MISSED_KEYWORDS = [
-    'belum', 'blm', 'belum minum', 'blm minum', 'belum diminum', 'lupa',
-    'lupa minum', 'skip', 'lewat', 'ga minum', 'tidak minum', 'belum ambil'
+    'belum', 'blm', 'belum selesai', 'blm selesai', 'belum lakukan', 'lupa',
+    'lupa lakukan', 'skip', 'lewat', 'ga lakukan', 'tidak lakukan', 'belum lakukan'
   ]
 
   private readonly CONFIRMATION_LATER_KEYWORDS = [
@@ -273,7 +272,6 @@ export class MessageProcessorService {
     const entities: MessageEntity[] = []
 
     // Extract different types of entities
-    entities.push(...this.extractMedicationEntities(message))
     entities.push(...this.extractTimeEntities(message))
     entities.push(...this.extractEmergencyEntities(message))
 
@@ -523,23 +521,7 @@ export class MessageProcessorService {
     }
   }
 
-  /**
-   * Extract medication entities from message
-   */
-  private extractMedicationEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
-    const medicationPattern = /\b(?:obat|pil|kapsul|tablet|syrup|salep)\s+([a-zA-Z\s]+)/gi
-    let match
-    while ((match = medicationPattern.exec(message)) !== null) {
-      entities.push({
-        type: 'medication',
-        value: match[1].trim(),
-        confidence: 0.8,
-        position: { start: match.index, end: match.index + match[0].length }
-      })
-    }
-    return entities
-  }
+
 
   /**
    * Extract time entities from message

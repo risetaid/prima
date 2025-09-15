@@ -56,7 +56,7 @@ async function testConfirmationFlow() {
 
     const schedule = activeSchedules[0];
     console.log(
-      `✅ Found active reminder schedule: ${schedule.medicationName} at ${schedule.scheduledTime}`
+      `✅ Found active reminder schedule: Pengingat at ${schedule.scheduledTime}`
     );
 
     // 3. Simulate sending a reminder (create reminder log)
@@ -67,11 +67,11 @@ async function testConfirmationFlow() {
       .values({
         reminderScheduleId: schedule.id,
         patientId: patient.id,
-        message: `Halo ${patient.name}, jangan lupa minum obat ${schedule.medicationName} pada waktu yang tepat.`,
+        message: `Halo ${patient.name}, jangan lupa minum obat pada waktu yang tepat.`,
         phoneNumber: patient.phoneNumber,
         sentAt: new Date(),
         status: "DELIVERED",
-        confirmationMessage: `Halo ${patient.name}, apakah sudah diminum obat ${schedule.medicationName}? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`,
+        confirmationMessage: `Halo ${patient.name}, apakah sudah diminum obat? Silakan balas "SUDAH" jika sudah diminum atau "BELUM" jika belum.`,
         confirmationSentAt: new Date(Date.now() + 18 * 60 * 1000), // 18 minutes later
         confirmationStatus: "PENDING",
       })

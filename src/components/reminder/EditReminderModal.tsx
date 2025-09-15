@@ -26,7 +26,6 @@ interface ContentItem {
 
 interface ScheduledReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   nextReminderDate: string;
   customMessage?: string;
@@ -57,9 +56,9 @@ export function EditReminderModal({
   React.useEffect(() => {
     if (isOpen && reminder) {
       setEditTime(reminder.scheduledTime);
-      setEditMessage(
-        reminder.customMessage || `Minum obat ${reminder.medicationName}`
-      );
+       setEditMessage(
+         reminder.customMessage || "Pengingat obat"
+       );
       setSelectedContent(reminder.attachedContent || []);
       setIsUpdating(false);
     }
@@ -168,10 +167,9 @@ export function EditReminderModal({
             <h4 className="text-sm font-medium text-gray-700 mb-1">
               Pengingat Saat Ini:
             </h4>
-            <p className="font-medium text-gray-900">
-              {reminder.customMessage ||
-                `Minum obat ${reminder.medicationName}`}
-            </p>
+             <p className="font-medium text-gray-900">
+               {reminder.customMessage || "Pengingat obat"}
+             </p>
             <p className="text-sm text-gray-600">
               {formatDate(reminder.nextReminderDate)} -{" "}
               {reminder.scheduledTime}
@@ -186,8 +184,7 @@ export function EditReminderModal({
               </h4>
               <div className="bg-white p-3 rounded border text-sm text-gray-800 whitespace-pre-line max-h-32 overflow-y-auto">
                 {generatePreviewMessage(
-                  editMessage.trim() ||
-                    `Minum obat ${reminder?.medicationName || "obat"}`,
+                   editMessage.trim() || "Pengingat obat",
                   selectedContent
                 )}
               </div>

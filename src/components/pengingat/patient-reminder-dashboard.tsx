@@ -11,7 +11,6 @@ import type { Reminder, ReminderStats, ContentItem } from "@/components/penginga
 
 interface ScheduledReminderApi {
   id: string;
-  medicationName?: string;
   scheduledTime?: string;
   nextReminderDate?: string;
   customMessage?: string;
@@ -20,7 +19,6 @@ interface ScheduledReminderApi {
 
 interface PendingReminderApi {
   id: string;
-  medicationName?: string;
   scheduledTime?: string;
   sentDate?: string;
   customMessage?: string;
@@ -28,61 +26,6 @@ interface PendingReminderApi {
 
 interface CompletedReminderApi {
   id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  completedDate?: string;
-  customMessage?: string;
-  medicationTaken?: boolean;
-  confirmedAt?: string;
-}
-
-interface ScheduledReminderApi {
-  id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  nextReminderDate?: string;
-  customMessage?: string;
-  attachedContent?: ContentItem[];
-}
-
-interface PendingReminderApi {
-  id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  sentDate?: string;
-  customMessage?: string;
-}
-
-interface CompletedReminderApi {
-  id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  completedDate?: string;
-  customMessage?: string;
-  medicationTaken?: boolean;
-  confirmedAt?: string;
-}
-
-interface ScheduledReminderApi {
-  id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  nextReminderDate?: string;
-  customMessage?: string;
-  attachedContent?: ContentItem[];
-}
-
-interface PendingReminderApi {
-  id: string;
-  medicationName?: string;
-  scheduledTime?: string;
-  sentDate?: string;
-  customMessage?: string;
-}
-
-interface CompletedReminderApi {
-  id: string;
-  medicationName?: string;
   scheduledTime?: string;
   completedDate?: string;
   customMessage?: string;
@@ -140,7 +83,6 @@ export function PatientReminderDashboard({
         const data = await response.json();
         const mappedData = data.map((item: ScheduledReminderApi) => ({
           id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
             item.nextReminderDate || new Date().toISOString().split("T")[0],
@@ -164,7 +106,6 @@ export function PatientReminderDashboard({
         const data = await response.json();
         const mappedData = data.map((item: PendingReminderApi) => ({
           id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate: item.sentDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
@@ -186,7 +127,6 @@ export function PatientReminderDashboard({
         const data = await response.json();
         const mappedData = data.map((item: CompletedReminderApi) => ({
           id: item.id,
-          medicationName: item.medicationName || "Obat tidak diketahui",
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
             item.completedDate || new Date().toISOString().split("T")[0],
@@ -254,7 +194,7 @@ export function PatientReminderDashboard({
   const handleEditReminder = (reminder: Reminder) => {
     setEditingReminder(reminder);
     setEditFormData({
-      message: reminder.customMessage || reminder.medicationName || "",
+      message: reminder.customMessage || "",
       time: reminder.scheduledTime || "",
     });
     setSelectedContent(reminder.attachedContent || []);

@@ -12,7 +12,7 @@ import {
 import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
-import { extractMedicationName } from "@/lib/medication-utils";
+
 import { db, patients, reminderLogs } from "@/db";
 import { ReminderError } from "./reminder.types";
 import { eq } from "drizzle-orm";
@@ -69,17 +69,16 @@ export class ReminderService {
       const reminderDate = new Date(dateString);
       if (isNaN(reminderDate.getTime())) continue;
 
-      const schedule = await this.repository.insert({
-        patientId: dto.patientId,
-        medicationName: extractMedicationName(dto.message),
-        scheduledTime: dto.time,
-        frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
-        startDate: reminderDate,
-        endDate: reminderDate,
-        isActive: true,
-        customMessage: dto.message,
-        createdById: dto.createdById,
-      });
+       const schedule = await this.repository.insert({
+         patientId: dto.patientId,
+         scheduledTime: dto.time,
+         frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
+         startDate: reminderDate,
+         endDate: reminderDate,
+         isActive: true,
+         customMessage: dto.message,
+         createdById: dto.createdById,
+       });
 
       createdSchedules.push(schedule);
 
@@ -124,14 +123,9 @@ export class ReminderService {
     }
 
     // Update reminder
-    const medicationName = extractMedicationName(
-      dto.customMessage,
-      reminder.medicationName || undefined
-    );
     const updated = await this.repository.update(id, {
       scheduledTime: dto.reminderTime,
       customMessage: dto.customMessage,
-      medicationName,
       updatedAt: getWIBTime(),
     });
 
@@ -160,7 +154,6 @@ export class ReminderService {
       message: "Reminder berhasil dihapus",
       deletedReminder: {
         id: reminder.id,
-        medicationName: reminder.medicationName,
         scheduledTime: reminder.scheduledTime,
       },
     };

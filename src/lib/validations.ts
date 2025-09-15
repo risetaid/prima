@@ -22,8 +22,6 @@ export const PatientUpdateSchema = PatientCreateSchema.partial()
 // Reminder validation schemas
 export const ReminderCreateSchema = z.object({
   patientId: z.string().uuid('Invalid patient ID'),
-  medicationName: z.string().min(1, 'Medication name is required').max(100),
-  dosage: z.string().max(50).optional(),
   doctorName: z.string().max(100).optional(),
   scheduledTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (HH:MM)'),
   frequency: z.enum(['CUSTOM', 'CUSTOM_RECURRENCE']),
@@ -46,8 +44,6 @@ export const ManualConfirmationCreateSchema = z.object({
   reminderLogId: z.string().uuid().optional(),
   visitDate: z.string().datetime(),
   visitTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/),
-  medicationsTaken: z.boolean(),
-  medicationsMissed: z.array(z.string()).default([]),
   patientCondition: z.enum(['GOOD', 'FAIR', 'POOR']),
   symptomsReported: z.array(z.string()).default([]),
   notes: z.string().max(500).optional(),

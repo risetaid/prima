@@ -30,8 +30,6 @@ export async function GET(
         reminderLogId: manualConfirmations.reminderLogId,
         visitDate: manualConfirmations.visitDate,
         visitTime: manualConfirmations.visitTime,
-        medicationsTaken: manualConfirmations.medicationsTaken,
-        medicationsMissed: manualConfirmations.medicationsMissed,
         confirmedAt: manualConfirmations.confirmedAt,
         notes: manualConfirmations.notes
       })
@@ -44,8 +42,7 @@ export async function GET(
     // Get associated data for each confirmation
     const completedReminders = []
     for (const confirmation of confirmations) {
-      let medicationName = 'Obat'
-      let customMessage = `Minum obat ${medicationName}`
+      let customMessage = 'Pengingat obat'
       let sentAt = null
 
       // Get reminder log details if available
@@ -62,61 +59,47 @@ export async function GET(
         if (logResult.length > 0) {
           sentAt = logResult[0].sentAt
 
-          // Get schedule details if available
-          if (logResult[0].reminderScheduleId) {
-            const scheduleResult = await db
-              .select({
-                medicationName: reminderSchedules.medicationName,
-                customMessage: reminderSchedules.customMessage
-              })
-              .from(reminderSchedules)
-              .where(
-                and(
-                  eq(reminderSchedules.id, logResult[0].reminderScheduleId),
-                  isNull(reminderSchedules.deletedAt)
-                )
-              )
-              .limit(1)
+           // Get schedule details if available
+           if (logResult[0].reminderScheduleId) {
+             const scheduleResult = await db
+               .select({
+                 customMessage: reminderSchedules.customMessage
+               })
+               .from(reminderSchedules)
+               .where(
+                 and(
+                   eq(reminderSchedules.id, logResult[0].reminderScheduleId),
+                   isNull(reminderSchedules.deletedAt)
+                 )
+               )
+               .limit(1)
 
-            if (scheduleResult.length > 0) {
-              medicationName = scheduleResult[0].medicationName || medicationName
-              customMessage = scheduleResult[0].customMessage || customMessage
-            }
-          }
+             if (scheduleResult.length > 0) {
+               customMessage = scheduleResult[0].customMessage || customMessage
+             }
+           }
         }
       }
 
-      // Use medications data from confirmation if available
-      if (confirmation.medicationsTaken && Array.isArray(confirmation.medicationsTaken) && confirmation.medicationsTaken.length > 0) {
-        medicationName = confirmation.medicationsTaken[0]
-      } else if (confirmation.medicationsMissed && Array.isArray(confirmation.medicationsMissed) && confirmation.medicationsMissed.length > 0) {
-        medicationName = confirmation.medicationsMissed[0]
-      }
-
-      completedReminders.push({
-        id: confirmation.id,
-        patientId: confirmation.patientId,
-        reminderLogId: confirmation.reminderLogId,
-        visitDate: confirmation.visitDate,
-        visitTime: confirmation.visitTime,
-        medicationsTaken: confirmation.medicationsTaken,
-        medicationsMissed: confirmation.medicationsMissed,
-        confirmedAt: confirmation.confirmedAt,
-        notes: confirmation.notes,
-        medicationName,
-        customMessage,
-        sentAt
-      })
+        completedReminders.push({
+          id: confirmation.id,
+          patientId: confirmation.patientId,
+          reminderLogId: confirmation.reminderLogId,
+          visitDate: confirmation.visitDate,
+          visitTime: confirmation.visitTime,
+          confirmedAt: confirmation.confirmedAt,
+          notes: confirmation.notes,
+          customMessage,
+          sentAt
+        })
     }
 
     // Transform to match frontend interface
     const formattedReminders = completedReminders.map(reminder => ({
       id: reminder.id,
-      medicationName: reminder.medicationName,
       scheduledTime: reminder.visitTime,
       completedDate: reminder.visitDate.toISOString().split('T')[0],
       customMessage: reminder.customMessage,
-      medicationTaken: reminder.medicationsTaken,
       confirmedAt: convertUTCToWIBString(reminder.confirmedAt),
       sentAt: reminder.sentAt ? reminder.sentAt.toISOString() : null,
       notes: reminder.notes

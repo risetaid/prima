@@ -12,7 +12,6 @@ async function checkReminders() {
       .select({
         id: reminderSchedules.id,
         patientName: patients.name,
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
         isActive: reminderSchedules.isActive
@@ -30,7 +29,7 @@ async function checkReminders() {
 
     console.log(`\n📋 Found ${todayReminders.length} active reminders for today:`)
     todayReminders.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.medicationName} at ${reminder.scheduledTime}`)
+      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime}`)
     })
 
     // Get today's reminder logs
@@ -58,7 +57,6 @@ async function checkReminders() {
       .select({
         id: reminderSchedules.id,
         patientName: patients.name,
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime
       })
       .from(reminderSchedules)
@@ -81,7 +79,7 @@ async function checkReminders() {
 
     console.log(`\n✅ Reminders that would be sent with smart duplicate prevention: ${remindersToSend.length}`)
     remindersToSend.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.medicationName} at ${reminder.scheduledTime}`)
+      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime}`)
     })
 
   } catch (error) {

@@ -56,8 +56,7 @@ export class PatientQueryBuilder {
     const query = db
       .select({
         id: reminderSchedules.id,
-        medicationName: reminderSchedules.medicationName,
-        dosage: reminderSchedules.dosage,
+
         scheduledTime: reminderSchedules.scheduledTime,
         isActive: reminderSchedules.isActive,
         createdAt: reminderSchedules.createdAt,
@@ -117,7 +116,7 @@ export class PatientQueryBuilder {
         id: manualConfirmations.id,
         visitDate: manualConfirmations.visitDate,
         visitTime: manualConfirmations.visitTime,
-        medicationsTaken: manualConfirmations.medicationsTaken,
+
         patientCondition: manualConfirmations.patientCondition,
         notes: manualConfirmations.notes,
         confirmedAt: manualConfirmations.confirmedAt,

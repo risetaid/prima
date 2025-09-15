@@ -63,13 +63,7 @@ export async function GET(
       nama: customVariablesMap.nama || patient.name || '',
       nomor: customVariablesMap.nomor || patient.phoneNumber || '',
 
-      // Medication data (priority: custom > reminder schedule)
-      obat: customVariablesMap.obat ||
-            recentReminders[0]?.medicationName || '',
 
-      // Dosage data (priority: custom > reminder schedule)
-      dosis: customVariablesMap.dosis ||
-             recentReminders[0]?.dosage || '',
 
       // Doctor data (priority: custom > current user > assigned volunteer > medical record recorder)
       dokter: customVariablesMap.dokter ||

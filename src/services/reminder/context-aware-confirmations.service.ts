@@ -12,7 +12,6 @@ import { LinkedConfirmationService } from '@/services/reminder/linked-confirmati
 export interface ConfirmationContext {
   patientId: string
   reminderLogId: string
-  medicationName: string
   scheduledTime: string
   timeSinceSent: number // minutes
   previousConfirmations: number
@@ -90,12 +89,10 @@ export class ContextAwareConfirmationsService {
       const reminderLog = await db
         .select({
           patientId: patients.id,
-          phoneNumber: patients.phoneNumber,
-          medicationName: reminderSchedules.medicationName
+          phoneNumber: patients.phoneNumber
         })
         .from(reminderLogs)
         .leftJoin(patients, eq(reminderLogs.patientId, patients.id))
-        .leftJoin(reminderSchedules, eq(reminderLogs.reminderScheduleId, reminderSchedules.id))
         .where(eq(reminderLogs.id, reminderLogId))
         .limit(1)
 
@@ -161,14 +158,12 @@ export class ContextAwareConfirmationsService {
     // Get medication info
     const schedule = await db
       .select({
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime
       })
       .from(reminderSchedules)
       .where(log.reminderScheduleId ? eq(reminderSchedules.id, log.reminderScheduleId) : undefined)
       .limit(1)
 
-    const medicationName = schedule.length > 0 ? schedule[0].medicationName || 'obat' : 'obat'
     const scheduledTime = schedule.length > 0 ? schedule[0].scheduledTime : 'unknown'
 
     // Calculate time since sent
@@ -186,7 +181,6 @@ export class ContextAwareConfirmationsService {
     return {
       patientId: log.patientId,
       reminderLogId: log.id,
-      medicationName,
       scheduledTime,
       timeSinceSent,
       previousConfirmations: confirmationStats.totalConfirmations,
@@ -215,10 +209,7 @@ export class ContextAwareConfirmationsService {
       elements.push('encouragement_needed')
     }
 
-    // Medication-specific elements
-    if (context.medicationName && context.medicationName !== 'obat') {
-      elements.push('medication_specific')
-    }
+    // No medication-specific elements needed
 
     // Emergency mode
     if (context.emergencyMode) {
@@ -258,7 +249,7 @@ export class ContextAwareConfirmationsService {
     context: ConfirmationContext,
     analysis: ConfirmationAnalysis
   ): string {
-    const baseMessage = `Halo! Sudah minum ${context.medicationName} yang dijadwalkan pukul ${context.scheduledTime}?`
+    const baseMessage = `Halo! Sudah menyelesaikan rutinitas kesehatan yang dijadwalkan pukul ${context.scheduledTime}?`
 
     let personalizedMessage = baseMessage
 
@@ -270,16 +261,16 @@ export class ContextAwareConfirmationsService {
 
     // Add encouragement or celebration
     if (analysis.reminderType === 'celebration') {
-      personalizedMessage += `\n\n🎉 Hebat! Sudah ${context.adherenceStreak} hari berturut-turut patuh minum obat!`
+      personalizedMessage += `\n\n🎉 Hebat! Sudah ${context.adherenceStreak} hari berturut-turut konsisten dengan rutinitas kesehatan!`
     } else if (analysis.encouragementNeeded) {
       personalizedMessage += `\n\n💙 Kami di sini untuk mendukung perjalanan kesehatan Anda.`
     }
 
     // Add response options
     personalizedMessage += `\n\nBalas:`
-    personalizedMessage += `\n✅ SUDAH - jika sudah minum`
+    personalizedMessage += `\n✅ SUDAH - jika sudah selesai`
     personalizedMessage += `\n❌ BELUM - jika belum sempat`
-    personalizedMessage += `\n⏰ NANTI - jika akan minum sebentar lagi`
+    personalizedMessage += `\n⏰ NANTI - jika akan selesai sebentar lagi`
 
     // Add emergency contact if needed
     if (analysis.reminderType === 'urgent') {
@@ -421,7 +412,7 @@ export class ContextAwareConfirmationsService {
    */
   private getDefaultConfirmation(): AdaptiveConfirmation {
     return {
-      message: `Halo! Sudah minum obat yang dijadwalkan?\n\nBalas:\n✅ SUDAH\n❌ BELUM\n⏰ NANTI`,
+      message: `Halo! Sudah menyelesaikan rutinitas kesehatan yang dijadwalkan?\n\nBalas:\n✅ SUDAH\n❌ BELUM\n⏰ NANTI`,
       priority: 'medium',
       followUpDelay: 15,
       escalationLevel: 1,

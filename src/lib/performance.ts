@@ -7,7 +7,7 @@ import { NextWebVitalsMetric } from 'next/app'
 
 /**
  * Report Web Vitals to analytics service
- * Can be extended to send to services like Google Analytics, Vercel Analytics, etc.
+ * Can be extended to send to services like Google Analytics, etc.
  */
 export function reportWebVitals(metric: NextWebVitalsMetric) {
   // Log to console in development

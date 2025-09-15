@@ -37,7 +37,7 @@ export class EnhancedVerificationService {
 
 Halo! Terima kasih telah bergabung dengan sistem monitoring kesehatan PRIMA.
 
-Saya akan membantu Anda menyelesaikan proses verifikasi agar bisa menerima pengingat obat secara otomatis.
+Saya akan membantu Anda menyelesaikan proses verifikasi agar bisa menerima pengingat kesehatan secara otomatis.
 
 Apakah Anda bersedia melanjutkan? (YA/TIDAK)`,
       expectedResponse: 'yes_no',
@@ -76,7 +76,7 @@ Apakah nomor WhatsApp ini milik Anda? (YA/TIDAK)`,
 
 Dengan melanjutkan, Anda menyetujui:
 
-✅ Menerima pengingat minum obat
+✅ Menerima pengingat kesehatan
 ✅ Data kesehatan Anda akan dijaga kerahasiaannya
 ✅ Dapat berhenti kapan saja dengan ketik "BERHENTI"
 
@@ -97,7 +97,7 @@ Apakah Anda menyetujui persyaratan ini? (YA/TIDAK)`,
 
 Selamat! Anda telah berhasil diverifikasi.
 
-✅ Anda akan menerima pengingat minum obat
+✅ Anda akan menerima pengingat kesehatan
 ✅ Tim PRIMA akan memantau kesehatan Anda
 ✅ Hubungi relawan jika ada pertanyaan
 

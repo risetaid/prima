@@ -7,7 +7,6 @@ import { UserButton } from '@clerk/nextjs'
 
 interface CompletedReminder {
   id: string
-  medicationName: string
   scheduledTime: string
   completedDate: string
   customMessage?: string
@@ -122,7 +121,7 @@ export default function CompletedRemindersPage() {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 mb-1">
-                      {reminder.customMessage || `Minum obat ${reminder.medicationName}`}
+                      {reminder.customMessage || `Minum obat`}
                     </h3>
                     <p className="text-gray-500 text-sm">
                       {formatDate(reminder.completedDate)}

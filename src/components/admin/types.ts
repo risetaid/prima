@@ -43,6 +43,6 @@ export const categoryColors = {
 }
 
 export const commonVariables = [
-  '{nama}', '{obat}', '{dosis}', '{waktu}', '{tanggal}',
+  '{nama}', '{waktu}', '{tanggal}',
   '{dokter}', '{rumahSakit}', '{volunteer}', '{nomor}'
 ]

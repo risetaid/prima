@@ -52,8 +52,6 @@ type ValidatedContent = {
 type ReminderSchedule = {
   id: string;
   patientId: string;
-  medicationName: string;
-  dosage: string | null;
   doctorName: string | null;
   scheduledTime: string;
   frequency: string;
@@ -92,8 +90,6 @@ export async function GET(
         // Reminder fields
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
-        dosage: reminderSchedules.dosage,
         doctorName: reminderSchedules.doctorName,
         scheduledTime: reminderSchedules.scheduledTime,
         frequency: reminderSchedules.frequency,
@@ -117,8 +113,6 @@ export async function GET(
     const formattedReminders = reminders.map((reminder) => ({
       id: reminder.id,
       patientId: reminder.patientId,
-      medicationName: reminder.medicationName,
-      dosage: reminder.dosage,
       doctorName: reminder.doctorName,
       scheduledTime: reminder.scheduledTime,
       frequency: reminder.frequency,
@@ -345,7 +339,6 @@ async function createReminderSchedules(
       .insert(reminderSchedules)
       .values({
         patientId,
-        medicationName: extractMedicationName(message),
         scheduledTime: time,
         frequency: isCustomRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
         startDate: reminderDate,
@@ -423,63 +416,7 @@ async function sendImmediateReminders(
   }
 }
 
-function extractMedicationName(message: string): string {
-  if (!message || typeof message !== "string") {
-    return "Obat"; // Safe default
-  }
 
-  // Clean and normalize the message
-  const cleanMessage = message.trim().toLowerCase();
-  if (cleanMessage.length === 0) {
-    return "Obat";
-  }
-
-  // Enhanced extraction - look for common medication patterns
-  const words = cleanMessage.split(/\s+/);
-  const medicationKeywords = [
-    "obat",
-    "tablet",
-    "kapsul",
-    "sirup",
-    // Common Indonesian medications
-    "candesartan",
-    "paracetamol",
-    "amoxicillin",
-    "metformin",
-    "amlodipine",
-    "aspirin",
-    "atorvastatin",
-    "captopril",
-    "dexamethasone",
-    "furosemide",
-    "insulin",
-    "omeprazole",
-  ];
-
-  // Look for medication keywords
-  for (const word of words) {
-    // Clean word (remove punctuation)
-    const cleanWord = word.replace(/[^\w]/g, "");
-    if (cleanWord.length < 3) continue; // Skip very short words
-
-    if (medicationKeywords.some((keyword) => cleanWord.includes(keyword))) {
-      return cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1); // Capitalize
-    }
-  }
-
-  // Fallback: look for words after "obat" or "minum"
-  const obatIndex = words.findIndex(
-    (word) => word.includes("obat") || word.includes("minum")
-  );
-  if (obatIndex !== -1 && obatIndex + 1 < words.length) {
-    const nextWord = words[obatIndex + 1].replace(/[^\w]/g, "");
-    if (nextWord.length >= 3) {
-      return nextWord.charAt(0).toUpperCase() + nextWord.slice(1);
-    }
-  }
-
-  return "Obat"; // Safe default
-}
 
 
 

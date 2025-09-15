@@ -136,8 +136,7 @@ export const manualConfirmations = pgTable("manual_confirmations", {
 	reminderLogId: uuid("reminder_log_id"),
 	visitDate: timestamp("visit_date", { withTimezone: true, mode: 'string' }).notNull(),
 	visitTime: text("visit_time").notNull(),
-	medicationsTaken: boolean("medications_taken").notNull(),
-	medicationsMissed: text("medications_missed").array().default([""]).notNull(),
+
 	patientCondition: patientCondition("patient_condition").notNull(),
 	symptomsReported: text("symptoms_reported").array().default([""]).notNull(),
 	notes: text("notes"),

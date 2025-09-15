@@ -18,8 +18,6 @@ export function TemplatePreviewModal({ isOpen, onOpenChange, template }: Templat
   const renderPreviewText = (text: string, variables: string[]) => {
     const sampleData: Record<string, string> = {
       '{nama}': 'Ibu Sari',
-      '{obat}': 'Paracetamol',
-      '{dosis}': '500mg',
       '{waktu}': '08:00',
       '{tanggal}': '15 Januari 2024',
       '{dokter}': 'Dr. Ahmad',

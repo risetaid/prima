@@ -8,7 +8,6 @@ import { toast } from "sonner";
 
 interface PendingReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   sentDate: string;
   customMessage?: string;
@@ -196,7 +195,7 @@ export default function PendingUpdatePage() {
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 mb-1">
                         {reminder.customMessage ||
-                          `Minum obat ${reminder.medicationName}`}
+                          `Minum obat`}
                       </h3>
                       <p className="text-gray-600 text-sm">
                         {formatDate(reminder.sentDate)}

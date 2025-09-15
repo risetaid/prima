@@ -10,7 +10,6 @@ export class ReminderRepository {
       .select({
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
         endDate: reminderSchedules.endDate,
@@ -32,8 +31,7 @@ export class ReminderRepository {
       .select({
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
-        dosage: reminderSchedules.dosage,
+
         doctorName: reminderSchedules.doctorName,
         scheduledTime: reminderSchedules.scheduledTime,
         frequency: reminderSchedules.frequency,

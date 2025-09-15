@@ -145,40 +145,7 @@ export const formatWhatsAppNumber = (phoneNumber: string): string => {
   return cleaned // Clean number format for Fonnte
 }
 
-/**
- * Create medication reminder message template
- */
-export const createMedicationReminder = (
-  patientName: string,
-  medicationName: string,
-  dosage: string,
-  time: string,
-  educationLink?: string
-): string => {
-  let message = `🏥 *Pengingat Minum Obat - PRIMA*
 
-Halo ${patientName},
-
-⏰ Saatnya minum obat:
-💊 *${medicationName}* 
-📏 Dosis: ${dosage}
-🕐 Waktu: ${time}
-
-Jangan lupa minum obat sesuai jadwal ya! 
-
-✅ Balas "SUDAH" jika sudah minum obat
-❌ Balas "BELUM" jika belum sempat
-
-Semoga lekas sembuh! 🙏`
-
-  if (educationLink) {
-    message += `\n\n📖 Info lebih lanjut: ${educationLink}`
-  }
-
-  message += '\n\n_Pesan otomatis dari PRIMA - Sistem Monitoring Pasien_'
-
-  return message
-}
 
 /**
  * Create appointment reminder message
@@ -219,7 +186,7 @@ export const createVerificationPoll = (patientName: string): WhatsAppMessage => 
 
 Halo ${patientName}!
 
-Apakah Anda bersedia menerima pengingat obat dari PRIMA?
+Apakah Anda bersedia menerima pengingat kesehatan dari PRIMA?
 
 Pilih salah satu opsi di bawah ini:`,
     choices: 'Ya,Tidak',
@@ -228,34 +195,7 @@ Pilih salah satu opsi di bawah ini:`,
   }
 }
 
-/**
- * Create medication reminder poll message
- */
-export const createMedicationPoll = (
-  patientName: string,
-  medicationName: string,
-  dosage: string,
-  time: string
-): WhatsAppMessage => {
-  return {
-    to: '', // Will be set by caller
-    body: `🏥 *Pengingat Minum Obat - PRIMA*
 
-Halo ${patientName},
-
-⏰ Saatnya minum obat:
-💊 *${medicationName}* 
-📏 Dosis: ${dosage}
-🕐 Waktu: ${time}
-
-Jangan lupa minum obat sesuai jadwal ya!
-
-Pilih status minum obat Anda:`,
-    choices: 'Sudah Minum,Belum Minum',
-    select: 'single',
-    pollname: 'Konfirmasi Obat'
-  }
-}
 
 /**
  * Create follow-up poll message (sent 15 minutes after initial reminder)
@@ -263,10 +203,10 @@ Pilih status minum obat Anda:`,
 export const createFollowUpPoll = (patientName: string): WhatsAppMessage => {
   return {
     to: '', // Will be set by caller
-    body: `Halo ${patientName}, apakah sudah diminum obatnya?`,
+    body: `Halo ${patientName}, apakah sudah menyelesaikan rutinitas kesehatan?`,
     choices: 'Sudah,Belum,Butuh Bantuan',
     select: 'single',
-    pollname: 'Follow-up Obat'
+    pollname: 'Follow-up Kesehatan'
   }
 }
 

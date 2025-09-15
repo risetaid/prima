@@ -31,7 +31,6 @@ interface ContentItem {
 
 interface ScheduledReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   nextReminderDate: string;
   customMessage?: string;

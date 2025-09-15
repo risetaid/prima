@@ -79,7 +79,6 @@ export async function GET(
         confirmationResponseAt: reminderLogs.confirmationResponseAt,
         confirmationSentAt: reminderLogs.confirmationSentAt,
         // Schedule fields
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         customMessage: reminderSchedules.customMessage,
       })
@@ -100,7 +99,6 @@ export async function GET(
     // Transform to match frontend interface
     const formattedReminders = pendingReminders.map((reminder) => ({
       id: reminder.id,
-      medicationName: reminder.medicationName || "Obat",
       scheduledTime: reminder.scheduledTime || "12:00",
       sentDate: reminder.sentAt.toISOString().split("T")[0],
       customMessage: reminder.customMessage || reminder.message,

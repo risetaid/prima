@@ -12,7 +12,6 @@ interface Patient {
 
 interface CompletedReminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
@@ -87,7 +86,7 @@ export function PatientRemindersTab({
               {completedReminders.slice(0, 5).map((reminder) => (
                 <div key={reminder.id} className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
-                    <p className="font-medium">{reminder.customMessage || reminder.medicationName}</p>
+                     <p className="font-medium">{reminder.customMessage || "Pengingat obat"}</p>
                     <p className="text-sm text-gray-500">
                       {new Date(reminder.completedDate).toLocaleDateString('id-ID')} • {reminder.scheduledTime}
                     </p>

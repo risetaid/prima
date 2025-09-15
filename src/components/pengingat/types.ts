@@ -18,7 +18,6 @@ export interface ContentItem {
 
 export interface Reminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;

@@ -69,18 +69,20 @@ export function AddReminderModal({
               <form onSubmit={handleSubmit} className="space-y-6">
                 <PatientInfo patient={patient} />
 
-                <MessageInput
-                  message={formData.message}
-                  onMessageChange={(message) =>
-                    setFormData({ ...formData, message })
-                  }
-                  templates={templates}
-                  autoFillData={autoFillData}
-                  selectedTemplate={selectedTemplate}
-                  onTemplateSelect={setSelectedTemplate}
-                  time={formData.time}
-                  selectedDates={selectedDates}
-                />
+                  <MessageInput
+                    message={formData.message}
+                    onMessageChange={(message) =>
+                      setFormData({ ...formData, message })
+                    }
+                    templates={templates}
+                    autoFillData={autoFillData}
+                    selectedTemplate={selectedTemplate}
+                    onTemplateSelect={setSelectedTemplate}
+                    time={formData.time}
+                    selectedDates={selectedDates}
+                  />
+
+
 
                 <div>
                   <div className="flex items-center justify-between mb-2">

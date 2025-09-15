@@ -13,33 +13,33 @@ interface TemplateData {
 }
 
 const messageTemplates: TemplateData[] = [
-  // REMINDER TEMPLATES - Core medication reminders
+  // REMINDER TEMPLATES - General health reminders
   {
-    templateName: "pengingat-obat-pagi",
+    templateName: "pengingat-pagi",
     templateText:
-      "Selamat pagi {nama}! 🌅 Saatnya minum obat {obat} dosis {dosis}. Semangat menjalani hari! 💊✨",
-    variables: ["{nama}", "{obat}", "{dosis}"],
+      "Selamat pagi {nama}! 🌅 Saatnya menjalani rutinitas kesehatan harian. Semangat menjalani hari! 💪✨",
+    variables: ["{nama}"],
     category: "REMINDER",
   },
   {
-    templateName: "pengingat-obat-siang",
+    templateName: "pengingat-siang",
     templateText:
-      "Halo {nama}! ☀️ Jangan lupa minum obat {obat} jam {waktu}. Tetap semangat! 💪",
-    variables: ["{nama}", "{obat}", "{waktu}"],
+      "Halo {nama}! ☀️ Jangan lupa menjalankan rutinitas kesehatan jam {waktu}. Tetap semangat! 💪",
+    variables: ["{nama}", "{waktu}"],
     category: "REMINDER",
   },
   {
-    templateName: "pengingat-obat-malam",
+    templateName: "pengingat-malam",
     templateText:
-      "Selamat malam {nama}! 🌙 Waktunya minum obat {obat}. Istirahat yang cukup ya! 💊😴",
-    variables: ["{nama}", "{obat}"],
+      "Selamat malam {nama}! 🌙 Waktunya istirahat yang cukup. Jaga kesehatan Anda! 😴",
+    variables: ["{nama}"],
     category: "REMINDER",
   },
   {
-    templateName: "pengingat-makan-dulu",
+    templateName: "pengingat-makan-sehat",
     templateText:
-      "Hai {nama}! Sebelum minum obat {obat}, pastikan sudah makan dulu ya. Perut kenyang = obat bekerja optimal! 🍽️💊",
-    variables: ["{nama}", "{obat}"],
+      "Hai {nama}! Pastikan makan makanan sehat dan bergizi untuk menjaga kesehatan! 🍽️💚",
+    variables: ["{nama}"],
     category: "REMINDER",
   },
   {
@@ -117,16 +117,16 @@ const messageTemplates: TemplateData[] = [
     category: "EDUCATIONAL",
   },
   {
-    templateName: "atasi-mual-obat",
+    templateName: "atasi-mual",
     templateText:
-      "Hai {nama}! Kalau mual setelah minum obat, coba dengan biskuit atau air jahe hangat. Kalau terus berlanjut, hubungi dokter! 🫖",
+      "Hai {nama}! Kalau merasa mual, coba dengan biskuit atau air jahe hangat. Kalau terus berlanjut, hubungi dokter! 🫖",
     variables: ["{nama}"],
     category: "EDUCATIONAL",
   },
   {
-    templateName: "pentingnya-kepatuhan",
+    templateName: "pentingnya-konsistensi",
     templateText:
-      "Hai {nama}! Ingat: minum obat tepat waktu & dosis = kunci kesembuhan. Jangan skip ya! Semangat terus! ⏰💊",
+      "Hai {nama}! Ingat: Konsistensi dalam menjaga kesehatan = kunci kesembuhan. Jangan skip rutinitas ya! Semangat terus! ⏰💚",
     variables: ["{nama}"],
     category: "EDUCATIONAL",
   },
@@ -154,8 +154,8 @@ const messageTemplates: TemplateData[] = [
   {
     templateName: "konfirmasi-data",
     templateText:
-      "Halo {nama}! Konfirmasi data: Obat {obat} {dosis}, kontrol ke Dr. {dokter} di {rumahSakit}. Jika ada yang salah, hubungi {volunteer}. ✅",
-    variables: ["{nama}", "{obat}", "{dosis}", "{dokter}", "{rumahSakit}", "{volunteer}"],
+      "Halo {nama}! Konfirmasi data: Kontrol ke Dr. {dokter} di {rumahSakit}. Jika ada yang salah, hubungi {volunteer}. ✅",
+    variables: ["{nama}", "{dokter}", "{rumahSakit}", "{volunteer}"],
     category: "EDUCATIONAL",
   },
 ];

@@ -21,7 +21,6 @@ const reminderRepository = new ReminderRepository();
 interface ReminderSchedule {
   id: string;
   patientId: string;
-  medicationName: string | null;
   scheduledTime: string;
   startDate: Date;
   customMessage: string | null;
@@ -115,7 +114,6 @@ async function fetchReminderSchedules(todayWIB: string, endOfDay: Date, todaySta
     .select({
       id: reminderSchedules.id,
       patientId: reminderSchedules.patientId,
-      medicationName: reminderSchedules.medicationName,
       scheduledTime: reminderSchedules.scheduledTime,
       startDate: reminderSchedules.startDate,
       customMessage: reminderSchedules.customMessage,
@@ -242,13 +240,13 @@ async function processSchedule(schedule: ReminderSchedule, attachmentsBySchedule
     // Rate limiting temporarily disabled
 
     try {
-      // Send WhatsApp medication reminder
-      logger.info("Sending WhatsApp medication reminder", {
+      // Send WhatsApp health reminder
+      logger.info("Sending WhatsApp health reminder", {
         api: true,
         cron: true,
         patientId: schedule.patientId,
         reminderId: schedule.id,
-        medicationName: schedule.medicationName,
+  
         hasCustomMessage: Boolean(schedule.customMessage),
       });
 
@@ -265,16 +263,14 @@ async function processSchedule(schedule: ReminderSchedule, attachmentsBySchedule
         );
       } else {
         // Fallback to template message
-        const templateMessage = `💊 *Pengingat Minum Obat*
+        const templateMessage = `💚 *Pengingat Kesehatan*
 
 Halo ${schedule.patientName}!
 
-Saatnya minum obat:
-🔹 *Obat:* ${schedule.medicationName || "obat Anda"}
-🔹 *Dosis:* sesuai resep
+Saatnya menjalankan rutinitas kesehatan:
 🔹 *Waktu:* ${schedule.scheduledTime}
 
-*Balas setelah minum obat:*
+*Balas setelah menyelesaikan:*
 ✅ SUDAH / SELESAI
 ⏰ BELUM (akan diingatkan lagi)
 🆘 BANTUAN (butuh bantuan relawan)
@@ -301,7 +297,7 @@ Saatnya minum obat:
         debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
         debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
         debugLogs.push(
-          `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+          `   💊 Medication: obat Anda`
         );
         debugLogs.push(`   ⏰ Scheduled: ${schedule.scheduledTime}`);
         debugLogs.push(
@@ -316,7 +312,7 @@ Saatnya minum obat:
         debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
         debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
         debugLogs.push(
-          `   💊 Medication: ${schedule.medicationName || "obat Anda"}`
+          `   💊 Medication: obat Anda`
         );
         debugLogs.push(`   ❌ Error: ${result.error}`);
       }
@@ -332,7 +328,7 @@ Saatnya minum obat:
         status: status,
         message:
           schedule.customMessage ||
-          `Medication reminder for ${schedule.medicationName} at ${schedule.scheduledTime}`,
+          `Medication reminder at ${schedule.scheduledTime}`,
         phoneNumber: schedule.patientPhoneNumber,
         fonnteMessageId: result.messageId,
       };
@@ -359,7 +355,7 @@ Saatnya minum obat:
               patientId: schedule.patientId,
               sentAt: getWIBTime(),
               status: status,
-              message: `Text: Medication reminder for ${schedule.medicationName}`,
+              message: `Text: Medication reminder`,
               phoneNumber: schedule.patientPhoneNumber,
               fonnteMessageId: result.messageId,
             })
@@ -456,9 +452,9 @@ function handleError(error: unknown, processedCount: number, sentCount: number, 
   );
 }
 
-// GET endpoint for Vercel Cron Functions
+// GET endpoint for cron functions
 export async function GET(request: NextRequest) {
-  // Verify this is called by Vercel Cron with secret
+  // Verify this is called by cron with secret
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     console.error("CRON_SECRET environment variable is not set");

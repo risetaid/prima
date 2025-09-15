@@ -58,7 +58,6 @@ export async function GET(
       .select({
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
         endDate: reminderSchedules.endDate,
@@ -159,7 +158,6 @@ export async function GET(
     // Transform to match frontend interface
     const formattedReminders = filteredReminders.map(reminder => ({
       id: reminder.id,
-      medicationName: reminder.medicationName,
       scheduledTime: reminder.scheduledTime,
       nextReminderDate: reminder.startDate.toISOString().split('T')[0],
       customMessage: reminder.customMessage,
@@ -207,8 +205,7 @@ export async function DELETE(
         )
       )
       .returning({
-        id: reminderSchedules.id,
-        medicationName: reminderSchedules.medicationName
+        id: reminderSchedules.id
       })
 
     // Invalidate cache after bulk deletion

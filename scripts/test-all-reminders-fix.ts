@@ -17,7 +17,6 @@ async function testAllRemindersFix() {
         sentAt: reminderLogs.sentAt,
         message: reminderLogs.message,
         // Join with schedule data
-        medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
         customMessage: reminderSchedules.customMessage
@@ -38,8 +37,7 @@ async function testAllRemindersFix() {
       .select({
         id: manualConfirmations.id,
         reminderLogId: manualConfirmations.reminderLogId,
-        visitDate: manualConfirmations.visitDate,
-        medicationsTaken: manualConfirmations.medicationsTaken
+        visitDate: manualConfirmations.visitDate
       })
       .from(manualConfirmations)
       .where(inArray(manualConfirmations.reminderLogId, logIds)) : []
@@ -47,8 +45,7 @@ async function testAllRemindersFix() {
     console.log(`\n📊 Processing ${allReminderLogs.length} individual logs:`)
 
     let pendingCount = 0
-    let completedTakenCount = 0
-    let completedNotTakenCount = 0
+    let completedCount = 0
     let scheduledCount = 0
 
     // Transform results (same logic as the fixed API)
@@ -60,17 +57,12 @@ async function testAllRemindersFix() {
       let id_suffix = log.id
 
       if (confirmation) {
-        status = confirmation.medicationsTaken ? 'completed_taken' : 'completed_not_taken'
+        status = 'completed'
         reminderDate = confirmation.visitDate ? confirmation.visitDate.toISOString().split('T')[0] : reminderDate
         id_suffix = `completed-${confirmation.id}`
 
-        if (confirmation.medicationsTaken) {
-          completedTakenCount++
-          console.log(`✅ Log ${log.id.slice(0,8)}... : COMPLETED_TAKEN`)
-        } else {
-          completedNotTakenCount++
-          console.log(`❌ Log ${log.id.slice(0,8)}... : COMPLETED_NOT_TAKEN`)
-        }
+        completedCount++
+        console.log(`✅ Log ${log.id.slice(0,8)}... : COMPLETED`)
       } else if (log.status === 'DELIVERED') {
         status = 'pending'
         id_suffix = `pending-${log.id}`
@@ -88,7 +80,6 @@ async function testAllRemindersFix() {
 
       return {
         id: `${status}-${id_suffix}`,
-        medicationName: log.medicationName || 'Obat',
         scheduledTime: log.scheduledTime || '12:00',
         reminderDate,
         customMessage: log.customMessage || log.message,
@@ -99,8 +90,7 @@ async function testAllRemindersFix() {
     console.log('\n📈 FINAL RESULTS:')
     console.log(`Total reminders: ${allReminders.length}`)
     console.log(`Pending: ${pendingCount}`)
-    console.log(`Completed Taken: ${completedTakenCount}`)
-    console.log(`Completed Not Taken: ${completedNotTakenCount}`)
+    console.log(`Completed: ${completedCount}`)
     console.log(`Scheduled: ${scheduledCount}`)
 
     console.log('\n✅ EXPECTED: Should now show all 9 reminders!')

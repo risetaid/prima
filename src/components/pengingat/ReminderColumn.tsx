@@ -20,7 +20,6 @@ interface ContentItem {
 
 interface Reminder {
   id: string;
-  medicationName: string;
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
@@ -135,11 +134,9 @@ const renderReminderCard = (
       >
         <div className="flex justify-between items-start mb-2">
           <div>
-            <h3 className={`font-semibold text-lg ${textColor}`}>
-              {reminder.customMessage ||
-                reminder.medicationName ||
-                "Pesan pengingat"}
-            </h3>
+             <h3 className={`font-semibold text-lg ${textColor}`}>
+               {reminder.customMessage || "Pesan pengingat"}
+             </h3>
             <p
               className={`text-sm ${
                 isPending ? "text-gray-600" : "opacity-90"
@@ -190,11 +187,9 @@ const renderSelesaiCard = (reminder: Reminder, index: number) => (
   >
     <div className="flex justify-between items-start mb-2">
       <div>
-        <h3 className="font-semibold text-gray-900">
-          {reminder.customMessage ||
-            reminder.medicationName ||
-            "Pesan pengingat"}
-        </h3>
+         <h3 className="font-semibold text-gray-900">
+           {reminder.customMessage || "Pesan pengingat"}
+         </h3>
         <p className="text-sm text-gray-600">
           {formatDate(reminder.reminderDate)}
         </p>

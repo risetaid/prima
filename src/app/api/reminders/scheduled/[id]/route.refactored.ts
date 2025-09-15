@@ -35,7 +35,6 @@ export async function PUT(
         id: updated.id,
         scheduledTime: updated.scheduledTime,
         customMessage: updated.customMessage,
-        medicationName: updated.medicationName,
         attachedContent: updated.attachedContent,
       },
     })

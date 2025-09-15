@@ -67,7 +67,7 @@ export function TemplateForm({
           name="templateText"
           value={formData.templateText}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onTextChange(e.target.value)}
-          placeholder="Halo {nama}, jangan lupa minum obat {obat} dengan dosis {dosis} pada pukul {waktu}. Terima kasih!"
+          placeholder="Halo {nama}, jangan lupa menjalankan rutinitas kesehatan pada pukul {waktu}. Terima kasih!"
           className="mt-1 min-h-[120px]"
         />
       </div>

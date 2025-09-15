@@ -11,7 +11,6 @@ export * from "./cms-schema";
 
 // Import tables for relations (they are already exported above, so we can use them directly)
 import { users } from "./core-schema";
-import { medications } from "./core-schema";
 import { patients } from "./patient-schema";
 import { medicalRecords } from "./patient-schema";
 
@@ -227,8 +226,7 @@ export const cmsVideosRelations = relations(cmsVideos, ({}) => ({
   // Note: contentAttachments relation removed as it's handled by reminderContentAttachmentsRelations
 }));
 
-export const medicationsRelations = relations(medications, ({}) => ({
-}));
+
 
 export const pollResponsesRelations = relations(pollResponses, ({ one }) => ({
   reminderLog: one(reminderLogs, {

@@ -32,14 +32,12 @@ interface EnhancedTemplate {
 
 interface ContentSelectorProps {
   patientName?: string
-  medicationName?: string
   onMessageGenerated?: (message: string, contentUrl?: string) => void
 }
 
-export default function ContentSelector({ 
-  patientName = '', 
-  medicationName = '', 
-  onMessageGenerated 
+export default function ContentSelector({
+  patientName = '',
+  onMessageGenerated
 }: ContentSelectorProps) {
   const [templates, setTemplates] = useState<EnhancedTemplate[]>([])
   const [articles, setArticles] = useState<ContentItem[]>([])
@@ -91,8 +89,7 @@ export default function ContentSelector({
           contentId: selectedContent,
           contentType: selectedContentType,
           patientData: {
-            nama: patientName,
-            obat: medicationName
+            nama: patientName
           }
         }),
       })
@@ -293,15 +290,7 @@ export default function ContentSelector({
               className="bg-gray-50"
             />
           </div>
-          <div>
-            <Label htmlFor="medicationName">Nama Obat</Label>
-            <Input
-              id="medicationName"
-              value={medicationName}
-              readOnly
-              className="bg-gray-50"
-            />
-          </div>
+
         </CardContent>
       </Card>
 

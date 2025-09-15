@@ -88,10 +88,3 @@ export const users = pgTable(
   })
 );
 
-export const medications = pgTable("medications", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});

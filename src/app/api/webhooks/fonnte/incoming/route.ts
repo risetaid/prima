@@ -179,20 +179,20 @@ function detectIntentEnhanced(
       { words: ["hapus", "delete", "remove"], weight: 9 },
       { words: ["unsubscribe", "unsub", "cabut"], weight: 10 },
     ],
-    medication_taken: [
+    confirmation_taken: [
       { words: ["sudah", "udah", "done", "selesai"], weight: 10 },
-      { words: ["diminum", "minum", "taken"], weight: 9 },
+      { words: ["sudah lakukan", "sudah selesai", "sudah dilakukan"], weight: 9 },
       { words: ["oke", "ok", "siap", "good"], weight: 7 },
       // Phrases
-      { words: ["sudah minum", "udah diminum", "sudah selesai"], weight: 15 },
-      { words: ["obat sudah", "sudah makan obat"], weight: 14 },
+      { words: ["sudah selesai", "sudah lakukan", "sudah dilakukan"], weight: 15 },
+      { words: ["sudah beres", "sudah selesai"], weight: 14 },
     ],
-    medication_pending: [
+    confirmation_pending: [
       { words: ["belum", "not yet", "nanti"], weight: 10 },
       { words: ["sebentar", "tunggu", "wait"], weight: 8 },
       { words: ["lupa", "forgot", "lupaa"], weight: 9 },
       // Phrases
-      { words: ["belum minum", "belum diminum"], weight: 14 },
+      { words: ["belum selesai", "belum lakukan"], weight: 14 },
       { words: ["nanti dulu", "sebentar lagi"], weight: 12 },
     ],
     need_help: [

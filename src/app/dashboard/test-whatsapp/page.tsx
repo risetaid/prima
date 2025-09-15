@@ -18,7 +18,6 @@ export default function TestWhatsAppPage() {
   const [formData, setFormData] = useState({
     phoneNumber: '081234567890', // Default test number
     patientName: 'Testing User',
-    medicationName: 'Tamoxifen',
     dosage: '20mg - 1 tablet'
   })
 
@@ -45,7 +44,6 @@ export default function TestWhatsAppPage() {
         body: JSON.stringify({
           phoneNumber: formData.phoneNumber,
           patientName: formData.patientName,
-          medicationName: formData.medicationName,
           dosage: formData.dosage
         }),
       })
@@ -130,18 +128,7 @@ export default function TestWhatsAppPage() {
             </div>
 
             {/* Medication Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nama Obat
-              </label>
-              <input
-                type="text"
-                name="medicationName"
-                value={formData.medicationName}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+
 
             {/* Dosage */}
             <div>

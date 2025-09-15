@@ -25,8 +25,6 @@ export const reminderSchedules = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     patientId: uuid("patient_id").notNull(),
-    medicationName: text("medication_name").notNull(),
-    dosage: text("dosage"),
     doctorName: text("doctor_name"),
     scheduledTime: text("scheduled_time").notNull(),
     frequency: frequencyEnum("frequency").notNull().default("CUSTOM"),
@@ -162,8 +160,6 @@ export const manualConfirmations = pgTable(
     reminderLogId: uuid("reminder_log_id"),
     visitDate: timestamp("visit_date", { withTimezone: true }).notNull(),
     visitTime: text("visit_time").notNull(),
-    medicationsTaken: boolean("medications_taken").notNull(),
-    medicationsMissed: text("medications_missed").array().notNull().default([]),
     patientCondition: patientConditionEnum("patient_condition").notNull(),
     symptomsReported: text("symptoms_reported").array().notNull().default([]),
     notes: text("notes"),
@@ -199,9 +195,7 @@ export const manualConfirmations = pgTable(
     confirmedAtIdx: index("manual_confirmations_confirmed_at_idx").on(
       table.confirmedAt
     ),
-    medicationsTakenIdx: index("manual_confirmations_medications_taken_idx").on(
-      table.medicationsTaken
-    ),
+
     patientConfirmedAtIdx: index(
       "manual_confirmations_patient_confirmed_at_idx"
     ).on(table.patientId, table.confirmedAt),
@@ -289,7 +283,7 @@ export const pollResponses = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     reminderLogId: uuid("reminder_log_id"),
     patientId: uuid("patient_id").notNull(),
-    pollType: text("poll_type").notNull(), // 'verification', 'medication', 'followup'
+    pollType: text("poll_type").notNull(), // 'verification', 'followup'
     pollName: text("poll_name").notNull(), // 'Verifikasi PRIMA', 'Konfirmasi Obat', 'Follow-up Obat'
     selectedOption: text("selected_option").notNull(),
     responseTime: timestamp("response_time", { withTimezone: true })

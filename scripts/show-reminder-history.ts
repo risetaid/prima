@@ -35,7 +35,7 @@ async function showReminderHistory() {
     console.log('================================================')
 
     allSchedules.forEach((schedule, index) => {
-      console.log(`${index + 1}. ${schedule.medicationName || 'Unknown'}`)
+      console.log(`${index + 1}. ${schedule.customMessage || 'No message'}`)
       console.log(`   ⏰ Time: ${schedule.scheduledTime}`)
       console.log(`   📅 Start: ${schedule.startDate.toISOString().split('T')[0]}`)
       console.log(`   ✅ Active: ${schedule.isActive ? 'Yes' : 'No'}`)
@@ -53,7 +53,7 @@ async function showReminderHistory() {
       console.log('💡 This explains why Terjadwal/Perlu Diperbarui/Semua = 0')
     } else {
       activeSchedules.forEach((schedule, index) => {
-        console.log(`${index + 1}. ${schedule.medicationName || 'Unknown'} - ${schedule.scheduledTime}`)
+        console.log(`${index + 1}. ${schedule.customMessage || 'No message'} - ${schedule.scheduledTime}`)
       })
     }
     console.log()
@@ -73,7 +73,7 @@ async function showReminderHistory() {
     } else {
       allLogs.slice(0, 10).forEach((log, index) => {
         const schedule = allSchedules.find(s => s.id === log.reminderScheduleId)
-        const scheduleName = schedule ? schedule.medicationName : 'Unknown'
+        const scheduleName = schedule ? (schedule.customMessage || 'No message') : 'Unknown'
         const isActive = schedule ? schedule.isActive : false
 
         console.log(`${index + 1}. ${scheduleName} (${log.status})`)
@@ -103,10 +103,10 @@ async function showReminderHistory() {
     } else {
       allConfirmations.slice(0, 10).forEach((conf, index) => {
         const schedule = allSchedules.find(s => s.id === conf.reminderScheduleId)
-        const scheduleName = schedule ? schedule.medicationName : 'Unknown'
+        const scheduleName = schedule ? (schedule.customMessage || 'No message') : 'Unknown'
         const isActive = schedule ? schedule.isActive : false
 
-        console.log(`${index + 1}. ${scheduleName} (${conf.medicationsTaken ? 'Ya' : 'Tidak'})`)
+        console.log(`${index + 1}. ${scheduleName}`)
         console.log(`   📅 Confirmed: ${conf.confirmedAt}`)
         console.log(`   📋 Schedule Active: ${isActive ? 'Yes' : 'No'}`)
         console.log()

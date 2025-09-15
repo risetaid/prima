@@ -318,12 +318,7 @@ export class PatientRepository {
       const result = await db
         .select({ count: count() })
         .from(manualConfirmations)
-        .where(
-          and(
-            eq(manualConfirmations.patientId, patientId),
-            eq(manualConfirmations.medicationsTaken, true)
-          )
-        );
+        .where(eq(manualConfirmations.patientId, patientId));
       return Number(result[0]?.count || 0);
     };
 
@@ -403,7 +398,7 @@ export class PatientRepository {
         id: manualConfirmations.id,
         visitDate: manualConfirmations.visitDate,
         visitTime: manualConfirmations.visitTime,
-        medicationsTaken: manualConfirmations.medicationsTaken,
+
         patientCondition: manualConfirmations.patientCondition,
         notes: manualConfirmations.notes,
         confirmedAt: manualConfirmations.confirmedAt,
@@ -425,8 +420,7 @@ export class PatientRepository {
         message: reminderLogs.message,
         sentAt: reminderLogs.sentAt,
         status: reminderLogs.status,
-        medicationName: reminderSchedules.medicationName,
-        dosage: reminderSchedules.dosage,
+
       })
       .from(reminderLogs)
       .leftJoin(
