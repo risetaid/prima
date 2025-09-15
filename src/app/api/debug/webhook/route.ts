@@ -3,7 +3,7 @@ import { logger } from '@/lib/logger'
 
 /**
  * Debug endpoint to capture ALL webhook traffic from Fonnte
- * This helps us understand the exact format of poll responses
+ * This helps us understand the exact format of webhook payloads
  */
 export async function POST(request: NextRequest) {
   const timestamp = new Date().toISOString()
@@ -53,10 +53,8 @@ export async function POST(request: NextRequest) {
     bodyKeys: Object.keys(body || {}),
     body,
     rawBody: rawBody || undefined,
-    // Check for various poll-related fields
-    pollAnalysis: {
-      hasPollName: Boolean(body.poll_name || body.pollname || body.poll_title),
-      hasSelectedOption: Boolean(body.selected_option || body.poll_response || body.choice),
+    // Message analysis
+    messageAnalysis: {
       hasMessage: Boolean(body.message || body.text || body.body),
       sender: body.sender || body.phone || body.from,
       messageType: determineMessageType(body)
@@ -82,11 +80,8 @@ export async function GET() {
 }
 
 function determineMessageType(body: Record<string, unknown>): string {
-  if (body.poll_name || body.pollname || body.poll_title) {
-    return 'poll_response'
-  }
   if (body.message || body.text || body.body) {
-    return 'text_message'  
+    return 'text_message'
   }
   return 'unknown'
 }

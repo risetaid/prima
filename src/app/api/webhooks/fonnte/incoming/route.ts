@@ -33,21 +33,12 @@ interface WebhookBody {
   timestamp?: string | number;
   time?: string | number;
   created_at?: string | number;
-  poll_name?: string;
-  pollname?: string;
-  poll_title?: string;
-  selected_option?: string;
-  poll_response?: string;
-  choice?: string;
-  poll?: { name?: string; choice?: string; selected?: string };
-  poll_data?: unknown;
   [key: string]: unknown;
 }
 
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
 import { logger } from "@/lib/logger";
-// Poll-based messaging handled by WhatsAppService
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 
 const whatsappService = new WhatsAppService();
@@ -59,12 +50,6 @@ const IncomingSchema = z.object({
   name: z.string().optional(),
   id: z.string().optional(),
   timestamp: z.union([z.string(), z.number()]).optional(),
-  // Poll response fields (based on Fonnte poll response format)
-  poll_name: z.string().optional(),
-  pollname: z.string().optional(),
-  selected_option: z.string().optional(),
-  poll_response: z.string().optional(),
-  poll_data: z.unknown().optional(),
 });
 
 function normalizeIncoming(body: WebhookBody) {
@@ -76,25 +61,6 @@ function normalizeIncoming(body: WebhookBody) {
   const id = body.id || body.message_id || body.msgId;
   const timestamp = body.timestamp || body.time || body.created_at;
 
-  // Poll response data - comprehensive field mapping for various possible formats
-  const poll_name =
-    body.poll_name || body.pollname || body.poll_title || body.poll?.name;
-  const pollname =
-    body.pollname || body.poll_name || body.poll_title || body.poll?.name;
-  const selected_option =
-    body.selected_option ||
-    body.poll_response ||
-    body.choice ||
-    body.poll?.choice ||
-    body.poll?.selected;
-  const poll_response =
-    body.poll_response ||
-    body.selected_option ||
-    body.choice ||
-    body.poll?.choice ||
-    body.poll?.selected;
-  const poll_data = body.poll_data || body.poll || {};
-
   const normalized = {
     sender,
     message,
@@ -102,21 +68,12 @@ function normalizeIncoming(body: WebhookBody) {
     name,
     id,
     timestamp,
-    poll_name,
-    pollname,
-    selected_option,
-    poll_response,
-    poll_data,
   };
 
   // Log normalization for debugging
   logger.info("Webhook normalization result", {
     sender: Boolean(sender),
     message: Boolean(message),
-    hasPollName: Boolean(poll_name),
-    hasSelectedOption: Boolean(selected_option),
-    pollName: poll_name,
-    selectedOption: selected_option,
     originalKeys: Object.keys(body || {}),
     normalizedKeys: Object.keys(normalized).filter(
       (key) => normalized[key as keyof typeof normalized]
@@ -622,15 +579,6 @@ function logWebhookPayload(parsed: WebhookBody, request: NextRequest, contentTyp
           : value;
       return acc;
     }, {} as Record<string, unknown>),
-    hasPollingFields: {
-      poll_name: Boolean(parsed.poll_name),
-      pollname: Boolean(parsed.pollname),
-      poll_title: Boolean(parsed.poll_title),
-      selected_option: Boolean(parsed.selected_option),
-      poll_response: Boolean(parsed.poll_response),
-      choice: Boolean(parsed.choice),
-      poll: Boolean(parsed.poll),
-    },
     messageFields: {
       message: Boolean(parsed.message),
       text: Boolean(parsed.text),
@@ -692,7 +640,7 @@ async function findPatient(sender: string, parsed: WebhookBody) {
   return found.patient;
 }
 
-async function logConversation(patient: Patient, sender: string, message: string | undefined, poll_name: string | undefined, pollname: string | undefined) {
+async function logConversation(patient: Patient, sender: string, message: string | undefined) {
   try {
     const conv = new ConversationStateService();
     const state = await conv.getOrCreateConversationState(
@@ -703,7 +651,7 @@ async function logConversation(patient: Patient, sender: string, message: string
     await conv.addMessage(state.id, {
       message: message || "",
       direction: "inbound",
-      messageType: poll_name || pollname ? "confirmation" : "general",
+      messageType: "general",
       intent: undefined,
       confidence: undefined,
       processedAt: new Date(),
@@ -835,8 +783,6 @@ export async function POST(request: NextRequest) {
     device,
     id,
     timestamp,
-    poll_name,
-    pollname,
   } = validationResult;
 
   const duplicateCheck = await checkIdempotency({ id, sender, timestamp, message });
@@ -852,7 +798,7 @@ export async function POST(request: NextRequest) {
   if (patientResult instanceof NextResponse) return patientResult;
   const patient = patientResult as Patient;
 
-  await logConversation(patient, sender, message || "", poll_name, pollname);
+  await logConversation(patient, sender, message || "");
 
   // PRIORITY 1: Check if patient is awaiting verification
   if (patient.verificationStatus === "pending_verification") {

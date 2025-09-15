@@ -60,8 +60,8 @@ async function dropAllTables() {
 
       `ALTER TABLE IF EXISTS verification_logs DROP CONSTRAINT IF EXISTS verification_logs_patient_id_fkey;`,
 
-      `ALTER TABLE IF EXISTS poll_responses DROP CONSTRAINT IF EXISTS poll_responses_reminder_log_id_fkey;`,
-      `ALTER TABLE IF EXISTS poll_responses DROP CONSTRAINT IF EXISTS poll_responses_patient_id_fkey;`,
+
+
 
       `ALTER TABLE IF EXISTS patients DROP CONSTRAINT IF EXISTS patients_assigned_volunteer_id_fkey;`,
 
@@ -78,7 +78,7 @@ async function dropAllTables() {
        `DROP TABLE IF EXISTS conversation_states CASCADE;`,
        `DROP TABLE IF EXISTS conversation_messages CASCADE;`,
        `DROP TABLE IF EXISTS verification_logs CASCADE;`,
-       `DROP TABLE IF EXISTS poll_responses CASCADE;`,
+
        `DROP TABLE IF EXISTS patients CASCADE;`,
        `DROP TABLE IF EXISTS whatsapp_templates CASCADE;`,
        `DROP TABLE IF EXISTS medications CASCADE;`,

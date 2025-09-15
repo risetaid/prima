@@ -317,9 +317,9 @@ Saatnya menjalankan rutinitas kesehatan:
         debugLogs.push(`   ❌ Error: ${result.error}`);
       }
 
-      // Create reminder log - SENT means waiting for poll confirmation
+      // Create reminder log - SENT means waiting for text response confirmation
       const status: "SENT" | "FAILED" = result.success
-        ? "SENT" // Changed from DELIVERED since we need poll confirmation
+        ? "SENT" // Changed from DELIVERED since we need text response confirmation
         : "FAILED";
       const logData = {
         reminderScheduleId: schedule.id,

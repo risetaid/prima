@@ -24,7 +24,7 @@ import { reminderLogs } from "./reminder-schema";
 import { manualConfirmations } from "./reminder-schema";
 import { whatsappTemplates } from "./reminder-schema";
 import { reminderContentAttachments } from "./reminder-schema";
-import { pollResponses } from "./reminder-schema";
+
 import { cmsArticles } from "./cms-schema";
 import { cmsVideos } from "./cms-schema";
 
@@ -62,7 +62,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   patientVariables: many(patientVariables),
   verificationLogs: many(verificationLogs),
   conversationStates: many(conversationStates),
-  pollResponses: many(pollResponses),
+
 }));
 
 export const reminderSchedulesRelations = relations(
@@ -130,7 +130,7 @@ export const reminderLogsRelations = relations(
       references: [patients.id],
     }),
     manualConfirmations: many(manualConfirmations),
-    pollResponses: many(pollResponses),
+
   })
 );
 
@@ -228,16 +228,7 @@ export const cmsVideosRelations = relations(cmsVideos, ({}) => ({
 
 
 
-export const pollResponsesRelations = relations(pollResponses, ({ one }) => ({
-  reminderLog: one(reminderLogs, {
-    fields: [pollResponses.reminderLogId],
-    references: [reminderLogs.id],
-  }),
-  patient: one(patients, {
-    fields: [pollResponses.patientId],
-    references: [patients.id],
-  }),
-}));
+
 
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect;
@@ -267,6 +258,3 @@ export type NewCmsArticle = typeof cmsArticles.$inferInsert;
 export type CmsVideo = typeof cmsVideos.$inferSelect;
 export type NewCmsVideo = typeof cmsVideos.$inferInsert;
 
-// Poll Response Types
-export type PollResponse = typeof pollResponses.$inferSelect;
-export type NewPollResponse = typeof pollResponses.$inferInsert;

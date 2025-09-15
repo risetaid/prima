@@ -1,294 +1,417 @@
-# 🏥 PRIMA System
+# PRIMA - Palliative Remote Integrated Monitoring and Assistance
 
-**Palliative Remote Integrated Monitoring and Assistance**
+A production-ready WhatsApp-based patient management system for Indonesian healthcare volunteers, providing comprehensive cancer patient care, medication compliance monitoring, and content management capabilities.
 
-A comprehensive medical-grade WhatsApp-based patient management system for Indonesian healthcare volunteers providing cancer patient care and medication compliance monitoring.
+## 🏥 Overview
 
-## 🎯 Project Status - **Production Ready** ✅
+PRIMA is a full-stack healthcare application designed to support palliative care volunteers in managing cancer patients through automated WhatsApp reminders, compliance tracking, and educational content delivery. The system operates in Indonesian healthcare settings with WIB (UTC+7) timezone support.
 
-PRIMA is a fully functional healthcare management platform with advanced features including patient verification, health tracking, content management, and automated medication reminders. The system is optimized for Indonesian healthcare workflows with medical-grade reliability.
+## ✨ Key Features
 
-## ✨ Current Features (All Implemented)
+### Patient Management
 
-### 🔐 **Authentication & Access Control**
+- **Comprehensive patient profiles** with medical history, cancer staging, and contact information
+- **Photo upload capabilities** for patient identification
+- **Health notes tracking** for monitoring patient conditions
+- **Volunteer assignment system** for care coordination
+- **Soft delete architecture** preserving data integrity
 
-- Role-based permissions (SUPERADMIN/ADMIN/MEMBER)
-- Clerk-based OAuth with Gmail integration
-- Volunteer approval workflows
-- Session management with Redis caching
+### WhatsApp Integration
 
-### 👨‍⚕️ **Patient Management System**
+- **Automated medication reminders** via Fonnte WhatsApp Business API
+- **Text-based confirmation system** for simple and reliable patient responses
+- **Response-driven workflows** with 15-minute follow-up messages
+- **Patient verification system** with retry logic
+- **Template-based messaging** for consistent communication
+- **Conversation state management** for context-aware interactions
 
-- Complete patient CRUD with photo upload (Minio)
-- WhatsApp-based verification system with retry logic
-- Health notes tracking with bulk operations
-- Custom patient variables for personalized care
-- Compliance rate calculation and monitoring
-- Medical records management with audit trails
+### Reminder System
 
-### 📱 **WhatsApp Integration & Reminders**
+- **Smart scheduling** with customizable frequencies (daily, weekly, monthly, custom)
+- **Content attachments** linking articles and videos to reminders
+- **Manual confirmation options** for volunteer intervention
+- **Compliance tracking** with detailed statistics
+- **Timezone-aware scheduling** (WIB/UTC+7)
 
-- WhatsApp Business API integration via Fonnte
-- Automated medication reminders via cron jobs with debug monitoring
-- **Content-Rich Reminders**: Include educational articles and videos with medication reminders
-- **Full Edit Capabilities**: Complete editing support for scheduled reminders including content updates
-- Template-based message management
-- Delivery status tracking and retry mechanisms
-- Timezone optimization (WIB/UTC+7)
-- Comprehensive reminder dashboard with multiple views (scheduled, completed, needs updates)
+### Content Management System (CMS)
 
-### 📚 **Content Management System**
+- **Article management** with rich text editing (TinyMCE)
+- **Educational video library** with YouTube/Vimeo integration
+- **Category-based organization** (general, nutrition, emotional, exercise, medication, spiritual, palliative care)
+- **SEO optimization** with meta tags and slugs
+- **Draft/published workflow** with soft delete support
 
-- Article creation with TinyMCE rich text editor
-- Video management with YouTube integration
-- Category-based content organization
-- Content workflow (draft/published/archived)
-- ISR optimization for fast public content loading
+### Admin Features
 
-### 🛠️ **Admin Panel**
+- **Role-based access control** (SUPERADMIN, ADMIN, RELAWAN)
+- **User approval workflow** with Gmail OAuth via Clerk
+- **Audit trails** for sensitive operations
+- **WhatsApp template management**
+- **System monitoring dashboard**
 
-- User approval and role management
-- System health monitoring dashboard
-- Template management for communications
-- Comprehensive activity tracking
-- Database management tools
+## 🛠 Tech Stack
 
-### ⚡ **Performance & Reliability**
+### Frontend
 
-- Redis caching (3min sessions, 15min patient data)
-- ISR with 1-hour revalidation for content
-- Comprehensive database indexing
-- Soft delete patterns for data integrity
-- Medical-grade error handling
+- **Framework:** Next.js 15.4.6 with React 19
+- **Styling:** Tailwind CSS 4 + shadcn/ui components
+- **Icons:** Lucide React
+- **Forms:** React Hook Form with Zod validation
+- **Rich Text:** TinyMCE editor
+- **Notifications:** Sonner toast library
 
-## 🛠️ Tech Stack (Current)
+### Backend
 
-- **Framework**: Next.js 15 + React 19 + TypeScript 5
-- **Authentication**: Clerk with Gmail OAuth and role-based access control
-- **Database**: PostgreSQL (Railway) + Drizzle ORM with comprehensive soft delete patterns
-- **Caching**: Redis with ioredis client (3min sessions, 15min patient data)
-- **UI**: Tailwind CSS 4 + shadcn/ui + Lucide React icons
-- **WhatsApp**: Fonnte WhatsApp Business API
-- **File Storage**: Minio for patient photos and content
-- **Rich Text**: TinyMCE with image upload support
-- **Deployment**: Railway with GitHub integration
-- **Package Manager**: Bun
+- **Runtime:** Bun (fast JavaScript runtime)
+- **API:** Next.js App Router with REST endpoints
+- **Database:** PostgreSQL with Drizzle ORM
+- **Caching:** Redis with ioredis (3min sessions, 15min patient data)
+- **Authentication:** Clerk with Gmail OAuth
+- **File Storage:** MinIO S3-compatible storage
+- **WhatsApp:** Fonnte Business API
 
-## 🚀 Quick Start
+### Infrastructure
 
-### Prerequisites
+- **Deployment:** Railway platform
+- **Database:** Railway PostgreSQL
+- **Cache:** Railway Redis
+- **Storage:** Railway MinIO
+- **Monitoring:** Built-in logging and performance tracking
 
-- Node.js 18+ installed
-- Bun package manager
-- PostgreSQL database (Railway)
-- Redis instance (Railway)
-- Minio Bucket and Minio Console
+## 📋 Prerequisites
+
+- Node.js 18+ or Bun runtime
+- PostgreSQL database
+- Redis server
+- MinIO or S3-compatible storage
 - Fonnte WhatsApp Business API account
-- Clerk authentication setup
-- TinyMCE API key
+- Clerk authentication account
 
-### Installation
+## 🚀 Installation
+
+1. **Clone the repository**
 
 ```bash
-# Clone the repository
-git clone <repository-url>
+git clone https://github.com/daviyusaku-13/prima.git
 cd prima
+```
 
-# Install dependencies
+2. **Install dependencies**
+
+```bash
 bun install
+```
 
-# Set up environment variables
-cp .env.example .env.local
-# Fill in your environment variables
+3. **Set up environment variables**
+   Create a `.env.local` file with the following variables:
 
-# Set up the database
-bun run db:generate        # Generate Drizzle schema
-bun run db:migrate         # Run migrations
-bun run db:push            # Push schema changes
+```env
+# Database
+DATABASE_URL="postgresql://..."
 
-# Seed initial data
-bun run seed:templates     # Seed WhatsApp message templates
+# Redis
+REDIS_URL="redis://..."
 
-# Start development server
+# Authentication (Clerk)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_..."
+CLERK_SECRET_KEY="sk_..."
+CLERK_WEBHOOK_SECRET="whsec_..."
+
+# WhatsApp (Fonnte)
+FONNTE_TOKEN="your_fonnte_token"
+
+# File Storage (MinIO)
+MINIO_ROOT_USER="..."
+MINIO_ROOT_PASSWORD="..."
+MINIO_PUBLIC_ENDPOINT="https://..."
+MINIO_PRIVATE_ENDPOINT="http://..."
+MINIO_BUCKET_NAME="..."
+
+# Rich Text Editor
+NEXT_PUBLIC_TINYMCE_API_KEY="..."
+
+# Cron Security
+CRON_SECRET="..."
+
+# Application
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+4. **Run database migrations**
+
+```bash
+bun run db:generate
+bun run db:migrate
+```
+
+5. **Set up first admin user**
+
+```bash
+bun run setup-first-user
+```
+
+6. **Start development server**
+
+```bash
 bun run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application.
+## 📖 Development
 
-## 🔧 Environment Variables
+### Available Scripts
 
-Create a `.env.local` file with the required environment variables. See `.env.example` for the complete list of required variables:
+```bash
+# Development
+bun run dev              # Start dev server with Turbo
+bun run build           # Production build
+bun run start           # Start production server
+bun run lint            # Run ESLint
 
-- **Database**: Railway PostgreSQL connection string
-- **Authentication**: Clerk OAuth configuration
-- **WhatsApp API**: Fonnte API token for messaging
-- **Caching**: Railway Redis configuration
-- **File Storage**: Minio for patient photos and content
-- **Content Management**: TinyMCE API key for rich text editing
-- **Automation**: Cron secret for automated reminder system
+# Database
+bun run db:generate     # Generate Drizzle schema
+bun run db:migrate      # Run migrations
+bun run db:push         # Push schema changes
+bun run db:studio       # Open Drizzle Studio GUI
 
-> **Note**: Never commit actual environment variables to version control. Use `.env.local` for development and configure environment variables in your deployment platform.
+# Testing
+bunx jest               # Run all tests
+bunx jest --watch       # Run tests in watch mode
 
-## 📱 User Roles & Permissions
+# Admin Scripts
+bun run nuke-recreate-db    # Reset database (caution!)
+bun run setup-first-user    # Create initial admin
+```
 
-### SUPERADMIN
-
-- Complete system administration
-- User role management and permissions
-- System configuration and settings
-- Access to all data and system functions
-
-### ADMIN
-
-- User management (approve/reject/activate volunteers)
-- Access to all patient data across the system
-- Content management system administration
-- Template management for communications
-- System monitoring and reporting
-
-### MEMBER (Healthcare Volunteer)
-
-- Patient management for assigned cases
-- Medication reminder scheduling and management
-- Health notes tracking and medical records
-- Compliance monitoring and reporting
-- Content access and patient communication
-- Requires ADMIN approval to access system
-
-## 🏗️ Project Structure
+### Project Structure
 
 ```
 src/
-├── app/
-│   ├── api/                    # API endpoints
-│   │   ├── admin/             # Admin management APIs
-│   │   ├── patients/          # Patient management APIs
-│   │   ├── cms/               # Content management APIs
-│   │   ├── cron/              # Automated reminder system
-│   │   ├── user/session/      # User session management
-│   │   └── webhooks/          # Clerk user sync
-│   ├── dashboard/             # Main application interface
-│   │   ├── admin/             # Admin panel with user management
-│   │   ├── pasien/            # Patient management system
-│   │   ├── pengingat/         # Reminder scheduling system
-│   │   └── cms/               # Content management system
-│   ├── content/               # Public content pages (articles/videos)
-│   └── (auth pages)
-├── components/
-│   ├── admin/                 # Admin-specific components
-│   ├── patients/              # Patient management components
-│   └── ui/                    # Reusable shadcn/ui components
-├── lib/
-│   ├── auth-utils.ts          # Authentication utilities (getAuthUser)
-│   ├── cache.ts               # Redis caching with TTL management
-│   └── (other utilities)
-├── db/
-│   ├── schema.ts              # Drizzle ORM schema with foreign keys
-│   └── index.ts               # Database connection and exports
-└── middleware.ts              # Route protection and authentication
+├── app/                    # Next.js App Router
+│   ├── api/               # REST API endpoints
+│   │   ├── admin/         # Admin management
+│   │   ├── patients/      # Patient CRUD
+│   │   ├── cms/           # Content management
+│   │   ├── cron/          # Scheduled tasks
+│   │   └── webhooks/      # External integrations
+│   ├── dashboard/         # Protected pages
+│   └── content/           # Public content
+├── components/            # React components
+│   ├── admin/            # Admin components
+│   ├── patient/          # Patient management
+│   ├── reminder/         # Reminder system
+│   └── ui/               # Reusable UI
+├── services/             # Business logic
+│   ├── patient/          # Patient services
+│   ├── reminder/         # Reminder services
+│   └── whatsapp/         # WhatsApp integration
+├── lib/                  # Utilities
+│   ├── auth-utils.ts     # Authentication
+│   ├── cache.ts          # Redis caching
+│   ├── timezone.ts       # WIB timezone
+│   └── validations.ts    # Zod schemas
+└── db/                   # Database
+    ├── schema.ts         # Drizzle schema
+    └── index.ts          # DB connection
 ```
 
-## 🔄 Development Commands
+## 🗄️ Database Schema
+
+The system uses 16 PostgreSQL tables with comprehensive relationships:
+
+### Core Tables
+
+- `users` - System users with roles and approval status
+- `patients` - Patient records with medical information
+- `reminder_schedules` - Scheduled medication reminders
+- `reminder_logs` - Reminder delivery history
+
+### Supporting Tables
+
+- `health_notes` - Patient condition tracking
+- `medical_records` - Medical history and treatments
+- `patient_variables` - Custom patient data
+- `conversation_states` - WhatsApp conversation context
+- `conversation_messages` - Conversation message history
+- `verification_logs` - Patient verification attempts
+- `manual_confirmations` - Volunteer confirmations
+- `whatsapp_templates` - Message templates
+- `reminder_content_attachments` - Content links
+
+- `cms_articles` - Educational articles
+- `cms_videos` - Educational videos
+
+All tables implement soft delete via `deletedAt` timestamp for data preservation.
+
+## 🔒 Security
+
+- **Authentication:** OAuth 2.0 via Clerk with Gmail integration
+- **Authorization:** Role-based access control (RBAC)
+- **Data Protection:** All sensitive data encrypted in transit and at rest
+- **Input Validation:** Zod schemas on all API endpoints
+- **Rate Limiting:** Built-in request throttling
+- **Audit Logging:** Comprehensive activity tracking
+- **Environment Variables:** Secrets never committed to repository
+
+## 🌍 Timezone Handling
+
+The system operates in WIB (Western Indonesia Time, UTC+7):
+
+- All reminder scheduling uses `src/lib/timezone.ts` utilities
+- Database stores UTC timestamps
+- UI displays WIB time for Indonesian users
+- Cron jobs scheduled in WIB timezone
+
+## 🤝 WhatsApp Integration
+
+### Message Types
+
+- **Text messages** for notifications and confirmations
+- **Media messages** with images or documents
+
+### Text-Based Confirmation System
+
+The system uses simple text message patterns for patient responses, supporting various Indonesian language responses for medication compliance tracking.
+
+### Response Flow
+
+1. Initial reminder sent at scheduled time
+2. Patient responds with simple text message
+3. System processes text response and updates status
+4. Follow-up message sent after 15 minutes if needed
+5. Volunteer notified if assistance required
+
+## 🧪 Testing
 
 ```bash
-# Core Development
-bun run dev                    # Start development server
-bun run build                  # Production build (includes schema generation)
-bun run lint                   # ESLint check
+# Run all tests
+bunx jest
 
-# Database Management (Drizzle ORM)
-bun run db:generate            # Generate Drizzle schema
-bun run db:migrate             # Run migrations
-bun run db:push                # Push schema changes
-bun run db:studio              # Open Drizzle Studio GUI
+# Run specific test file
+bunx jest src/__tests__/compliance-service.test.ts
 
-# Content Management
-bun run seed:templates         # Seed WhatsApp message templates
+# Run with coverage
+bunx jest --coverage
 
-# Production
-bun start                      # Start production server
+# Watch mode for development
+bunx jest --watch
 ```
 
-## 🚀 Deployment
+Tests focus on:
 
-### Recommended: Railway Deployment
+- Service layer business logic
+- API endpoint validation
+- Timezone calculations (WIB)
+- Cache invalidation
+- Text message pattern matching
 
-The application is optimized for Railway with GitHub integration:
+## 📊 Performance Optimizations
 
-1. Connect GitHub repository to Railway
-2. Configure Railway PostgreSQL and Redis services
-3. Set up Minio Bucket for file storage
-4. Configure environment variables in Railway dashboard
-5. Automatic deployments on git push
+- **Redis Caching:** 3-minute user sessions, 15-minute patient data
+- **Database Indexing:** Optimized queries with composite indexes
+- **Connection Pooling:** Efficient database connections
+- **Code Splitting:** Optimized bundle sizes for faster loading
+- **ISR (Incremental Static Regeneration):** 1-hour revalidation for public content
+- **Turbopack:** Faster development builds
 
-### Database Configuration
+## 🚢 Deployment
 
-- **Production**: Railway PostgreSQL
-  - **Connection**: Direct PostgreSQL connection (`DATABASE_URL`)
-- **Caching**: Railway Redis
-  - **Connection**: Redis URL with authentication (`REDIS_URL`)
-- **File Storage**: Minio Bucket with Minio Console
+### Production Build
 
-### Build Configuration
+```bash
+bun run build
+bun run start
+```
 
-- **Build Command**: `bun run build` (includes schema generation)
-- **Start Command**: `bun start`
-- **Node.js**: 18+ runtime required
-- **Environment**: All variables from Railway environment must be configured
+### Environment Setup
 
-## 🤝 Contributing
+1. Configure all environment variables in production
+2. Run database migrations
+3. Set up cron jobs for automated reminders
+4. Configure webhook endpoints for Clerk and Fonnte
+5. Enable Redis for session management
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit changes: `git commit -m 'Add amazing feature'`
-4. Push to branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+### Railway Deployment
+
+The application is optimized for Railway platform with:
+
+- Automatic deployments from GitHub
+- Built-in PostgreSQL, Redis, and MinIO services
+- Environment variable management
+- Custom domain support
+
+## 📝 API Documentation
+
+### Patient Endpoints
+
+- `GET /api/patients` - List all patients
+- `POST /api/patients` - Create new patient
+- `GET /api/patients/[id]` - Get patient details
+- `PUT /api/patients/[id]` - Update patient
+- `DELETE /api/patients/[id]` - Soft delete patient
+
+### Reminder Endpoints
+
+- `GET /api/patients/[id]/reminders` - Get patient reminders
+- `POST /api/patients/[id]/reminders` - Create reminder
+- `POST /api/reminders/instant-send-all` - Send immediate reminders
+- `PUT /api/reminders/scheduled/[id]` - Update reminder
+
+### CMS Endpoints
+
+- `GET /api/cms/articles` - List articles
+- `POST /api/cms/articles` - Create article
+- `GET /api/cms/videos` - List videos
+- `POST /api/cms/videos` - Create video
+
+### Webhook Endpoints
+
+- `POST /api/webhooks/clerk` - User synchronization
+- `POST /api/webhooks/fonnte/incoming` - WhatsApp messages
+- `POST /api/webhooks/fonnte/message-status` - Delivery status
+
+## 🤖 Cron Jobs
+
+Automated tasks run via `/api/cron`:
+
+- **Medication Reminders:** Every 30 minutes (WIB timezone)
+- **Follow-up Messages:** 15 minutes after initial reminder
+- **Compliance Calculation:** Daily at midnight WIB
+- **Inactive Patient Check:** Weekly
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is proprietary software for healthcare use in Indonesia.
 
-## 👥 Authors
+## 👥 Contributing
 
-- **Primary Developer** - Initial work and system architecture
-- **Healthcare Partner** - Medical consultation and requirements
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 🎯 Recent Major Updates (January 2025)
+### Commit Convention
 
-### ✅ **Production-Ready Milestone Achieved**
+Use conventional commits:
 
-- **Database Schema**: Comprehensive foreign key relationships and soft delete patterns
-- **Database Cleanup**: Removed 8 unused legacy tables, maintaining 15 optimized tables
-- **Code Quality**: Removed 12 unused files, cleaned codebase with 55+ API routes and 45+ components
-- **Authentication Fix**: Resolved sign-in race condition with proper redirect configuration
-- **Reminder Enhancement**: Added content attachment support and full editing capabilities
-- **Performance Optimization**: Redis caching, connection pooling, and ISR implementation
-- **Feature Complete**: All core healthcare management features fully implemented and optimized
+- `feat:` New features
+- `fix:` Bug fixes
+- `docs:` Documentation changes
+- `style:` Code style changes
+- `refactor:` Code refactoring
+- `test:` Test additions/changes
+- `chore:` Maintenance tasks
 
-### 🚀 **System Highlights**
+## 🆘 Support
 
-- **Medical-Grade Reliability**: Comprehensive audit trails and data integrity
-- **Scalable Architecture**: Optimized for Indonesian healthcare volunteer networks
-- **Enhanced WhatsApp Integration**: Content-rich reminders with educational materials
-- **Mobile-First Design**: Optimized for healthcare workers using mobile devices
-- **Clean Codebase**: Maintained, optimized, and production-ready with comprehensive documentation
+For issues and feature requests, please use the GitHub issue tracker.
 
 ## 🙏 Acknowledgments
 
-- Indonesian healthcare volunteers for their dedication and feedback
-- Fonnte for reliable WhatsApp Business API service
-- Clerk for seamless authentication and user management
-- Railway for comprehensive full-stack deployment platform
-- Minio for S3-compatible object storage
-- shadcn/ui for beautiful, accessible React components
-
-## 📚 Documentation
-
-- **`AGENTS.md`** - Complete development guide for AI coding agents
-- **`README.md`** - This project overview and setup guide
-- **Database Schema** - Available in `src/db/schema.ts` with comprehensive relationships
+- Built for Indonesian healthcare volunteers
+- Powered by open-source technologies
+- Designed with patient care in mind
 
 ---
 
-_Built with ❤️ for Indonesian healthcare workers_
-_Last Updated: January 2025 - Production Ready Release_
+**PRIMA** - Empowering palliative care through technology 💚

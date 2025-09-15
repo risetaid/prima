@@ -6,7 +6,6 @@ import {
   uuid,
   integer,
   index,
-  jsonb,
 } from "drizzle-orm/pg-core";
 
 // Import enums
@@ -275,38 +274,3 @@ export const reminderContentAttachments = pgTable(
   })
 );
 
-// ===== POLL RESPONSES TABLE =====
-
-export const pollResponses = pgTable(
-  "poll_responses",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    reminderLogId: uuid("reminder_log_id"),
-    patientId: uuid("patient_id").notNull(),
-    pollType: text("poll_type").notNull(), // 'verification', 'followup'
-    pollName: text("poll_name").notNull(), // 'Verifikasi PRIMA', 'Konfirmasi Obat', 'Follow-up Obat'
-    selectedOption: text("selected_option").notNull(),
-    responseTime: timestamp("response_time", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    messageId: text("message_id"), // Fonnte message ID
-    pollData: jsonb("poll_data"), // Full poll response data from Fonnte
-    phoneNumber: text("phone_number").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => ({
-    patientIdIdx: index("poll_responses_patient_id_idx").on(table.patientId),
-    reminderLogIdIdx: index("poll_responses_reminder_log_id_idx").on(
-      table.reminderLogId
-    ),
-    pollTypeIdx: index("poll_responses_poll_type_idx").on(table.pollType),
-    responseTimeIdx: index("poll_responses_response_time_idx").on(
-      table.responseTime
-    ),
-    phoneNumberIdx: index("poll_responses_phone_number_idx").on(
-      table.phoneNumber
-    ),
-  })
-);

@@ -71,12 +71,12 @@ The system operates in WIB (UTC+7) timezone for Indonesian healthcare workers:
 ### WhatsApp Integration
 
 - Central WhatsApp service at `src/services/whatsapp/whatsapp.service.ts`
-- **Poll-based interactions**: Ya/Tidak verification polls, Sudah/Belum/Butuh Bantuan medication polls
-- **Response-driven confirmation system**: 15-minute follow-up messages based on patient responses
+- **Text-based confirmation system**: Simple text message interactions for patient responses
+- **Response-driven workflows**: 15-minute follow-up messages based on patient text responses
 - Automated medication reminders with content attachments
 - Patient verification workflows with retry logic
 - Template-based message management
-- Fonnte WhatsApp Business API with poll functionality (choices, select, pollname parameters)
+- Fonnte WhatsApp Business API for reliable message delivery
 
 ## File Structure Conventions
 
@@ -191,25 +191,25 @@ Essential environment variables (never commit actual values):
 - Follow existing patterns for new feature development
 - Medication reminders are scheduled via cron jobs - test timing carefully
 
-## Poll-Based Interaction System
+## Text-Based Interaction System
 
 ### Implementation Patterns
-- **Verification polls**: Use Ya/Tidak options for patient verification instead of text-based responses
-- **Medication confirmation polls**: Use Sudah/Belum/Butuh Bantuan options for medication reminders
-- **Response-driven workflow**: Auto-confirmation based on patient poll responses, not timers
+- **Text response verification**: Simple text message patterns for patient verification
+- **Medication confirmation**: Text-based responses for medication compliance tracking
+- **Response-driven workflow**: Auto-confirmation based on patient text responses, not timers
 - **Follow-up system**: Send "Halo {nama}, apakah sudah diminum obatnya?" 15 minutes after initial reminder
 - **Status flow**: TERJADWAL → PERLU_DIPERBARUI → SELESAI based on patient responses
 
 ### Technical Requirements
-- Poll responses processed via webhook at `/api/webhooks/fonnte/incoming/route.ts`
-- Database schema includes poll tracking fields in `reminderLogs` and `pollResponses` tables
-- Use official Fonnte documentation patterns for poll implementation
-- Maintain backward compatibility with existing text-based responses
+- Text responses processed via webhook at `/api/webhooks/fonnte/incoming/route.ts`
+- Database schema includes response tracking in `reminderLogs` and conversation tables
+- Implement robust text pattern matching for Indonesian language responses
+- Maintain flexibility for various text response patterns
 - Implement proper error handling and fallback mechanisms
 
 ### API Integration Rules
 - Always reference official Fonnte documentation at https://docs.fonnte.com/
-- Use poll parameters: `choices` (comma-separated), `select` (single/multiple), `pollname` (title)
+- Use simple text message format for reliable delivery across all WhatsApp clients
 - Never implement timer-based auto-confirmation - always response-driven
 - Preserve manual confirmation options for relawan when needed
 - Follow Indonesian language patterns and WIB timezone for healthcare context
