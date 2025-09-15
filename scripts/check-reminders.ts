@@ -14,7 +14,8 @@ async function checkReminders() {
         patientName: patients.name,
         medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
-        startDate: reminderSchedules.startDate
+        startDate: reminderSchedules.startDate,
+        isActive: reminderSchedules.isActive
       })
       .from(reminderSchedules)
       .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))

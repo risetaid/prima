@@ -15,7 +15,7 @@ async function checkReminders() {
         medicationName: reminderSchedules.medicationName,
         scheduledTime: reminderSchedules.scheduledTime,
         startDate: reminderSchedules.startDate,
-        status: reminderSchedules.status
+        isActive: reminderSchedules.isActive
       })
       .from(reminderSchedules)
       .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
@@ -30,7 +30,7 @@ async function checkReminders() {
 
     console.log(`\n📋 Found ${todayReminders.length} active reminders for today:`)
     todayReminders.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.medicationName} at ${reminder.scheduledTime} (${reminder.status})`)
+      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.medicationName} at ${reminder.scheduledTime} (${reminder.isActive ? 'Active' : 'Inactive'})`)
     })
 
     // Get today's reminder logs
