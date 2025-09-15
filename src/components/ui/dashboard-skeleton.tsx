@@ -659,7 +659,7 @@ export function PatientListMobileSkeleton() {
   )
 }
 
-// Dashboard Skeleton - matches the exact structure of the dashboard page
+// Dashboard Skeleton - matches the simple, clean style of the PatientList component
 export function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -668,8 +668,30 @@ export function DashboardSkeleton() {
         <Skeleton className="absolute inset-0" />
       </div>
 
-      <DashboardHeaderSkeleton />
-      <PatientListSkeleton />
+      {/* Main Content */}
+      <div className="relative z-10 px-4 lg:px-8 py-6">
+        {/* Patient Cards - Simple white cards matching PatientList style */}
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg p-4 shadow-sm animate-pulse">
+              <div className="flex items-center space-x-3">
+                {/* Avatar placeholder */}
+                <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
+                {/* Text placeholders */}
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-300 rounded w-1/2"></div>
+                </div>
+                {/* Status badges */}
+                <div className="flex flex-col space-y-1">
+                  <div className="h-6 bg-gray-300 rounded-full w-16"></div>
+                  <div className="h-6 bg-gray-300 rounded-full w-20"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

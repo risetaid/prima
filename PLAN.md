@@ -1,143 +1,167 @@
-# Plan: Remove Tests and Unused Libraries
+Migration Plan: Dashboard → New Routes
 
-This document describes a precise, safe, and verifiable plan to remove all tests and testing libraries from this repository, along with a lightweight audit for unused libraries. Follow steps in order and validate after each phase.
+Scope
+- Move user-facing routes from `/dashboard/...` to new top‑level paths.
+- Preserve subpages and dynamic routes; maintain shared layout shell.
+- Update navigation, breadcrumbs, middleware (RBAC), and add redirects.
 
-## Scope
-- Remove all test files and test-only helpers.
-- Remove Jest config, setup, and test devDependencies.
-- Update TypeScript config and documentation to reflect the removal.
-- Remove CI test steps/jobs if present.
-- Audit and remove truly unused libraries (conservative approach).
+Route Mapping (Old → New)
+- `/dashboard` → `/pasien`
+- `/dashboard/pengingat/**` → `/pengingat/**`
+- `/dashboard/berita/**` → `/berita/**`
+- `/dashboard/video/**` → `/video-edukasi/**`
+- `/dashboard/cms/**` → `/cms/**`
+- `/dashboard/admin/**` → `/admin/**`
+- Any other `/dashboard/<subpath>` → `/pasien/<subpath>` (subject to confirmation; see Decision Points)
 
-## Preconditions
-- Ensure you are on a clean working tree: `git status` must show no local changes you want to keep uncommitted.
-- You have permission to push a branch and open a PR.
+Decision Points (confirm before implementation)
+- Flattening patients: should existing `/dashboard/pasien` become the new root `/pasien` (i.e., move its `page.tsx` up) or live under `/pasien/pasien`? Recommended: flatten to `/pasien`.
+- Dev‑only routes: what is the desired destination for `/dashboard/test-whatsapp`? Proposal: `/pasien/test-whatsapp` or remove if not needed in prod.
 
----
+Assumptions
+- API routes remain under `src/app/api/**` and are not renamed (e.g., `/api/dashboard/overview` can remain; it doesn’t affect user URLs).
+- A common shell is provided by `src/app/dashboard/layout.tsx`; we will extract/preserve this shell via a route group so URLs do not include the group name.
 
-## 1) Align Scope and Risks
-- Confirm the team agrees to remove the entire test suite and all Jest-related tooling.
-- Acknowledge risk: you lose automated regressions checks; rely on build, type checks, manual QA.
+Phases
 
-## 2) Create Branch and Backup
-- Create a working branch:
-  - `git checkout -b chore/remove-tests-and-unused-libs`
-- Optional: backup test artifacts and configs (for easy rollback/reference):
-  - `tar -czf backup-tests-$(date +%F).tar.gz src/__tests__ src/services/reminder/reminder.test.ts jest.config.js jest.setup.js 2>/dev/null || true`
+Phase 0 — Preparation
+- Create a working branch; ensure `bun install` completes and dev server runs.
+- Run `bun run build` to capture a baseline and surface type errors.
+- Inventory the current tree under `src/app/dashboard/**` and note special files: `layout.tsx`, `page.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx`, `template.tsx`.
 
-## 3) Inventory Tests and Fixtures
-- Known test files in this repo:
-  - `src/__tests__/rate-limiter.test.ts`
-  - `src/__tests__/auth-race-conditions.test.ts`
-  - `src/__tests__/compliance-service.test.ts`
-  - `src/services/reminder/reminder.test.ts`
-- Sanity scan for more:
-  - `rg -n "__tests__|\.test\.(t|j)sx?$|\.spec\.(t|j)sx?$" -g '!node_modules'`
-  - `rg -n "__mocks__|jest\.mock\(|@testing-library" -g '!node_modules'`
+Phase 1 — Inventory and Audit
+- List all subroutes present today:
+  - `src/app/dashboard/{admin,berita,cms,pasien,pengingat,video,test-whatsapp}`
+- Search code for hardcoded `"/dashboard"` usage in:
+  - `src/components/**` (navigation, breadcrumbs, buttons, redirects)
+  - `src/app/**` (server actions, redirects, static params)
+  - `src/middleware.ts` and `src/middleware/**`
+- Collect a change list to update these references after moves.
 
-## 4) Delete Test Files and Folders
-- Remove the files identified above:
-  - `git rm -f src/__tests__/rate-limiter.test.ts`
-  - `git rm -f src/__tests__/auth-race-conditions.test.ts`
-  - `git rm -f src/__tests__/compliance-service.test.ts`
-  - `git rm -f src/services/reminder/reminder.test.ts`
-- If additional tests/fixtures are found in step 3, remove them too.
+Phase 2 — Layout Strategy
+- Extract the shared dashboard shell `src/app/dashboard/layout.tsx` into a route group to keep the shell without changing URLs:
+  - Create `src/app/(shell)/layout.tsx` and move the shell there (or re‑export if identical).
+  - New routes will live under `src/app/(shell)/{pasien,pengingat,berita,video-edukasi,cms,admin}`.
+- Retain section‑specific layouts (e.g., `dashboard/cms/layout.tsx`, `dashboard/pengingat/layout.tsx`) by moving them with their subtree.
 
-## 5) Remove Jest Config and Setup
-- Delete Jest setup and config files:
-  - `git rm -f jest.config.js`
-  - `git rm -f jest.setup.js`
-- Optional: if `/coverage` is only used by Jest, remove from `.gitignore` (harmless to keep):
-  - Open `.gitignore` and remove the `/coverage` line if desired.
+Phase 3 — Define Exact File Moves
+- Top‑level destinations:
+  - `src/app/dashboard/pengingat` → `src/app/pengingat`
+  - `src/app/dashboard/berita` → `src/app/berita`
+  - `src/app/dashboard/video` → `src/app/video-edukasi`
+  - `src/app/dashboard/cms` → `src/app/cms`
+  - `src/app/dashboard/admin` → `src/app/admin`
+  - Remaining `src/app/dashboard/*` (including `page.tsx`) → `src/app/pasien/*`
+- If flattening patients is approved:
+  - Move `src/app/dashboard/pasien/page.tsx` to `src/app/pasien/page.tsx` (replace or merge with any placeholder).
+  - Move/merge `src/app/dashboard/page.tsx` content if it duplicates patient overview.
+- Keep API routes under `src/app/api/**` unchanged; verify no API routes are nested under `src/app/dashboard`.
 
-## 6) Drop Jest Types from TypeScript
-- Edit `tsconfig.json` and update `compilerOptions.types` to remove Jest entries.
-- From:
-  - `"types": ["node", "jest", "@types/jest"]`
-- To:
-  - `"types": ["node"]`
+Phase 4 — Implement Moves and Route Group
+- Create `src/app/(shell)/layout.tsx` by moving the shell from `src/app/dashboard/layout.tsx`.
+- Place each new top‑level route directory under `(shell)` so the shell wraps them without affecting the URL:
+  - `src/app/(shell)/pasien`, `src/app/(shell)/pengingat`, `src/app/(shell)/berita`, `src/app/(shell)/video-edukasi`, `src/app/(shell)/cms`, `src/app/(shell)/admin`.
+- Physically move files from Phase 3 to their mapped destinations, preserving any `layout.tsx` present in subtrees.
+- Remove the now‑empty `src/app/dashboard` directory after verification.
 
-## 7) Prune Test DevDependencies
-- Remove test-only devDependencies:
-  - `bun remove -D @testing-library/jest-dom @testing-library/react @testing-library/user-event @types/jest jest-environment-jsdom`
-- Install to refresh lockfile:
-  - `bun install`
+Phase 5 — Update Links, Imports, and Navigation
+- Replace all `href`/`router.push`/`redirect` pointing to `/dashboard...` with the new paths.
+- Centralize route strings to avoid drift:
+  - Add `src/lib/routes.ts` (e.g., `export const routes = { pasien: '/pasien', pengingat: '/pengingat', berita: '/berita', video: '/video-edukasi', cms: '/cms', admin: '/admin' }`).
+  - Refactor components to use these constants where reasonable.
+- Update active‑state logic and pathname checks to match new prefixes.
+- Key places to touch (from grep):
+  - `src/components/ui/desktop-header.tsx`
+  - `src/components/ui/mobile-admin-actions.tsx`
+  - `src/components/ui/navigation.tsx`, `src/components/ui/mobile-header.tsx`
+  - `src/components/ui/back-button.tsx`
+  - `src/components/ui/breadcrumb.tsx`
+  - `src/components/dashboard/**` (buttons and router pushes)
+  - `src/components/cms/**` (links to CMS routes)
+  - Any `redirect("/dashboard...")` in server components/actions.
 
-## 8) Remove Test Scripts and Docs
-- Update documentation to remove test instructions and references:
-  - `README.md`: remove sections/lines mentioning `bunx jest`, coverage, or watching tests.
-  - `AGENTS.md`: remove “Tests” commands and “Testing Guidelines” that reference Jest.
-  - `CLAUDE.md`: remove test-related commands and steps.
-- If any package scripts refer to tests, remove them (none present at the moment).
+Phase 6 — Breadcrumbs and Labels
+- Update breadcrumb base and labels to reflect new IA:
+  - Base becomes `/pasien` instead of `/dashboard` for patient pages.
+  - Map: `pengingat → Pengingat Obat`, `berita → Berita`, `video-edukasi → Video Edukasi`, `cms → Manajemen Konten`, `admin → Administrasi`.
+- Adjust any special breadcrumb generators in `src/components/ui/breadcrumb.tsx`.
 
-## 9) Delete CI Test Workflows/Steps (If Present)
-- Check for GitHub Actions or other CI configs:
-  - Inspect `.github/workflows/*` for jobs invoking `jest` or test commands.
-  - Remove entire test jobs or just steps that run tests.
-- If tests were required checks, update branch protection rules accordingly.
+Phase 7 — Middleware and RBAC
+- Update protected route matcher in `src/middleware.ts`:
+  - Replace `'/dashboard(.*)'` with `'^/(pasien|pengingat|berita|video-edukasi|cms|admin)(.*)$'` style entries.
+- Remove or invert the legacy redirect currently sending `/pengingat` → `/dashboard/pengingat`.
+- Ensure `/admin/**` remains restricted to `ADMIN`/`DEVELOPER`; adjust any role guards that key off pathnames.
 
-## 10) Search for "jest" and Test Remnants
-- Ensure nothing lingering remains:
-  - `rg -n "\b(jest|testing-library|describe|it|expect)\b" -g '!node_modules'`
-  - `rg -n "jest\.config|jest\.setup|__tests__|\.test\.|\.spec\." -g '!node_modules'`
+Phase 8 — Redirects (preserve old links)
+- Add permanent redirects in `next.config.ts`:
+  - `/dashboard` → `/pasien` (status 308)
+  - `/dashboard/pengingat/:path*` → `/pengingat/:path*`
+  - `/dashboard/berita/:path*` → `/berita/:path*`
+  - `/dashboard/video/:path*` → `/video-edukasi/:path*`
+  - `/dashboard/cms/:path*` → `/cms/:path*`
+  - `/dashboard/admin/:path*` → `/admin/:path*`
+  - Catch‑all: `/dashboard/:path*` → `/pasien/:path*`
+- Keep redirects for at least one release cycle; monitor 404s and redirect counts.
 
-## 11) Audit Imports for Unused Runtime Libraries
-- Quick static import audit (informational):
-  - `rg -no --hidden "^\s*import\s+.*?from\s+['\"]([^\./][^'\"]*)['\"]|^\s*require\(['\"]([^\./][^'\"]*)['\"]\)" src | sed -E "s/.*from ['\"]([^'\"]+)['\"]/\1/; s/.*require\(['\"]([^'\"]+)['\"]\)/\1/" | cut -d'/' -f1 | sort -u`
-- Optional automated audit (verify results manually; Next.js can resolve dynamically):
-  - `npx depcheck`
-  - or `npx knip`
-- Only remove a dependency if confidently unused in app/runtime code.
+Phase 9 — SEO and Content
+- If a sitemap is present, update to include new URLs and remove `/dashboard...`.
+- Review any `metadata` exports for canonical/OG URLs and update as needed.
+- Update internal links in content (`src/app/content/**`) if they reference `/dashboard...`.
 
-## 12) Remove Truly Unused Dependencies (Conservative)
-- For each confirmed-unused package:
-  - `bun remove <package>`
-- Reinstall to normalize lockfile:
-  - `bun install`
+Phase 10 — Caching, Webhooks, and Integrations
+- If cache keys include path segments, update them and add backward‑compat invalidation.
+- Review any webhooks or external services that call back to `/dashboard...` and update.
 
-## 13) Build and Lint
-- Ensure the app still builds and types are sound:
-  - `bun run build`
-  - `bun run lint`
+Phase 11 — Build, Lint, and Type Check
+- Run `bun run build` and fix any route import/type issues exposed by moves.
+- Run `bun run lint` and resolve path/unused import warnings.
 
-## 14) Run Dev and Manual Smoke
-- Start dev server and manually check critical flows:
-  - `bun run dev`
-- Suggested manual checks:
-  - Authentication-protected routes (Clerk integration).
-  - Dashboard and patient pages.
-  - Reminder pages and actions.
-  - Upload endpoint used by TinyMCE.
+Phase 12 — QA and Verification
+- Manual QA checklist across all sections:
+  - Pages render in new locations (page/loading/error/not‑found still wired).
+  - Dynamic routes (`[id]`, `[[...slug]]`) navigate correctly and params resolve.
+  - Navigation active states and visibility by role are correct.
+  - Breadcrumbs show the new hierarchy and links work.
+  - Middleware protects all intended routes; `/admin/**` remains restricted.
+  - Redirects return 308 and land on the correct page.
+  - API endpoints under `/api/**` still function; UI calls succeed.
 
-## 15) Commit Changes
-- Make small, focused commits:
-  - `git add -A`
-  - `git commit -m "chore(tests): remove Jest config, setup, and all test files"`
-  - `git commit -m "chore(deps): remove test libraries and types"` (if separate)
-  - `git commit -m "chore(tsconfig): drop Jest types"`
-  - `git commit -m "docs: remove test commands and references"`
-  - `git commit -m "ci: remove test jobs and steps"` (if applicable)
+Phase 13 — Cleanup and Docs
+- Remove any leftover `src/app/dashboard/**` artifacts.
+- Replace remaining inline path strings with `src/lib/routes.ts` constants where high‑impact.
+- Update README/internal docs/screenshots to reference the new URLs.
 
-## 16) Open PR with Notes
-- Open a PR titled: "chore: remove tests and unused testing libraries".
-- Include:
-  - Summary of what was removed and why.
-  - Risks and validation performed (build, lint, smoke checks).
-  - Any CI changes and branch protection updates needed.
+Phase 14 — Deploy and Monitor
+- Deploy; verify build and runtime logs.
+- Monitor 404s and redirect hits; fix stragglers if discovered.
 
----
+Acceptance Criteria
+- All `/dashboard...` URLs permanently redirect to the correct new paths.
+- New routes (`/pasien`, `/pengingat`, `/berita`, `/video-edukasi`, `/cms`, `/admin`) render with the intended shared shell and section layouts.
+- RBAC enforcement on new prefixes matches previous behavior.
+- Navigation, breadcrumbs, and deep links work across all subpages.
+- Build and lint pass with TypeScript strict enabled.
 
-## Validation Checklist
-- [ ] All test files removed; no `__tests__`, `.test.`, `.spec.` matches remain.
-- [ ] `jest.config.js` and `jest.setup.js` removed.
-- [ ] `tsconfig.json` no longer references Jest types.
-- [ ] Test devDependencies removed; `bun install` succeeds.
-- [ ] Docs no longer reference `bunx jest` or coverage.
-- [ ] CI has no steps running tests (if applicable).
-- [ ] `bun run build` and `bun run lint` both pass.
-- [ ] Key routes load and basic actions work in dev.
+Appendix — Quick File Map (current tree)
+- Shared shell: `src/app/dashboard/layout.tsx`
+- Subsections:
+  - `src/app/dashboard/pasien/{layout.tsx,page.tsx}`
+  - `src/app/dashboard/pengingat/{layout.tsx,page.tsx}`
+  - `src/app/dashboard/berita/page.tsx`
+  - `src/app/dashboard/video/page.tsx`
+  - `src/app/dashboard/cms/{layout.tsx,page.tsx}`
+  - `src/app/dashboard/admin/page.tsx`
+- Middleware: `src/middleware.ts` (protects `/dashboard(.*)` and redirects `/pengingat → /dashboard/pengingat`)
+- Navigation and breadcrumbs to update:
+  - `src/components/ui/desktop-header.tsx`
+  - `src/components/ui/mobile-admin-actions.tsx`
+  - `src/components/ui/navigation.tsx`
+  - `src/components/ui/mobile-header.tsx`
+  - `src/components/ui/back-button.tsx`
+  - `src/components/ui/breadcrumb.tsx`
+  - `src/components/dashboard/**` and `src/components/cms/**`
 
-## Rollback Plan
-- Checkout previous commit or branch to restore tests and tooling: `git checkout main && git revert -m 1 <merge_commit_sha>` or `git revert <range>` as appropriate.
-- Alternatively, restore from the backup tarball created in step 2.
-
+Notes
+- Use a route group `(shell)` to preserve the current shell across all new top‑level routes without affecting URL paths.
+- Prefer absolute paths in `Link href` to avoid relative path breakage after moves.
+- Add `src/lib/routes.ts` to centralize route constants and reduce future churn.
