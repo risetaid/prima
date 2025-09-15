@@ -7,7 +7,6 @@
 - Data: `src/db/schema.ts` (Drizzle) and `src/db/index.ts` (connection); soft-deletes via `deletedAt`.
 - UI: `src/components` (admin, patient, reminder, ui, providers); content at `src/app/content`.
 - Lib: `src/lib` (auth, cache, timezone, phone, validations, webhook, fonnte).
-- Tests: `src/__tests__` for unit/integration.
 
 ## Build, Test, and Development Commands
 
@@ -17,7 +16,6 @@
 - Start: `bun run start` — serve the production build.
 - Lint: `bun run lint` — ESLint (Next core-web-vitals).
 - DB: `bun run db:migrate`, `bun run db:generate`, `bun run db:studio`.
-- Tests: `bunx jest` (watch: `bunx jest --watch`).
 
 ## Coding Style & Naming Conventions
 
@@ -25,12 +23,6 @@
 - Files: kebab-case; React components `PascalCase` in `*.tsx`.
 - Variables/functions: `camelCase`; Drizzle columns `snake_case`, mapped to TS `camelCase`.
 - Validate inputs with Zod in `src/lib/validations.ts`; respect RBAC guards.
-
-## Testing Guidelines
-
-- Place tests in `src/__tests__` as `*.test.ts`/`*.test.tsx`.
-- Cover services and API routes; include edge cases for timezone (WIB) and caching.
-- Run with `bun test`; keep fast and isolated (no network; mock WhatsApp/Redis/DB).
 
 ## Commit & Pull Request Guidelines
 

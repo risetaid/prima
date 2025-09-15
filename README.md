@@ -173,10 +173,6 @@ bun run db:migrate      # Run migrations
 bun run db:push         # Push schema changes
 bun run db:studio       # Open Drizzle Studio GUI
 
-# Testing
-bunx jest               # Run all tests
-bunx jest --watch       # Run tests in watch mode
-
 # Admin Scripts
 bun run nuke-recreate-db    # Reset database (caution!)
 bun run setup-first-user    # Create initial admin
@@ -279,30 +275,6 @@ The system uses simple text message patterns for patient responses, supporting v
 3. System processes text response and updates status
 4. Follow-up message sent after 15 minutes if needed
 5. Volunteer notified if assistance required
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-bunx jest
-
-# Run specific test file
-bunx jest src/__tests__/compliance-service.test.ts
-
-# Run with coverage
-bunx jest --coverage
-
-# Watch mode for development
-bunx jest --watch
-```
-
-Tests focus on:
-
-- Service layer business logic
-- API endpoint validation
-- Timezone calculations (WIB)
-- Cache invalidation
-- Text message pattern matching
 
 ## 📊 Performance Optimizations
 

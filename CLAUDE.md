@@ -20,11 +20,6 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 - `bun run db:push` - Push schema changes to database
 - `bun run db:studio` - Open Drizzle Studio GUI for database inspection
 
-### Testing
-- `bunx jest` - Run all tests
-- `bunx jest --watch` - Run tests in watch mode
-- `bunx jest src/__tests__/[specific-file].test.ts` - Run specific test file
-
 ### Administrative Scripts
 - `bun run nuke-recreate-db` - Nuclear option to recreate database (use with caution)
 - `bun run setup-first-user` - Set up initial admin user
@@ -132,20 +127,12 @@ src/
 - Input validation with Zod on all API endpoints
 - Audit trails for sensitive operations
 
-### Testing Requirements
-- Tests in `src/__tests__/` as `*.test.ts`/`*.test.tsx`
-- Focus on services and API routes
-- Mock external dependencies (Redis, database, WhatsApp API)
-- Include timezone edge cases for WIB operations
-- Run tests before commits: `bunx jest`
-
 ## Development Workflow
 
 ### Pre-commit Checklist
 1. Run type checking: `bunx tsc --noEmit`
 2. Run linting: `bun run lint --quiet`
-3. Run tests: `bunx jest`
-4. Address all errors before committing
+3. Address all errors before committing
 
 ### Commit Standards
 - Use conventional commit format: `feat(scope): description`
