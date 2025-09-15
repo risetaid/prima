@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { routes } from "@/lib/routes";
 
 interface BackButtonProps {
   className?: string;
@@ -36,18 +37,37 @@ export function BackButton({
       // Fallback: navigate to appropriate parent page based on current path
       const currentPath = window.location.pathname;
 
+      const isCmsPath =
+        currentPath === routes.cms || currentPath.startsWith(`${routes.cms}/`);
+      const isPasienPath =
+        currentPath === routes.pasien || currentPath.startsWith(`${routes.pasien}/`);
+      const isPengingatPath =
+        currentPath === routes.pengingat || currentPath.startsWith(`${routes.pengingat}/`);
+      const isBeritaPath =
+        currentPath === routes.berita || currentPath.startsWith(`${routes.berita}/`);
+      const isVideoPath =
+        currentPath === routes.videoEdukasi || currentPath.startsWith(`${routes.videoEdukasi}/`);
+      const isAdminPath =
+        currentPath === routes.admin || currentPath.startsWith(`${routes.admin}/`);
+
       if (currentPath.startsWith("/content/videos/")) {
         // For video pages, go to home (since we don't have a videos listing page)
         router.push("/");
       } else if (currentPath.startsWith("/content/articles/")) {
         // For article pages, go to home (since we don't have an articles listing page)
         router.push("/");
-      } else if (currentPath.startsWith("/cms/")) {
+      } else if (isCmsPath) {
         // For CMS pages, go to CMS dashboard
-        router.push("/cms");
-      } else if (currentPath.startsWith("/pasien/") || currentPath.startsWith("/pengingat/") || currentPath.startsWith("/berita/") || currentPath.startsWith("/video-edukasi/") || currentPath.startsWith("/admin/")) {
+        router.push(routes.cms);
+      } else if (
+        isPasienPath ||
+        isPengingatPath ||
+        isBeritaPath ||
+        isVideoPath ||
+        isAdminPath
+      ) {
         // For protected pages, go to pasien home
-        router.push("/pasien");
+        router.push(routes.pasien);
       } else {
         // Default fallback to home
         router.push("/");

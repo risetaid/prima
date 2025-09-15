@@ -30,6 +30,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: '/dashboard/pasien/:path*',
+        destination: '/pasien/:path*',
+        permanent: true,
+      },
+      {
         source: '/dashboard/admin/:path*',
         destination: '/admin/:path*',
         permanent: true,

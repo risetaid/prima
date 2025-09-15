@@ -66,9 +66,9 @@ function generateBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   const breadcrumbs: BreadcrumbItem[] = [
     {
       label: 'Pasien',
-      href: '/pasien',
-      icon: Home
-    }
+      href: routes.pasien,
+      icon: Home,
+    },
   ]
 
   // Healthcare-specific path mapping
@@ -134,8 +134,8 @@ export function CMSBreadcrumb() {
   const pathname = usePathname()
   
   const cmsItems: BreadcrumbItem[] = [
-    { label: 'Beranda', href: '/', icon: Home },
-    { label: 'Manajemen Konten', href: '/cms' }
+    { label: 'Pasien', href: routes.pasien, icon: Home },
+    { label: 'Manajemen Konten', href: routes.cms },
   ]
 
   if (pathname.includes('/articles')) {
@@ -163,8 +163,7 @@ export function PatientBreadcrumb() {
   const pathname = usePathname()
   
   const patientItems: BreadcrumbItem[] = [
-    { label: 'Beranda', href: '/', icon: Home },
-    { label: 'Data Pasien', href: '/pasien' }
+    { label: 'Pasien', href: routes.pasien, icon: Home },
   ]
 
   if (pathname.includes('/tambah')) {
@@ -182,8 +181,8 @@ export function ReminderBreadcrumb() {
   const pathname = usePathname()
   
   const reminderItems: BreadcrumbItem[] = [
-    { label: 'Beranda', href: '/', icon: Home },
-    { label: 'Pengingat Obat', href: '/pengingat' }
+    { label: 'Pasien', href: routes.pasien, icon: Home },
+    { label: 'Pengingat Obat', href: routes.pengingat },
   ]
 
   if (pathname.includes('/terjadwal')) {
