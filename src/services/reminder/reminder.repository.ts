@@ -31,8 +31,6 @@ export class ReminderRepository {
       .select({
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-
-        doctorName: reminderSchedules.doctorName,
         scheduledTime: reminderSchedules.scheduledTime,
         frequency: reminderSchedules.frequency,
         startDate: reminderSchedules.startDate,
@@ -117,5 +115,4 @@ export class ReminderRepository {
     return await validateContentAttachments(attachedContent)
   }
 }
-
 

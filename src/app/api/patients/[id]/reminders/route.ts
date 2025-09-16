@@ -52,7 +52,6 @@ type ValidatedContent = {
 type ReminderSchedule = {
   id: string;
   patientId: string;
-  doctorName: string | null;
   scheduledTime: string;
   frequency: string;
   startDate: Date;
@@ -90,7 +89,6 @@ export async function GET(
         // Reminder fields
         id: reminderSchedules.id,
         patientId: reminderSchedules.patientId,
-        doctorName: reminderSchedules.doctorName,
         scheduledTime: reminderSchedules.scheduledTime,
         frequency: reminderSchedules.frequency,
         startDate: reminderSchedules.startDate,
@@ -113,7 +111,6 @@ export async function GET(
     const formattedReminders = reminders.map((reminder) => ({
       id: reminder.id,
       patientId: reminder.patientId,
-      doctorName: reminder.doctorName,
       scheduledTime: reminder.scheduledTime,
       frequency: reminder.frequency,
       startDate: reminder.startDate,

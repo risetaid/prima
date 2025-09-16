@@ -250,7 +250,6 @@ export const reminderSchedules = pgTable("reminder_schedules", {
 	patientId: uuid("patient_id").notNull(),
 	medicationName: text("medication_name").notNull(),
 	dosage: text("dosage"),
-	doctorName: text("doctor_name"),
 	scheduledTime: text("scheduled_time").notNull(),
 	frequency: frequency("frequency").default('CUSTOM').notNull(),
 	startDate: timestamp("start_date", { withTimezone: true, mode: 'string' }).notNull(),

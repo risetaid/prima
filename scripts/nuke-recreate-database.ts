@@ -36,61 +36,39 @@ async function dropAllTables() {
     const dropQueries = [
       // Drop foreign key constraints first
       `ALTER TABLE IF EXISTS reminder_content_attachments DROP CONSTRAINT IF EXISTS reminder_content_attachments_reminder_schedule_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS reminder_logs DROP CONSTRAINT IF EXISTS reminder_logs_reminder_schedule_id_fkey;`,
-      `ALTER TABLE IF EXISTS reminder_logs DROP CONSTRAINT IF EXISTS reminder_logs_patient_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS manual_confirmations DROP CONSTRAINT IF EXISTS manual_confirmations_patient_id_fkey;`,
-      `ALTER TABLE IF EXISTS manual_confirmations DROP CONSTRAINT IF EXISTS manual_confirmations_volunteer_id_fkey;`,
-      `ALTER TABLE IF EXISTS manual_confirmations DROP CONSTRAINT IF EXISTS manual_confirmations_reminder_schedule_id_fkey;`,
-      `ALTER TABLE IF EXISTS manual_confirmations DROP CONSTRAINT IF EXISTS manual_confirmations_reminder_log_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS reminder_schedules DROP CONSTRAINT IF EXISTS reminder_schedules_patient_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS medical_records DROP CONSTRAINT IF EXISTS medical_records_patient_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS health_notes DROP CONSTRAINT IF EXISTS health_notes_patient_id_fkey;`,
-      `ALTER TABLE IF EXISTS health_notes DROP CONSTRAINT IF EXISTS health_notes_recorded_by_fkey;`,
-
-      `ALTER TABLE IF EXISTS patient_variables DROP CONSTRAINT IF EXISTS patient_variables_patient_id_fkey;`,
-
       `ALTER TABLE IF EXISTS conversation_states DROP CONSTRAINT IF EXISTS conversation_states_patient_id_fkey;`,
-
       `ALTER TABLE IF EXISTS conversation_messages DROP CONSTRAINT IF EXISTS conversation_messages_conversation_state_id_fkey;`,
 
-      `ALTER TABLE IF EXISTS verification_logs DROP CONSTRAINT IF EXISTS verification_logs_patient_id_fkey;`,
+      // Drop tables (child tables first)
+      `DROP TABLE IF EXISTS reminder_content_attachments CASCADE;`,
+      `DROP TABLE IF EXISTS reminder_logs CASCADE;`,
+      `DROP TABLE IF EXISTS manual_confirmations CASCADE;`,
+      `DROP TABLE IF EXISTS reminder_schedules CASCADE;`,
+      `DROP TABLE IF EXISTS conversation_messages CASCADE;`,
+      `DROP TABLE IF EXISTS conversation_states CASCADE;`,
+      `DROP TABLE IF EXISTS verification_logs CASCADE;`,
+      `DROP TABLE IF EXISTS patient_variables CASCADE;`,
+      `DROP TABLE IF EXISTS health_notes CASCADE;`,
+      `DROP TABLE IF EXISTS medical_records CASCADE;`,
 
-
-
-
-      `ALTER TABLE IF EXISTS patients DROP CONSTRAINT IF EXISTS patients_assigned_volunteer_id_fkey;`,
-
-      `ALTER TABLE IF EXISTS whatsapp_templates DROP CONSTRAINT IF EXISTS whatsapp_templates_created_by_fkey;`,
-
-       // Drop tables
-       `DROP TABLE IF EXISTS reminder_content_attachments CASCADE;`,
-       `DROP TABLE IF EXISTS reminder_logs CASCADE;`,
-       `DROP TABLE IF EXISTS manual_confirmations CASCADE;`,
-       `DROP TABLE IF EXISTS reminder_schedules CASCADE;`,
-       `DROP TABLE IF EXISTS medical_records CASCADE;`,
-       `DROP TABLE IF EXISTS health_notes CASCADE;`,
-       `DROP TABLE IF EXISTS patient_variables CASCADE;`,
-       `DROP TABLE IF EXISTS conversation_states CASCADE;`,
-       `DROP TABLE IF EXISTS conversation_messages CASCADE;`,
-       `DROP TABLE IF EXISTS verification_logs CASCADE;`,
-
-       `DROP TABLE IF EXISTS patients CASCADE;`,
-       `DROP TABLE IF EXISTS whatsapp_templates CASCADE;`,
-       `DROP TABLE IF EXISTS medications CASCADE;`,
-       `DROP TABLE IF EXISTS cms_articles CASCADE;`,
-       `DROP TABLE IF EXISTS cms_videos CASCADE;`,
-       `DROP TABLE IF EXISTS users CASCADE;`,
+      `DROP TABLE IF EXISTS cms_articles CASCADE;`,
+      `DROP TABLE IF EXISTS cms_videos CASCADE;`,
+      `DROP TABLE IF EXISTS whatsapp_templates CASCADE;`,
+      `DROP TABLE IF EXISTS patients CASCADE;`,
+      `DROP TABLE IF EXISTS users CASCADE;`,
 
       // Drop enum types
       `DROP TYPE IF EXISTS user_role CASCADE;`,
       `DROP TYPE IF EXISTS cancer_stage CASCADE;`,
-      `DROP TYPE IF EXISTS verification_status CASCADE;`,
+      `DROP TYPE IF EXISTS medical_record_type CASCADE;`,
+      `DROP TYPE IF EXISTS frequency CASCADE;`,
+      `DROP TYPE IF EXISTS reminder_status CASCADE;`,
+      `DROP TYPE IF EXISTS confirmation_status CASCADE;`,
+      `DROP TYPE IF EXISTS patient_condition CASCADE;`,
       `DROP TYPE IF EXISTS template_category CASCADE;`,
+      `DROP TYPE IF EXISTS verification_status CASCADE;`,
+      `DROP TYPE IF EXISTS content_category CASCADE;`,
+      `DROP TYPE IF EXISTS content_status CASCADE;`,
 
       // Drop drizzle migration tracking
       `DROP TABLE IF EXISTS "__drizzle_migrations" CASCADE;`,

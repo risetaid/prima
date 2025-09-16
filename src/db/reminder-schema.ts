@@ -24,7 +24,6 @@ export const reminderSchedules = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     patientId: uuid("patient_id").notNull(),
-    doctorName: text("doctor_name"),
     scheduledTime: text("scheduled_time").notNull(),
     frequency: frequencyEnum("frequency").notNull().default("CUSTOM"),
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
@@ -273,4 +272,3 @@ export const reminderContentAttachments = pgTable(
     createdByIdx: index("reminder_content_created_by_idx").on(table.createdBy),
   })
 );
-
