@@ -1,145 +1,155 @@
 /**
- * LLM Service for Z.AI integration
- * Handles communication with Z.AI API for natural language processing
+ * LLM Service for Google Gemini integration
+ * Handles communication with Google Gemini API for natural language processing
  */
 
-import OpenAI from 'openai'
-import { logger } from '@/lib/logger'
-import { responseCache } from '@/lib/response-cache'
-import { safetyFilterService } from './safety-filter'
-import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from '@/lib/circuit-breaker'
-import { withRetry, DEFAULT_RETRY_CONFIGS } from '@/lib/retry'
-import { messageQueueService } from '@/services/message-queue.service'
-import { usageLimits } from '@/lib/usage-limits'
+import { GoogleGenAI } from "@google/genai";
+import { logger } from "@/lib/logger";
+import { responseCache } from "@/lib/response-cache";
+import { safetyFilterService } from "./safety-filter";
+import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from "@/lib/circuit-breaker";
+import { withRetry, DEFAULT_RETRY_CONFIGS } from "@/lib/retry";
+import { messageQueueService } from "@/services/message-queue.service";
+import { usageLimits } from "@/lib/usage-limits";
 import {
   LLMConfig,
   LLMRequest,
   ProcessedLLMResponse,
   IntentDetectionResult,
-  ConversationContext
-} from './llm.types'
+  ConversationContext,
+} from "./llm.types";
 
 export class LLMService {
-  private client: OpenAI
-  private config: LLMConfig
-  private circuitBreaker: CircuitBreaker
-  private isCircuitBreakerEnabled: boolean
+  private client: GoogleGenAI;
+  private config: LLMConfig;
+  private circuitBreaker: CircuitBreaker;
+  private isCircuitBreakerEnabled: boolean;
 
   constructor() {
     this.config = {
-      apiKey: process.env.Z_AI_API_KEY || '',
-      baseURL: process.env.Z_AI_BASE_URL || 'https://api.z.ai/api/paas/v4/',
-      model: process.env.Z_AI_MODEL || 'glm-4.5',
-      maxTokens: parseInt(process.env.LLM_MAX_TOKENS || '500'),
-      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
-      timeout: parseInt(process.env.LLM_TIMEOUT_MS || '30000')
-    }
+      apiKey: process.env.GEMINI_API_KEY || "",
+      baseURL: "", // Gemini doesn't use baseURL
+      model: process.env.GEMINI_MODEL || "gemini-2.0-flash-exp",
+      maxTokens: parseInt(process.env.LLM_MAX_TOKENS || "500"),
+      temperature: parseFloat(process.env.LLM_TEMPERATURE || "0.7"),
+      timeout: parseInt(process.env.LLM_TIMEOUT_MS || "30000"),
+    };
 
     if (!this.config.apiKey) {
-      throw new Error('Z_AI_API_KEY environment variable is required')
+      throw new Error("GEMINI_API_KEY environment variable is required");
     }
 
-    this.client = new OpenAI({
+    this.client = new GoogleGenAI({
       apiKey: this.config.apiKey,
-      baseURL: this.config.baseURL,
-      timeout: this.config.timeout
-    })
+    });
 
     // Initialize circuit breaker
-    this.isCircuitBreakerEnabled = process.env.ENABLE_CIRCUIT_BREAKER !== 'false'
-    this.circuitBreaker = new CircuitBreaker(DEFAULT_CIRCUIT_CONFIGS.llm)
+    this.isCircuitBreakerEnabled =
+      process.env.ENABLE_CIRCUIT_BREAKER !== "false";
+    this.circuitBreaker = new CircuitBreaker(DEFAULT_CIRCUIT_CONFIGS.llm);
 
-    logger.info('LLM Service initialized', {
+    logger.info("LLM Service initialized", {
       model: this.config.model,
-      baseURL: this.config.baseURL,
-      circuitBreakerEnabled: this.isCircuitBreakerEnabled
-    })
+      provider: "Google Gemini",
+      circuitBreakerEnabled: this.isCircuitBreakerEnabled,
+    });
   }
 
   /**
    * Send a request to the LLM and get processed response with fallback mechanisms
    */
   async generateResponse(request: LLMRequest): Promise<ProcessedLLMResponse> {
-    const startTime = Date.now()
+    const startTime = Date.now();
 
     // Check usage limits before proceeding
-    const limitCheck = await usageLimits.checkLimits()
+    const limitCheck = await usageLimits.checkLimits();
     if (!limitCheck.allowed) {
-      logger.warn('Usage limits exceeded, blocking LLM request', {
+      logger.warn("Usage limits exceeded, blocking LLM request", {
         limits: limitCheck.limits,
-        alerts: limitCheck.alerts.length
-      })
+        alerts: limitCheck.alerts.length,
+      });
 
       // Queue the message for later processing when limits reset
-      await this.queueMessageForRetry(request, 'Usage limits exceeded')
-      throw new Error('Usage limits exceeded - request queued for later processing')
+      await this.queueMessageForRetry(request, "Usage limits exceeded");
+      throw new Error(
+        "Usage limits exceeded - request queued for later processing"
+      );
     }
 
     // Check if circuit breaker allows the request
     if (this.isCircuitBreakerEnabled && !this.circuitBreaker.canExecute()) {
-      logger.warn('Circuit breaker is open, queuing message for later processing', {
-        state: this.circuitBreaker.getStats().state
-      })
+      logger.warn(
+        "Circuit breaker is open, queuing message for later processing",
+        {
+          state: this.circuitBreaker.getStats().state,
+        }
+      );
 
       // Queue the message for later processing
-      await this.queueMessageForRetry(request, 'LLM circuit breaker open')
-      throw new Error('LLM service temporarily unavailable (circuit breaker open)')
+      await this.queueMessageForRetry(request, "LLM circuit breaker open");
+      throw new Error(
+        "LLM service temporarily unavailable (circuit breaker open)"
+      );
     }
 
     try {
       // Execute with retry logic and circuit breaker protection
       const response = await this.executeWithFallbacks(async () => {
-        logger.debug('Sending LLM request', {
+        logger.debug("Sending Gemini LLM request", {
           messageCount: request.messages.length,
-          maxTokens: request.maxTokens || this.config.maxTokens
-        })
+          maxTokens: request.maxTokens || this.config.maxTokens,
+        });
 
-        const completion = await this.client.chat.completions.create({
+        // Convert OpenAI format to Gemini format
+        const prompt = this.convertMessagesToGeminiPrompt(request.messages);
+
+        const result = await this.client.models.generateContent({
           model: this.config.model,
-          messages: request.messages,
-          max_tokens: request.maxTokens || this.config.maxTokens,
-          temperature: request.temperature || this.config.temperature,
-          stream: false
-        }) as OpenAI.ChatCompletion
+          contents: [{ parts: [{ text: prompt }] }],
+          config: {
+            thinkingConfig: {
+              thinkingBudget: 0, // Disable thinking for cost savings
+            },
+          },
+        });
 
-        return completion
-      })
+        return result;
+      });
 
-      const responseTime = Date.now() - startTime
-      const content = response.choices[0]?.message?.content || ''
-      const tokensUsed = response.usage?.total_tokens || 0
-      const finishReason = response.choices[0]?.finish_reason || 'unknown'
+      const responseTime = Date.now() - startTime;
+      const content = response.text || "";
+      const tokensUsed = this.estimateTokens(content); // Gemini doesn't provide token count directly
+      const finishReason = "stop"; // Gemini doesn't provide finish reason in the same way
 
-      logger.info('LLM response generated successfully', {
+      logger.info("Gemini LLM response generated successfully", {
         tokensUsed,
         responseTime,
-        finishReason,
-        contentLength: content.length
-      })
+        contentLength: content.length,
+      });
 
       return {
         content,
         tokensUsed,
-        model: response.model,
+        model: this.config.model,
         responseTime,
-        finishReason
-      }
+        finishReason,
+      };
     } catch (error) {
-      const responseTime = Date.now() - startTime
-      const err = error as Error
+      const responseTime = Date.now() - startTime;
+      const err = error as Error;
 
-      logger.error('LLM request failed after all retries', err, {
+      logger.error("Gemini LLM request failed after all retries", err, {
         responseTime,
         model: this.config.model,
-        circuitBreakerState: this.circuitBreaker.getStats().state
-      })
+        circuitBreakerState: this.circuitBreaker.getStats().state,
+      });
 
       // Queue message for later retry if it's a temporary failure
       if (this.isRetryableError(err)) {
-        await this.queueMessageForRetry(request, err.message)
+        await this.queueMessageForRetry(request, err.message);
       }
 
-      throw new Error(`LLM request failed: ${err.message}`)
+      throw new Error(`Gemini LLM request failed: ${err.message}`);
     }
   }
 
@@ -150,38 +160,41 @@ export class LLMService {
     message: string,
     context: ConversationContext
   ): Promise<IntentDetectionResult> {
-    const systemPrompt = this.buildIntentDetectionPrompt(context)
+    const systemPrompt = this.buildIntentDetectionPrompt(context);
 
     const request: LLMRequest = {
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: "system", content: systemPrompt },
         ...context.previousMessages.slice(-5), // Last 5 messages for context
-        { role: 'user', content: message }
+        { role: "user", content: message },
       ],
       maxTokens: 200,
-      temperature: 0.3 // Lower temperature for more consistent intent detection
-    }
+      temperature: 0.3, // Lower temperature for more consistent intent detection
+    };
 
     try {
-      const response = await this.generateResponse(request)
+      const response = await this.generateResponse(request);
 
       // Parse the JSON response from LLM
-      const parsedResponse = this.parseIntentResponse(response.content)
+      const parsedResponse = this.parseIntentResponse(response.content);
 
       return {
         intent: parsedResponse.intent,
         confidence: parsedResponse.confidence,
         entities: parsedResponse.entities,
-        rawResponse: response
-      }
+        rawResponse: response,
+      };
     } catch (error) {
-      logger.error('Intent detection failed, using fallback', error as Error, {
+      logger.error("Intent detection failed, using fallback", error as Error, {
         patientId: context.patientId,
-        messageLength: message.length
-      })
+        messageLength: message.length,
+      });
 
       // Use keyword-based fallback for intent detection
-      const fallbackResult = await this.fallbackIntentDetection(message, context)
+      const fallbackResult = await this.fallbackIntentDetection(
+        message,
+        context
+      );
 
       return {
         intent: fallbackResult.intent,
@@ -190,94 +203,115 @@ export class LLMService {
         rawResponse: {
           content: JSON.stringify(fallbackResult),
           tokensUsed: 0,
-          model: 'fallback-keyword',
+          model: "fallback-keyword",
           responseTime: 0,
-          finishReason: 'fallback'
-        }
-      }
+          finishReason: "fallback",
+        },
+      };
     }
   }
 
   /**
-    * Generate a natural language response for the patient
-    */
+   * Generate a natural language response for the patient
+   */
   async generatePatientResponse(
     intent: string,
     context: ConversationContext,
     additionalContext?: string
   ): Promise<ProcessedLLMResponse> {
     // Check cache first for common queries
-    if (responseCache.shouldCache(intent, 0.8)) { // Assume high confidence for now
+    if (responseCache.shouldCache(intent, 0.8)) {
+      // Assume high confidence for now
       const patientContext = {
         patientName: context.patientInfo?.name,
         verificationStatus: context.patientInfo?.verificationStatus,
         activeRemindersCount: context.patientInfo?.activeReminders?.length || 0,
-        conversationLength: context.previousMessages.length
-      }
+        conversationLength: context.previousMessages.length,
+      };
 
-      const cachedResponse = await responseCache.get(`intent:${intent}`, patientContext)
+      const cachedResponse = await responseCache.get(
+        `intent:${intent}`,
+        patientContext
+      );
       if (cachedResponse) {
-        logger.debug('Using cached LLM response', {
+        logger.debug("Using cached LLM response", {
           intent,
-          cacheAge: Date.now() - cachedResponse.createdAt.getTime()
-        })
+          cacheAge: Date.now() - cachedResponse.createdAt.getTime(),
+        });
 
         // Parse the cached response from JSON string
-        const parsedResponse = JSON.parse(cachedResponse.response) as ProcessedLLMResponse
+        const parsedResponse = JSON.parse(
+          cachedResponse.response
+        ) as ProcessedLLMResponse;
 
         const cachedResponseObj = {
           content: parsedResponse.content,
           tokensUsed: parsedResponse.tokensUsed || 0,
           model: parsedResponse.model || this.config.model,
           responseTime: 0, // Cached response
-          finishReason: 'cached'
-        }
+          finishReason: "cached",
+        };
 
         // Even cached responses need safety filtering
-        const safetyResult = await safetyFilterService.filterLLMResponse(cachedResponseObj, context)
+        const safetyResult = await safetyFilterService.filterLLMResponse(
+          cachedResponseObj,
+          context
+        );
         if (!safetyResult.isSafe) {
-          logger.warn('Cached response failed safety filter', {
+          logger.warn("Cached response failed safety filter", {
             intent,
             patientId: context.patientId,
-            violations: safetyResult.violations.length
-          })
+            violations: safetyResult.violations.length,
+          });
           // Fall through to generate new response
         } else {
-          return cachedResponseObj
+          return cachedResponseObj;
         }
       }
     }
 
-    const systemPrompt = this.buildResponseGenerationPrompt(context, additionalContext)
+    const systemPrompt = this.buildResponseGenerationPrompt(
+      context,
+      additionalContext
+    );
 
     const request: LLMRequest = {
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: "system", content: systemPrompt },
         ...context.previousMessages.slice(-10), // More context for response generation
-        { role: 'user', content: `Intent detected: ${intent}` }
+        { role: "user", content: `Intent detected: ${intent}` },
       ],
       maxTokens: this.config.maxTokens,
-      temperature: this.config.temperature
-    }
+      temperature: this.config.temperature,
+    };
 
-    const response = await this.generateResponse(request)
+    const response = await this.generateResponse(request);
 
     // Apply safety filtering to LLM response
-    const safetyResult = await safetyFilterService.filterLLMResponse(response, context)
+    const safetyResult = await safetyFilterService.filterLLMResponse(
+      response,
+      context
+    );
 
-    let finalResponse = response
+    let finalResponse = response;
     if (!safetyResult.isSafe) {
-      logger.warn('LLM response failed safety filter, using sanitized version', {
-        intent,
-        patientId: context.patientId,
-        violations: safetyResult.violations.length
-      })
+      logger.warn(
+        "LLM response failed safety filter, using sanitized version",
+        {
+          intent,
+          patientId: context.patientId,
+          violations: safetyResult.violations.length,
+        }
+      );
 
       // Sanitize the response
       finalResponse = {
         ...response,
-        content: safetyFilterService.sanitizeContent(response.content, safetyResult.violations)
-      }
+        content: safetyFilterService.sanitizeContent(
+          response.content,
+          safetyResult.violations
+        ),
+      };
     }
 
     // Cache the response if appropriate (only safe responses)
@@ -286,19 +320,23 @@ export class LLMService {
         patientName: context.patientInfo?.name,
         verificationStatus: context.patientInfo?.verificationStatus,
         activeRemindersCount: context.patientInfo?.activeReminders?.length || 0,
-        conversationLength: context.previousMessages.length
-      }
+        conversationLength: context.previousMessages.length,
+      };
 
-      await responseCache.set(`intent:${intent}`, patientContext, JSON.stringify({
-        content: finalResponse.content,
-        tokensUsed: finalResponse.tokensUsed,
-        model: finalResponse.model,
-        responseTime: finalResponse.responseTime,
-        finishReason: finalResponse.finishReason
-      }))
+      await responseCache.set(
+        `intent:${intent}`,
+        patientContext,
+        JSON.stringify({
+          content: finalResponse.content,
+          tokensUsed: finalResponse.tokensUsed,
+          model: finalResponse.model,
+          responseTime: finalResponse.responseTime,
+          finishReason: finalResponse.finishReason,
+        })
+      );
     }
 
-    return finalResponse
+    return finalResponse;
   }
 
   /**
@@ -308,9 +346,9 @@ export class LLMService {
     return `You are an AI assistant for PRIMA healthcare system helping patients via WhatsApp.
 
 Patient Information:
-- Name: ${context.patientInfo?.name || 'Unknown'}
+- Name: ${context.patientInfo?.name || "Unknown"}
 - Phone: ${context.phoneNumber}
-- Verification Status: ${context.patientInfo?.verificationStatus || 'Unknown'}
+- Verification Status: ${context.patientInfo?.verificationStatus || "Unknown"}
 
 Your task is to analyze the patient's message and determine their intent. Respond with a JSON object containing:
 - intent: One of [verification_response, medication_confirmation, unsubscribe, general_inquiry, emergency, unknown]
@@ -324,7 +362,7 @@ Guidelines:
 - For emergency: Look for urgent medical situations
 - For general inquiry: Any other questions or statements
 
-Respond only with valid JSON.`
+Respond only with valid JSON.`;
   }
 
   /**
@@ -337,7 +375,7 @@ Respond only with valid JSON.`
     return `You are a helpful healthcare assistant for PRIMA system communicating with patients via WhatsApp.
 
 Patient Information:
-- Name: ${context.patientInfo?.name || 'Unknown'}
+- Name: ${context.patientInfo?.name || "Unknown"}
 - Phone: ${context.phoneNumber}
 
 Guidelines for responses:
@@ -349,36 +387,36 @@ Guidelines for responses:
 - Include PRIMA branding when appropriate
 - Use simple, clear language
 
-${additionalContext ? `Additional Context: ${additionalContext}` : ''}
+${additionalContext ? `Additional Context: ${additionalContext}` : ""}
 
-Generate a natural, helpful response based on the detected intent.`
+Generate a natural, helpful response based on the detected intent.`;
   }
 
   /**
    * Parse the JSON response from intent detection
    */
   private parseIntentResponse(content: string): {
-    intent: string
-    confidence: number
-    entities?: Record<string, unknown>
+    intent: string;
+    confidence: number;
+    entities?: Record<string, unknown>;
   } {
     try {
-      const parsed = JSON.parse(content.trim())
+      const parsed = JSON.parse(content.trim());
       return {
-        intent: parsed.intent || 'unknown',
+        intent: parsed.intent || "unknown",
         confidence: parsed.confidence || 0,
-        entities: parsed.entities as Record<string, unknown> || {}
-      }
+        entities: (parsed.entities as Record<string, unknown>) || {},
+      };
     } catch (error) {
-      logger.warn('Failed to parse LLM intent response', {
+      logger.warn("Failed to parse LLM intent response", {
         content: content.substring(0, 100),
-        error: (error as Error).message
-      })
+        error: (error as Error).message,
+      });
 
       return {
-        intent: 'unknown',
-        confidence: 0
-      }
+        intent: "unknown",
+        confidence: 0,
+      };
     }
   }
 
@@ -389,17 +427,20 @@ Generate a natural, helpful response based on the detected intent.`
     message: string,
     context: ConversationContext
   ): Promise<{
-    emergencyDetected: boolean
-    safetyViolations: number
-    escalationRequired: boolean
+    emergencyDetected: boolean;
+    safetyViolations: number;
+    escalationRequired: boolean;
   }> {
-    const analysis = await safetyFilterService.analyzePatientMessage(message, context)
+    const analysis = await safetyFilterService.analyzePatientMessage(
+      message,
+      context
+    );
 
     return {
       emergencyDetected: analysis.emergencyResult.isEmergency,
       safetyViolations: analysis.safetyResult.violations.length,
-      escalationRequired: analysis.safetyResult.escalationRequired
-    }
+      escalationRequired: analysis.safetyResult.escalationRequired,
+    };
   }
 
   /**
@@ -408,92 +449,97 @@ Generate a natural, helpful response based on the detected intent.`
   private async executeWithFallbacks<T>(fn: () => Promise<T>): Promise<T> {
     if (!this.isCircuitBreakerEnabled) {
       // Simple retry without circuit breaker
-      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm)
+      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm);
     }
 
     // Execute with circuit breaker protection
     return this.circuitBreaker.execute(async () => {
-      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm)
-    })
+      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm);
+    });
   }
 
   /**
    * Check if an error is retryable
    */
   private isRetryableError(error: Error): boolean {
-    const message = error.message.toLowerCase()
+    const message = error.message.toLowerCase();
     const retryablePatterns = [
-      'timeout',
-      'network',
-      'connection',
-      'rate limit',
-      'server error',
-      'internal server error',
-      'bad gateway',
-      'service unavailable',
-      'gateway timeout',
-      'too many requests',
-      'temporary failure'
-    ]
+      "timeout",
+      "network",
+      "connection",
+      "rate limit",
+      "server error",
+      "internal server error",
+      "bad gateway",
+      "service unavailable",
+      "gateway timeout",
+      "too many requests",
+      "temporary failure",
+    ];
 
-    return retryablePatterns.some(pattern => message.includes(pattern))
+    return retryablePatterns.some((pattern) => message.includes(pattern));
   }
 
   /**
    * Queue message for later retry when LLM is unavailable
    */
-  private async queueMessageForRetry(request: LLMRequest, reason: string): Promise<void> {
+  private async queueMessageForRetry(
+    request: LLMRequest,
+    reason: string
+  ): Promise<void> {
     try {
       // Extract patient information from the request for queuing
-      const patientInfo = this.extractPatientInfoFromRequest(request)
+      const patientInfo = this.extractPatientInfoFromRequest(request);
 
       if (patientInfo) {
         await messageQueueService.enqueueMessage({
           patientId: patientInfo.patientId,
           phoneNumber: patientInfo.phoneNumber,
           message: this.extractMessageFromRequest(request),
-          priority: 'medium',
-          messageType: 'general',
+          priority: "medium",
+          messageType: "general",
           maxRetries: 3,
           metadata: {
             originalRequest: request,
             failureReason: reason,
-            queuedAt: new Date().toISOString()
-          }
-        })
+            queuedAt: new Date().toISOString(),
+          },
+        });
 
-        logger.info('Message queued for retry', {
+        logger.info("Message queued for retry", {
           patientId: patientInfo.patientId,
           reason,
-          priority: 'medium'
-        })
+          priority: "medium",
+        });
       }
     } catch (queueError) {
-      logger.error('Failed to queue message for retry', queueError as Error, {
-        reason
-      })
+      logger.error("Failed to queue message for retry", queueError as Error, {
+        reason,
+      });
     }
   }
 
   /**
    * Extract patient information from LLM request
    */
-  private extractPatientInfoFromRequest(request: LLMRequest): { patientId: string; phoneNumber: string } | null {
+  private extractPatientInfoFromRequest(
+    request: LLMRequest
+  ): { patientId: string; phoneNumber: string } | null {
     // Try to extract from system message or user context
     for (const message of request.messages) {
-      if (message.role === 'system' && message.content) {
-        const patientMatch = message.content.match(/Patient: (\w+)/)
-        const phoneMatch = message.content.match(/Phone: (\+?[\d\s-]+)/)
+      if (message.role === "system" && message.content) {
+        const patientMatch = message.content.match(/Patient: (\w+)/);
+        const phoneMatch = message.content.match(/Phone: (\+?[\d\s-]+)/);
 
         if (patientMatch && phoneMatch) {
           return {
             patientId: patientMatch[1],
-            phoneNumber: phoneMatch[1].replace(/\s+/g, '')
-          }
+            phoneNumber: phoneMatch[1].replace(/\s+/g, ""),
+          };
         }
       }
     }
-    return null
+    return null;
   }
 
   /**
@@ -501,8 +547,10 @@ Generate a natural, helpful response based on the detected intent.`
    */
   private extractMessageFromRequest(request: LLMRequest): string {
     // Get the last user message
-    const userMessages = request.messages.filter(msg => msg.role === 'user')
-    return userMessages.length > 0 ? userMessages[userMessages.length - 1].content : 'LLM processing request'
+    const userMessages = request.messages.filter((msg) => msg.role === "user");
+    return userMessages.length > 0
+      ? userMessages[userMessages.length - 1].content
+      : "LLM processing request";
   }
 
   /**
@@ -511,42 +559,106 @@ Generate a natural, helpful response based on the detected intent.`
   private async fallbackIntentDetection(
     message: string,
     context: ConversationContext
-  ): Promise<{ intent: string; confidence: number; entities?: Record<string, unknown> }> {
-    const normalizedMessage = message.toLowerCase().trim()
+  ): Promise<{
+    intent: string;
+    confidence: number;
+    entities?: Record<string, unknown>;
+  }> {
+    const normalizedMessage = message.toLowerCase().trim();
 
     // Simple keyword-based intent detection
-    if (normalizedMessage.includes('ya') || normalizedMessage.includes('yes') || normalizedMessage.includes('setuju')) {
-      return { intent: 'verification_response', confidence: 0.8 }
+    if (
+      normalizedMessage.includes("ya") ||
+      normalizedMessage.includes("yes") ||
+      normalizedMessage.includes("setuju")
+    ) {
+      return { intent: "verification_response", confidence: 0.8 };
     }
 
-    if (normalizedMessage.includes('sudah') || normalizedMessage.includes('belum')) {
-      return { intent: 'medication_confirmation', confidence: 0.8 }
+    if (
+      normalizedMessage.includes("sudah") ||
+      normalizedMessage.includes("belum")
+    ) {
+      return { intent: "medication_confirmation", confidence: 0.8 };
     }
 
-    if (normalizedMessage.includes('berhenti') || normalizedMessage.includes('stop') || normalizedMessage.includes('unsubscribe')) {
-      return { intent: 'unsubscribe', confidence: 0.9 }
+    if (
+      normalizedMessage.includes("berhenti") ||
+      normalizedMessage.includes("stop") ||
+      normalizedMessage.includes("unsubscribe")
+    ) {
+      return { intent: "unsubscribe", confidence: 0.9 };
     }
 
-    if (normalizedMessage.includes('darurat') || normalizedMessage.includes('sakit') || normalizedMessage.includes('tolong')) {
-      return { intent: 'emergency', confidence: 0.9 }
+    if (
+      normalizedMessage.includes("darurat") ||
+      normalizedMessage.includes("sakit") ||
+      normalizedMessage.includes("tolong")
+    ) {
+      return { intent: "emergency", confidence: 0.9 };
     }
 
-    if (normalizedMessage.includes('tanya') || normalizedMessage.includes('bantuan') || normalizedMessage.includes('help')) {
-      return { intent: 'general_inquiry', confidence: 0.7 }
+    if (
+      normalizedMessage.includes("tanya") ||
+      normalizedMessage.includes("bantuan") ||
+      normalizedMessage.includes("help")
+    ) {
+      return { intent: "general_inquiry", confidence: 0.7 };
     }
 
     // Check for emergency keywords with higher priority
-    const emergencyKeywords = ['darurat', 'emergency', 'sakit', 'muntah', 'alergi', 'sesak', 'nyeri', 'demam', 'gawat', 'tolong']
-    if (emergencyKeywords.some(keyword => normalizedMessage.includes(keyword))) {
-      return { intent: 'emergency', confidence: 0.95 }
+    const emergencyKeywords = [
+      "darurat",
+      "emergency",
+      "sakit",
+      "muntah",
+      "alergi",
+      "sesak",
+      "nyeri",
+      "demam",
+      "gawat",
+      "tolong",
+    ];
+    if (
+      emergencyKeywords.some((keyword) => normalizedMessage.includes(keyword))
+    ) {
+      return { intent: "emergency", confidence: 0.95 };
     }
 
-    logger.debug('Fallback intent detection: unknown intent', {
+    logger.debug("Fallback intent detection: unknown intent", {
       message: normalizedMessage.substring(0, 100),
-      patientId: context.patientId
-    })
+      patientId: context.patientId,
+    });
 
-    return { intent: 'unknown', confidence: 0.3 }
+    return { intent: "unknown", confidence: 0.3 };
+  }
+
+  /**
+   * Convert OpenAI message format to Gemini prompt
+   */
+  private convertMessagesToGeminiPrompt(
+    messages: LLMRequest["messages"]
+  ): string {
+    return messages
+      .map((msg) => {
+        if (msg.role === "system") {
+          return `System: ${msg.content}`;
+        } else if (msg.role === "user") {
+          return `User: ${msg.content}`;
+        } else if (msg.role === "assistant") {
+          return `Assistant: ${msg.content}`;
+        }
+        return msg.content;
+      })
+      .join("\n\n");
+  }
+
+  /**
+   * Estimate token count (rough approximation)
+   */
+  private estimateTokens(text: string): number {
+    // Rough estimation: ~4 characters per token for English/Indonesian text
+    return Math.ceil(text.length / 4);
   }
 
   /**
@@ -556,11 +668,13 @@ Generate a natural, helpful response based on the detected intent.`
   getConfig(): Partial<LLMConfig> & { circuitBreaker?: any } {
     return {
       ...this.config,
-      apiKey: this.config.apiKey ? '***' : '', // Hide API key
-      circuitBreaker: this.isCircuitBreakerEnabled ? this.circuitBreaker.getStats() : null
-    }
+      apiKey: this.config.apiKey ? "***" : "", // Hide API key
+      circuitBreaker: this.isCircuitBreakerEnabled
+        ? this.circuitBreaker.getStats()
+        : null,
+    };
   }
 }
 
 // Export singleton instance
-export const llmService = new LLMService()
+export const llmService = new LLMService();

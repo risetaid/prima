@@ -89,9 +89,10 @@ export async function POST(request: NextRequest) {
       name: validatedData.name,
     };
 
-    // Step 5: Process message with enhanced LLM-based intent detection and conversation continuity
+    // Step 5: Process message with LLM-based conversation handling
     let useLLM = true; // Feature flag for LLM processing
     let llmResult = null;
+    let llmSuccess = false;
 
     if (useLLM) {
       try {
@@ -111,6 +112,8 @@ export async function POST(request: NextRequest) {
         };
 
         llmResult = await messageProcessor.processMessage(messageContext);
+        llmSuccess = true;
+
         logger.info("LLM message processing successful", {
           intent: llmResult.intent.primary,
           confidence: llmResult.intent.confidence,
@@ -118,23 +121,23 @@ export async function POST(request: NextRequest) {
           responseType: llmResult.response.type,
         });
 
-        // Step 5.1: Send personalized response if auto-reply is recommended
+        // Step 5.1: Send LLM-generated response if auto-reply is recommended
         if (llmResult.response.type === 'auto_reply' && llmResult.response.message) {
           try {
             const whatsAppService = new WhatsAppService();
             await whatsAppService.sendPersonalizedResponse(
               validatedData.sender,
-              'Pasien', // TODO: Get from patient context
+              llmResult.context.patientName || 'Pasien',
               llmResult.intent.primary,
               llmResult.response.message
             );
-            logger.info("Personalized response sent", {
+            logger.info("LLM personalized response sent", {
               phoneNumber: validatedData.sender,
               intent: llmResult.intent.primary,
               responseLength: llmResult.response.message.length
             });
           } catch (sendError) {
-            logger.error("Failed to send personalized response", sendError as Error, {
+            logger.error("Failed to send LLM personalized response", sendError as Error, {
               phoneNumber: validatedData.sender,
               intent: llmResult.intent.primary
             });
@@ -147,16 +150,16 @@ export async function POST(request: NextRequest) {
             const whatsAppService = new WhatsAppService();
             await whatsAppService.sendEmergencyAlert(
               validatedData.sender,
-              'Pasien', // TODO: Get from patient context
+              llmResult.context.patientName || 'Pasien',
               validatedData.message,
               'urgent'
             );
-            logger.warn("Emergency alert sent", {
+            logger.warn("LLM emergency alert sent", {
               phoneNumber: validatedData.sender,
               message: validatedData.message
             });
           } catch (alertError) {
-            logger.error("Failed to send emergency alert", alertError as Error, {
+            logger.error("Failed to send LLM emergency alert", alertError as Error, {
               phoneNumber: validatedData.sender
             });
           }
@@ -167,12 +170,26 @@ export async function POST(request: NextRequest) {
           error: error instanceof Error ? error.message : String(error)
         });
         useLLM = false;
+        llmSuccess = false;
       }
     }
 
-    // Step 6: Process through verification webhook service (fallback or primary)
-    const verificationService = new VerificationWebhookService();
-    const result = await verificationService.processWebhook(webhookPayload);
+    // Step 6: Process through verification webhook service ONLY if LLM failed
+    let result;
+    if (llmSuccess) {
+      // LLM succeeded, return success without calling verification service
+      result = {
+        success: true,
+        message: "LLM processed successfully",
+        patientId: llmResult?.context.patientId || 'unknown',
+        result: 'llm_processed',
+        status: 200
+      };
+    } else {
+      // LLM failed, fall back to verification service
+      const verificationService = new VerificationWebhookService();
+      result = await verificationService.processWebhook(webhookPayload);
+    }
 
     // Step 7: Log processing result
     const processingTime = Date.now() - startTime;

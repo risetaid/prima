@@ -1249,8 +1249,8 @@ Provide a natural, conversational response that addresses the patient's message 
    * Calculate LLM cost based on tokens and model
    */
   private calculateLLMCost(tokensUsed: number): number {
-    // Z.AI pricing (approximate)
-    const costPerThousandTokens = 0.002; // $0.002 per 1K tokens
+    // Gemini pricing (approximate)
+    const costPerThousandTokens = 0.0005; // $0.0005 per 1K tokens for gemini-2.0-flash-exp
     return (tokensUsed / 1000) * costPerThousandTokens;
   }
 
