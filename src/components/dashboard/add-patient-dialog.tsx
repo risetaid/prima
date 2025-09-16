@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logger'
+import { IndonesianDateInput } from '@/components/ui/indonesian-date-input'
 
 type CancerStageOption = '' | 'I' | 'II' | 'III' | 'IV'
 
@@ -305,30 +306,26 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-gray-600 text-sm mb-2" htmlFor="birthDate">
+                <label className="block text-gray-600 text-sm mb-2">
                   Tanggal Lahir
                 </label>
-                <input
-                  id="birthDate"
-                  name="birthDate"
-                  type="date"
+                <IndonesianDateInput
                   value={formData.birthDate}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                  onChange={(value) => setFormData((previous) => ({ ...previous, birthDate: value }))}
+                  placeholder="hh/bb/tttt"
+                  className="border-blue-200 rounded-xl"
                 />
               </div>
 
               <div>
-                <label className="block text-gray-600 text-sm mb-2" htmlFor="diagnosisDate">
+                <label className="block text-gray-600 text-sm mb-2">
                   Tanggal Diagnosis
                 </label>
-                <input
-                  id="diagnosisDate"
-                  name="diagnosisDate"
-                  type="date"
+                <IndonesianDateInput
                   value={formData.diagnosisDate}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                  onChange={(value) => setFormData((previous) => ({ ...previous, diagnosisDate: value }))}
+                  placeholder="hh/bb/tttt"
+                  className="border-blue-200 rounded-xl"
                 />
               </div>
             </div>
