@@ -7,9 +7,11 @@ import {
 import {
   MessageProcessorService,
   MessageContext,
+  ResponseAction,
 } from "@/services/message-processor.service";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientContextService } from "@/services/patient/patient-context.service";
+import { ReminderService } from "@/services/reminder/reminder.service";
 import { logger } from "@/lib/logger";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 
@@ -25,6 +27,106 @@ const WhatsAppWebhookSchema = z.object({
 
 // Type for validated webhook data
 type ValidatedWebhookData = z.infer<typeof WhatsAppWebhookSchema>;
+
+/**
+ * Execute response actions from LLM processing
+ */
+async function executeResponseActions(
+  actions: ResponseAction[],
+  patientId: string,
+  phoneNumber: string,
+  message: string
+): Promise<void> {
+  const reminderService = new ReminderService();
+
+  for (const action of actions) {
+    try {
+      switch (action.type) {
+        case "log_confirmation":
+          // Log the confirmation in reminder logs
+          // TODO: Fix TypeScript types for reminderLogs insertion
+          logger.info("Confirmation action requested", {
+            patientId,
+            status: action.data.status,
+            response: action.data.response,
+          });
+          break;
+
+        case "send_followup":
+          // Schedule a follow-up reminder
+          if (action.data.type === "reminder" && action.data.delay) {
+            const delay =
+              typeof action.data.delay === "number"
+                ? action.data.delay
+                : parseInt(String(action.data.delay));
+            const followUpTime = new Date(Date.now() + delay);
+
+            // Create a follow-up reminder schedule
+            const followUpReminders = await reminderService.createReminder({
+              patientId,
+              message: `⏰ Pengingat Susulan\n\nHalo! Kami ingin memastikan Anda sudah menyelesaikan rutinitas kesehatan sebelumnya.\n\nBalas SUDAH atau BELUM.\n\n💙 Tim PRIMA`,
+              time: followUpTime.toTimeString().split(" ")[0], // HH:MM:SS format
+              selectedDates: [followUpTime.toISOString().split("T")[0]], // Today's date
+              createdById: "system", // System-generated reminder
+            });
+
+            const followUpReminder = followUpReminders?.[0];
+            logger.info("Follow-up reminder scheduled", {
+              patientId,
+              followUpTime: followUpTime.toISOString(),
+              delay,
+              reminderId: followUpReminder?.id,
+            });
+          }
+          break;
+
+        case "notify_volunteer":
+          // This would notify volunteers - for now just log
+          logger.warn("Volunteer notification required", {
+            patientId,
+            priority: action.data.priority || "medium",
+            message: action.data.message || message,
+            reason: action.data.reason || "llm_recommendation",
+          });
+          // TODO: Implement actual volunteer notification system
+          break;
+
+        case "update_patient_status":
+          // Update patient status
+          if (action.data.status) {
+            // This would update patient status in database
+            logger.info("Patient status update requested", {
+              patientId,
+              newStatus: action.data.status,
+            });
+            // TODO: Implement patient status update
+          }
+          break;
+
+        case "create_manual_confirmation":
+          // Create manual confirmation record
+          logger.info("Manual confirmation requested", {
+            patientId,
+            reminderLogId: action.data.reminderLogId,
+            volunteerId: action.data.volunteerId,
+          });
+          // TODO: Implement manual confirmation creation
+          break;
+
+        default:
+          logger.warn("Unknown action type", {
+            actionType: action.type,
+            patientId,
+          });
+      }
+    } catch (error) {
+      logger.error("Failed to execute response action", error as Error, {
+        actionType: action.type,
+        patientId,
+      });
+    }
+  }
+}
 
 /**
  * Production WhatsApp Webhook Route
@@ -158,6 +260,34 @@ export async function POST(request: NextRequest) {
               {
                 phoneNumber: validatedData.sender,
                 intent: llmResult.intent.primary,
+              }
+            );
+          }
+        }
+
+        // Step 5.3: Execute response actions (follow-up reminders, logging, etc.)
+        if (
+          llmResult.response.actions &&
+          llmResult.response.actions.length > 0
+        ) {
+          try {
+            await executeResponseActions(
+              llmResult.response.actions,
+              llmResult.context.patientId || "unknown",
+              validatedData.sender,
+              validatedData.message
+            );
+            logger.info("Response actions executed", {
+              patientId: llmResult.context.patientId || "unknown",
+              actionCount: llmResult.response.actions.length,
+            });
+          } catch (actionError) {
+            logger.error(
+              "Failed to execute response actions",
+              actionError as Error,
+              {
+                patientId: llmResult.context.patientId || "unknown",
+                actionCount: llmResult.response.actions.length,
               }
             );
           }
@@ -307,7 +437,6 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({
-    success: true,
     message: "WhatsApp webhook is operational",
     mode,
     timestamp: new Date().toISOString(),

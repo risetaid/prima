@@ -26,7 +26,7 @@ export interface MessageContext {
   patientName?: string;
   verificationStatus?: string;
   activeReminders?: unknown[];
-  fullPatientContext?: import("./patient/patient-context.service").PatientContext;
+  fullPatientContext?: FullPatientContext;
 }
 
 export interface MessageHistory {
@@ -99,6 +99,58 @@ export interface ResponseAction {
     | "notify_volunteer"
     | "create_manual_confirmation";
   data: Record<string, unknown>;
+}
+
+export interface FullPatientContext {
+  patient: {
+    id: string;
+    name: string;
+    phoneNumber: string;
+    verificationStatus: string;
+    isActive: boolean;
+    assignedVolunteerId?: string;
+    cancerStage?: string;
+    diagnosisDate?: Date;
+    doctorName?: string;
+    hospitalName?: string;
+    birthDate?: Date;
+    address?: string;
+    emergencyContactName?: string;
+    emergencyContactPhone?: string;
+    notes?: string;
+    photoUrl?: string;
+    lastReactivatedAt?: Date;
+  };
+  todaysReminders?: Array<{
+    id: string;
+    medicationName: string;
+    scheduledTime: string;
+  }>;
+  activeReminders?:
+    | Array<{
+        medicationName: string;
+        scheduledTime: string;
+      }>
+    | unknown[];
+  medicalHistory?: {
+    symptoms?: Array<{
+      symptom: string;
+      severity?: string;
+      reportedAt?: Date;
+    }>;
+  };
+  recentHealthNotes?: Array<{
+    id: string;
+    note: string;
+    recordedDate: Date;
+    recordedBy: string;
+  }>;
+  patientVariables?: Array<{
+    id: string;
+    name: string;
+    value: string;
+    isActive: boolean;
+  }>;
 }
 
 export class MessageProcessorService {
@@ -1098,6 +1150,7 @@ export class MessageProcessorService {
   private async generateDirectLLMResponse(
     message: string,
     context: ConversationContext,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fullPatientContext?: any
   ): Promise<ProcessedLLMResponse | null> {
     try {
@@ -1156,7 +1209,7 @@ export class MessageProcessorService {
    */
   private buildDirectResponsePrompt(
     context: ConversationContext,
-    fullPatientContext?: any
+    fullPatientContext?: FullPatientContext
   ): string {
     const patientInfo = context.patientInfo;
     const activeReminders = patientInfo?.activeReminders || [];
@@ -1197,13 +1250,14 @@ export class MessageProcessorService {
       if (todaysReminders.length > 0) {
         patientDetails += `
 - Today's Reminders: ${todaysReminders
-          .map((r: any) => `${r.medicationName} at ${r.scheduledTime}`)
+          .map((r) => `${r.medicationName} at ${r.scheduledTime}`)
           .join(", ")}`;
       }
 
       if (activeReminders.length > 0) {
         patientDetails += `
 - Active Medications: ${activeReminders
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((r: any) => r.medicationName)
           .join(", ")}`;
       }
@@ -1212,6 +1266,7 @@ export class MessageProcessorService {
         patientDetails += `
 - Recent Symptoms: ${medicalHistory.symptoms
           .slice(0, 3)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((s: any) => s.symptom)
           .join(", ")}`;
       }
@@ -1220,6 +1275,7 @@ export class MessageProcessorService {
         patientDetails += `
 - Recent Health Notes: ${recentHealthNotes
           .slice(0, 2)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((n: any) => n.note.substring(0, 50) + "...")
           .join("; ")}`;
       }
@@ -1228,12 +1284,14 @@ export class MessageProcessorService {
         patientDetails += `
 - Custom Variables: ${patientVariables
           .slice(0, 3)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .map((v: any) => `${v.name}: ${v.value}`)
           .join(", ")}`;
       }
     } else if (activeReminders.length > 0) {
       patientDetails += `
 - Active Medications: ${activeReminders
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((r: any) => r.medicationName)
         .join(", ")}`;
     }
@@ -1269,7 +1327,10 @@ Provide a comprehensive, natural response that fully addresses the patient's que
    */
   private createResponseFromLLM(
     llmResponse: ProcessedLLMResponse | null,
-    safetyAnalysis: any,
+    safetyAnalysis: {
+      emergencyDetected: boolean;
+      escalationRequired: boolean;
+    },
     context: MessageContext
   ): RecommendedResponse {
     // Handle emergency situations

@@ -8,7 +8,6 @@ import {
   patients,
   healthNotes,
   patientVariables,
-  medicalRecords,
 } from "@/db";
 import { eq, and, gte, desc, isNull, or, inArray, lte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
