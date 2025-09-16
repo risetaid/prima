@@ -27,6 +27,12 @@
 - ✅ Redis caching (3min sessions, 15min patient data)
 - ✅ ISR optimization for public content
 - ✅ Medical-grade error handling and soft deletes
+- ✅ **LLM Integration with Cost Management**:
+  - Response caching for common queries
+  - Token usage tracking and analytics
+  - Cost monitoring and alerts
+  - Usage limits and rate limiting
+  - Prompt optimization for efficiency
 
 ## 🏗️ System Architecture
 
@@ -196,6 +202,24 @@ src/
 - Phone number validation
 - Error handling and retry logic
 
+### LLM Cost Management Services
+
+**Location**: `src/lib/llm-analytics.ts`, `src/lib/usage-limits.ts`, `src/lib/prompt-optimizer.ts`
+
+**Core Responsibilities**:
+
+- **LLM Analytics**: Token usage tracking, cost monitoring, performance metrics
+- **Usage Limits**: Rate limiting, quota enforcement, automated alerts
+- **Prompt Optimization**: Token reduction, response caching, efficiency improvements
+
+**Key Features**:
+
+- Real-time cost monitoring with configurable alerts
+- Automatic usage limit enforcement
+- Response caching for common queries (24h TTL)
+- Prompt optimization to reduce token consumption
+- Comprehensive analytics dashboard for administrators
+
 ## ⏰ Cron System (Automated Reminders)
 
 ### Architecture
@@ -283,8 +307,9 @@ await setCachedData(patientKey, patientData, 900);
 - **Patients**: `/api/patients` (CRUD + verification + compliance)
 - **Reminders**: `/api/reminders` (scheduling + management)
 - **CMS**: `/api/cms` (articles + videos + templates)
-- **Admin**: `/api/admin` (users + system management)
+- **Admin**: `/api/admin` (users + system management + LLM analytics)
 - **Cron**: `/api/cron` (automated reminder processing)
+- **LLM Analytics**: `/api/admin/llm-analytics` (cost monitoring and usage stats)
 
 ### Key API Patterns
 
@@ -292,6 +317,26 @@ await setCachedData(patientKey, patientData, 900);
 - **Validation**: Zod schemas for request/response validation
 - **Error Handling**: Structured error responses with appropriate HTTP codes
 - **Caching**: Strategic caching with TTL management
+- **Cost Management**: LLM usage tracking and limit enforcement
+
+### Admin Panel Features
+
+**Location**: `src/components/admin/`, `src/app/dashboard/admin/`
+
+**Core Features**:
+
+- **User Management**: Approve/reject volunteers, role assignment, activity monitoring
+- **System Monitoring**: Performance metrics, error tracking, cache management
+- **LLM Analytics Dashboard**: Cost monitoring, usage limits, optimization recommendations
+- **Content Moderation**: CMS article/video approval workflow
+
+**LLM Analytics Dashboard** (`src/components/admin/llm-analytics-dashboard.tsx`):
+
+- Real-time cost monitoring with alerts
+- Token usage by model and intent
+- Daily usage trends and cost projections
+- Usage limit status and recommendations
+- Performance metrics (response times, error rates)
 
 ## 🧪 Testing & Quality Assurance
 

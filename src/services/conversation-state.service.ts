@@ -36,6 +36,12 @@ export interface ConversationMessageData {
   intent?: string
   confidence?: number
   processedAt?: Date
+  // LLM-specific fields
+  llmResponseId?: string
+  llmModel?: string
+  llmTokensUsed?: number
+  llmCost?: number
+  llmResponseTimeMs?: number
   createdAt: Date
 }
 
@@ -154,12 +160,30 @@ export class ConversationStateService {
     message: Omit<ConversationMessageData, 'id' | 'conversationStateId' | 'createdAt'>
   ): Promise<ConversationMessageData> {
     try {
+      // Prepare the insert data with proper type conversions
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const insertData: any = {
+        conversationStateId,
+        message: message.message,
+        direction: message.direction,
+        messageType: message.messageType,
+        intent: message.intent,
+        confidence: message.confidence,
+        processedAt: message.processedAt,
+        llmResponseId: message.llmResponseId,
+        llmModel: message.llmModel,
+        llmTokensUsed: message.llmTokensUsed,
+        llmResponseTimeMs: message.llmResponseTimeMs,
+      }
+
+      // Convert llmCost to string for decimal storage
+      if (message.llmCost !== undefined) {
+        insertData.llmCost = message.llmCost.toString()
+      }
+
       const newMessage = await db
         .insert(conversationMessages)
-        .values({
-          conversationStateId,
-          ...message,
-        })
+        .values(insertData)
         .returning()
 
       // Update conversation state message count and last message
@@ -177,7 +201,9 @@ export class ConversationStateService {
         conversationStateId,
         direction: message.direction,
         messageType: message.messageType,
-        intent: message.intent
+        intent: message.intent,
+        llmModel: message.llmModel,
+        llmTokensUsed: message.llmTokensUsed
       })
 
       return this.mapConversationMessage(newMessage[0])
@@ -264,6 +290,175 @@ export class ConversationStateService {
       return cleanedCount
     } catch (error) {
       logger.error('Failed to cleanup expired conversation states', error as Error)
+      throw error
+    }
+  }
+
+  /**
+   * Switch conversation context
+   */
+  async switchContext(
+    conversationStateId: string,
+    newContext: ConversationStateData['currentContext'],
+    relatedEntityId?: string,
+    relatedEntityType?: ConversationStateData['relatedEntityType'],
+    stateData?: Record<string, unknown>
+  ): Promise<ConversationStateData> {
+    try {
+      const updates: Partial<ConversationStateData> = {
+        currentContext: newContext,
+        relatedEntityId,
+        relatedEntityType,
+        stateData,
+        updatedAt: new Date(),
+      }
+
+      // Set new expiration time based on context
+      const newExpiresAt = this.calculateExpirationTime(newContext)
+      updates.expiresAt = newExpiresAt
+
+      const updated = await this.updateConversationState(conversationStateId, updates)
+
+      logger.info('Switched conversation context', {
+        conversationStateId,
+        oldContext: updated.currentContext,
+        newContext,
+        relatedEntityId,
+        relatedEntityType
+      })
+
+      return updated
+    } catch (error) {
+      logger.error('Failed to switch conversation context', error as Error, {
+        conversationStateId,
+        newContext
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Extend conversation timeout
+   */
+  async extendTimeout(
+    conversationStateId: string,
+    additionalMinutes: number = 30
+  ): Promise<ConversationStateData> {
+    try {
+      const currentState = await this.getConversationStateById(conversationStateId)
+      if (!currentState) {
+        throw new Error(`Conversation state ${conversationStateId} not found`)
+      }
+
+      const newExpiresAt = new Date(currentState.expiresAt.getTime() + additionalMinutes * 60 * 1000)
+
+      const updated = await this.updateConversationState(conversationStateId, {
+        expiresAt: newExpiresAt
+      })
+
+      logger.info('Extended conversation timeout', {
+        conversationStateId,
+        additionalMinutes,
+        newExpiresAt
+      })
+
+      return updated
+    } catch (error) {
+      logger.error('Failed to extend conversation timeout', error as Error, {
+        conversationStateId,
+        additionalMinutes
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Get conversation state by ID
+   */
+  async getConversationStateById(conversationStateId: string): Promise<ConversationStateData | null> {
+    try {
+      const states = await db
+        .select()
+        .from(conversationStates)
+        .where(eq(conversationStates.id, conversationStateId))
+        .limit(1)
+
+      if (states.length === 0) {
+        return null
+      }
+
+      return this.mapConversationState(states[0])
+    } catch (error) {
+      logger.error('Failed to get conversation state by ID', error as Error, {
+        conversationStateId
+      })
+      throw error
+    }
+  }
+
+  /**
+   * Calculate expiration time based on context
+   */
+  private calculateExpirationTime(context: ConversationStateData['currentContext']): Date {
+    const now = new Date()
+
+    switch (context) {
+      case 'verification':
+        // Verification conversations expire in 24 hours
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      case 'reminder_confirmation':
+        // Reminder confirmations expire in 2 hours
+        return new Date(now.getTime() + 2 * 60 * 60 * 1000)
+      case 'emergency':
+        // Emergency conversations expire in 1 hour
+        return new Date(now.getTime() + 1 * 60 * 60 * 1000)
+      case 'general_inquiry':
+      default:
+        // General inquiries expire in 12 hours
+        return new Date(now.getTime() + 12 * 60 * 60 * 1000)
+    }
+  }
+
+  /**
+   * Get conversation statistics
+   */
+  async getConversationStats(patientId: string): Promise<{
+    totalConversations: number
+    activeConversations: number
+    averageMessageCount: number
+    totalMessages: number
+    contextDistribution: Record<string, number>
+  }> {
+    try {
+      const allStates = await db
+        .select()
+        .from(conversationStates)
+        .where(eq(conversationStates.patientId, patientId))
+
+      const activeStates = allStates.filter(state => state.isActive && state.expiresAt > new Date())
+
+      const contextDistribution: Record<string, number> = {}
+      let totalMessages = 0
+
+      for (const state of allStates) {
+        const context = state.currentContext || 'unknown'
+        contextDistribution[context] = (contextDistribution[context] || 0) + 1
+        totalMessages += state.messageCount
+      }
+
+      const averageMessageCount = allStates.length > 0 ? totalMessages / allStates.length : 0
+
+      return {
+        totalConversations: allStates.length,
+        activeConversations: activeStates.length,
+        averageMessageCount,
+        totalMessages,
+        contextDistribution
+      }
+    } catch (error) {
+      logger.error('Failed to get conversation stats', error as Error, {
+        patientId
+      })
       throw error
     }
   }
@@ -361,6 +556,11 @@ export class ConversationStateService {
       intent: row.intent || undefined,
       confidence: row.confidence || undefined,
       processedAt: row.processedAt || undefined,
+      llmResponseId: row.llmResponseId || undefined,
+      llmModel: row.llmModel || undefined,
+      llmTokensUsed: row.llmTokensUsed || undefined,
+      llmCost: row.llmCost ? parseFloat(row.llmCost) : undefined,
+      llmResponseTimeMs: row.llmResponseTimeMs || undefined,
       createdAt: row.createdAt,
     }
   }

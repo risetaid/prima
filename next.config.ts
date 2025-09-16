@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Exclude archived files from TypeScript compilation
+  typescript: {
+    ignoreBuildErrors: false,
+    tsconfigPath: './tsconfig.json',
+  },
+
   // Permanent redirects for old /dashboard paths
   async redirects() {
     return [

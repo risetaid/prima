@@ -1,0 +1,265 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { RefreshCw, TrendingUp, DollarSign, Clock, AlertTriangle } from 'lucide-react'
+import { llmAnalytics, LLMUsageStats, LLMCostAlert } from '@/lib/llm-analytics'
+
+interface LLMAnalyticsDashboardProps {
+  className?: string
+}
+
+export function LLMAnalyticsDashboard({ className }: LLMAnalyticsDashboardProps) {
+  const [stats, setStats] = useState<LLMUsageStats | null>(null)
+  const [alerts, setAlerts] = useState<LLMCostAlert[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const [usageStats, costAlerts] = await Promise.all([
+        llmAnalytics.getUsageStats(),
+        llmAnalytics.checkAlerts()
+      ])
+
+      setStats(usageStats)
+      setAlerts(costAlerts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load analytics data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const formatCurrency = (amount: number) => `$${amount.toFixed(4)}`
+  const formatNumber = (num: number) => num.toLocaleString()
+
+  if (loading) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">LLM Analytics Dashboard</h2>
+          <Button disabled>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Loading...
+          </Button>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardHeader className="pb-2">
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`space-y-6 ${className}`}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">LLM Analytics Dashboard</h2>
+          <Button onClick={loadData}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  if (!stats) return null
+
+  return (
+    <div className={`space-y-6 ${className}`}>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">LLM Analytics Dashboard</h2>
+        <Button onClick={loadData}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map((alert, index) => (
+            <Alert key={index} variant={alert.severity === 'critical' ? 'destructive' : 'default'}>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>{alert.message}</AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+
+      {/* Key Metrics */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Requests</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(stats.totalRequests)}</div>
+            <p className="text-xs text-muted-foreground">
+              Last 30 days
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatNumber(stats.totalTokens)}</div>
+            <p className="text-xs text-muted-foreground">
+              {((stats.totalTokens / 1000000) * 100).toFixed(1)}% of monthly limit
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(stats.totalCost)}</div>
+            <p className="text-xs text-muted-foreground">
+              ${(stats.totalCost / 30).toFixed(4)} per day
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.averageResponseTime.toFixed(0)}ms</div>
+            <p className="text-xs text-muted-foreground">
+              Target: &lt; 3s
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detailed Analytics */}
+      <Tabs defaultValue="models" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="models">By Model</TabsTrigger>
+          <TabsTrigger value="intents">By Intent</TabsTrigger>
+          <TabsTrigger value="daily">Daily Usage</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="models" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage by Model</CardTitle>
+              <CardDescription>Requests and costs broken down by LLM model</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(stats.requestsByModel).map(([model, requests]) => (
+                  <div key={model} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="outline">{model}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {requests} requests
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">
+                        {formatCurrency(stats.costByModel[model] || 0)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {((requests / stats.totalRequests) * 100).toFixed(1)}% of total
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="intents" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Usage by Intent</CardTitle>
+              <CardDescription>Requests broken down by detected intent</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(stats.requestsByIntent)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([intent, requests]) => (
+                  <div key={intent} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary">{intent}</Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {requests} requests
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">
+                        {((requests / stats.totalRequests) * 100).toFixed(1)}% of total
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="daily" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Usage</CardTitle>
+              <CardDescription>Requests, tokens, and costs over the last 30 days</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {stats.dailyUsage.map((day) => (
+                  <div key={day.date} className="flex items-center justify-between py-2 border-b">
+                    <div className="font-medium">{day.date}</div>
+                    <div className="flex space-x-4 text-sm">
+                      <span>{day.requests} req</span>
+                      <span>{formatNumber(day.tokens)} tokens</span>
+                      <span>{formatCurrency(day.cost)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

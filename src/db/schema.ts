@@ -9,6 +9,9 @@ export * from "./patient-schema";
 export * from "./reminder-schema";
 export * from "./cms-schema";
 
+// Import LLM cache table
+import { volunteerNotifications } from "./patient-schema";
+
 // Import tables for relations (they are already exported above, so we can use them directly)
 import { users } from "./core-schema";
 import { patients } from "./patient-schema";
@@ -226,6 +229,20 @@ export const cmsVideosRelations = relations(cmsVideos, ({}) => ({
   // Note: contentAttachments relation removed as it's handled by reminderContentAttachmentsRelations
 }));
 
+export const volunteerNotificationsRelations = relations(
+  volunteerNotifications,
+  ({ one }) => ({
+    patient: one(patients, {
+      fields: [volunteerNotifications.patientId],
+      references: [patients.id],
+    }),
+    assignedVolunteer: one(users, {
+      fields: [volunteerNotifications.assignedVolunteerId],
+      references: [users.id],
+    }),
+  })
+);
+
 
 
 
@@ -257,4 +274,8 @@ export type CmsArticle = typeof cmsArticles.$inferSelect;
 export type NewCmsArticle = typeof cmsArticles.$inferInsert;
 export type CmsVideo = typeof cmsVideos.$inferSelect;
 export type NewCmsVideo = typeof cmsVideos.$inferInsert;
+
+// Volunteer Notification Types
+export type VolunteerNotification = typeof volunteerNotifications.$inferSelect;
+export type NewVolunteerNotification = typeof volunteerNotifications.$inferInsert;
 

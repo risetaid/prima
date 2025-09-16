@@ -271,6 +271,83 @@ class RedisClient {
     }
   }
 
+  // Sorted set operations for message queue
+  async zadd(key: string, score: number, member: string): Promise<boolean> {
+    if (!this.client) return false
+
+    try {
+      await this.client.zadd(key, score, member)
+      return true
+    } catch (error) {
+      logger.warn('IORedis ZADD failed', {
+        redis: true,
+        operation: 'zadd',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return false
+    }
+  }
+
+  async zrange(key: string, start: number, stop: number): Promise<string[]> {
+    if (!this.client) return []
+
+    try {
+      return await this.client.zrange(key, start, stop)
+    } catch (error) {
+      logger.warn('IORedis ZRANGE failed', {
+        redis: true,
+        operation: 'zrange',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return []
+    }
+  }
+
+  async zrangebyscore(key: string, min: string | number, max: string | number): Promise<string[]> {
+    if (!this.client) return []
+
+    try {
+      return await this.client.zrangebyscore(key, min, max)
+    } catch (error) {
+      logger.warn('IORedis ZRANGEBYSCORE failed', {
+        redis: true,
+        operation: 'zrangebyscore',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return []
+    }
+  }
+
+  async zrem(key: string, ...members: string[]): Promise<number> {
+    if (!this.client) return 0
+
+    try {
+      return await this.client.zrem(key, ...members)
+    } catch (error) {
+      logger.warn('IORedis ZREM failed', {
+        redis: true,
+        operation: 'zrem',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return 0
+    }
+  }
+
+  async zcard(key: string): Promise<number> {
+    if (!this.client) return 0
+
+    try {
+      return await this.client.zcard(key)
+    } catch (error) {
+      logger.warn('IORedis ZCARD failed', {
+        redis: true,
+        operation: 'zcard',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return 0
+    }
+  }
+
   // For health checks
   isConnected(): boolean {
     return this.client !== null && this.client.status === 'ready'

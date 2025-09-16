@@ -1,6 +1,12 @@
 // Message Processor Service - Advanced NLP for Indonesian WhatsApp responses
 // Handles natural language processing, context awareness, and intelligent response classification
 
+import { llmService } from './llm/llm.service'
+import { ConversationContext } from './llm/llm.types'
+import { PatientContextService } from './patient/patient-context.service'
+import { ConversationStateService, ConversationMessageData } from './conversation-state.service'
+import { WhatsAppService } from './whatsapp/whatsapp.service'
+
 export interface MessageContext {
   patientId: string
   phoneNumber: string
@@ -8,6 +14,9 @@ export interface MessageContext {
   timestamp: Date
   conversationState?: ConversationState
   previousMessages?: MessageHistory[]
+  patientName?: string
+  verificationStatus?: string
+  activeReminders?: unknown[]
 }
 
 export interface MessageHistory {
@@ -65,7 +74,21 @@ export interface ResponseAction {
 }
 
 export class MessageProcessorService {
-  // Indonesian keyword mappings with variations and typos
+  private patientContextService: PatientContextService
+  private conversationStateService: ConversationStateService
+  private whatsAppService: WhatsAppService
+
+  constructor() {
+    this.patientContextService = new PatientContextService()
+    this.conversationStateService = new ConversationStateService()
+    this.whatsAppService = new WhatsAppService()
+  }
+
+  // Confidence threshold for LLM responses
+  private readonly CONFIDENCE_THRESHOLD = 0.6
+  private readonly LOW_CONFIDENCE_THRESHOLD = 0.3
+
+  // Indonesian keyword mappings for fallback (kept for emergency cases)
   private readonly ACCEPT_KEYWORDS = [
     'ya', 'iya', 'yes', 'y', 'ok', 'oke', 'baik', 'setuju', 'mau', 'ingin',
     'terima', 'siap', 'bisa', 'boleh', 'sudah siap', 'sudah oke', 'sudah baik'
@@ -107,25 +130,109 @@ export class MessageProcessorService {
   ]
 
   /**
-   * Process incoming message with full NLP analysis
+   * Map LLM intent to internal intent types
    */
+  private mapLLMIntentToInternal(llmIntent: string): MessageIntent['primary'] {
+    switch (llmIntent) {
+      case 'verification_response':
+        return 'accept' // Will be refined based on YA/TIDAK in response generation
+      case 'medication_confirmation':
+        return 'confirm_taken' // Will be refined based on SUDAH/BELUM
+      case 'unsubscribe':
+        return 'unsubscribe'
+      case 'emergency':
+        return 'emergency'
+      case 'general_inquiry':
+        return 'inquiry'
+      default:
+        return 'unknown'
+    }
+  }
+
+  /**
+   * Fallback keyword-based intent detection for when LLM fails
+   */
+  private fallbackKeywordIntentDetection(message: string): MessageIntent {
+    const scores = this.calculateIntentScores(message)
+    const maxScore = Math.max(...Object.values(scores))
+    const primaryIntent = this.selectPrimaryIntent(scores)
+    const sentiment = this.determineSentiment(message, primaryIntent)
+    const confidence = this.calculateIntentConfidence(maxScore, message)
+
+    return {
+      primary: primaryIntent || 'unknown',
+      sentiment,
+      confidence: Math.min(confidence || 0.5, 0.5) // Cap fallback confidence at 0.5
+    }
+  }
+
+  /**
+    * Process incoming message with full NLP analysis and conversation continuity
+    */
   async processMessage(context: MessageContext): Promise<ProcessedMessage> {
     const normalizedMessage = this.normalizeMessage(context.message)
 
-    // Detect intent with confidence scoring
-    const intent = this.detectIntent(normalizedMessage)
+    // Get or create conversation state for continuity
+    let conversationState = await this.conversationStateService.findByPhoneNumber(context.phoneNumber)
+    if (!conversationState) {
+      conversationState = await this.conversationStateService.getOrCreateConversationState(
+        context.patientId,
+        context.phoneNumber,
+        'general_inquiry'
+      )
+    }
+
+     // Get conversation history for context
+     const conversationHistory = await this.conversationStateService.getConversationHistory(
+       conversationState.id,
+       20 // Last 20 messages for context
+     )
+
+     // Detect intent with LLM using conversation context
+     const intent = await this.detectIntent(normalizedMessage, context, conversationHistory)
+
+     // Analyze message for safety concerns and emergencies
+     await llmService.analyzePatientMessageSafety(normalizedMessage, {
+       patientId: context.patientId,
+       phoneNumber: context.phoneNumber,
+       conversationId: conversationState.id,
+          previousMessages: conversationHistory?.map((msg: ConversationMessageData) => ({
+           role: msg.direction === 'inbound' ? 'user' : 'assistant',
+         content: msg.message
+       })),
+       patientInfo: {
+         name: context.patientName,
+         verificationStatus: context.verificationStatus,
+         activeReminders: context.activeReminders
+       }
+     })
 
     // Extract entities
     const entities = this.extractEntities(normalizedMessage)
+
+    // Update conversation state based on intent
+    await this.updateConversationState(conversationState.id, intent, normalizedMessage)
 
     // Determine context and conversation state
     const conversationContext = await this.determineContext(context, intent)
 
     // Generate recommended response
-    const response = this.generateResponse(intent, entities, conversationContext)
+    const response = await this.generateResponse(intent, entities, conversationContext)
 
-    // Check if human intervention is needed
+    // Check if human intervention is needed (with confidence-based logic)
     const requiresHumanIntervention = this.requiresHumanIntervention(intent, entities)
+
+    // Store the message and response in conversation history
+    await this.conversationStateService.addMessage(conversationState.id, {
+      message: normalizedMessage,
+      direction: 'inbound',
+      messageType: this.mapIntentToMessageType(intent.primary),
+      intent: intent.primary,
+      confidence: intent.confidence ? Math.round(intent.confidence * 100) : undefined, // Convert to 0-100 scale
+      processedAt: new Date()
+    })
+
+    // Note: Response is now stored in generateLLMResponse method to include LLM metadata
 
     return {
       intent,
@@ -158,25 +265,94 @@ export class MessageProcessorService {
   }
 
   /**
-   * Detect message intent with confidence scoring
-   */
-  private detectIntent(message: string): MessageIntent {
-    const scores = this.calculateIntentScores(message)
+    * Update conversation state based on intent
+    */
+   private async updateConversationState(
+     conversationStateId: string,
+     intent: MessageIntent,
+     message: string
+   ): Promise<void> {
+    const updates: Record<string, unknown> = {
+      currentContext: this.mapIntentToContext(intent.primary),
+      lastMessage: message,
+      messageCount: undefined // Will be auto-incremented
+    }
 
-    // Find highest scoring intent
-    const maxScore = Math.max(...Object.values(scores))
-    const primaryIntent = this.selectPrimaryIntent(scores)
+    // Set expected response type based on intent
+    updates.expectedResponseType = this.getExpectedResponseType(intent.primary)
 
-    // Determine sentiment
-    const sentiment = this.determineSentiment(message, primaryIntent)
+    await this.conversationStateService.updateConversationState(conversationStateId, updates)
+  }
 
-    // Calculate confidence based on score and message length
-    const confidence = this.calculateIntentConfidence(maxScore, message)
+  /**
+    * Map intent to message type for storage
+    */
+  private mapIntentToMessageType(intent: MessageIntent['primary']): ConversationMessageData['messageType'] {
+    switch (intent) {
+      case 'accept':
+      case 'decline':
+        return 'verification'
+      case 'confirm_taken':
+      case 'confirm_missed':
+      case 'confirm_later':
+        return 'confirmation'
+      case 'emergency':
+        return 'general' // Emergency gets special handling
+      default:
+        return 'general'
+    }
+  }
 
-    return {
-      primary: primaryIntent || 'unknown',
-      sentiment,
-      confidence: confidence || 0.5
+  /**
+    * Detect message intent using LLM
+    */
+  private async detectIntent(
+    message: string,
+    context: MessageContext,
+    conversationHistory?: ConversationMessageData[]
+  ): Promise<MessageIntent> {
+    try {
+      // Get patient context for LLM
+      const patientContext = await this.patientContextService.getPatientContext(context.phoneNumber)
+
+      // Build conversation context for LLM with conversation history
+      const llmContext: ConversationContext = {
+        patientId: context.patientId,
+        phoneNumber: context.phoneNumber,
+        previousMessages: (conversationHistory || context.previousMessages || []).map(msg => ({
+          role: msg.direction === 'inbound' ? 'user' : 'assistant',
+          content: msg.message
+        })),
+        patientInfo: patientContext.found && patientContext.context ? {
+          name: patientContext.context.patient.name,
+          verificationStatus: patientContext.context.patient.verificationStatus,
+          activeReminders: patientContext.context.activeReminders.map(r => ({
+            medicationName: r.customMessage || 'obat',
+            scheduledTime: r.scheduledTime
+          }))
+        } : undefined
+      }
+
+      // Use LLM for intent detection
+      const llmResult = await llmService.detectIntent(message, llmContext)
+
+      // Map LLM intent to our internal intent types
+      const primaryIntent = this.mapLLMIntentToInternal(llmResult.intent)
+
+      // Determine sentiment
+      const sentiment = this.determineSentiment(message, primaryIntent)
+
+      return {
+        primary: primaryIntent,
+        sentiment,
+        confidence: llmResult.confidence,
+        secondary: [llmResult.intent] // Keep original LLM intent as secondary
+      }
+    } catch (error) {
+      console.error('LLM intent detection failed, falling back to keyword-based:', error)
+
+      // Fallback to keyword-based detection if LLM fails
+      return this.fallbackKeywordIntentDetection(message)
     }
   }
 
@@ -341,11 +517,24 @@ export class MessageProcessorService {
   /**
    * Generate recommended response
    */
-  private generateResponse(
+  private async generateResponse(
     intent: MessageIntent,
     entities: MessageEntity[],
     context: MessageContext
-  ): RecommendedResponse {
+  ): Promise<RecommendedResponse> {
+    // For high confidence intents, try to generate natural language response using LLM
+    if ((intent.confidence ?? 0.5) >= this.CONFIDENCE_THRESHOLD) {
+      try {
+        const llmResponse = await this.generateLLMResponse(intent, context)
+        if (llmResponse) {
+          return llmResponse
+        }
+      } catch (error) {
+        console.warn('LLM response generation failed, falling back to template:', error)
+      }
+    }
+
+    // Fallback to template-based responses
     switch (intent.primary) {
       case 'accept':
         return this.generateAcceptResponse()
@@ -375,7 +564,7 @@ export class MessageProcessorService {
     if (intent.primary === 'emergency') return true
 
     // Low confidence intents need human review
-    if ((intent.confidence ?? 0.5) < 0.3) return true
+    if ((intent.confidence ?? 0.5) < this.LOW_CONFIDENCE_THRESHOLD) return true
 
     // Complex entities might need human interpretation
     if (entities.some(entity => entity.confidence < 0.5)) return true
@@ -499,15 +688,42 @@ export class MessageProcessorService {
    * Generate response for low confidence or unknown intent
    */
   private generateLowConfidenceResponse(intent: MessageIntent): RecommendedResponse {
-    if ((intent.confidence ?? 0.5) < 0.3) {
+    const confidence = intent.confidence ?? 0.5
+
+    if (confidence < this.LOW_CONFIDENCE_THRESHOLD) {
       const actions: ResponseAction[] = []
       actions.push({
         type: 'notify_volunteer',
-        data: { priority: 'low', reason: 'unclear_message' }
+        data: {
+          priority: 'medium',
+          reason: 'low_confidence_llm',
+          originalIntent: intent.primary,
+          confidence: confidence
+        }
       })
       return {
         type: 'human_intervention',
-        message: 'Maaf, pesan Anda kurang jelas. Relawan akan segera membantu Anda.',
+        message: 'Maaf, saya kurang yakin memahami pesan Anda. Relawan kami akan segera membantu.',
+        actions,
+        priority: 'medium'
+      }
+    }
+
+    if (confidence < this.CONFIDENCE_THRESHOLD) {
+      // Medium confidence - provide basic response but flag for potential review
+      const actions: ResponseAction[] = []
+      actions.push({
+        type: 'notify_volunteer',
+        data: {
+          priority: 'low',
+          reason: 'medium_confidence_llm',
+          originalIntent: intent.primary,
+          confidence: confidence
+        }
+      })
+      return {
+        type: 'auto_reply',
+        message: 'Terima kasih atas pesannya. Jika ini bukan yang Anda maksud, silakan jelaskan lebih lanjut.',
         actions,
         priority: 'low'
       }
@@ -521,40 +737,130 @@ export class MessageProcessorService {
     }
   }
 
-
-
   /**
-   * Extract time entities from message
+   * Generate natural language response using LLM
    */
-  private extractTimeEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
-    const timePattern = /\b(\d{1,2}):(\d{2})\b/g
-    let match
-    while ((match = timePattern.exec(message)) !== null) {
-      entities.push({
-        type: 'time',
-        value: `${match[1]}:${match[2]}`,
-        confidence: 0.9,
-        position: { start: match.index, end: match.index + match[0].length }
-      })
+  private async generateLLMResponse(
+    intent: MessageIntent,
+    context: MessageContext
+  ): Promise<RecommendedResponse | null> {
+    try {
+      // Get patient context for LLM
+      const patientContext = await this.patientContextService.getPatientContext(context.phoneNumber)
+
+      // Build conversation context for LLM
+      const llmContext: ConversationContext = {
+        patientId: context.patientId,
+        phoneNumber: context.phoneNumber,
+        previousMessages: context.previousMessages?.map(msg => ({
+          role: msg.direction === 'inbound' ? 'user' : 'assistant',
+          content: msg.message
+        })) || [],
+        patientInfo: patientContext.found && patientContext.context ? {
+          name: patientContext.context.patient.name,
+          verificationStatus: patientContext.context.patient.verificationStatus,
+          activeReminders: patientContext.context.activeReminders.map(r => ({
+            medicationName: r.customMessage || 'obat',
+            scheduledTime: r.scheduledTime
+          }))
+        } : undefined
+      }
+
+      // Generate response using LLM
+      const llmResponse = await llmService.generatePatientResponse(
+        intent.primary,
+        llmContext,
+        `Intent confidence: ${intent.confidence}. Handle appropriately.`
+      )
+
+      // Store LLM response metadata in conversation
+      if (llmResponse) {
+        await this.conversationStateService.addMessage(context.conversationState?.id || '', {
+          message: llmResponse.content,
+          direction: 'outbound',
+          messageType: this.mapIntentToMessageType(intent.primary),
+          intent: intent.primary,
+          confidence: intent.confidence ? Math.round(intent.confidence * 100) : undefined,
+          llmResponseId: llmResponse.model, // Use model as response ID for now
+          llmModel: llmResponse.model,
+          llmTokensUsed: llmResponse.tokensUsed,
+          llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
+          llmResponseTimeMs: llmResponse.responseTime,
+          processedAt: new Date()
+        })
+      }
+
+      // Map to our response format
+      const actions: ResponseAction[] = []
+
+      // Add appropriate actions based on intent
+      switch (intent.primary) {
+        case 'accept':
+          actions.push({
+            type: 'update_patient_status',
+            data: { status: 'verified' }
+          })
+          break
+        case 'decline':
+          actions.push({
+            type: 'update_patient_status',
+            data: { status: 'declined' }
+          })
+          break
+        case 'confirm_taken':
+          actions.push({
+            type: 'log_confirmation',
+            data: { status: 'CONFIRMED', response: context.message }
+          })
+          break
+        case 'confirm_missed':
+          actions.push({
+            type: 'log_confirmation',
+            data: { status: 'MISSED', response: context.message }
+          })
+          actions.push({
+            type: 'send_followup',
+            data: { type: 'reminder', delay: 2 * 60 * 60 * 1000 }
+          })
+          break
+        case 'unsubscribe':
+          actions.push({
+            type: 'update_patient_status',
+            data: { status: 'unsubscribed' }
+          })
+          break
+        case 'emergency':
+          actions.push({
+            type: 'notify_volunteer',
+            data: { priority: 'urgent', message: context.message }
+          })
+          return {
+            type: 'human_intervention',
+            message: llmResponse.content,
+            actions,
+            priority: 'urgent'
+          }
+      }
+
+      return {
+        type: 'auto_reply',
+        message: llmResponse.content,
+        actions,
+        priority: (intent.primary as string) === 'emergency' ? 'urgent' : 'low'
+      }
+    } catch (error) {
+      console.error('LLM response generation failed:', error)
+      return null
     }
-    return entities
   }
 
   /**
-   * Extract emergency entities from message
+   * Calculate LLM cost based on tokens and model
    */
-  private extractEmergencyEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
-    if (this.EMERGENCY_KEYWORDS.some(keyword => message.includes(keyword))) {
-      entities.push({
-        type: 'emergency_level',
-        value: 'high',
-        confidence: 0.7,
-        position: { start: 0, end: message.length }
-      })
-    }
-    return entities
+  private calculateLLMCost(tokensUsed: number): number {
+    // Z.AI pricing (approximate)
+    const costPerThousandTokens = 0.002 // $0.002 per 1K tokens
+    return (tokensUsed / 1000) * costPerThousandTokens
   }
 
   /**
@@ -618,5 +924,39 @@ export class MessageProcessorService {
       default:
         return 'neutral'
     }
+  }
+
+  /**
+   * Extract time entities from message
+   */
+  private extractTimeEntities(message: string): MessageEntity[] {
+    const entities: MessageEntity[] = []
+    const timePattern = /\b(\d{1,2}):(\d{2})\b/g
+    let match
+    while ((match = timePattern.exec(message)) !== null) {
+      entities.push({
+        type: 'time',
+        value: `${match[1]}:${match[2]}`,
+        confidence: 0.9,
+        position: { start: match.index, end: match.index + match[0].length }
+      })
+    }
+    return entities
+  }
+
+  /**
+   * Extract emergency entities from message
+   */
+  private extractEmergencyEntities(message: string): MessageEntity[] {
+    const entities: MessageEntity[] = []
+    if (this.EMERGENCY_KEYWORDS.some(keyword => message.includes(keyword))) {
+      entities.push({
+        type: 'emergency_level',
+        value: 'high',
+        confidence: 0.7,
+        position: { start: 0, end: message.length }
+      })
+    }
+    return entities
   }
 }

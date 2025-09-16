@@ -29,6 +29,20 @@
       "when": 1757771710622,
       "tag": "0003_drop_patient_medications",
       "breakpoints": true
-    }
+    },
+     {
+      "idx": 4,
+      "version": "7",
+      "when": 1758038709333,
+      "tag": "0004_woozy_absorbing_man",
+      "breakpoints": true
+     },
+     {
+      "idx": 5,
+      "version": "7",
+      "when": 1758039000000,
+      "tag": "0005_llm_tables_only",
+      "breakpoints": true
+     }
   ]
 }

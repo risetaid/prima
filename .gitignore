@@ -50,3 +50,6 @@ ERD.md
 prima_backup.sql
 # clerk configuration (can include secrets)
 /.clerk/
+
+# archived files
+_archive/

@@ -105,9 +105,80 @@ Apakah sudah menyelesaikan rutinitas kesehatan?
   }
 
   /**
-   * Send acknowledgment message after response
-   */
+    * Send acknowledgment message after response
+    */
   async sendAck(phoneNumber: string, message: string): Promise<WhatsAppMessageResult> {
+    return await this.send(phoneNumber, message)
+  }
+
+  /**
+    * Send personalized natural language response
+    */
+  async sendPersonalizedResponse(
+    phoneNumber: string,
+    patientName: string,
+    intent: string,
+    response: string,
+    includeSignature: boolean = true
+  ): Promise<WhatsAppMessageResult> {
+    let message = response
+
+    // Add signature if requested
+    if (includeSignature) {
+      message += '\n\n💙 Tim PRIMA'
+    }
+
+    return await this.send(phoneNumber, message)
+  }
+
+  /**
+    * Send emergency alert to volunteers
+    */
+  async sendEmergencyAlert(
+    patientPhone: string,
+    patientName: string,
+    message: string,
+    priority: 'urgent' | 'high' | 'medium' = 'urgent'
+  ): Promise<WhatsAppMessageResult[]> {
+    // This would send to volunteer WhatsApp numbers
+    // For now, just log the emergency
+    const alertMessage = `🚨 DARURAT MEDIS 🚨
+
+Pasien: ${patientName}
+No. HP: ${patientPhone}
+Pesan: "${message}"
+Prioritas: ${priority.toUpperCase()}
+
+Segera hubungi pasien atau koordinasikan dengan tim medis.
+
+💙 Tim PRIMA`
+
+    // TODO: Send to volunteer WhatsApp numbers
+    // For now, return empty array
+    console.log('Emergency Alert:', alertMessage)
+    return []
+  }
+
+  /**
+    * Send follow-up message for missed medication
+    */
+  async sendFollowUpReminder(
+    phoneNumber: string,
+    patientName: string,
+    medicationName: string
+  ): Promise<WhatsAppMessageResult> {
+    const message = `⏰ *Follow-up: Pengingat Obat*
+
+Halo ${patientName}!
+
+Kami ingin memastikan Anda sudah minum ${medicationName} sesuai jadwal.
+
+Apakah sudah diminum? Balas "SUDAH" atau "BELUM".
+
+Jika ada kendala, jangan ragu untuk menghubungi kami.
+
+💙 Tim PRIMA`
+
     return await this.send(phoneNumber, message)
   }
 }

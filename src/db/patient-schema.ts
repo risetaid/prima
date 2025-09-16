@@ -7,6 +7,7 @@ import {
   integer,
   index,
   jsonb,
+  decimal,
 } from "drizzle-orm/pg-core";
 
 // Import enums
@@ -265,6 +266,12 @@ export const conversationMessages = pgTable(
     intent: text("intent"), // Detected intent from NLP
     confidence: integer("confidence"), // Confidence score (0-100)
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    // LLM-specific fields for conversation history
+    llmResponseId: text("llm_response_id"), // LLM response identifier
+    llmModel: text("llm_model"), // Model used (e.g., 'glm-4.5')
+    llmTokensUsed: integer("llm_tokens_used"), // Tokens consumed
+    llmCost: decimal("llm_cost", { precision: 10, scale: 6 }), // Cost in USD
+    llmResponseTimeMs: integer("llm_response_time_ms"), // Response time in milliseconds
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -313,5 +320,69 @@ export const verificationLogs = pgTable(
     patientLogIdx: index("verification_logs_patient_idx").on(table.patientId),
     createdAtIdx: index("verification_logs_created_at_idx").on(table.createdAt),
     actionIdx: index("verification_logs_action_idx").on(table.action),
+  })
+);
+
+// ===== LLM RESPONSE CACHE =====
+
+export const llmResponseCache = pgTable(
+  "llm_response_cache",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    messageHash: text("message_hash").notNull(),
+    patientContextHash: text("patient_context_hash").notNull(),
+    response: jsonb("response").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    messageHashIdx: index("llm_response_cache_message_hash_idx").on(table.messageHash),
+    patientContextHashIdx: index("llm_response_cache_patient_context_hash_idx").on(table.patientContextHash),
+    expiresAtIdx: index("llm_response_cache_expires_at_idx").on(table.expiresAt),
+    // Composite unique index for cache lookup
+    messagePatientUniqueIdx: index("llm_response_cache_message_patient_unique_idx")
+      .on(table.messageHash, table.patientContextHash),
+  })
+);
+
+// ===== VOLUNTEER NOTIFICATIONS =====
+
+export const volunteerNotifications = pgTable(
+  "volunteer_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id),
+    message: text("message").notNull(),
+    priority: text("priority").notNull(), // 'emergency', 'high', 'medium', 'low'
+    status: text("status").notNull().default("pending"), // 'pending', 'assigned', 'responded', 'resolved', 'dismissed'
+    assignedVolunteerId: uuid("assigned_volunteer_id"),
+    escalationReason: text("escalation_reason").notNull(), // 'emergency_detection', 'low_confidence', 'complex_inquiry'
+    confidence: integer("confidence"), // Confidence score for low_confidence escalations
+    intent: text("intent"), // Detected intent that triggered escalation
+    patientContext: jsonb("patient_context"), // Patient context at time of escalation
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    response: text("response"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    patientIdIdx: index("volunteer_notifications_patient_id_idx").on(table.patientId),
+    priorityIdx: index("volunteer_notifications_priority_idx").on(table.priority),
+    statusIdx: index("volunteer_notifications_status_idx").on(table.status),
+    assignedVolunteerIdx: index("volunteer_notifications_assigned_volunteer_idx").on(table.assignedVolunteerId),
+    escalationReasonIdx: index("volunteer_notifications_escalation_reason_idx").on(table.escalationReason),
+    createdAtIdx: index("volunteer_notifications_created_at_idx").on(table.createdAt),
+    // Composite indexes for common queries
+    statusPriorityIdx: index("volunteer_notifications_status_priority_idx").on(table.status, table.priority),
+    assignedStatusIdx: index("volunteer_notifications_assigned_status_idx").on(table.assignedVolunteerId, table.status),
+    patientStatusIdx: index("volunteer_notifications_patient_status_idx").on(table.patientId, table.status),
   })
 );
