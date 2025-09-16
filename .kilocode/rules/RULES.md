@@ -14,15 +14,20 @@
 
 ## Build Commands
 
-- **ONLY run `bun run build`** when explicitly allowed/permitted
+- **DO NOT RUN `bun run build`**
 - Before concluding any code changes or final verdicts, always run:
   - `bunx tsc --noEmit` (TypeScript type checking)
-  - `bun run lint --quiet` (ESLint checking)
+  - `bun run lint` (ESLint checking)
 
 ## Import Statements
 
 - **NEVER use relative imports** like `import x from ".." `
 - **ALWAYS use absolute imports** with `@/` prefix: `import x from "@/path/to/x"`
+
+## TypeScript Types
+
+- **DO NOT USE `any`** under any circumstances
+- **ALWAYS use proper TypeScript types** for all variables, parameters, and return values
 
 ## Logging
 

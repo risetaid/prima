@@ -25,6 +25,7 @@ interface PatientHeaderCardProps {
   patient: Patient;
   onAddReminder: () => void;
   onViewReminders: () => void;
+  onToggleStatus: () => void;
 }
 
 const getVerificationStatusBadge = (status: string) => {
@@ -48,7 +49,7 @@ const getStatusBadge = (isActive: boolean) => {
     <Badge variant="secondary" className="bg-red-100 text-red-800">Tidak Aktif</Badge>;
 };
 
-export function PatientHeaderCard({ patient, onAddReminder, onViewReminders }: PatientHeaderCardProps) {
+export function PatientHeaderCard({ patient, onAddReminder, onViewReminders, onToggleStatus }: PatientHeaderCardProps) {
   return (
     <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
       <CardContent className="p-6 sm:p-8">
@@ -93,6 +94,13 @@ export function PatientHeaderCard({ patient, onAddReminder, onViewReminders }: P
             >
               <Eye className="w-4 h-4 mr-2" />
               Lihat Pengingat
+            </Button>
+            <Button
+              variant={patient.isActive ? "destructive" : "default"}
+              onClick={onToggleStatus}
+              className={patient.isActive ? "" : "bg-green-600 hover:bg-green-700 text-white border-green-600"}
+            >
+              {patient.isActive ? "Nonaktifkan" : "Aktifkan"}
             </Button>
           </div>
         </div>

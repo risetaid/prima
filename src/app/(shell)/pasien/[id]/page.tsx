@@ -16,6 +16,7 @@ import { PatientProfileTab } from "@/components/patient/patient-profile-tab";
 import { PatientHealthTab } from "@/components/patient/patient-health-tab";
 import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
 import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
+import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { Patient as SchemaPatient } from "@/db/schema";
 import { AlertTriangle } from "lucide-react";
 
@@ -62,8 +63,11 @@ export default function PatientDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [healthNotes, setHealthNotes] = useState<HealthNote[]>([]);
-  const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
+  const [completedReminders, setCompletedReminders] = useState<
+    CompletedReminder[]
+  >([]);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
   // Edit mode states
@@ -76,7 +80,7 @@ export default function PatientDetailPage() {
     phoneNumber: "",
     address: "",
     birthDate: "",
-    diagnosisDate: ""
+    diagnosisDate: "",
   });
 
   const [medicalInfoForm, setMedicalInfoForm] = useState({
@@ -85,7 +89,7 @@ export default function PatientDetailPage() {
     hospitalName: "",
     emergencyContactName: "",
     emergencyContactPhone: "",
-    notes: ""
+    notes: "",
   });
 
   // Ref to track previous verification status for toast notifications
@@ -149,7 +153,10 @@ export default function PatientDetailPage() {
       } else if (response.status === 404) {
         setHealthNotes([]);
       } else {
-        logger.error("Health notes fetch error", undefined, { status: response.status, statusText: response.statusText });
+        logger.error("Health notes fetch error", undefined, {
+          status: response.status,
+          statusText: response.statusText,
+        });
         toast.error("Gagal memuat catatan kesehatan");
       }
     } catch {
@@ -160,12 +167,16 @@ export default function PatientDetailPage() {
 
   const fetchCompletedReminders = useCallback(async (patientId: string) => {
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders/completed`);
+      const response = await fetch(
+        `/api/patients/${patientId}/reminders/completed`
+      );
       if (response.ok) {
         const data: CompletedReminder[] = await response.json();
         const transformedData = data.map((item) => ({
           ...item,
-          medicationTaken: Array.isArray(item.medicationTaken) ? item.medicationTaken.length > 0 : !!item.medicationTaken,
+          medicationTaken: Array.isArray(item.medicationTaken)
+            ? item.medicationTaken.length > 0
+            : !!item.medicationTaken,
         }));
         setCompletedReminders(transformedData);
       } else {
@@ -231,11 +242,14 @@ export default function PatientDetailPage() {
 
   const handleEditNote = async (noteId: string, note: string, date: string) => {
     try {
-      const response = await fetch(`/api/patients/${params.id}/health-notes/${noteId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: note.trim(), noteDate: date }),
-      });
+      const response = await fetch(
+        `/api/patients/${params.id}/health-notes/${noteId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note: note.trim(), noteDate: date }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -245,7 +259,9 @@ export default function PatientDetailPage() {
           note: data.healthNote.note,
           createdAt: data.healthNote.createdAt,
         };
-        setHealthNotes((prev) => prev.map((note) => (note.id === noteId ? updatedNote : note)));
+        setHealthNotes((prev) =>
+          prev.map((note) => (note.id === noteId ? updatedNote : note))
+        );
         toast.success("Catatan berhasil diperbarui");
       } else {
         const error = await response.json();
@@ -263,16 +279,23 @@ export default function PatientDetailPage() {
     }
 
     try {
-      const response = await fetch(`/api/patients/${params.id}/health-notes/bulk-delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noteIds }),
-      });
+      const response = await fetch(
+        `/api/patients/${params.id}/health-notes/bulk-delete`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ noteIds }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
-        setHealthNotes((prev) => prev.filter((note) => !noteIds.includes(note.id)));
-        toast.success(data.message || `${noteIds.length} catatan berhasil dihapus`);
+        setHealthNotes((prev) =>
+          prev.filter((note) => !noteIds.includes(note.id))
+        );
+        toast.success(
+          data.message || `${noteIds.length} catatan berhasil dihapus`
+        );
       } else {
         const error = await response.json();
         toast.error(error.error || "Gagal menghapus catatan");
@@ -284,10 +307,12 @@ export default function PatientDetailPage() {
 
   const handleAddReminder = () => {
     if (!patient) return;
-    const allowed = patient.verificationStatus === "verified" && patient.isActive;
+    const allowed =
+      patient.verificationStatus === "verified" && patient.isActive;
     if (!allowed) {
       toast.error("Pasien belum terverifikasi", {
-        description: "Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.",
+        description:
+          "Tambah pengingat dinonaktifkan sampai pasien menyetujui verifikasi WhatsApp.",
       });
       return;
     }
@@ -298,14 +323,42 @@ export default function PatientDetailPage() {
     router.push(`/pengingat/pasien/${params.id}`);
   };
 
+  const handleToggleStatus = () => {
+    setIsStatusModalOpen(true);
+  };
+
+  const handleConfirmStatusToggle = async () => {
+    if (!patient) return;
+
+    try {
+      const endpoint = patient.isActive ? "deactivate" : "reactivate";
+      const response = await fetch(`/api/patients/${params.id}/${endpoint}`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await fetchPatient(params.id as string); // Refresh patient data
+        toast.success(
+          data.message ||
+            `Pasien berhasil ${
+              patient.isActive ? "dinonaktifkan" : "diaktifkan"
+            }`
+        );
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Gagal mengubah status pasien");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat mengubah status pasien");
+    }
+  };
+
   const handleReminderSuccess = () => {
     // Could add refresh logic here if needed
   };
 
   // Edit mode handlers
-
-
-
 
   const handleCancelBasicInfo = () => {
     setIsEditingBasicInfo(false);
@@ -322,7 +375,7 @@ export default function PatientDetailPage() {
         phoneNumber: basicInfoForm.phoneNumber,
         address: basicInfoForm.address || null,
         birthDate: basicInfoForm.birthDate || null,
-        diagnosisDate: basicInfoForm.diagnosisDate || null
+        diagnosisDate: basicInfoForm.diagnosisDate || null,
       };
 
       const response = await fetch(`/api/patients/${params.id}`, {
@@ -353,7 +406,7 @@ export default function PatientDetailPage() {
         hospitalName: medicalInfoForm.hospitalName || null,
         emergencyContactName: medicalInfoForm.emergencyContactName || null,
         emergencyContactPhone: medicalInfoForm.emergencyContactPhone || null,
-        notes: medicalInfoForm.notes || null
+        notes: medicalInfoForm.notes || null,
       };
 
       const response = await fetch(`/api/patients/${params.id}`, {
@@ -376,20 +429,20 @@ export default function PatientDetailPage() {
     }
   };
 
-
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5" style={{ backgroundImage: "url(/bg_desktop.png)" }} />
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+          />
         </div>
 
         <Header showNavigation={true} />
 
         <main className="relative z-10 pt-4 pb-12">
           <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
-
             {/* Patient Header Card Skeleton */}
             <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
               <CardContent className="p-6 sm:p-8">
@@ -416,10 +469,18 @@ export default function PatientDetailPage() {
             {/* Main Content Tabs Skeleton */}
             <Tabs value="profile" className="space-y-6">
               <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile" disabled>Profil</TabsTrigger>
-                <TabsTrigger value="health" disabled>Kesehatan</TabsTrigger>
-                <TabsTrigger value="reminders" disabled>Pengingat</TabsTrigger>
-                <TabsTrigger value="verification" disabled>Verifikasi</TabsTrigger>
+                <TabsTrigger value="profile" disabled>
+                  Profil
+                </TabsTrigger>
+                <TabsTrigger value="health" disabled>
+                  Kesehatan
+                </TabsTrigger>
+                <TabsTrigger value="reminders" disabled>
+                  Pengingat
+                </TabsTrigger>
+                <TabsTrigger value="verification" disabled>
+                  Verifikasi
+                </TabsTrigger>
               </TabsList>
 
               {/* Profile Tab Skeleton */}
@@ -510,7 +571,10 @@ export default function PatientDetailPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5" style={{ backgroundImage: "url(/bg_desktop.png)" }} />
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+          />
         </div>
         <Header showNavigation={true} />
         <main className="relative z-10 py-12">
@@ -521,9 +585,15 @@ export default function PatientDetailPage() {
                   <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
                     <AlertTriangle className="w-8 h-8 text-red-600" />
                   </div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">Terjadi Kesalahan</h2>
-                  <p className="text-gray-600 mb-6">Tidak dapat memuat data pasien. Silakan coba lagi.</p>
-                  <Button onClick={() => window.location.reload()}>Coba Lagi</Button>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    Terjadi Kesalahan
+                  </h2>
+                  <p className="text-gray-600 mb-6">
+                    Tidak dapat memuat data pasien. Silakan coba lagi.
+                  </p>
+                  <Button onClick={() => window.location.reload()}>
+                    Coba Lagi
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -536,23 +606,30 @@ export default function PatientDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5" style={{ backgroundImage: "url(/bg_desktop.png)" }} />
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+          style={{ backgroundImage: "url(/bg_desktop.png)" }}
+        />
       </div>
 
       <Header showNavigation={true} />
 
       <main className="relative z-10 pt-4 pb-12">
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
-
-           {/* Patient Header Card */}
-           <PatientHeaderCard
-             patient={patient}
-             onAddReminder={handleAddReminder}
-             onViewReminders={handleViewReminders}
-           />
+          {/* Patient Header Card */}
+          <PatientHeaderCard
+            patient={patient}
+            onAddReminder={handleAddReminder}
+            onViewReminders={handleViewReminders}
+            onToggleStatus={handleToggleStatus}
+          />
 
           {/* Main Content Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="space-y-6"
+          >
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">Profil</TabsTrigger>
               <TabsTrigger value="health">Kesehatan</TabsTrigger>
@@ -560,54 +637,54 @@ export default function PatientDetailPage() {
               <TabsTrigger value="verification">Verifikasi</TabsTrigger>
             </TabsList>
 
-             {/* Profile Tab */}
-             <TabsContent value="profile">
-               <PatientProfileTab
-                 patient={patient}
-                 isEditingBasicInfo={isEditingBasicInfo}
-                 setIsEditingBasicInfo={setIsEditingBasicInfo}
-                 basicInfoForm={basicInfoForm}
-                 setBasicInfoForm={setBasicInfoForm}
-                 handleSaveBasicInfo={handleSaveBasicInfo}
-                 handleCancelBasicInfo={handleCancelBasicInfo}
-                 isEditingMedicalInfo={isEditingMedicalInfo}
-                 setIsEditingMedicalInfo={setIsEditingMedicalInfo}
-                 medicalInfoForm={medicalInfoForm}
-                 setMedicalInfoForm={setMedicalInfoForm}
-                 handleSaveMedicalInfo={handleSaveMedicalInfo}
-                 handleCancelMedicalInfo={handleCancelMedicalInfo}
-                 patientId={params.id as string}
-               />
-             </TabsContent>
+            {/* Profile Tab */}
+            <TabsContent value="profile">
+              <PatientProfileTab
+                patient={patient}
+                isEditingBasicInfo={isEditingBasicInfo}
+                setIsEditingBasicInfo={setIsEditingBasicInfo}
+                basicInfoForm={basicInfoForm}
+                setBasicInfoForm={setBasicInfoForm}
+                handleSaveBasicInfo={handleSaveBasicInfo}
+                handleCancelBasicInfo={handleCancelBasicInfo}
+                isEditingMedicalInfo={isEditingMedicalInfo}
+                setIsEditingMedicalInfo={setIsEditingMedicalInfo}
+                medicalInfoForm={medicalInfoForm}
+                setMedicalInfoForm={setMedicalInfoForm}
+                handleSaveMedicalInfo={handleSaveMedicalInfo}
+                handleCancelMedicalInfo={handleCancelMedicalInfo}
+                patientId={params.id as string}
+              />
+            </TabsContent>
 
-             {/* Health Notes Tab */}
-             <TabsContent value="health">
-               <PatientHealthTab
-                 healthNotes={healthNotes}
-                 patientId={params.id as string}
-                 onAddNote={handleAddNote}
-                 onEditNote={handleEditNote}
-                 onDeleteNotes={handleDeleteSelectedNotes}
-               />
-             </TabsContent>
+            {/* Health Notes Tab */}
+            <TabsContent value="health">
+              <PatientHealthTab
+                healthNotes={healthNotes}
+                patientId={params.id as string}
+                onAddNote={handleAddNote}
+                onEditNote={handleEditNote}
+                onDeleteNotes={handleDeleteSelectedNotes}
+              />
+            </TabsContent>
 
-             {/* Reminders Tab */}
-             <TabsContent value="reminders">
-               <PatientRemindersTab
-                 patient={patient}
-                 completedReminders={completedReminders}
-                 onAddReminder={handleAddReminder}
-                 onViewReminders={handleViewReminders}
-               />
-             </TabsContent>
+            {/* Reminders Tab */}
+            <TabsContent value="reminders">
+              <PatientRemindersTab
+                patient={patient}
+                completedReminders={completedReminders}
+                onAddReminder={handleAddReminder}
+                onViewReminders={handleViewReminders}
+              />
+            </TabsContent>
 
-             {/* Verification Tab */}
-             <TabsContent value="verification">
-               <PatientVerificationTab
-                 patient={patient}
-                 onUpdate={() => fetchPatient(params.id as string)}
-               />
-             </TabsContent>
+            {/* Verification Tab */}
+            <TabsContent value="verification">
+              <PatientVerificationTab
+                patient={patient}
+                onUpdate={() => fetchPatient(params.id as string)}
+              />
+            </TabsContent>
           </Tabs>
         </div>
       </main>
@@ -618,6 +695,21 @@ export default function PatientDetailPage() {
         onClose={() => setIsReminderModalOpen(false)}
         onSuccess={handleReminderSuccess}
         patientName={patient.name}
+      />
+
+      {/* Status Toggle Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        onConfirm={handleConfirmStatusToggle}
+        title={patient?.isActive ? "Nonaktifkan Pasien" : "Aktifkan Pasien"}
+        description={
+          patient?.isActive
+            ? `Apakah Anda yakin ingin menonaktifkan pasien ${patient.name}? Semua pengingat akan dihentikan dan pasien akan menerima pesan WhatsApp konfirmasi.`
+            : `Apakah Anda yakin ingin mengaktifkan kembali pasien ${patient.name}? Pasien akan kembali ke status verifikasi awal.`
+        }
+        confirmText={patient?.isActive ? "Nonaktifkan" : "Aktifkan"}
+        variant={patient?.isActive ? "destructive" : "default"}
       />
     </div>
   );
