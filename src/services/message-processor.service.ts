@@ -220,15 +220,21 @@ export class MessageProcessorService {
       return true;
     }
 
+    const normalizedMessage = message.toLowerCase();
+
     // Use intent detection for messages containing verification/confirmation keywords
     const verificationKeywords = ["ya", "tidak", "iya", "yes", "no"];
-    const confirmationKeywords = ["sudah", "belum", "udh", "blm"];
+    const confirmationKeywords = [
+      "sudah", "belum", "udh", "blm",
+      "minum", "ambil obat", "makan obat", "telan", "konsumsi",
+      "keduanya", "semuanya", "obat", "pil"
+    ];
 
     const hasVerificationKeywords = verificationKeywords.some((keyword) =>
-      message.toLowerCase().includes(keyword)
+      normalizedMessage.includes(keyword)
     );
     const hasConfirmationKeywords = confirmationKeywords.some((keyword) =>
-      message.toLowerCase().includes(keyword)
+      normalizedMessage.includes(keyword)
     );
 
     // Use intent detection if message contains relevant keywords

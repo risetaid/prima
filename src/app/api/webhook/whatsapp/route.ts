@@ -44,12 +44,67 @@ async function executeResponseActions(
       switch (action.type) {
         case "log_confirmation":
           // Log the confirmation in reminder logs
-          // TODO: Fix TypeScript types for reminderLogs insertion
-          logger.info("Confirmation action requested", {
-            patientId,
-            status: action.data.status,
-            response: action.data.response,
-          });
+          try {
+            const { db, reminderLogs } = await import("@/db");
+            const { eq, and } = await import("drizzle-orm");
+
+            // Find the most recent reminder log for this patient that needs confirmation
+            const recentLogs = await db
+              .select({
+                id: reminderLogs.id,
+                confirmationStatus: reminderLogs.confirmationStatus,
+                sentAt: reminderLogs.sentAt,
+              })
+              .from(reminderLogs)
+              .where(
+                and(
+                  eq(reminderLogs.patientId, patientId),
+                  eq(reminderLogs.confirmationStatus, "PENDING")
+                )
+              )
+              .orderBy(reminderLogs.sentAt)
+              .limit(5); // Get last 5 pending confirmations
+
+            if (recentLogs.length > 0) {
+              // Update the most recent pending confirmation
+              const logToUpdate = recentLogs[recentLogs.length - 1]; // Most recent
+
+              const status = (action.data.status as string) || "CONFIRMED";
+              const validStatuses = ["CONFIRMED", "MISSED", "PENDING", "SENT", "UNKNOWN"] as const;
+              const confirmationStatus = validStatuses.includes(status as any) ? status as "CONFIRMED" | "MISSED" | "PENDING" | "SENT" | "UNKNOWN" : "CONFIRMED";
+
+              await db
+                .update(reminderLogs)
+                .set({
+                  confirmationStatus,
+                  confirmationResponse:
+                    (action.data.response as string) || message,
+                  confirmationResponseAt: new Date(),
+                })
+                .where(eq(reminderLogs.id, logToUpdate.id));
+
+              logger.info("Confirmation logged in database", {
+                patientId,
+                reminderLogId: logToUpdate.id,
+                status: action.data.status || "CONFIRMED",
+                response: action.data.response || message,
+              });
+            } else {
+              logger.warn("No pending reminder logs found for confirmation", {
+                patientId,
+                actionData: action.data,
+              });
+            }
+          } catch (dbError) {
+            logger.error(
+              "Failed to log confirmation in database",
+              dbError as Error,
+              {
+                patientId,
+                actionData: action.data,
+              }
+            );
+          }
           break;
 
         case "send_followup":

@@ -343,12 +343,22 @@ export class LLMService {
    * Build system prompt for intent detection
    */
   private buildIntentDetectionPrompt(context: ConversationContext): string {
-    return `You are an AI assistant for PRIMA healthcare system helping patients via WhatsApp.
+    const activeReminders = context.patientInfo?.activeReminders || [];
+    const reminderContext =
+      activeReminders.length > 0
+        ? `\nActive Medication Reminders: ${activeReminders
+            .map((r: any) => r.medicationName || r.customMessage || "obat")
+            .join(", ")}`
+        : "";
+
+    return `You are an AI assistant for PRIMA healthcare system helping cancer patients via WhatsApp.
 
 Patient Information:
 - Name: ${context.patientInfo?.name || "Unknown"}
 - Phone: ${context.phoneNumber}
-- Verification Status: ${context.patientInfo?.verificationStatus || "Unknown"}
+- Verification Status: ${
+      context.patientInfo?.verificationStatus || "Unknown"
+    }${reminderContext}
 
 Your task is to analyze the patient's message and determine their intent. Respond with a JSON object containing:
 - intent: One of [verification_response, medication_confirmation, unsubscribe, general_inquiry, emergency, unknown]
@@ -356,11 +366,18 @@ Your task is to analyze the patient's message and determine their intent. Respon
 - entities: Any extracted information (medication names, times, etc.)
 
 Guidelines:
-- For verification: Look for "YA" or "TIDAK" responses
-- For medication: Look for "SUDAH" or "BELUM" confirmations
-- For unsubscribe: Look for "BERHENTI" or similar stop requests
-- For emergency: Look for urgent medical situations
-- For general inquiry: Any other questions or statements
+- For verification: Look for "YA" or "TIDAK" responses to verification questions
+- For medication_confirmation: Look for confirmations about taking medication, such as:
+  * "SUDAH minum", "sudah saya minum", "sudah ambil obat"
+  * "BELUM minum", "belum saya minum", "belum ambil obat"
+  * "sudah makan obat", "sudah telan obat", "sudah konsumsi obat"
+  * References to taking medication: "minum", "ambil obat", "makan obat", "telan", "konsumsi"
+  * Numbers like "keduanya sudah" (both already), "semuanya sudah" (all already)
+- For unsubscribe: Look for "BERHENTI", "STOP", "CANCEL" or similar stop requests
+- For emergency: Look for urgent medical situations, pain, symptoms
+- For general_inquiry: Any other questions or statements
+
+IMPORTANT: Distinguish between FOOD reminders and MEDICATION reminders. Messages about "makan makanan" (eating food) are NOT medication confirmations.
 
 Respond only with valid JSON.`;
   }
