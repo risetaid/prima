@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger";
 
 import { db, patients, reminderLogs } from "@/db";
 import { ReminderError } from "./reminder.types";
+import { requirePatientAccess } from "@/lib/patient-access-control";
 import { eq } from "drizzle-orm";
 
 export class ReminderService {
@@ -32,13 +33,19 @@ export class ReminderService {
     const patient = await this.getPatient(dto.patientId);
     if (!patient) throw new NotFoundError("Patient not found");
 
-    if (patient.verificationStatus !== 'verified' || patient.isActive !== true) {
+    if (
+      patient.verificationStatus !== "verified" ||
+      patient.isActive !== true
+    ) {
       throw new ReminderError(
-        'Patient must be verified and active to create reminders',
-        'PATIENT_NOT_VERIFIED',
+        "Patient must be verified and active to create reminders",
+        "PATIENT_NOT_VERIFIED",
         403,
-        { verificationStatus: patient.verificationStatus, isActive: patient.isActive }
-      )
+        {
+          verificationStatus: patient.verificationStatus,
+          isActive: patient.isActive,
+        }
+      );
     }
 
     // Validate and process content attachments
@@ -69,16 +76,16 @@ export class ReminderService {
       const reminderDate = new Date(dateString);
       if (isNaN(reminderDate.getTime())) continue;
 
-       const schedule = await this.repository.insert({
-         patientId: dto.patientId,
-         scheduledTime: dto.time,
-         frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
-         startDate: reminderDate,
-         endDate: reminderDate,
-         isActive: true,
-         customMessage: dto.message,
-         createdById: dto.createdById,
-       });
+      const schedule = await this.repository.insert({
+        patientId: dto.patientId,
+        scheduledTime: dto.time,
+        frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
+        startDate: reminderDate,
+        endDate: reminderDate,
+        isActive: true,
+        customMessage: dto.message,
+        createdById: dto.createdById,
+      });
 
       createdSchedules.push(schedule);
 
@@ -108,9 +115,22 @@ export class ReminderService {
   }
 
   // UPDATE operations
-  async updateReminder(id: string, dto: UpdateReminderDTO, userId: string) {
+  async updateReminder(
+    id: string,
+    dto: UpdateReminderDTO,
+    userId: string,
+    userRole: string
+  ) {
     const reminder = await this.repository.getById(id);
     if (!reminder) throw new NotFoundError("Reminder not found");
+
+    // Check patient access control
+    await requirePatientAccess(
+      userId,
+      userRole,
+      reminder.patientId,
+      "update this patient's reminder"
+    );
 
     // Validate content attachments if provided
     let validatedContent: ValidatedContent[] = [];
@@ -142,9 +162,17 @@ export class ReminderService {
   }
 
   // DELETE operations
-  async deleteReminder(id: string) {
+  async deleteReminder(id: string, userId: string, userRole: string) {
     const reminder = await this.repository.getById(id);
     if (!reminder) throw new NotFoundError("Reminder not found");
+
+    // Check patient access control
+    await requirePatientAccess(
+      userId,
+      userRole,
+      reminder.patientId,
+      "delete this patient's reminder"
+    );
 
     await this.repository.softDelete(id, getWIBTime());
     await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
@@ -160,13 +188,34 @@ export class ReminderService {
   }
 
   // READ operations
-  async getReminder(id: string) {
+  async getReminder(id: string, userId: string, userRole: string) {
     const reminder = await this.repository.getById(id);
     if (!reminder) throw new NotFoundError("Reminder not found");
+
+    // Check patient access control
+    await requirePatientAccess(
+      userId,
+      userRole,
+      reminder.patientId,
+      "view this patient's reminder"
+    );
+
     return reminder;
   }
 
-  async listPatientReminders(patientId: string) {
+  async listPatientReminders(
+    patientId: string,
+    userId: string,
+    userRole: string
+  ) {
+    // Check patient access control
+    await requirePatientAccess(
+      userId,
+      userRole,
+      patientId,
+      "view this patient's reminders"
+    );
+
     const reminders = await this.repository.listByPatient(patientId);
     return reminders.map((r) => ({
       ...r,

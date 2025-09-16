@@ -53,7 +53,11 @@ export async function POST() {
     const debugLogs: string[] = [];
 
     // Build patient filter based on role
-    const patientConditions = [isNull(patients.deletedAt)];
+    const patientConditions = [
+      isNull(patients.deletedAt),
+      eq(patients.isActive, true),
+      eq(patients.verificationStatus, "verified"),
+    ];
     if (user.role === "ADMIN" || user.role === "RELAWAN") {
       // Both ADMIN and MEMBER can only send to patients they manage
       patientConditions.push(eq(patients.assignedVolunteerId, user.id));
@@ -152,7 +156,9 @@ export async function POST() {
       console.log("📝 Reminder details:");
       activeReminders.forEach((reminder, index) => {
         console.log(
-          `  ${index + 1}. ${reminder.patientName} - obat at ${reminder.scheduledTime} (${reminder.patientPhoneNumber})`
+          `  ${index + 1}. ${reminder.patientName} - obat at ${
+            reminder.scheduledTime
+          } (${reminder.patientPhoneNumber})`
         );
       });
     }

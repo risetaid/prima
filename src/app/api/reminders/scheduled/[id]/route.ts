@@ -5,6 +5,7 @@ import { getWIBTime } from "@/lib/timezone";
 
 import { validateContentAttachments } from "@/lib/content-validation";
 import { invalidateAfterReminderOperation } from "@/lib/cache-invalidation";
+import { requirePatientAccess } from "@/lib/patient-access-control";
 import { z } from "zod";
 
 const updateReminderBodySchema = z.object({
@@ -75,6 +76,14 @@ export const PUT = createApiHandler(
     }
 
     const patientId = reminderScheduleResult[0].patientId;
+
+    // Check role-based access to this patient's reminder
+    await requirePatientAccess(
+      context.user.id,
+      context.user.role,
+      patientId,
+      "update this patient's reminder"
+    );
 
     // Update the reminder schedule
     const updatedReminderResult = await db
@@ -155,6 +164,14 @@ export const DELETE = createApiHandler(
     }
 
     const reminder = reminderScheduleResult[0];
+
+    // Check role-based access to this patient's reminder
+    await requirePatientAccess(
+      context.user.id,
+      context.user.role,
+      reminder.patientId,
+      "delete this patient's reminder"
+    );
 
     // Soft delete by setting deletedAt timestamp
     await db
