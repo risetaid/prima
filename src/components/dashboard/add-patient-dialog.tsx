@@ -6,6 +6,34 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { logger } from '@/lib/logger'
+
+type CancerStageOption = '' | 'I' | 'II' | 'III' | 'IV'
+
+interface PatientFormData {
+  name: string
+  phoneNumber: string
+  address: string
+  birthDate: string
+  diagnosisDate: string
+  cancerStage: CancerStageOption
+  emergencyContactName: string
+  emergencyContactPhone: string
+  notes: string
+}
+
+interface CreatePatientPayload {
+  name: string
+  phoneNumber: string
+  address?: string
+  birthDate?: string
+  diagnosisDate?: string
+  cancerStage?: 'I' | 'II' | 'III' | 'IV'
+  emergencyContactName?: string
+  emergencyContactPhone?: string
+  notes?: string
+  photoUrl?: string
+}
 
 interface AddPatientDialogProps {
   isOpen: boolean
@@ -14,20 +42,55 @@ interface AddPatientDialogProps {
 }
 
 export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPatientDialogProps) {
-  const [formData, setFormData] = useState({
+  const createInitialFormState = (): PatientFormData => ({
     name: '',
-    whatsappNumber: ''
+    phoneNumber: '',
+    address: '',
+    birthDate: '',
+    diagnosisDate: '',
+    cancerStage: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    notes: '',
   })
+
+  const [formData, setFormData] = useState<PatientFormData>(createInitialFormState)
   const [loading, setLoading] = useState(false)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = event.target
+    setFormData((previous) => ({
+      ...previous,
+      [name]: value,
+    }))
+  }
+
+  const resetForm = () => {
+    setFormData(createInitialFormState())
+    setPhotoPreview(null)
+    setPhotoFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
+      const trimmedName = formData.name.trim()
+      const trimmedPhone = formData.phoneNumber.trim()
+
+      if (!trimmedName || !trimmedPhone) {
+        toast.error('Nama dan nomor WhatsApp wajib diisi')
+        setLoading(false)
+        return
+      }
+
       let photoUrl = null
 
       // Upload photo first if selected
@@ -46,40 +109,54 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         }
       }
 
-      // Create patient with photo URL
+      const payload: CreatePatientPayload = {
+        name: trimmedName,
+        phoneNumber: trimmedPhone,
+      }
+
+      if (formData.address.trim()) payload.address = formData.address.trim()
+      if (formData.birthDate) payload.birthDate = formData.birthDate
+      if (formData.diagnosisDate) payload.diagnosisDate = formData.diagnosisDate
+      if (formData.cancerStage) payload.cancerStage = formData.cancerStage
+      if (formData.emergencyContactName.trim())
+        payload.emergencyContactName = formData.emergencyContactName.trim()
+      if (formData.emergencyContactPhone.trim())
+        payload.emergencyContactPhone = formData.emergencyContactPhone.trim()
+      if (formData.notes.trim()) payload.notes = formData.notes.trim()
+      if (photoUrl) payload.photoUrl = photoUrl
+
       const response = await fetch('/api/patients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: formData.name,
-          phoneNumber: formData.whatsappNumber,
-          photoUrl: photoUrl,
-          isActive: true
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
-        setFormData({ name: '', whatsappNumber: '' })
-        setPhotoPreview(null)
-        setPhotoFile(null)
+        toast.success('Pasien berhasil ditambahkan')
+        resetForm()
         onClose()
         if (onSuccess) onSuccess()
       } else {
-        console.error('Failed to add patient')
+        const errorBody = await response.json().catch(() => ({ error: 'Terjadi kesalahan' }))
+        toast.error('Gagal menambahkan pasien', {
+          description: errorBody?.error || 'Terjadi kesalahan pada server',
+        })
+        logger.warn('Failed to add patient via modal', { status: response.status })
       }
     } catch (error) {
-      console.error('Error adding patient:', error)
+      logger.error('Error adding patient via modal', error as Error)
+      toast.error('Kesalahan jaringan', {
+        description: 'Tidak dapat menambahkan pasien. Periksa koneksi internet Anda.',
+      })
     } finally {
       setLoading(false)
     }
   }
 
   const handleCancel = () => {
-    setFormData({ name: '', whatsappNumber: '' })
-    setPhotoPreview(null)
-    setPhotoFile(null)
+    resetForm()
     onClose()
   }
 
@@ -125,7 +202,7 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-sm max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <User className="w-5 h-5 sm:w-6 sm:h-6 text-gray-700" />
@@ -133,7 +210,7 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Photo Upload */}
           <div>
             <label className="block text-gray-600 text-sm mb-2">
@@ -178,34 +255,149 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
             />
           </div>
 
-          {/* Name Field */}
-          <div>
-            <label className="block text-gray-600 text-sm mb-2">
-              Nama Pasien
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Stella Maureen Ignacia Santoso"
-              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
-              required
-            />
-          </div>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+            <label className="block text-gray-600 text-sm mb-2" htmlFor="name">
+              Nama Pasien <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="name"
+                name="name"
+                type="text"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="Stella Maureen Ignacia Santoso"
+                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                required
+              />
+            </div>
 
-          {/* WhatsApp Number Field */}
-          <div>
-            <label className="block text-gray-600 text-sm mb-2">
-              Nomor WhatsApp
-            </label>
-            <input
-              type="text"
-              value={formData.whatsappNumber}
-              onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
-              placeholder="087863071881"
-              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
-              required
-            />
+            <div>
+            <label className="block text-gray-600 text-sm mb-2" htmlFor="phoneNumber">
+              Nomor WhatsApp <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="phoneNumber"
+                name="phoneNumber"
+                type="tel"
+                value={formData.phoneNumber}
+                onChange={handleInputChange}
+                placeholder="087863071881"
+                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-gray-600 text-sm mb-2" htmlFor="address">
+                Alamat
+              </label>
+              <textarea
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                placeholder="Jl. Sehat No. 123, Jakarta"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-600 text-sm mb-2" htmlFor="birthDate">
+                  Tanggal Lahir
+                </label>
+                <input
+                  id="birthDate"
+                  name="birthDate"
+                  type="date"
+                  value={formData.birthDate}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 text-sm mb-2" htmlFor="diagnosisDate">
+                  Tanggal Diagnosis
+                </label>
+                <input
+                  id="diagnosisDate"
+                  name="diagnosisDate"
+                  type="date"
+                  value={formData.diagnosisDate}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-600 text-sm mb-2" htmlFor="cancerStage">
+                Stadium Kanker
+              </label>
+              <select
+                id="cancerStage"
+                name="cancerStage"
+                value={formData.cancerStage}
+                onChange={handleInputChange}
+                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+              >
+                <option value="">Pilih Stadium</option>
+                <option value="I">Stadium I</option>
+                <option value="II">Stadium II</option>
+                <option value="III">Stadium III</option>
+                <option value="IV">Stadium IV</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-gray-600 text-sm mb-2" htmlFor="emergencyContactName">
+                  Nama Kontak Darurat
+                </label>
+                <input
+                  id="emergencyContactName"
+                  name="emergencyContactName"
+                  type="text"
+                  value={formData.emergencyContactName}
+                  onChange={handleInputChange}
+                  placeholder="Nama Kontak"
+                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-gray-600 text-sm mb-2" htmlFor="emergencyContactPhone">
+                  Nomor Kontak Darurat
+                </label>
+                <input
+                  id="emergencyContactPhone"
+                  name="emergencyContactPhone"
+                  type="tel"
+                  value={formData.emergencyContactPhone}
+                  onChange={handleInputChange}
+                  placeholder="08123456789"
+                  className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-gray-600 text-sm mb-2" htmlFor="notes">
+                Catatan Tambahan
+              </label>
+              <textarea
+                id="notes"
+                name="notes"
+                value={formData.notes}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-blue-500 focus:outline-none transition-colors"
+                placeholder="Catatan kesehatan atau preferensi pasien"
+              />
+            </div>
           </div>
 
           <DialogFooter className="gap-3 pt-3 sm:pt-4">
@@ -222,7 +414,7 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
               disabled={loading}
               className="flex-1"
             >
-              {loading ? 'Loading...' : 'Tambah'}
+              {loading ? 'Menyimpan...' : 'Tambah'}
             </Button>
           </DialogFooter>
         </form>

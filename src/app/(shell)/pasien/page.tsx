@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Search, Plus } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
@@ -8,6 +8,7 @@ import { Header } from '@/components/ui/header'
 import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
 import Image from 'next/image'
 import { logger } from '@/lib/logger'
+import AddPatientDialog from '@/components/dashboard/add-patient-dialog'
 
 interface Patient {
   id: string
@@ -24,6 +25,7 @@ export default function PatientPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilters, setActiveFilters] = useState<string[]>([])
+  const [showAddPatientModal, setShowAddPatientModal] = useState(false)
 
   const filteredPatients = (() => {
     let filtered = patients
@@ -40,11 +42,7 @@ export default function PatientPage() {
     return filtered
   })()
 
-  useEffect(() => {
-    fetchPatients()
-  }, [])
-
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
     try {
       // Use optimized dashboard overview endpoint
       const response = await fetch('/api/dashboard/overview')
@@ -65,6 +63,16 @@ export default function PatientPage() {
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => {
+    void fetchPatients()
+  }, [fetchPatients])
+
+  const handleAddPatientSuccess = () => {
+    setLoading(true)
+    setShowAddPatientModal(false)
+    void fetchPatients()
   }
 
   const toggleFilter = (filterType: string) => {
@@ -172,7 +180,7 @@ export default function PatientPage() {
                   {loading ? "Loading..." : `${filteredPatients.length} Pasien Dalam Pengawasan`}
                 </h1>
                 <button
-                  onClick={() => router.push('/pasien/tambah')}
+                  onClick={() => setShowAddPatientModal(true)}
                   className="bg-white text-blue-600 p-3 rounded-full hover:bg-blue-50 transition-colors cursor-pointer"
                 >
                   <Plus className="w-6 h-6" />
@@ -322,7 +330,7 @@ export default function PatientPage() {
             <h2 className="text-xl font-bold text-gray-900">Pasien Dalam Pengawasan</h2>
             <div className="flex items-center space-x-3">
               <button
-                onClick={() => router.push('/pasien/tambah')}
+                onClick={() => setShowAddPatientModal(true)}
                 className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 <Plus className="w-5 h-5" />
@@ -423,6 +431,12 @@ export default function PatientPage() {
           </div>
         </main>
       </div>
+
+      <AddPatientDialog
+        isOpen={showAddPatientModal}
+        onClose={() => setShowAddPatientModal(false)}
+        onSuccess={handleAddPatientSuccess}
+      />
     </div>
   )
 }
