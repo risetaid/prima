@@ -26,6 +26,7 @@ export interface MessageContext {
   patientName?: string;
   verificationStatus?: string;
   activeReminders?: unknown[];
+  fullPatientContext?: import("./patient/patient-context.service").PatientContext;
 }
 
 export interface MessageHistory {
@@ -353,7 +354,8 @@ export class MessageProcessorService {
     // Generate direct LLM response (no intent detection)
     const llmResponse = await this.generateDirectLLMResponse(
       normalizedMessage,
-      llmContext
+      llmContext,
+      context.fullPatientContext
     );
 
     // Determine if human intervention is needed
@@ -1095,10 +1097,14 @@ export class MessageProcessorService {
    */
   private async generateDirectLLMResponse(
     message: string,
-    context: ConversationContext
+    context: ConversationContext,
+    fullPatientContext?: any
   ): Promise<ProcessedLLMResponse | null> {
     try {
-      const systemPrompt = this.buildDirectResponsePrompt(context);
+      const systemPrompt = this.buildDirectResponsePrompt(
+        context,
+        fullPatientContext
+      );
 
       const request: LLMRequest = {
         messages: [
@@ -1148,41 +1154,114 @@ export class MessageProcessorService {
   /**
    * Build system prompt for direct LLM response generation
    */
-  private buildDirectResponsePrompt(context: ConversationContext): string {
+  private buildDirectResponsePrompt(
+    context: ConversationContext,
+    fullPatientContext?: any
+  ): string {
     const patientInfo = context.patientInfo;
     const activeReminders = patientInfo?.activeReminders || [];
 
-    return `You are a helpful healthcare assistant for PRIMA system communicating with patients via WhatsApp.
-
-PATIENT INFORMATION:
+    // Build comprehensive patient information
+    let patientDetails = `PATIENT INFORMATION:
 - Name: ${patientInfo?.name || "Unknown Patient"}
 - Phone: ${context.phoneNumber}
-- Verification Status: ${patientInfo?.verificationStatus || "Unknown"}
-${
-  activeReminders.length > 0
-    ? `- Active Medications: ${activeReminders
+- Verification Status: ${patientInfo?.verificationStatus || "Unknown"}`;
+
+    if (fullPatientContext) {
+      const patient = fullPatientContext.patient;
+      const todaysReminders = fullPatientContext.todaysReminders || [];
+      const medicalHistory = fullPatientContext.medicalHistory || {};
+      const recentHealthNotes = fullPatientContext.recentHealthNotes || [];
+      const patientVariables = fullPatientContext.patientVariables || [];
+
+      patientDetails += `
+- Age: ${
+        patient.birthDate
+          ? new Date().getFullYear() - new Date(patient.birthDate).getFullYear()
+          : "Unknown"
+      }
+- Cancer Stage: ${patient.cancerStage || "Unknown"}
+- Diagnosis Date: ${
+        patient.diagnosisDate
+          ? new Date(patient.diagnosisDate).toLocaleDateString("id-ID")
+          : "Unknown"
+      }
+- Doctor: ${patient.doctorName || "Unknown"}
+- Hospital: ${patient.hospitalName || "Unknown"}
+- Emergency Contact: ${patient.emergencyContactName || "Unknown"} (${
+        patient.emergencyContactPhone || "Unknown"
+      })
+- Address: ${patient.address || "Unknown"}
+- Notes: ${patient.notes || "None"}`;
+
+      if (todaysReminders.length > 0) {
+        patientDetails += `
+- Today's Reminders: ${todaysReminders
+          .map((r: any) => `${r.medicationName} at ${r.scheduledTime}`)
+          .join(", ")}`;
+      }
+
+      if (activeReminders.length > 0) {
+        patientDetails += `
+- Active Medications: ${activeReminders
+          .map((r: any) => r.medicationName)
+          .join(", ")}`;
+      }
+
+      if (medicalHistory.symptoms && medicalHistory.symptoms.length > 0) {
+        patientDetails += `
+- Recent Symptoms: ${medicalHistory.symptoms
+          .slice(0, 3)
+          .map((s: any) => s.symptom)
+          .join(", ")}`;
+      }
+
+      if (recentHealthNotes.length > 0) {
+        patientDetails += `
+- Recent Health Notes: ${recentHealthNotes
+          .slice(0, 2)
+          .map((n: any) => n.note.substring(0, 50) + "...")
+          .join("; ")}`;
+      }
+
+      if (patientVariables.length > 0) {
+        patientDetails += `
+- Custom Variables: ${patientVariables
+          .slice(0, 3)
+          .map((v: any) => `${v.name}: ${v.value}`)
+          .join(", ")}`;
+      }
+    } else if (activeReminders.length > 0) {
+      patientDetails += `
+- Active Medications: ${activeReminders
         .map((r: any) => r.medicationName)
-        .join(", ")}`
-    : ""
-}
+        .join(", ")}`;
+    }
+
+    return `You are a helpful healthcare assistant for PRIMA (Palliative Remote Integrated Monitoring and Assistance) system communicating with cancer patients via WhatsApp.
+
+${patientDetails}
 
 CONVERSATION CONTEXT:
 You have access to the previous conversation messages above. Use this context to provide relevant, personalized responses.
 
 RESPONSE GUIDELINES:
 - Always respond in Indonesian (Bahasa Indonesia)
-- Be friendly, empathetic, and professional
-- Keep responses concise but helpful (under 300 characters when possible)
-- Never give medical advice or diagnoses
-- For medication questions: Direct to healthcare providers, don't give advice
-- For emergencies: Immediately alert that help is needed
-- Include PRIMA branding when appropriate
-- Use simple, clear language
-- If patient asks about breathing exercises or general wellness: Provide general information only
-- If patient reports symptoms: Ask them to contact their healthcare provider
+- Be friendly, empathetic, supportive, and professional
+- Provide comprehensive, informative responses that satisfy user questions
+- Share general educational information about palliative care, cancer support, and wellness
+- Explain concepts clearly with examples when helpful
+- Include practical tips and resources when appropriate
+- Never give personalized medical advice, diagnoses, or treatment recommendations
+- For medical concerns, always direct to consult healthcare professionals
+- For emergencies, immediately direct to appropriate help and alert volunteers
+- Include PRIMA branding and offer further assistance
+- Use simple, clear language that cancer patients can easily understand
+- Acknowledge emotions and provide emotional support
+- End responses by offering to connect with PRIMA volunteers for more personalized support
 
 RESPONSE FORMAT:
-Provide a natural, conversational response that addresses the patient's message directly.`;
+Provide a comprehensive, natural response that fully addresses the patient's question or concern while maintaining safety and professionalism.`;
   }
 
   /**

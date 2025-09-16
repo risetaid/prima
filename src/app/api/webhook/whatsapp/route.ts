@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { VerificationWebhookService, WebhookPayload } from "@/services/webhook/verification-webhook.service";
-import { MessageProcessorService, MessageContext } from "@/services/message-processor.service";
+import {
+  VerificationWebhookService,
+  WebhookPayload,
+} from "@/services/webhook/verification-webhook.service";
+import {
+  MessageProcessorService,
+  MessageContext,
+} from "@/services/message-processor.service";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientContextService } from "@/services/patient/patient-context.service";
 import { logger } from "@/lib/logger";
@@ -35,7 +41,9 @@ export async function POST(request: NextRequest) {
     const authError = requireWebhookToken(request);
     if (authError) {
       logger.warn("WhatsApp webhook authentication failed", {
-        ip: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip"),
+        ip:
+          request.headers.get("x-forwarded-for") ||
+          request.headers.get("x-real-ip"),
         userAgent: request.headers.get("user-agent"),
         url: request.url,
       });
@@ -74,7 +82,8 @@ export async function POST(request: NextRequest) {
     logger.info("Processing WhatsApp message", {
       sender: validatedData.sender,
       messageLength: validatedData.message.length,
-      messagePreview: validatedData.message.substring(0, 100) +
+      messagePreview:
+        validatedData.message.substring(0, 100) +
         (validatedData.message.length > 100 ? "..." : ""),
       device: validatedData.device,
       messageId: validatedData.id,
@@ -98,17 +107,20 @@ export async function POST(request: NextRequest) {
       try {
         // Get patient context first
         const patientContextService = new PatientContextService();
-        const patientContextResult = await patientContextService.getPatientContext(validatedData.sender);
+        const patientContextResult =
+          await patientContextService.getPatientContext(validatedData.sender);
 
         const messageProcessor = new MessageProcessorService();
         const messageContext: MessageContext = {
-          patientId: patientContextResult.context?.patient.id || 'unknown',
+          patientId: patientContextResult.context?.patient.id || "unknown",
           phoneNumber: validatedData.sender,
           message: validatedData.message,
           timestamp: new Date(),
           patientName: patientContextResult.context?.patient.name,
-          verificationStatus: patientContextResult.context?.patient.verificationStatus,
-          activeReminders: patientContextResult.context?.activeReminders
+          verificationStatus:
+            patientContextResult.context?.patient.verificationStatus,
+          activeReminders: patientContextResult.context?.activeReminders,
+          fullPatientContext: patientContextResult.context,
         };
 
         llmResult = await messageProcessor.processMessage(messageContext);
@@ -122,52 +134,62 @@ export async function POST(request: NextRequest) {
         });
 
         // Step 5.1: Send LLM-generated response if auto-reply is recommended
-        if (llmResult.response.type === 'auto_reply' && llmResult.response.message) {
+        if (
+          llmResult.response.type === "auto_reply" &&
+          llmResult.response.message
+        ) {
           try {
             const whatsAppService = new WhatsAppService();
             await whatsAppService.sendPersonalizedResponse(
               validatedData.sender,
-              llmResult.context.patientName || 'Pasien',
+              llmResult.context.patientName || "Pasien",
               llmResult.intent.primary,
               llmResult.response.message
             );
             logger.info("LLM personalized response sent", {
               phoneNumber: validatedData.sender,
               intent: llmResult.intent.primary,
-              responseLength: llmResult.response.message.length
+              responseLength: llmResult.response.message.length,
             });
           } catch (sendError) {
-            logger.error("Failed to send LLM personalized response", sendError as Error, {
-              phoneNumber: validatedData.sender,
-              intent: llmResult.intent.primary
-            });
+            logger.error(
+              "Failed to send LLM personalized response",
+              sendError as Error,
+              {
+                phoneNumber: validatedData.sender,
+                intent: llmResult.intent.primary,
+              }
+            );
           }
         }
 
         // Step 5.2: Handle emergency situations
-        if (llmResult.intent.primary === 'emergency') {
+        if (llmResult.intent.primary === "emergency") {
           try {
             const whatsAppService = new WhatsAppService();
             await whatsAppService.sendEmergencyAlert(
               validatedData.sender,
-              llmResult.context.patientName || 'Pasien',
+              llmResult.context.patientName || "Pasien",
               validatedData.message,
-              'urgent'
+              "urgent"
             );
             logger.warn("LLM emergency alert sent", {
               phoneNumber: validatedData.sender,
-              message: validatedData.message
+              message: validatedData.message,
             });
           } catch (alertError) {
-            logger.error("Failed to send LLM emergency alert", alertError as Error, {
-              phoneNumber: validatedData.sender
-            });
+            logger.error(
+              "Failed to send LLM emergency alert",
+              alertError as Error,
+              {
+                phoneNumber: validatedData.sender,
+              }
+            );
           }
         }
-
       } catch (error) {
         logger.warn("LLM processing failed, falling back to keyword-based", {
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
         useLLM = false;
         llmSuccess = false;
@@ -181,9 +203,9 @@ export async function POST(request: NextRequest) {
       result = {
         success: true,
         message: "LLM processed successfully",
-        patientId: llmResult?.context.patientId || 'unknown',
-        result: 'llm_processed',
-        status: 200
+        patientId: llmResult?.context.patientId || "unknown",
+        result: "llm_processed",
+        status: 200,
       };
     } else {
       // LLM failed, fall back to verification service
@@ -220,7 +242,8 @@ export async function POST(request: NextRequest) {
       if (llmResult) {
         responseData.llmIntent = llmResult.intent.primary;
         responseData.llmConfidence = llmResult.intent.confidence;
-        responseData.requiresHumanIntervention = llmResult.requiresHumanIntervention;
+        responseData.requiresHumanIntervention =
+          llmResult.requiresHumanIntervention;
 
         // Use LLM-generated response if confidence is high enough
         if (llmResult.intent.confidence && llmResult.intent.confidence >= 0.6) {
@@ -240,16 +263,19 @@ export async function POST(request: NextRequest) {
         { status: result.status || 400 }
       );
     }
-
   } catch (error) {
     // Step 8: Handle unexpected errors
     const processingTime = Date.now() - startTime;
 
-    logger.error("WhatsApp webhook processing error", error instanceof Error ? error : new Error(String(error)), {
-      processingTimeMs: processingTime,
-      url: request.url,
-      method: request.method,
-    });
+    logger.error(
+      "WhatsApp webhook processing error",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        processingTimeMs: processingTime,
+        url: request.url,
+        method: request.method,
+      }
+    );
 
     return NextResponse.json(
       {
