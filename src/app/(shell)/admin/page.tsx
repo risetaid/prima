@@ -2,11 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Shield, Users, MessageSquareText, Settings, ChevronRight, AlertCircle } from "lucide-react";
+import {
+  Shield,
+  Users,
+  MessageSquareText,
+  Settings,
+  ChevronRight,
+  AlertCircle,
+  Brain,
+} from "lucide-react";
 import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
 import { Patient } from "@/db/schema";
-
 
 export default function AdminPanelPage() {
   const router = useRouter();
@@ -15,7 +22,7 @@ export default function AdminPanelPage() {
     pendingUsers: 0,
     totalUsers: 0,
     totalTemplates: 0,
-    activePatients: 0
+    activePatients: 0,
   });
 
   useEffect(() => {
@@ -30,10 +37,10 @@ export default function AdminPanelPage() {
       const usersResponse = await fetch("/api/admin/users");
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
-        setStats(prev => ({ 
-          ...prev, 
+        setStats((prev) => ({
+          ...prev,
           pendingUsers: usersData.pendingCount || 0,
-          totalUsers: usersData.count || 0
+          totalUsers: usersData.count || 0,
         }));
       }
 
@@ -41,9 +48,9 @@ export default function AdminPanelPage() {
       const templatesResponse = await fetch("/api/admin/templates");
       if (templatesResponse.ok) {
         const templatesData = await templatesResponse.json();
-        setStats(prev => ({ 
-          ...prev, 
-          totalTemplates: templatesData.templates?.length || 0
+        setStats((prev) => ({
+          ...prev,
+          totalTemplates: templatesData.templates?.length || 0,
         }));
       }
 
@@ -51,10 +58,12 @@ export default function AdminPanelPage() {
       const patientsResponse = await fetch("/api/patients");
       if (patientsResponse.ok) {
         const patientsData = await patientsResponse.json();
-        const activePatients = patientsData.patients?.filter((p: Patient) => p.isActive)?.length || 0;
-        setStats(prev => ({ 
-          ...prev, 
-          activePatients
+        const activePatients =
+          patientsData.patients?.filter((p: Patient) => p.isActive)?.length ||
+          0;
+        setStats((prev) => ({
+          ...prev,
+          activePatients,
         }));
       }
     } catch (error) {
@@ -73,7 +82,7 @@ export default function AdminPanelPage() {
       href: "/admin/users",
       badge: stats.pendingUsers > 0 ? `${stats.pendingUsers} menunggu` : null,
       badgeType: "warning" as const,
-      stats: `${stats.totalUsers} total pengguna`
+      stats: `${stats.totalUsers} total pengguna`,
     },
     {
       title: "Template WhatsApp",
@@ -82,8 +91,17 @@ export default function AdminPanelPage() {
       href: "/admin/templates",
       badge: null,
       badgeType: null,
-      stats: `${stats.totalTemplates} template aktif`
-    }
+      stats: `${stats.totalTemplates} template aktif`,
+    },
+    {
+      title: "LLM Analytics",
+      description: "Pantau penggunaan dan biaya AI",
+      icon: Brain,
+      href: "/admin/llm-analytics",
+      badge: null,
+      badgeType: null,
+      stats: "AI & Cost Monitoring",
+    },
   ];
 
   const quickActions = [
@@ -92,8 +110,8 @@ export default function AdminPanelPage() {
       description: "Konfigurasi sistem dan preferensi",
       icon: Settings,
       href: "/admin/settings",
-      color: "bg-gray-500 hover:bg-gray-600"
-    }
+      color: "bg-gray-500 hover:bg-gray-600",
+    },
   ];
 
   if (loading) {
@@ -144,8 +162,12 @@ export default function AdminPanelPage() {
                 <Users className="h-8 w-8 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Pengguna</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalUsers}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Total Pengguna
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.totalUsers}
+                </p>
               </div>
             </div>
           </div>
@@ -156,8 +178,12 @@ export default function AdminPanelPage() {
                 <AlertCircle className="h-8 w-8 text-orange-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Menunggu Approval</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.pendingUsers}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Menunggu Approval
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.pendingUsers}
+                </p>
               </div>
             </div>
           </div>
@@ -168,8 +194,12 @@ export default function AdminPanelPage() {
                 <MessageSquareText className="h-8 w-8 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Template WhatsApp</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalTemplates}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Template WhatsApp
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.totalTemplates}
+                </p>
               </div>
             </div>
           </div>
@@ -180,8 +210,12 @@ export default function AdminPanelPage() {
                 <Shield className="h-8 w-8 text-purple-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pasien Aktif</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.activePatients}</p>
+                <p className="text-sm font-medium text-gray-600">
+                  Pasien Aktif
+                </p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {stats.activePatients}
+                </p>
               </div>
             </div>
           </div>
@@ -204,13 +238,17 @@ export default function AdminPanelPage() {
                         <div className="flex-shrink-0 mr-3">
                           <IconComponent className="h-6 w-6 text-blue-600" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {item.title}
+                        </h3>
                         {item.badge && (
-                          <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${
-                            item.badgeType === 'warning' 
-                              ? 'bg-orange-100 text-orange-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
+                          <span
+                            className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${
+                              item.badgeType === "warning"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
                             {item.badge}
                           </span>
                         )}
@@ -230,7 +268,9 @@ export default function AdminPanelPage() {
 
         {/* Quick Actions */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Aksi Cepat</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Aksi Cepat
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {quickActions.map((action) => {
               const IconComponent = action.icon;
@@ -256,4 +296,3 @@ export default function AdminPanelPage() {
     </div>
   );
 }
-
