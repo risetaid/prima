@@ -1,151 +1,267 @@
 // Message Processor Service - Advanced NLP for Indonesian WhatsApp responses
 // Handles natural language processing, context awareness, and intelligent response classification
 
-import { llmService } from './llm/llm.service'
-import { ConversationContext } from './llm/llm.types'
-import { PatientContextService } from './patient/patient-context.service'
-import { ConversationStateService, ConversationMessageData } from './conversation-state.service'
-import { WhatsAppService } from './whatsapp/whatsapp.service'
+import { llmService } from "./llm/llm.service";
+import {
+  ConversationContext,
+  LLMRequest,
+  ProcessedLLMResponse,
+} from "./llm/llm.types";
+import { PatientContextService } from "./patient/patient-context.service";
+import {
+  ConversationStateService,
+  ConversationMessageData,
+} from "./conversation-state.service";
+import { WhatsAppService } from "./whatsapp/whatsapp.service";
+import { safetyFilterService } from "./llm/safety-filter";
+import { logger } from "@/lib/logger";
 
 export interface MessageContext {
-  patientId: string
-  phoneNumber: string
-  message: string
-  timestamp: Date
-  conversationState?: ConversationState
-  previousMessages?: MessageHistory[]
-  patientName?: string
-  verificationStatus?: string
-  activeReminders?: unknown[]
+  patientId: string;
+  phoneNumber: string;
+  message: string;
+  timestamp: Date;
+  conversationState?: ConversationState;
+  previousMessages?: MessageHistory[];
+  patientName?: string;
+  verificationStatus?: string;
+  activeReminders?: unknown[];
 }
 
 export interface MessageHistory {
-  message: string
-  timestamp: Date
-  direction: 'inbound' | 'outbound'
-  type: 'verification' | 'reminder' | 'confirmation' | 'general'
+  message: string;
+  timestamp: Date;
+  direction: "inbound" | "outbound";
+  type: "verification" | "reminder" | "confirmation" | "general";
 }
 
 export interface ConversationState {
-  id: string
-  patientId: string
-  currentContext: 'verification' | 'reminder_confirmation' | 'general_inquiry' | 'emergency'
-  expectedResponseType?: 'yes_no' | 'confirmation' | 'text' | 'number'
-  relatedEntityId?: string // reminder_log_id, verification_id, etc.
-  stateData?: Record<string, unknown>
-  expiresAt: Date
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  patientId: string;
+  currentContext:
+    | "verification"
+    | "reminder_confirmation"
+    | "general_inquiry"
+    | "emergency";
+  expectedResponseType?: "yes_no" | "confirmation" | "text" | "number";
+  relatedEntityId?: string; // reminder_log_id, verification_id, etc.
+  stateData?: Record<string, unknown>;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface ProcessedMessage {
-  intent: MessageIntent
-  confidence: number
-  entities: MessageEntity[]
-  response: RecommendedResponse
-  context: MessageContext
-  requiresHumanIntervention: boolean
+  intent: MessageIntent;
+  confidence: number;
+  entities: MessageEntity[];
+  response: RecommendedResponse;
+  context: MessageContext;
+  requiresHumanIntervention: boolean;
 }
 
 export interface MessageIntent {
-  primary: 'accept' | 'decline' | 'confirm_taken' | 'confirm_missed' | 'confirm_later' | 'unsubscribe' | 'inquiry' | 'emergency' | 'unknown'
-  secondary?: string[]
-  sentiment: 'positive' | 'negative' | 'neutral'
-  confidence?: number
+  primary:
+    | "accept"
+    | "decline"
+    | "confirm_taken"
+    | "confirm_missed"
+    | "confirm_later"
+    | "unsubscribe"
+    | "inquiry"
+    | "emergency"
+    | "unknown";
+  secondary?: string[];
+  sentiment: "positive" | "negative" | "neutral";
+  confidence?: number;
 }
 
 export interface MessageEntity {
-  type: 'time' | 'date' | 'symptom' | 'emergency_level'
-  value: string
-  confidence: number
-  position: { start: number; end: number }
+  type: "time" | "date" | "symptom" | "emergency_level";
+  value: string;
+  confidence: number;
+  position: { start: number; end: number };
 }
 
 export interface RecommendedResponse {
-  type: 'auto_reply' | 'human_intervention' | 'escalation'
-  message?: string
-  actions: ResponseAction[]
-  priority: 'low' | 'medium' | 'high' | 'urgent'
+  type: "auto_reply" | "human_intervention" | "escalation";
+  message?: string;
+  actions: ResponseAction[];
+  priority: "low" | "medium" | "high" | "urgent";
 }
 
 export interface ResponseAction {
-  type: 'update_patient_status' | 'log_confirmation' | 'send_followup' | 'notify_volunteer' | 'create_manual_confirmation'
-  data: Record<string, unknown>
+  type:
+    | "update_patient_status"
+    | "log_confirmation"
+    | "send_followup"
+    | "notify_volunteer"
+    | "create_manual_confirmation";
+  data: Record<string, unknown>;
 }
 
 export class MessageProcessorService {
-  private patientContextService: PatientContextService
-  private conversationStateService: ConversationStateService
-  private whatsAppService: WhatsAppService
+  private patientContextService: PatientContextService;
+  private conversationStateService: ConversationStateService;
+  private whatsAppService: WhatsAppService;
 
   constructor() {
-    this.patientContextService = new PatientContextService()
-    this.conversationStateService = new ConversationStateService()
-    this.whatsAppService = new WhatsAppService()
+    this.patientContextService = new PatientContextService();
+    this.conversationStateService = new ConversationStateService();
+    this.whatsAppService = new WhatsAppService();
   }
 
   // Confidence threshold for LLM responses
-  private readonly CONFIDENCE_THRESHOLD = 0.6
-  private readonly LOW_CONFIDENCE_THRESHOLD = 0.3
+  private readonly CONFIDENCE_THRESHOLD = 0.6;
+  private readonly LOW_CONFIDENCE_THRESHOLD = 0.3;
 
   // Indonesian keyword mappings for fallback (kept for emergency cases)
   private readonly ACCEPT_KEYWORDS = [
-    'ya', 'iya', 'yes', 'y', 'ok', 'oke', 'baik', 'setuju', 'mau', 'ingin',
-    'terima', 'siap', 'bisa', 'boleh', 'sudah siap', 'sudah oke', 'sudah baik'
-  ]
+    "ya",
+    "iya",
+    "yes",
+    "y",
+    "ok",
+    "oke",
+    "baik",
+    "setuju",
+    "mau",
+    "ingin",
+    "terima",
+    "siap",
+    "bisa",
+    "boleh",
+    "sudah siap",
+    "sudah oke",
+    "sudah baik",
+  ];
 
   private readonly DECLINE_KEYWORDS = [
-    'tidak', 'no', 'n', 'ga', 'gak', 'engga', 'enggak', 'tolak', 'nanti',
-    'besok', 'belum', 'ga mau', 'ga bisa', 'ga siap', 'belum siap'
-  ]
+    "tidak",
+    "no",
+    "n",
+    "ga",
+    "gak",
+    "engga",
+    "enggak",
+    "tolak",
+    "nanti",
+    "besok",
+    "belum",
+    "ga mau",
+    "ga bisa",
+    "ga siap",
+    "belum siap",
+  ];
 
   private readonly CONFIRMATION_TAKEN_KEYWORDS = [
-    'sudah', 'udh', 'sudah selesai', 'udh selesai', 'sudah lakukan', 'udh lakukan',
-    'selesai', 'telah selesai', 'sudah lakukan', 'done', 'selesai', 'sudah selesai'
-  ]
+    "sudah",
+    "udh",
+    "sudah selesai",
+    "udh selesai",
+    "sudah lakukan",
+    "udh lakukan",
+    "selesai",
+    "telah selesai",
+    "sudah lakukan",
+    "done",
+    "selesai",
+    "sudah selesai",
+  ];
 
   private readonly CONFIRMATION_MISSED_KEYWORDS = [
-    'belum', 'blm', 'belum selesai', 'blm selesai', 'belum lakukan', 'lupa',
-    'lupa lakukan', 'skip', 'lewat', 'ga lakukan', 'tidak lakukan', 'belum lakukan'
-  ]
+    "belum",
+    "blm",
+    "belum selesai",
+    "blm selesai",
+    "belum lakukan",
+    "lupa",
+    "lupa lakukan",
+    "skip",
+    "lewat",
+    "ga lakukan",
+    "tidak lakukan",
+    "belum lakukan",
+  ];
 
   private readonly CONFIRMATION_LATER_KEYWORDS = [
-    'nanti', 'bentaran', 'sebentar', 'tunggu', 'wait', 'later', 'tunggu sebentar',
-    'nanti dulu', 'belum saatnya', 'masih ada waktu'
-  ]
+    "nanti",
+    "bentaran",
+    "sebentar",
+    "tunggu",
+    "wait",
+    "later",
+    "tunggu sebentar",
+    "nanti dulu",
+    "belum saatnya",
+    "masih ada waktu",
+  ];
 
   private readonly UNSUBSCRIBE_KEYWORDS = [
-    'berhenti', 'stop', 'cancel', 'batal', 'keluar', 'hapus', 'unsubscribe',
-    'cabut', 'stop dulu', 'berhenti dulu', 'tidak mau lagi', 'sudah cukup'
-  ]
+    "berhenti",
+    "stop",
+    "cancel",
+    "batal",
+    "keluar",
+    "hapus",
+    "unsubscribe",
+    "cabut",
+    "stop dulu",
+    "berhenti dulu",
+    "tidak mau lagi",
+    "sudah cukup",
+  ];
 
   private readonly EMERGENCY_KEYWORDS = [
-    'darurat', 'emergency', 'sakit', 'mual', 'muntah', 'alergi', 'sesak',
-    'nyeri', 'sakit kepala', 'demam', 'panas', 'gawat', 'tolong', 'help'
-  ]
+    "darurat",
+    "emergency",
+    "sakit",
+    "mual",
+    "muntah",
+    "alergi",
+    "sesak",
+    "nyeri",
+    "sakit kepala",
+    "demam",
+    "panas",
+    "gawat",
+    "tolong",
+    "help",
+  ];
 
   private readonly INQUIRY_KEYWORDS = [
-    'tanya', 'pertanyaan', 'bagaimana', 'gimana', 'kenapa', 'kok', 'mengapa',
-    'info', 'informasi', 'bantuan', 'help', 'tolong', 'mau tanya'
-  ]
+    "tanya",
+    "pertanyaan",
+    "bagaimana",
+    "gimana",
+    "kenapa",
+    "kok",
+    "mengapa",
+    "info",
+    "informasi",
+    "bantuan",
+    "help",
+    "tolong",
+    "mau tanya",
+  ];
 
   /**
    * Map LLM intent to internal intent types
    */
-  private mapLLMIntentToInternal(llmIntent: string): MessageIntent['primary'] {
+  private mapLLMIntentToInternal(llmIntent: string): MessageIntent["primary"] {
     switch (llmIntent) {
-      case 'verification_response':
-        return 'accept' // Will be refined based on YA/TIDAK in response generation
-      case 'medication_confirmation':
-        return 'confirm_taken' // Will be refined based on SUDAH/BELUM
-      case 'unsubscribe':
-        return 'unsubscribe'
-      case 'emergency':
-        return 'emergency'
-      case 'general_inquiry':
-        return 'inquiry'
+      case "verification_response":
+        return "accept"; // Will be refined based on YA/TIDAK in response generation
+      case "medication_confirmation":
+        return "confirm_taken"; // Will be refined based on SUDAH/BELUM
+      case "unsubscribe":
+        return "unsubscribe";
+      case "emergency":
+        return "emergency";
+      case "general_inquiry":
+        return "inquiry";
       default:
-        return 'unknown'
+        return "unknown";
     }
   }
 
@@ -153,159 +269,221 @@ export class MessageProcessorService {
    * Fallback keyword-based intent detection for when LLM fails
    */
   private fallbackKeywordIntentDetection(message: string): MessageIntent {
-    const scores = this.calculateIntentScores(message)
-    const maxScore = Math.max(...Object.values(scores))
-    const primaryIntent = this.selectPrimaryIntent(scores)
-    const sentiment = this.determineSentiment(message, primaryIntent)
-    const confidence = this.calculateIntentConfidence(maxScore, message)
+    const scores = this.calculateIntentScores(message);
+    const maxScore = Math.max(...Object.values(scores));
+    const primaryIntent = this.selectPrimaryIntent(scores);
+    const sentiment = this.determineSentiment(message, primaryIntent);
+    const confidence = this.calculateIntentConfidence(maxScore, message);
 
     return {
-      primary: primaryIntent || 'unknown',
+      primary: primaryIntent || "unknown",
       sentiment,
-      confidence: Math.min(confidence || 0.5, 0.5) // Cap fallback confidence at 0.5
-    }
+      confidence: Math.min(confidence || 0.5, 0.5), // Cap fallback confidence at 0.5
+    };
   }
 
   /**
-    * Process incoming message with full NLP analysis and conversation continuity
-    */
+   * Process incoming message with full NLP analysis and conversation continuity
+   */
   async processMessage(context: MessageContext): Promise<ProcessedMessage> {
-    const normalizedMessage = this.normalizeMessage(context.message)
+    const normalizedMessage = this.normalizeMessage(context.message);
 
     // Get or create conversation state for continuity
-    let conversationState = await this.conversationStateService.findByPhoneNumber(context.phoneNumber)
+    let conversationState =
+      await this.conversationStateService.findByPhoneNumber(
+        context.phoneNumber
+      );
     if (!conversationState) {
-      conversationState = await this.conversationStateService.getOrCreateConversationState(
-        context.patientId,
-        context.phoneNumber,
-        'general_inquiry'
-      )
+      conversationState =
+        await this.conversationStateService.getOrCreateConversationState(
+          context.patientId,
+          context.phoneNumber,
+          "general_inquiry"
+        );
     }
 
-     // Get conversation history for context
-     const conversationHistory = await this.conversationStateService.getConversationHistory(
-       conversationState.id,
-       20 // Last 20 messages for context
-     )
+    // Get conversation history for context
+    const conversationHistory =
+      await this.conversationStateService.getConversationHistory(
+        conversationState.id,
+        20 // Last 20 messages for context
+      );
 
-     // Detect intent with LLM using conversation context
-     const intent = await this.detectIntent(normalizedMessage, context, conversationHistory)
+    // Get patient context for LLM
+    const patientContext = await this.patientContextService.getPatientContext(
+      context.phoneNumber
+    );
 
-     // Analyze message for safety concerns and emergencies
-     await llmService.analyzePatientMessageSafety(normalizedMessage, {
-       patientId: context.patientId,
-       phoneNumber: context.phoneNumber,
-       conversationId: conversationState.id,
-          previousMessages: conversationHistory?.map((msg: ConversationMessageData) => ({
-           role: msg.direction === 'inbound' ? 'user' : 'assistant',
-         content: msg.message
-       })),
-       patientInfo: {
-         name: context.patientName,
-         verificationStatus: context.verificationStatus,
-         activeReminders: context.activeReminders
-       }
-     })
+    // Build full conversation context for LLM
+    const llmContext: ConversationContext = {
+      patientId: context.patientId,
+      phoneNumber: context.phoneNumber,
+      previousMessages: (conversationHistory || []).map((msg) => ({
+        role: msg.direction === "inbound" ? "user" : "assistant",
+        content: msg.message,
+      })),
+      patientInfo:
+        patientContext.found && patientContext.context
+          ? {
+              name: patientContext.context.patient.name,
+              verificationStatus:
+                patientContext.context.patient.verificationStatus,
+              activeReminders: patientContext.context.activeReminders.map(
+                (r) => ({
+                  medicationName: r.customMessage || "obat",
+                  scheduledTime: r.scheduledTime,
+                })
+              ),
+            }
+          : undefined,
+    };
 
-    // Extract entities
-    const entities = this.extractEntities(normalizedMessage)
+    // Analyze message for safety concerns and emergencies
+    const safetyAnalysis = await llmService.analyzePatientMessageSafety(
+      normalizedMessage,
+      {
+        patientId: context.patientId,
+        phoneNumber: context.phoneNumber,
+        conversationId: conversationState.id,
+        previousMessages: llmContext.previousMessages,
+        patientInfo: llmContext.patientInfo,
+      }
+    );
 
-    // Update conversation state based on intent
-    await this.updateConversationState(conversationState.id, intent, normalizedMessage)
+    // Generate direct LLM response (no intent detection)
+    const llmResponse = await this.generateDirectLLMResponse(
+      normalizedMessage,
+      llmContext
+    );
 
-    // Determine context and conversation state
-    const conversationContext = await this.determineContext(context, intent)
+    // Determine if human intervention is needed
+    const requiresHumanIntervention =
+      safetyAnalysis.escalationRequired || safetyAnalysis.emergencyDetected;
 
-    // Generate recommended response
-    const response = await this.generateResponse(intent, entities, conversationContext)
+    // Create response based on LLM output and safety analysis
+    const response = this.createResponseFromLLM(
+      llmResponse,
+      safetyAnalysis,
+      context
+    );
 
-    // Check if human intervention is needed (with confidence-based logic)
-    const requiresHumanIntervention = this.requiresHumanIntervention(intent, entities)
+    // Update conversation state
+    await this.updateConversationState(
+      conversationState.id,
+      {
+        primary: "inquiry",
+        sentiment: "neutral",
+        confidence: 1.0,
+      },
+      normalizedMessage
+    );
 
-    // Store the message and response in conversation history
+    // Store the message in conversation history
     await this.conversationStateService.addMessage(conversationState.id, {
       message: normalizedMessage,
-      direction: 'inbound',
-      messageType: this.mapIntentToMessageType(intent.primary),
-      intent: intent.primary,
-      confidence: intent.confidence ? Math.round(intent.confidence * 100) : undefined, // Convert to 0-100 scale
-      processedAt: new Date()
-    })
+      direction: "inbound",
+      messageType: "general",
+      intent: "general_inquiry",
+      confidence: 100, // Full LLM confidence
+      processedAt: new Date(),
+    });
 
-    // Note: Response is now stored in generateLLMResponse method to include LLM metadata
+    // Store LLM response if generated
+    if (llmResponse) {
+      await this.conversationStateService.addMessage(conversationState.id, {
+        message: llmResponse.content,
+        direction: "outbound",
+        messageType: "general",
+        intent: "general_inquiry",
+        confidence: 100,
+        llmResponseId: llmResponse.model,
+        llmModel: llmResponse.model,
+        llmTokensUsed: llmResponse.tokensUsed,
+        llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
+        llmResponseTimeMs: llmResponse.responseTime,
+        processedAt: new Date(),
+      });
+    }
 
     return {
-      intent,
-      confidence: intent.confidence ?? 0.5,
-      entities,
+      intent: { primary: "inquiry", confidence: 1.0, sentiment: "neutral" },
+      confidence: 1.0,
+      entities: [],
       response,
-      context: conversationContext,
-      requiresHumanIntervention
-    }
+      context,
+      requiresHumanIntervention,
+    };
   }
 
   /**
    * Normalize message for better processing
    */
   private normalizeMessage(message: string): string {
-    return message
-      .toLowerCase()
-      .trim()
-      // Remove extra whitespace
-      .replace(/\s+/g, ' ')
-      // Remove common punctuation that doesn't affect meaning
-      .replace(/[.,!?;:]$/g, '')
-      // Normalize common abbreviations
-      .replace(/\budh\b/g, 'sudah')
-      .replace(/\bblm\b/g, 'belum')
-      .replace(/\bga\b/g, 'tidak')
-      .replace(/\bgak\b/g, 'tidak')
-      .replace(/\bengga\b/g, 'tidak')
-      .replace(/\benggak\b/g, 'tidak')
+    return (
+      message
+        .toLowerCase()
+        .trim()
+        // Remove extra whitespace
+        .replace(/\s+/g, " ")
+        // Remove common punctuation that doesn't affect meaning
+        .replace(/[.,!?;:]$/g, "")
+        // Normalize common abbreviations
+        .replace(/\budh\b/g, "sudah")
+        .replace(/\bblm\b/g, "belum")
+        .replace(/\bga\b/g, "tidak")
+        .replace(/\bgak\b/g, "tidak")
+        .replace(/\bengga\b/g, "tidak")
+        .replace(/\benggak\b/g, "tidak")
+    );
   }
 
   /**
-    * Update conversation state based on intent
-    */
-   private async updateConversationState(
-     conversationStateId: string,
-     intent: MessageIntent,
-     message: string
-   ): Promise<void> {
+   * Update conversation state based on intent
+   */
+  private async updateConversationState(
+    conversationStateId: string,
+    intent: MessageIntent,
+    message: string
+  ): Promise<void> {
     const updates: Record<string, unknown> = {
       currentContext: this.mapIntentToContext(intent.primary),
       lastMessage: message,
-      messageCount: undefined // Will be auto-incremented
-    }
+      messageCount: undefined, // Will be auto-incremented
+    };
 
     // Set expected response type based on intent
-    updates.expectedResponseType = this.getExpectedResponseType(intent.primary)
+    updates.expectedResponseType = this.getExpectedResponseType(intent.primary);
 
-    await this.conversationStateService.updateConversationState(conversationStateId, updates)
+    await this.conversationStateService.updateConversationState(
+      conversationStateId,
+      updates
+    );
   }
 
   /**
-    * Map intent to message type for storage
-    */
-  private mapIntentToMessageType(intent: MessageIntent['primary']): ConversationMessageData['messageType'] {
+   * Map intent to message type for storage
+   */
+  private mapIntentToMessageType(
+    intent: MessageIntent["primary"]
+  ): ConversationMessageData["messageType"] {
     switch (intent) {
-      case 'accept':
-      case 'decline':
-        return 'verification'
-      case 'confirm_taken':
-      case 'confirm_missed':
-      case 'confirm_later':
-        return 'confirmation'
-      case 'emergency':
-        return 'general' // Emergency gets special handling
+      case "accept":
+      case "decline":
+        return "verification";
+      case "confirm_taken":
+      case "confirm_missed":
+      case "confirm_later":
+        return "confirmation";
+      case "emergency":
+        return "general"; // Emergency gets special handling
       default:
-        return 'general'
+        return "general";
     }
   }
 
   /**
-    * Detect message intent using LLM
-    */
+   * Detect message intent using LLM
+   */
   private async detectIntent(
     message: string,
     context: MessageContext,
@@ -313,46 +491,61 @@ export class MessageProcessorService {
   ): Promise<MessageIntent> {
     try {
       // Get patient context for LLM
-      const patientContext = await this.patientContextService.getPatientContext(context.phoneNumber)
+      const patientContext = await this.patientContextService.getPatientContext(
+        context.phoneNumber
+      );
 
       // Build conversation context for LLM with conversation history
       const llmContext: ConversationContext = {
         patientId: context.patientId,
         phoneNumber: context.phoneNumber,
-        previousMessages: (conversationHistory || context.previousMessages || []).map(msg => ({
-          role: msg.direction === 'inbound' ? 'user' : 'assistant',
-          content: msg.message
+        previousMessages: (
+          conversationHistory ||
+          context.previousMessages ||
+          []
+        ).map((msg) => ({
+          role: msg.direction === "inbound" ? "user" : "assistant",
+          content: msg.message,
         })),
-        patientInfo: patientContext.found && patientContext.context ? {
-          name: patientContext.context.patient.name,
-          verificationStatus: patientContext.context.patient.verificationStatus,
-          activeReminders: patientContext.context.activeReminders.map(r => ({
-            medicationName: r.customMessage || 'obat',
-            scheduledTime: r.scheduledTime
-          }))
-        } : undefined
-      }
+        patientInfo:
+          patientContext.found && patientContext.context
+            ? {
+                name: patientContext.context.patient.name,
+                verificationStatus:
+                  patientContext.context.patient.verificationStatus,
+                activeReminders: patientContext.context.activeReminders.map(
+                  (r) => ({
+                    medicationName: r.customMessage || "obat",
+                    scheduledTime: r.scheduledTime,
+                  })
+                ),
+              }
+            : undefined,
+      };
 
       // Use LLM for intent detection
-      const llmResult = await llmService.detectIntent(message, llmContext)
+      const llmResult = await llmService.detectIntent(message, llmContext);
 
       // Map LLM intent to our internal intent types
-      const primaryIntent = this.mapLLMIntentToInternal(llmResult.intent)
+      const primaryIntent = this.mapLLMIntentToInternal(llmResult.intent);
 
       // Determine sentiment
-      const sentiment = this.determineSentiment(message, primaryIntent)
+      const sentiment = this.determineSentiment(message, primaryIntent);
 
       return {
         primary: primaryIntent,
         sentiment,
         confidence: llmResult.confidence,
-        secondary: [llmResult.intent] // Keep original LLM intent as secondary
-      }
+        secondary: [llmResult.intent], // Keep original LLM intent as secondary
+      };
     } catch (error) {
-      console.error('LLM intent detection failed, falling back to keyword-based:', error)
+      console.error(
+        "LLM intent detection failed, falling back to keyword-based:",
+        error
+      );
 
       // Fallback to keyword-based detection if LLM fails
-      return this.fallbackKeywordIntentDetection(message)
+      return this.fallbackKeywordIntentDetection(message);
     }
   }
 
@@ -360,24 +553,24 @@ export class MessageProcessorService {
    * Calculate keyword matching score
    */
   private calculateKeywordScore(message: string, keywords: string[]): number {
-    let score = 0
+    let score = 0;
 
     for (const keyword of keywords) {
       if (message.includes(keyword)) {
         // Exact match gets higher score
         if (message === keyword) {
-          score += 10
+          score += 10;
         } else {
-          score += keyword.length
+          score += keyword.length;
         }
       }
 
       // Check for fuzzy matches (partial words)
-      const fuzzyMatches = this.findFuzzyMatches(message, keyword)
-      score += fuzzyMatches * (keyword.length * 0.5)
+      const fuzzyMatches = this.findFuzzyMatches(message, keyword);
+      score += fuzzyMatches * (keyword.length * 0.5);
     }
 
-    return score
+    return score;
   }
 
   /**
@@ -385,79 +578,85 @@ export class MessageProcessorService {
    */
   private findFuzzyMatches(message: string, keyword: string): number {
     // Simple Levenshtein distance for fuzzy matching
-    const words = message.split(' ')
-    let matches = 0
+    const words = message.split(" ");
+    let matches = 0;
 
     for (const word of words) {
       if (this.levenshteinDistance(word, keyword) <= 2) {
-        matches++
+        matches++;
       }
     }
 
-    return matches
+    return matches;
   }
 
   /**
    * Calculate Levenshtein distance for fuzzy matching
    */
   private levenshteinDistance(str1: string, str2: string): number {
-    const matrix = []
+    const matrix = [];
 
     for (let i = 0; i <= str2.length; i++) {
-      matrix[i] = [i]
+      matrix[i] = [i];
     }
 
     for (let j = 0; j <= str1.length; j++) {
-      matrix[0][j] = j
+      matrix[0][j] = j;
     }
 
     for (let i = 1; i <= str2.length; i++) {
       for (let j = 1; j <= str1.length; j++) {
         if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1]
+          matrix[i][j] = matrix[i - 1][j - 1];
         } else {
           matrix[i][j] = Math.min(
             matrix[i - 1][j - 1] + 1,
             matrix[i][j - 1] + 1,
             matrix[i - 1][j] + 1
-          )
+          );
         }
       }
     }
 
-    return matrix[str2.length][str1.length]
+    return matrix[str2.length][str1.length];
   }
 
   /**
    * Determine sentiment of the message
    */
-  private determineSentiment(message: string, intent: MessageIntent['primary']): MessageIntent['sentiment'] {
-    const { positive, negative } = this.calculateWordBasedSentiment(message)
+  private determineSentiment(
+    message: string,
+    intent: MessageIntent["primary"]
+  ): MessageIntent["sentiment"] {
+    const { positive, negative } = this.calculateWordBasedSentiment(message);
 
-    if (positive > negative) return 'positive'
-    if (negative > positive) return 'negative'
+    if (positive > negative) return "positive";
+    if (negative > positive) return "negative";
 
     // Default sentiment based on intent
-    return this.getDefaultSentimentForIntent(intent)
+    return this.getDefaultSentimentForIntent(intent);
   }
 
   /**
    * Extract entities from message
    */
   private extractEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
+    const entities: MessageEntity[] = [];
 
     // Extract different types of entities
-    entities.push(...this.extractTimeEntities(message))
-    entities.push(...this.extractEmergencyEntities(message))
+    entities.push(...this.extractTimeEntities(message));
+    entities.push(...this.extractEmergencyEntities(message));
 
-    return entities
+    return entities;
   }
 
   /**
    * Determine conversation context
    */
-  private async determineContext(context: MessageContext, intent: MessageIntent): Promise<MessageContext> {
+  private async determineContext(
+    context: MessageContext,
+    intent: MessageIntent
+  ): Promise<MessageContext> {
     // This would typically query the database for conversation state
     // For now, return the context as-is with enhanced information
     return {
@@ -469,48 +668,52 @@ export class MessageProcessorService {
         expectedResponseType: this.getExpectedResponseType(intent.primary),
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
         createdAt: new Date(),
-        updatedAt: new Date()
-      }
-    }
+        updatedAt: new Date(),
+      },
+    };
   }
 
   /**
    * Map intent to conversation context
    */
-  private mapIntentToContext(intent: MessageIntent['primary']): ConversationState['currentContext'] {
+  private mapIntentToContext(
+    intent: MessageIntent["primary"]
+  ): ConversationState["currentContext"] {
     switch (intent) {
-      case 'accept':
-      case 'decline':
-        return 'verification'
-      case 'confirm_taken':
-      case 'confirm_missed':
-      case 'confirm_later':
-        return 'reminder_confirmation'
-      case 'emergency':
-        return 'emergency'
-      case 'inquiry':
-        return 'general_inquiry'
+      case "accept":
+      case "decline":
+        return "verification";
+      case "confirm_taken":
+      case "confirm_missed":
+      case "confirm_later":
+        return "reminder_confirmation";
+      case "emergency":
+        return "emergency";
+      case "inquiry":
+        return "general_inquiry";
       default:
-        return 'general_inquiry'
+        return "general_inquiry";
     }
   }
 
   /**
    * Get expected response type for intent
    */
-  private getExpectedResponseType(intent: MessageIntent['primary']): ConversationState['expectedResponseType'] {
+  private getExpectedResponseType(
+    intent: MessageIntent["primary"]
+  ): ConversationState["expectedResponseType"] {
     switch (intent) {
-      case 'accept':
-      case 'decline':
-      case 'confirm_taken':
-      case 'confirm_missed':
-        return 'yes_no'
-      case 'confirm_later':
-        return 'text'
-      case 'inquiry':
-        return 'text'
+      case "accept":
+      case "decline":
+      case "confirm_taken":
+      case "confirm_missed":
+        return "yes_no";
+      case "confirm_later":
+        return "text";
+      case "inquiry":
+        return "text";
       default:
-        return 'text'
+        return "text";
     }
   }
 
@@ -525,31 +728,34 @@ export class MessageProcessorService {
     // For high confidence intents, try to generate natural language response using LLM
     if ((intent.confidence ?? 0.5) >= this.CONFIDENCE_THRESHOLD) {
       try {
-        const llmResponse = await this.generateLLMResponse(intent, context)
+        const llmResponse = await this.generateLLMResponse(intent, context);
         if (llmResponse) {
-          return llmResponse
+          return llmResponse;
         }
       } catch (error) {
-        console.warn('LLM response generation failed, falling back to template:', error)
+        console.warn(
+          "LLM response generation failed, falling back to template:",
+          error
+        );
       }
     }
 
     // Fallback to template-based responses
     switch (intent.primary) {
-      case 'accept':
-        return this.generateAcceptResponse()
-      case 'decline':
-        return this.generateDeclineResponse()
-      case 'confirm_taken':
-        return this.generateConfirmTakenResponse(context)
-      case 'confirm_missed':
-        return this.generateConfirmMissedResponse(context)
-      case 'emergency':
-        return this.generateEmergencyResponse(context)
-      case 'unsubscribe':
-        return this.generateUnsubscribeResponse()
+      case "accept":
+        return this.generateAcceptResponse();
+      case "decline":
+        return this.generateDeclineResponse();
+      case "confirm_taken":
+        return this.generateConfirmTakenResponse(context);
+      case "confirm_missed":
+        return this.generateConfirmMissedResponse(context);
+      case "emergency":
+        return this.generateEmergencyResponse(context);
+      case "unsubscribe":
+        return this.generateUnsubscribeResponse();
       default:
-        return this.generateLowConfidenceResponse(intent)
+        return this.generateLowConfidenceResponse(intent);
     }
   }
 
@@ -561,180 +767,196 @@ export class MessageProcessorService {
     entities: MessageEntity[]
   ): boolean {
     // Emergency situations always require human intervention
-    if (intent.primary === 'emergency') return true
+    if (intent.primary === "emergency") return true;
 
     // Low confidence intents need human review
-    if ((intent.confidence ?? 0.5) < this.LOW_CONFIDENCE_THRESHOLD) return true
+    if ((intent.confidence ?? 0.5) < this.LOW_CONFIDENCE_THRESHOLD) return true;
 
     // Complex entities might need human interpretation
-    if (entities.some(entity => entity.confidence < 0.5)) return true
+    if (entities.some((entity) => entity.confidence < 0.5)) return true;
 
     // Inquiries typically need human response
-    if (intent.primary === 'inquiry') return true
+    if (intent.primary === "inquiry") return true;
 
     // Messages with negative sentiment might need attention
-    if (intent.sentiment === 'negative') return true
+    if (intent.sentiment === "negative") return true;
 
-    return false
+    return false;
   }
 
   /**
    * Generate response for accept intent
    */
   private generateAcceptResponse(): RecommendedResponse {
-    const actions: ResponseAction[] = []
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'update_patient_status',
-      data: { status: 'verified' }
-    })
+      type: "update_patient_status",
+      data: { status: "verified" },
+    });
     return {
-      type: 'auto_reply',
-      message: 'Terima kasih atas konfirmasinya! Anda akan menerima pengingat obat secara otomatis.',
+      type: "auto_reply",
+      message:
+        "Terima kasih atas konfirmasinya! Anda akan menerima pengingat obat secara otomatis.",
       actions,
-      priority: 'low'
-    }
+      priority: "low",
+    };
   }
 
   /**
    * Generate response for decline intent
    */
   private generateDeclineResponse(): RecommendedResponse {
-    const actions: ResponseAction[] = []
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'update_patient_status',
-      data: { status: 'declined' }
-    })
+      type: "update_patient_status",
+      data: { status: "declined" },
+    });
     return {
-      type: 'auto_reply',
-      message: 'Baik, terima kasih atas responsnya. Jika berubah pikiran, Anda bisa menghubungi relawan PRIMA.',
+      type: "auto_reply",
+      message:
+        "Baik, terima kasih atas responsnya. Jika berubah pikiran, Anda bisa menghubungi relawan PRIMA.",
       actions,
-      priority: 'low'
-    }
+      priority: "low",
+    };
   }
 
   /**
    * Generate response for confirm_taken intent
    */
-  private generateConfirmTakenResponse(context: MessageContext): RecommendedResponse {
-    const actions: ResponseAction[] = []
+  private generateConfirmTakenResponse(
+    context: MessageContext
+  ): RecommendedResponse {
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'log_confirmation',
-      data: { status: 'CONFIRMED', response: context.message }
-    })
+      type: "log_confirmation",
+      data: { status: "CONFIRMED", response: context.message },
+    });
     return {
-      type: 'auto_reply',
-      message: 'Bagus! Terus jaga kesehatan ya. 💊❤️',
+      type: "auto_reply",
+      message: "Bagus! Terus jaga kesehatan ya. 💊❤️",
       actions,
-      priority: 'low'
-    }
+      priority: "low",
+    };
   }
 
   /**
    * Generate response for confirm_missed intent
    */
-  private generateConfirmMissedResponse(context: MessageContext): RecommendedResponse {
-    const actions: ResponseAction[] = []
+  private generateConfirmMissedResponse(
+    context: MessageContext
+  ): RecommendedResponse {
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'log_confirmation',
-      data: { status: 'MISSED', response: context.message }
-    })
+      type: "log_confirmation",
+      data: { status: "MISSED", response: context.message },
+    });
     actions.push({
-      type: 'send_followup',
-      data: { type: 'reminder', delay: 2 * 60 * 60 * 1000 } // 2 hours
-    })
+      type: "send_followup",
+      data: { type: "reminder", delay: 2 * 60 * 60 * 1000 }, // 2 hours
+    });
     return {
-      type: 'auto_reply',
-      message: 'Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙',
+      type: "auto_reply",
+      message:
+        "Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙",
       actions,
-      priority: 'medium'
-    }
+      priority: "medium",
+    };
   }
 
   /**
    * Generate response for emergency intent
    */
-  private generateEmergencyResponse(context: MessageContext): RecommendedResponse {
-    const actions: ResponseAction[] = []
+  private generateEmergencyResponse(
+    context: MessageContext
+  ): RecommendedResponse {
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'notify_volunteer',
-      data: { priority: 'urgent', message: context.message }
-    })
+      type: "notify_volunteer",
+      data: { priority: "urgent", message: context.message },
+    });
     return {
-      type: 'human_intervention',
-      message: 'Kami mendeteksi ini sebagai situasi darurat. Relawan akan segera menghubungi Anda.',
+      type: "human_intervention",
+      message:
+        "Kami mendeteksi ini sebagai situasi darurat. Relawan akan segera menghubungi Anda.",
       actions,
-      priority: 'urgent'
-    }
+      priority: "urgent",
+    };
   }
 
   /**
    * Generate response for unsubscribe intent
    */
   private generateUnsubscribeResponse(): RecommendedResponse {
-    const actions: ResponseAction[] = []
+    const actions: ResponseAction[] = [];
     actions.push({
-      type: 'update_patient_status',
-      data: { status: 'unsubscribed' }
-    })
+      type: "update_patient_status",
+      data: { status: "unsubscribed" },
+    });
     return {
-      type: 'auto_reply',
-      message: 'Baik, kami akan berhenti mengirim pengingat. Semoga sehat selalu! 🙏',
+      type: "auto_reply",
+      message:
+        "Baik, kami akan berhenti mengirim pengingat. Semoga sehat selalu! 🙏",
       actions,
-      priority: 'low'
-    }
+      priority: "low",
+    };
   }
 
   /**
    * Generate response for low confidence or unknown intent
    */
-  private generateLowConfidenceResponse(intent: MessageIntent): RecommendedResponse {
-    const confidence = intent.confidence ?? 0.5
+  private generateLowConfidenceResponse(
+    intent: MessageIntent
+  ): RecommendedResponse {
+    const confidence = intent.confidence ?? 0.5;
 
     if (confidence < this.LOW_CONFIDENCE_THRESHOLD) {
-      const actions: ResponseAction[] = []
+      const actions: ResponseAction[] = [];
       actions.push({
-        type: 'notify_volunteer',
+        type: "notify_volunteer",
         data: {
-          priority: 'medium',
-          reason: 'low_confidence_llm',
+          priority: "medium",
+          reason: "low_confidence_llm",
           originalIntent: intent.primary,
-          confidence: confidence
-        }
-      })
+          confidence: confidence,
+        },
+      });
       return {
-        type: 'human_intervention',
-        message: 'Maaf, saya kurang yakin memahami pesan Anda. Relawan kami akan segera membantu.',
+        type: "human_intervention",
+        message:
+          "Maaf, saya kurang yakin memahami pesan Anda. Relawan kami akan segera membantu.",
         actions,
-        priority: 'medium'
-      }
+        priority: "medium",
+      };
     }
 
     if (confidence < this.CONFIDENCE_THRESHOLD) {
       // Medium confidence - provide basic response but flag for potential review
-      const actions: ResponseAction[] = []
+      const actions: ResponseAction[] = [];
       actions.push({
-        type: 'notify_volunteer',
+        type: "notify_volunteer",
         data: {
-          priority: 'low',
-          reason: 'medium_confidence_llm',
+          priority: "low",
+          reason: "medium_confidence_llm",
           originalIntent: intent.primary,
-          confidence: confidence
-        }
-      })
+          confidence: confidence,
+        },
+      });
       return {
-        type: 'auto_reply',
-        message: 'Terima kasih atas pesannya. Jika ini bukan yang Anda maksud, silakan jelaskan lebih lanjut.',
+        type: "auto_reply",
+        message:
+          "Terima kasih atas pesannya. Jika ini bukan yang Anda maksud, silakan jelaskan lebih lanjut.",
         actions,
-        priority: 'low'
-      }
+        priority: "low",
+      };
     }
 
     return {
-      type: 'auto_reply',
-      message: 'Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.',
+      type: "auto_reply",
+      message:
+        "Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.",
       actions: [],
-      priority: 'low'
-    }
+      priority: "low",
+    };
   }
 
   /**
@@ -746,112 +968,281 @@ export class MessageProcessorService {
   ): Promise<RecommendedResponse | null> {
     try {
       // Get patient context for LLM
-      const patientContext = await this.patientContextService.getPatientContext(context.phoneNumber)
+      const patientContext = await this.patientContextService.getPatientContext(
+        context.phoneNumber
+      );
 
       // Build conversation context for LLM
       const llmContext: ConversationContext = {
         patientId: context.patientId,
         phoneNumber: context.phoneNumber,
-        previousMessages: context.previousMessages?.map(msg => ({
-          role: msg.direction === 'inbound' ? 'user' : 'assistant',
-          content: msg.message
-        })) || [],
-        patientInfo: patientContext.found && patientContext.context ? {
-          name: patientContext.context.patient.name,
-          verificationStatus: patientContext.context.patient.verificationStatus,
-          activeReminders: patientContext.context.activeReminders.map(r => ({
-            medicationName: r.customMessage || 'obat',
-            scheduledTime: r.scheduledTime
-          }))
-        } : undefined
-      }
+        previousMessages:
+          context.previousMessages?.map((msg) => ({
+            role: msg.direction === "inbound" ? "user" : "assistant",
+            content: msg.message,
+          })) || [],
+        patientInfo:
+          patientContext.found && patientContext.context
+            ? {
+                name: patientContext.context.patient.name,
+                verificationStatus:
+                  patientContext.context.patient.verificationStatus,
+                activeReminders: patientContext.context.activeReminders.map(
+                  (r) => ({
+                    medicationName: r.customMessage || "obat",
+                    scheduledTime: r.scheduledTime,
+                  })
+                ),
+              }
+            : undefined,
+      };
 
       // Generate response using LLM
       const llmResponse = await llmService.generatePatientResponse(
         intent.primary,
         llmContext,
         `Intent confidence: ${intent.confidence}. Handle appropriately.`
-      )
+      );
 
       // Store LLM response metadata in conversation
       if (llmResponse) {
-        await this.conversationStateService.addMessage(context.conversationState?.id || '', {
-          message: llmResponse.content,
-          direction: 'outbound',
-          messageType: this.mapIntentToMessageType(intent.primary),
-          intent: intent.primary,
-          confidence: intent.confidence ? Math.round(intent.confidence * 100) : undefined,
-          llmResponseId: llmResponse.model, // Use model as response ID for now
-          llmModel: llmResponse.model,
-          llmTokensUsed: llmResponse.tokensUsed,
-          llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
-          llmResponseTimeMs: llmResponse.responseTime,
-          processedAt: new Date()
-        })
+        await this.conversationStateService.addMessage(
+          context.conversationState?.id || "",
+          {
+            message: llmResponse.content,
+            direction: "outbound",
+            messageType: this.mapIntentToMessageType(intent.primary),
+            intent: intent.primary,
+            confidence: intent.confidence
+              ? Math.round(intent.confidence * 100)
+              : undefined,
+            llmResponseId: llmResponse.model, // Use model as response ID for now
+            llmModel: llmResponse.model,
+            llmTokensUsed: llmResponse.tokensUsed,
+            llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
+            llmResponseTimeMs: llmResponse.responseTime,
+            processedAt: new Date(),
+          }
+        );
       }
 
       // Map to our response format
-      const actions: ResponseAction[] = []
+      const actions: ResponseAction[] = [];
 
       // Add appropriate actions based on intent
       switch (intent.primary) {
-        case 'accept':
+        case "accept":
           actions.push({
-            type: 'update_patient_status',
-            data: { status: 'verified' }
-          })
-          break
-        case 'decline':
+            type: "update_patient_status",
+            data: { status: "verified" },
+          });
+          break;
+        case "decline":
           actions.push({
-            type: 'update_patient_status',
-            data: { status: 'declined' }
-          })
-          break
-        case 'confirm_taken':
+            type: "update_patient_status",
+            data: { status: "declined" },
+          });
+          break;
+        case "confirm_taken":
           actions.push({
-            type: 'log_confirmation',
-            data: { status: 'CONFIRMED', response: context.message }
-          })
-          break
-        case 'confirm_missed':
+            type: "log_confirmation",
+            data: { status: "CONFIRMED", response: context.message },
+          });
+          break;
+        case "confirm_missed":
           actions.push({
-            type: 'log_confirmation',
-            data: { status: 'MISSED', response: context.message }
-          })
+            type: "log_confirmation",
+            data: { status: "MISSED", response: context.message },
+          });
           actions.push({
-            type: 'send_followup',
-            data: { type: 'reminder', delay: 2 * 60 * 60 * 1000 }
-          })
-          break
-        case 'unsubscribe':
+            type: "send_followup",
+            data: { type: "reminder", delay: 2 * 60 * 60 * 1000 },
+          });
+          break;
+        case "unsubscribe":
           actions.push({
-            type: 'update_patient_status',
-            data: { status: 'unsubscribed' }
-          })
-          break
-        case 'emergency':
+            type: "update_patient_status",
+            data: { status: "unsubscribed" },
+          });
+          break;
+        case "emergency":
           actions.push({
-            type: 'notify_volunteer',
-            data: { priority: 'urgent', message: context.message }
-          })
+            type: "notify_volunteer",
+            data: { priority: "urgent", message: context.message },
+          });
           return {
-            type: 'human_intervention',
+            type: "human_intervention",
             message: llmResponse.content,
             actions,
-            priority: 'urgent'
-          }
+            priority: "urgent",
+          };
       }
 
       return {
-        type: 'auto_reply',
+        type: "auto_reply",
         message: llmResponse.content,
         actions,
-        priority: (intent.primary as string) === 'emergency' ? 'urgent' : 'low'
-      }
+        priority: (intent.primary as string) === "emergency" ? "urgent" : "low",
+      };
     } catch (error) {
-      console.error('LLM response generation failed:', error)
-      return null
+      console.error("LLM response generation failed:", error);
+      return null;
     }
+  }
+
+  /**
+   * Generate direct LLM response without intent detection
+   */
+  private async generateDirectLLMResponse(
+    message: string,
+    context: ConversationContext
+  ): Promise<ProcessedLLMResponse | null> {
+    try {
+      const systemPrompt = this.buildDirectResponsePrompt(context);
+
+      const request: LLMRequest = {
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...context.previousMessages.slice(-10), // More context for response generation
+          { role: "user", content: message },
+        ],
+        maxTokens: 500,
+        temperature: 0.7,
+      };
+
+      const response = await llmService.generateResponse(request);
+
+      // Apply safety filtering to LLM response
+      const safetyResult = await safetyFilterService.filterLLMResponse(
+        response,
+        context
+      );
+
+      let finalResponse = response;
+      if (!safetyResult.isSafe) {
+        logger.warn(
+          "LLM response failed safety filter, using sanitized version",
+          {
+            patientId: context.patientId,
+            violations: safetyResult.violations.length,
+          }
+        );
+
+        // Sanitize the response
+        finalResponse = {
+          ...response,
+          content: safetyFilterService.sanitizeContent(
+            response.content,
+            safetyResult.violations
+          ),
+        };
+      }
+
+      return finalResponse;
+    } catch (error) {
+      logger.error("Direct LLM response generation failed:", error as Error);
+      return null;
+    }
+  }
+
+  /**
+   * Build system prompt for direct LLM response generation
+   */
+  private buildDirectResponsePrompt(context: ConversationContext): string {
+    const patientInfo = context.patientInfo;
+    const activeReminders = patientInfo?.activeReminders || [];
+
+    return `You are a helpful healthcare assistant for PRIMA system communicating with patients via WhatsApp.
+
+PATIENT INFORMATION:
+- Name: ${patientInfo?.name || "Unknown Patient"}
+- Phone: ${context.phoneNumber}
+- Verification Status: ${patientInfo?.verificationStatus || "Unknown"}
+${
+  activeReminders.length > 0
+    ? `- Active Medications: ${activeReminders
+        .map((r: any) => r.medicationName)
+        .join(", ")}`
+    : ""
+}
+
+CONVERSATION CONTEXT:
+You have access to the previous conversation messages above. Use this context to provide relevant, personalized responses.
+
+RESPONSE GUIDELINES:
+- Always respond in Indonesian (Bahasa Indonesia)
+- Be friendly, empathetic, and professional
+- Keep responses concise but helpful (under 300 characters when possible)
+- Never give medical advice or diagnoses
+- For medication questions: Direct to healthcare providers, don't give advice
+- For emergencies: Immediately alert that help is needed
+- Include PRIMA branding when appropriate
+- Use simple, clear language
+- If patient asks about breathing exercises or general wellness: Provide general information only
+- If patient reports symptoms: Ask them to contact their healthcare provider
+
+RESPONSE FORMAT:
+Provide a natural, conversational response that addresses the patient's message directly.`;
+  }
+
+  /**
+   * Create response object from LLM output
+   */
+  private createResponseFromLLM(
+    llmResponse: ProcessedLLMResponse | null,
+    safetyAnalysis: any,
+    context: MessageContext
+  ): RecommendedResponse {
+    // Handle emergency situations
+    if (safetyAnalysis.emergencyDetected) {
+      return {
+        type: "human_intervention",
+        message:
+          "Kami mendeteksi ini sebagai situasi darurat. Relawan akan segera menghubungi Anda.",
+        actions: [
+          {
+            type: "notify_volunteer",
+            data: { priority: "urgent", message: context.message },
+          },
+        ],
+        priority: "urgent",
+      };
+    }
+
+    // Handle cases requiring human intervention
+    if (safetyAnalysis.escalationRequired) {
+      return {
+        type: "human_intervention",
+        message:
+          "Pesan Anda memerlukan perhatian khusus. Relawan kami akan segera membantu.",
+        actions: [
+          {
+            type: "notify_volunteer",
+            data: { priority: "high", message: context.message },
+          },
+        ],
+        priority: "medium",
+      };
+    }
+
+    // Use LLM response if available
+    if (llmResponse) {
+      return {
+        type: "auto_reply",
+        message: llmResponse.content,
+        actions: [],
+        priority: "low",
+      };
+    }
+
+    // Fallback response
+    return {
+      type: "auto_reply",
+      message:
+        "Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.",
+      actions: [],
+      priority: "low",
+    };
   }
 
   /**
@@ -859,8 +1250,8 @@ export class MessageProcessorService {
    */
   private calculateLLMCost(tokensUsed: number): number {
     // Z.AI pricing (approximate)
-    const costPerThousandTokens = 0.002 // $0.002 per 1K tokens
-    return (tokensUsed / 1000) * costPerThousandTokens
+    const costPerThousandTokens = 0.002; // $0.002 per 1K tokens
+    return (tokensUsed / 1000) * costPerThousandTokens;
   }
 
   /**
@@ -870,59 +1261,102 @@ export class MessageProcessorService {
     return {
       accept: this.calculateKeywordScore(message, this.ACCEPT_KEYWORDS),
       decline: this.calculateKeywordScore(message, this.DECLINE_KEYWORDS),
-      confirm_taken: this.calculateKeywordScore(message, this.CONFIRMATION_TAKEN_KEYWORDS),
-      confirm_missed: this.calculateKeywordScore(message, this.CONFIRMATION_MISSED_KEYWORDS),
-      confirm_later: this.calculateKeywordScore(message, this.CONFIRMATION_LATER_KEYWORDS),
-      unsubscribe: this.calculateKeywordScore(message, this.UNSUBSCRIBE_KEYWORDS),
+      confirm_taken: this.calculateKeywordScore(
+        message,
+        this.CONFIRMATION_TAKEN_KEYWORDS
+      ),
+      confirm_missed: this.calculateKeywordScore(
+        message,
+        this.CONFIRMATION_MISSED_KEYWORDS
+      ),
+      confirm_later: this.calculateKeywordScore(
+        message,
+        this.CONFIRMATION_LATER_KEYWORDS
+      ),
+      unsubscribe: this.calculateKeywordScore(
+        message,
+        this.UNSUBSCRIBE_KEYWORDS
+      ),
       emergency: this.calculateKeywordScore(message, this.EMERGENCY_KEYWORDS),
-      inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS)
-    }
+      inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS),
+    };
   }
 
   /**
    * Select primary intent from scores
    */
-  private selectPrimaryIntent(scores: Record<string, number>): MessageIntent['primary'] {
-    const maxScore = Math.max(...Object.values(scores))
-    return Object.keys(scores).find(key => scores[key] === maxScore) as MessageIntent['primary'] || 'unknown'
+  private selectPrimaryIntent(
+    scores: Record<string, number>
+  ): MessageIntent["primary"] {
+    const maxScore = Math.max(...Object.values(scores));
+    return (
+      (Object.keys(scores).find(
+        (key) => scores[key] === maxScore
+      ) as MessageIntent["primary"]) || "unknown"
+    );
   }
 
   /**
    * Calculate confidence for intent
    */
   private calculateIntentConfidence(maxScore: number, message: string): number {
-    return Math.min(maxScore / message.length * 100, 1.0) || 0.5
+    return Math.min((maxScore / message.length) * 100, 1.0) || 0.5;
   }
 
   /**
    * Calculate sentiment score based on positive/negative words
    */
-  private calculateWordBasedSentiment(message: string): { positive: number; negative: number } {
-    const positiveWords = ['baik', 'bagus', 'senang', 'terima kasih', 'makasih', 'thanks', 'good']
-    const negativeWords = ['buruk', 'jelek', 'marah', 'kesal', 'kecewa', 'tidak suka', 'bad']
+  private calculateWordBasedSentiment(message: string): {
+    positive: number;
+    negative: number;
+  } {
+    const positiveWords = [
+      "baik",
+      "bagus",
+      "senang",
+      "terima kasih",
+      "makasih",
+      "thanks",
+      "good",
+    ];
+    const negativeWords = [
+      "buruk",
+      "jelek",
+      "marah",
+      "kesal",
+      "kecewa",
+      "tidak suka",
+      "bad",
+    ];
 
-    const positiveScore = positiveWords.reduce((score, word) =>
-      score + (message.includes(word) ? 1 : 0), 0)
-    const negativeScore = negativeWords.reduce((score, word) =>
-      score + (message.includes(word) ? 1 : 0), 0)
+    const positiveScore = positiveWords.reduce(
+      (score, word) => score + (message.includes(word) ? 1 : 0),
+      0
+    );
+    const negativeScore = negativeWords.reduce(
+      (score, word) => score + (message.includes(word) ? 1 : 0),
+      0
+    );
 
-    return { positive: positiveScore, negative: negativeScore }
+    return { positive: positiveScore, negative: negativeScore };
   }
 
   /**
    * Get default sentiment based on intent
    */
-  private getDefaultSentimentForIntent(intent: MessageIntent['primary']): MessageIntent['sentiment'] {
+  private getDefaultSentimentForIntent(
+    intent: MessageIntent["primary"]
+  ): MessageIntent["sentiment"] {
     switch (intent) {
-      case 'accept':
-      case 'confirm_taken':
-        return 'positive'
-      case 'decline':
-      case 'confirm_missed':
-      case 'unsubscribe':
-        return 'negative'
+      case "accept":
+      case "confirm_taken":
+        return "positive";
+      case "decline":
+      case "confirm_missed":
+      case "unsubscribe":
+        return "negative";
       default:
-        return 'neutral'
+        return "neutral";
     }
   }
 
@@ -930,33 +1364,33 @@ export class MessageProcessorService {
    * Extract time entities from message
    */
   private extractTimeEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
-    const timePattern = /\b(\d{1,2}):(\d{2})\b/g
-    let match
+    const entities: MessageEntity[] = [];
+    const timePattern = /\b(\d{1,2}):(\d{2})\b/g;
+    let match;
     while ((match = timePattern.exec(message)) !== null) {
       entities.push({
-        type: 'time',
+        type: "time",
         value: `${match[1]}:${match[2]}`,
         confidence: 0.9,
-        position: { start: match.index, end: match.index + match[0].length }
-      })
+        position: { start: match.index, end: match.index + match[0].length },
+      });
     }
-    return entities
+    return entities;
   }
 
   /**
    * Extract emergency entities from message
    */
   private extractEmergencyEntities(message: string): MessageEntity[] {
-    const entities: MessageEntity[] = []
-    if (this.EMERGENCY_KEYWORDS.some(keyword => message.includes(keyword))) {
+    const entities: MessageEntity[] = [];
+    if (this.EMERGENCY_KEYWORDS.some((keyword) => message.includes(keyword))) {
       entities.push({
-        type: 'emergency_level',
-        value: 'high',
+        type: "emergency_level",
+        value: "high",
         confidence: 0.7,
-        position: { start: 0, end: message.length }
-      })
+        position: { start: 0, end: message.length },
+      });
     }
-    return entities
+    return entities;
   }
 }
