@@ -183,11 +183,13 @@ export default function AdminTemplatesPage() {
       </div>
 
       {/* Main Content */}
-       <main className="max-w-7xl my-4 lg:my-8 relative z-10 px-4 sm:px-6 lg:px-8">
-        <TemplateManagement
-          onSeedTemplates={handleSeedTemplates}
-          seeding={seeding}
-        />
+      <main className="relative z-10 px-4 sm:px-6 lg:px-10 py-6 lg:py-10">
+        <div className="w-full">
+          <TemplateManagement
+            onSeedTemplates={handleSeedTemplates}
+            seeding={seeding}
+          />
+        </div>
       </main>
 
       {/* Seed Templates Confirmation Modal */}
