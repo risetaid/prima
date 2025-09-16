@@ -121,36 +121,72 @@ export interface FullPatientContext {
     photoUrl?: string;
     lastReactivatedAt?: Date;
   };
-  todaysReminders?: Array<{
+  todaysReminders: Array<{
     id: string;
-    medicationName: string;
     scheduledTime: string;
+    frequency: string;
+    medicationName?: string;
+    customMessage?: string;
+    isCompleted?: boolean;
+    lastCompletedAt?: Date;
   }>;
-  activeReminders?:
-    | Array<{
-        medicationName: string;
-        scheduledTime: string;
-      }>
-    | unknown[];
-  medicalHistory?: {
+  activeReminders: Array<{
+    id: string;
+    scheduledTime: string;
+    frequency: string;
+    startDate: Date;
+    endDate?: Date;
+    customMessage?: string;
+    createdAt: Date;
+  }>;
+  medicalHistory: {
+    diagnosisDate?: Date;
+    cancerStage?: string;
+    doctorName?: string;
+    hospitalName?: string;
     symptoms?: Array<{
       symptom: string;
       severity?: string;
-      reportedAt?: Date;
+      notedDate: Date;
+      notes?: string;
+    }>;
+    medications?: Array<{
+      name: string;
+      dosage?: string;
+      frequency?: string;
+      startDate?: Date;
+      notes?: string;
     }>;
   };
-  recentHealthNotes?: Array<{
+  recentHealthNotes: Array<{
     id: string;
     note: string;
-    recordedDate: Date;
+    noteDate: Date;
     recordedBy: string;
+    createdAt: Date;
   }>;
-  patientVariables?: Array<{
-    id: string;
+  patientVariables: Array<{
     name: string;
     value: string;
     isActive: boolean;
   }>;
+  recentConversationHistory: Array<{
+    id: string;
+    message: string;
+    direction: "inbound" | "outbound";
+    messageType: string;
+    intent?: string;
+    confidence?: number;
+    createdAt: Date;
+  }>;
+  conversationState?: {
+    id: string;
+    currentContext: string;
+    expectedResponseType?: string;
+    lastMessage?: string;
+    lastMessageAt?: Date;
+    messageCount: number;
+  };
 }
 
 export class MessageProcessorService {
@@ -167,6 +203,37 @@ export class MessageProcessorService {
   // Confidence threshold for LLM responses
   private readonly CONFIDENCE_THRESHOLD = 0.6;
   private readonly LOW_CONFIDENCE_THRESHOLD = 0.3;
+
+  /**
+   * Determine if message needs intent detection based on keywords and context
+   */
+  private shouldUseIntentDetection(
+    message: string,
+    conversationState: ConversationState,
+    context: MessageContext
+  ): boolean {
+    // Always use intent detection for verification and reminder contexts
+    if (
+      conversationState.currentContext === "verification" ||
+      conversationState.currentContext === "reminder_confirmation"
+    ) {
+      return true;
+    }
+
+    // Use intent detection for messages containing verification/confirmation keywords
+    const verificationKeywords = ["ya", "tidak", "iya", "yes", "no"];
+    const confirmationKeywords = ["sudah", "belum", "udh", "blm"];
+
+    const hasVerificationKeywords = verificationKeywords.some((keyword) =>
+      message.toLowerCase().includes(keyword)
+    );
+    const hasConfirmationKeywords = confirmationKeywords.some((keyword) =>
+      message.toLowerCase().includes(keyword)
+    );
+
+    // Use intent detection if message contains relevant keywords
+    return hasVerificationKeywords || hasConfirmationKeywords;
+  }
 
   // Indonesian keyword mappings for fallback (kept for emergency cases)
   private readonly ACCEPT_KEYWORDS = [
@@ -362,6 +429,34 @@ export class MessageProcessorService {
         20 // Last 20 messages for context
       );
 
+    // Determine if this message needs intent classification
+    const needsIntentDetection = this.shouldUseIntentDetection(
+      normalizedMessage,
+      conversationState,
+      context
+    );
+
+    let intent: MessageIntent;
+    let entities: MessageEntity[] = [];
+    let llmResponse: ProcessedLLMResponse | null = null;
+
+    if (needsIntentDetection) {
+      // Use intent detection for verification and confirmation messages
+      intent = await this.detectIntent(
+        normalizedMessage,
+        context,
+        conversationHistory
+      );
+      entities = this.extractEntities(normalizedMessage);
+    } else {
+      // Use direct LLM response for general inquiries
+      intent = {
+        primary: "inquiry",
+        sentiment: "neutral",
+        confidence: 1.0,
+      };
+    }
+
     // Get patient context for LLM
     const patientContext = await this.patientContextService.getPatientContext(
       context.phoneNumber
@@ -403,32 +498,44 @@ export class MessageProcessorService {
       }
     );
 
-    // Generate direct LLM response (no intent detection)
-    const llmResponse = await this.generateDirectLLMResponse(
-      normalizedMessage,
-      llmContext,
-      context.fullPatientContext
-    );
+    // Generate response based on intent detection result
+    let recommendedResponse: RecommendedResponse;
+    if (
+      needsIntentDetection &&
+      intent.confidence &&
+      intent.confidence >= this.CONFIDENCE_THRESHOLD
+    ) {
+      // Use intent-based response generation for high-confidence intents
+      recommendedResponse = await this.generateResponse(
+        intent,
+        entities,
+        context
+      );
+    } else {
+      // Use direct LLM response for general inquiries or low-confidence intents
+      llmResponse = await this.generateDirectLLMResponse(
+        normalizedMessage,
+        llmContext,
+        context.fullPatientContext
+      );
+      recommendedResponse = this.createResponseFromLLM(
+        llmResponse,
+        safetyAnalysis,
+        context
+      );
+    }
 
     // Determine if human intervention is needed
     const requiresHumanIntervention =
-      safetyAnalysis.escalationRequired || safetyAnalysis.emergencyDetected;
-
-    // Create response based on LLM output and safety analysis
-    const response = this.createResponseFromLLM(
-      llmResponse,
-      safetyAnalysis,
-      context
-    );
+      safetyAnalysis.escalationRequired ||
+      safetyAnalysis.emergencyDetected ||
+      (intent.confidence !== undefined &&
+        intent.confidence < this.LOW_CONFIDENCE_THRESHOLD);
 
     // Update conversation state
     await this.updateConversationState(
       conversationState.id,
-      {
-        primary: "inquiry",
-        sentiment: "neutral",
-        confidence: 1.0,
-      },
+      intent,
       normalizedMessage
     );
 
@@ -436,9 +543,9 @@ export class MessageProcessorService {
     await this.conversationStateService.addMessage(conversationState.id, {
       message: normalizedMessage,
       direction: "inbound",
-      messageType: "general",
-      intent: "general_inquiry",
-      confidence: 100, // Full LLM confidence
+      messageType: this.mapIntentToMessageType(intent.primary),
+      intent: intent.primary,
+      confidence: intent.confidence ? Math.round(intent.confidence * 100) : 100,
       processedAt: new Date(),
     });
 
@@ -447,9 +554,11 @@ export class MessageProcessorService {
       await this.conversationStateService.addMessage(conversationState.id, {
         message: llmResponse.content,
         direction: "outbound",
-        messageType: "general",
-        intent: "general_inquiry",
-        confidence: 100,
+        messageType: this.mapIntentToMessageType(intent.primary),
+        intent: intent.primary,
+        confidence: intent.confidence
+          ? Math.round(intent.confidence * 100)
+          : 100,
         llmResponseId: llmResponse.model,
         llmModel: llmResponse.model,
         llmTokensUsed: llmResponse.tokensUsed,
@@ -460,10 +569,10 @@ export class MessageProcessorService {
     }
 
     return {
-      intent: { primary: "inquiry", confidence: 1.0, sentiment: "neutral" },
-      confidence: 1.0,
-      entities: [],
-      response,
+      intent,
+      confidence: intent.confidence ?? 1.0,
+      entities,
+      response: recommendedResponse,
       context,
       requiresHumanIntervention,
     };
@@ -1250,7 +1359,12 @@ export class MessageProcessorService {
       if (todaysReminders.length > 0) {
         patientDetails += `
 - Today's Reminders: ${todaysReminders
-          .map((r) => `${r.medicationName} at ${r.scheduledTime}`)
+          .map(
+            (r) =>
+              `${r.medicationName || r.customMessage || "obat"} at ${
+                r.scheduledTime
+              }`
+          )
           .join(", ")}`;
       }
 
@@ -1258,7 +1372,7 @@ export class MessageProcessorService {
         patientDetails += `
 - Active Medications: ${activeReminders
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((r: any) => r.medicationName)
+          .map((r: any) => r.customMessage || "obat")
           .join(", ")}`;
       }
 
