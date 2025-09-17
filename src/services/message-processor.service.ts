@@ -70,6 +70,7 @@ export interface MessageIntent {
     | "confirm_missed"
     | "confirm_later"
     | "unsubscribe"
+    | "reminder_inquiry"
     | "inquiry"
     | "emergency"
     | "unknown";
@@ -235,7 +236,7 @@ export class MessageProcessorService {
 
     const normalizedMessage = message.toLowerCase();
 
-    // Use intent detection for messages containing verification/confirmation keywords
+    // Use intent detection for messages containing verification/confirmation/reminder keywords
     const verificationKeywords = ["ya", "tidak", "iya", "yes", "no"];
     const confirmationKeywords = [
       "sudah",
@@ -259,9 +260,16 @@ export class MessageProcessorService {
     const hasConfirmationKeywords = confirmationKeywords.some((keyword) =>
       normalizedMessage.includes(keyword)
     );
+    const hasReminderInquiryKeywords = this.REMINDER_INQUIRY_KEYWORDS.some(
+      (keyword) => normalizedMessage.includes(keyword)
+    );
 
     // Use intent detection if message contains relevant keywords
-    return hasVerificationKeywords || hasConfirmationKeywords;
+    return (
+      hasVerificationKeywords ||
+      hasConfirmationKeywords ||
+      hasReminderInquiryKeywords
+    );
   }
 
   // Indonesian keyword mappings for fallback (kept for emergency cases)
@@ -359,6 +367,26 @@ export class MessageProcessorService {
     "berhenti dulu",
     "tidak mau lagi",
     "sudah cukup",
+  ];
+
+  private readonly REMINDER_INQUIRY_KEYWORDS = [
+    "reminder",
+    "pengingat",
+    "jadwal",
+    "schedule",
+    "obat hari ini",
+    "obat besok",
+    "kapan minum obat",
+    "apa reminder saya",
+    "lihat reminder",
+    "cek reminder",
+    "reminder hari ini",
+    "reminder besok",
+    "jadwal obat",
+    "waktu minum obat",
+    "ada reminder",
+    "apa ada pengingat",
+    "kapan pengingat",
   ];
 
   private readonly EMERGENCY_KEYWORDS = [
@@ -1018,6 +1046,8 @@ export class MessageProcessorService {
         return this.generateEmergencyResponse(context);
       case "unsubscribe":
         return this.generateUnsubscribeResponse();
+      case "reminder_inquiry":
+        return this.generateReminderInquiryResponse(context);
       default:
         return this.generateLowConfidenceResponse(intent);
     }
@@ -1174,6 +1204,69 @@ export class MessageProcessorService {
       type: "auto_reply",
       message:
         "Baik, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙",
+      actions,
+      priority: "low",
+    };
+  }
+
+  /**
+   * Generate response for reminder inquiry intent
+   */
+  private generateReminderInquiryResponse(
+    context: MessageContext
+  ): RecommendedResponse {
+    const actions: ResponseAction[] = [];
+
+    // Get today's reminders from context
+    const todaysReminders = context.fullPatientContext?.todaysReminders || [];
+    const activeReminders = context.fullPatientContext?.activeReminders || [];
+
+    let message = `Halo ${
+      context.patientName || "pasien"
+    }, berikut informasi pengingat obat Anda:\n\n`;
+
+    if (todaysReminders.length > 0) {
+      message += "📅 *Pengingat Hari Ini:*\n";
+      todaysReminders.forEach((reminder, index) => {
+        const medicationName =
+          reminder.medicationName || reminder.customMessage || "obat";
+        const scheduledTime =
+          reminder.scheduledTime || "waktu yang dijadwalkan";
+        message += `${index + 1}. ${medicationName} - pukul ${scheduledTime}\n`;
+      });
+      message += "\n";
+    } else {
+      message +=
+        "📅 *Hari Ini:* Tidak ada pengingat obat yang dijadwalkan.\n\n";
+    }
+
+    if (activeReminders.length > 0) {
+      message += "📋 *Jadwal Pengingat Aktif:*\n";
+      activeReminders.slice(0, 5).forEach((reminder, index) => {
+        const medicationName = reminder.customMessage || "obat";
+        const scheduledTime =
+          reminder.scheduledTime || "waktu yang dijadwalkan";
+        const frequency = reminder.frequency || "sekali sehari";
+        message += `${
+          index + 1
+        }. ${medicationName} - ${scheduledTime} (${frequency})\n`;
+      });
+
+      if (activeReminders.length > 5) {
+        message += `... dan ${activeReminders.length - 5} pengingat lainnya.\n`;
+      }
+      message += "\n";
+    } else {
+      message +=
+        "📋 *Status:* Tidak ada pengingat obat yang aktif saat ini.\n\n";
+    }
+
+    message +=
+      "💙 Jika ada pertanyaan, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
+
+    return {
+      type: "auto_reply",
+      message,
       actions,
       priority: "low",
     };
@@ -1564,6 +1657,10 @@ RESPONSE GUIDELINES:
       unsubscribe: this.calculateKeywordScore(
         message,
         this.UNSUBSCRIBE_KEYWORDS
+      ),
+      reminder_inquiry: this.calculateKeywordScore(
+        message,
+        this.REMINDER_INQUIRY_KEYWORDS
       ),
       emergency: this.calculateKeywordScore(message, this.EMERGENCY_KEYWORDS),
       inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS),
