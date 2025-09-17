@@ -1298,7 +1298,11 @@ async function processMessageWithUnifiedProcessor(
     });
 
     // Execute the recommended response actions
-    await executeResponseActions(processedResult.response, patient);
+    await executeResponseActions(
+      processedResult.response,
+      patient,
+      messageContext.message
+    );
 
     return {
       processed: true,
@@ -1325,7 +1329,8 @@ async function processMessageWithUnifiedProcessor(
  */
 async function executeResponseActions(
   response: RecommendedResponse,
-  patient: Patient
+  patient: Patient,
+  message?: string
 ): Promise<void> {
   if (!response || !response.actions) {
     return;
@@ -1364,6 +1369,17 @@ async function executeResponseActions(
             patient,
             action.data.priority as string,
             action.data.message as string
+          );
+          break;
+        case "deactivate_reminders":
+          await deactivatePatientReminders(patient.id);
+          break;
+        case "log_verification_event":
+          await logVerificationEvent(
+            patient.id,
+            action.data.action as string,
+            message || "",
+            action.data.verificationResult as string
           );
           break;
         default:
@@ -1470,6 +1486,51 @@ async function notifyVolunteers(
       message,
     });
   }
+}
+
+/**
+ * Helper function to deactivate all reminders for a patient
+ */
+async function deactivatePatientReminders(patientId: string): Promise<void> {
+  const { db, reminderSchedules } = await import("@/db");
+  const { eq } = await import("drizzle-orm");
+
+  logger.info("Deactivating all reminders for patient", { patientId });
+
+  await db
+    .update(reminderSchedules)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(reminderSchedules.patientId, patientId));
+}
+
+/**
+ * Helper function to log verification events
+ */
+async function logVerificationEvent(
+  patientId: string,
+  action: string,
+  patientResponse: string,
+  verificationResult: string
+): Promise<void> {
+  const { db, verificationLogs } = await import("@/db");
+
+  logger.info("Logging verification event", {
+    patientId,
+    action,
+    verificationResult,
+  });
+
+  await db.insert(verificationLogs).values({
+    patientId: patientId,
+    action: action,
+    patientResponse: patientResponse,
+    verificationResult: verificationResult as
+      | "verified"
+      | "declined"
+      | "unsubscribed"
+      | "pending_verification"
+      | "expired",
+  });
 }
 
 export async function POST(request: NextRequest) {

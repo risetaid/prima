@@ -98,7 +98,9 @@ export interface ResponseAction {
     | "log_confirmation"
     | "send_followup"
     | "notify_volunteer"
-    | "create_manual_confirmation";
+    | "create_manual_confirmation"
+    | "deactivate_reminders"
+    | "log_verification_event";
   data: Record<string, unknown>;
 }
 
@@ -482,28 +484,43 @@ export class MessageProcessorService {
         entities = [];
       }
     } else {
-      // Determine if this message needs intent classification
-      needsIntentDetection = this.shouldUseIntentDetection(
-        normalizedMessage,
-        conversationState,
-        context
+      // Always check for unsubscribe keywords first, regardless of context
+      const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some((keyword) =>
+        normalizedMessage.includes(keyword)
       );
 
-      if (needsIntentDetection) {
-        // Use intent detection for verification and confirmation messages
-        intent = await this.detectIntent(
-          normalizedMessage,
-          context,
-          conversationHistory
-        );
+      if (hasUnsubscribeKeywords) {
+        // Force unsubscribe intent detection for messages with unsubscribe keywords
+        intent = {
+          primary: "unsubscribe",
+          sentiment: "negative",
+          confidence: 0.9, // High confidence for keyword-based detection
+        };
         entities = this.extractEntities(normalizedMessage);
       } else {
-        // Use direct LLM response for general inquiries
-        intent = {
-          primary: "inquiry",
-          sentiment: "neutral",
-          confidence: 1.0,
-        };
+        // Determine if this message needs intent classification
+        needsIntentDetection = this.shouldUseIntentDetection(
+          normalizedMessage,
+          conversationState,
+          context
+        );
+
+        if (needsIntentDetection) {
+          // Use intent detection for verification and confirmation messages
+          intent = await this.detectIntent(
+            normalizedMessage,
+            context,
+            conversationHistory
+          );
+          entities = this.extractEntities(normalizedMessage);
+        } else {
+          // Use direct LLM response for general inquiries
+          intent = {
+            primary: "inquiry",
+            sentiment: "neutral",
+            confidence: 1.0,
+          };
+        }
       }
     }
 
@@ -1137,12 +1154,26 @@ export class MessageProcessorService {
     const actions: ResponseAction[] = [];
     actions.push({
       type: "update_patient_status",
-      data: { status: "unsubscribed" },
+      data: {
+        verificationStatus: "declined",
+        isActive: false,
+      },
+    });
+    actions.push({
+      type: "deactivate_reminders",
+      data: {},
+    });
+    actions.push({
+      type: "log_verification_event",
+      data: {
+        action: "unsubscribe",
+        verificationResult: "declined",
+      },
     });
     return {
       type: "auto_reply",
       message:
-        "Baik, kami akan berhenti mengirim pengingat. Semoga sehat selalu! 🙏",
+        "Baik, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙",
       actions,
       priority: "low",
     };
@@ -1215,11 +1246,15 @@ export class MessageProcessorService {
   ): Promise<RecommendedResponse | null> {
     // CRITICAL: Never use LLM for verification response generation
     // Verification responses must use templates to ensure consistency and avoid inappropriate content
-    if (intent.primary === "accept" || intent.primary === "decline") {
-      logger.warn("LLM response generation blocked for verification intent", {
+    if (
+      intent.primary === "accept" ||
+      intent.primary === "decline" ||
+      intent.primary === "unsubscribe"
+    ) {
+      logger.warn("LLM response generation blocked for critical intents", {
         intent: intent.primary,
         patientId: context.patientId,
-        operation: "verification_response_protection",
+        operation: "critical_intent_protection",
       });
       return null; // Force fallback to template responses
     }
@@ -1297,7 +1332,7 @@ export class MessageProcessorService {
       const actions: ResponseAction[] = [];
 
       // Add appropriate actions based on intent
-      // Note: accept/decline cases are handled by template responses, not LLM
+      // Note: accept/decline/unsubscribe cases are handled by template responses, not LLM
       switch (intent.primary) {
         case "confirm_taken":
           actions.push({
@@ -1313,12 +1348,6 @@ export class MessageProcessorService {
           actions.push({
             type: "send_followup",
             data: { type: "reminder", delay: 2 * 60 * 60 * 1000 },
-          });
-          break;
-        case "unsubscribe":
-          actions.push({
-            type: "update_patient_status",
-            data: { status: "unsubscribed" },
           });
           break;
         case "emergency":
