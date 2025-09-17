@@ -53,13 +53,28 @@ export function PatientVariablesManager({
       const response = await fetch(`/api/patients/${patientId}/variables`);
 
       if (!response.ok) {
-        throw new Error("Failed to load variables");
+        const errorData = await response.json().catch(() => ({}));
+        logger.error(
+          "Variables API error",
+          new Error(`API Error: ${response.status} ${response.statusText}`),
+          {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+            patientId,
+          }
+        );
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      logger.info("Variables loaded successfully", {
+        patientId,
+        variablesCount: Object.keys(data.variables || {}).length,
+      });
       setVariables(data.variables || {});
     } catch (error) {
-      logger.error("Error loading variables", error as Error);
+      logger.error("Error loading variables", error as Error, { patientId });
       toast.error("Gagal memuat variabel pasien");
     } finally {
       setIsLoading(false);
@@ -73,11 +88,14 @@ export function PatientVariablesManager({
 
       // Filter out empty values
       const cleanedValues = Object.fromEntries(
-        Object.entries(editingValues).filter(
-          ([, value]) => value.trim() !== ""
-        )
+        Object.entries(editingValues).filter(([, value]) => value.trim() !== "")
       );
 
+      logger.info("Saving variables", {
+        patientId,
+        variablesCount: Object.keys(cleanedValues).length,
+        // Note: Not logging actual variable names/values for privacy compliance
+      });
       const response = await fetch(`/api/patients/${patientId}/variables`, {
         method: "POST",
         headers: {
@@ -89,15 +107,32 @@ export function PatientVariablesManager({
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save variables");
+        const errorData = await response.json().catch(() => ({}));
+        logger.error(
+          "Variables save API error",
+          new Error(`API Error: ${response.status} ${response.statusText}`),
+          {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+            patientId,
+            requestBody: { variables: cleanedValues },
+          }
+        );
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
+      logger.info("Variables saved successfully", {
+        patientId,
+        variablesCount: Object.keys(data.variables || {}).length,
+        // Note: Not logging actual variable contents for privacy
+      });
       setVariables(data.variables || {});
       setIsDialogOpen(false);
       toast.success("Variabel pasien berhasil disimpan");
     } catch (error) {
-      logger.error("Error saving variables", error as Error);
+      logger.error("Error saving variables", error as Error, { patientId });
       toast.error("Gagal menyimpan variabel pasien");
     } finally {
       setIsLoading(false);
@@ -125,7 +160,7 @@ export function PatientVariablesManager({
       );
 
       if (response.ok) {
-        toast.success("Variabel \"" + variableToDelete + "\" berhasil dihapus");
+        toast.success('Variabel "' + variableToDelete + '" berhasil dihapus');
         loadVariables();
       } else {
         const error = await response.json();
@@ -254,7 +289,9 @@ export function PatientVariablesManager({
           <div className="text-center py-4 text-muted-foreground">
             <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Belum ada data pasien</p>
-            <p className="text-xs">Klik &quot;Kelola&quot; untuk mengatur data pasien</p>
+            <p className="text-xs">
+              Klik &quot;Kelola&quot; untuk mengatur data pasien
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -302,7 +339,9 @@ export function PatientVariablesManager({
         }}
         onConfirm={confirmDeleteVariable}
         title="Hapus Variabel"
-        description={"Yakin ingin menghapus variabel \"" + variableToDelete + "\"?"}
+        description={
+          'Yakin ingin menghapus variabel "' + variableToDelete + '"?'
+        }
         confirmText="Ya, Hapus"
         cancelText="Batal"
         variant="destructive"

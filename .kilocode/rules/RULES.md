@@ -15,9 +15,13 @@
 ## Build Commands
 
 - **DO NOT RUN `bun run build`**
+- **DO NOT RUN `bun run db{any following words}`** - no database commands allowed
+- **DO NOT RUN 'bun run build' on each subagent**
 - Before concluding any code changes or final verdicts, always run:
   - `bunx tsc --noEmit` (TypeScript type checking)
   - `bun run lint` (ESLint checking)
+- **run 'bunx tsc --noEmit' and 'bun run lint' after all subagents are done.. while issues still appearing, deploy subagent to fix**
+- **For any prohibited commands, pass them to me instead so I can run them myself and provide feedback**
 
 ## Import Statements
 

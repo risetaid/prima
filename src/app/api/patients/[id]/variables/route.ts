@@ -97,9 +97,53 @@ export async function POST(
     );
 
     const body = await request.json();
-    const { variables } = body;
+    let { variables } = body;
 
-    if (!variables || !Array.isArray(variables)) {
+    // Handle both array format [{name, value}] and object format {variables: {name: value}}
+    if (!variables) {
+      return apiValidationError(
+        [
+          {
+            field: "variables",
+            message: "Variables must be provided",
+            code: "MISSING_VARIABLES",
+          },
+        ],
+        {
+          context: extractRequestContext(request, currentUser.id),
+          operation: "update_patient_variables",
+          duration: Date.now() - startTime,
+        }
+      );
+    }
+
+    // Convert object format to array format if needed
+    if (!Array.isArray(variables)) {
+      if (typeof variables === 'object' && variables !== null) {
+        // Convert {nama: "value", dokter: "value"} to [{name: "nama", value: "value"}, ...]
+        variables = Object.entries(variables).map(([name, value]) => ({
+          name,
+          value: String(value)
+        }));
+      } else {
+        return apiValidationError(
+          [
+            {
+              field: "variables",
+              message: "Variables must be an array or object",
+              code: "INVALID_FORMAT",
+            },
+          ],
+          {
+            context: extractRequestContext(request, currentUser.id),
+            operation: "update_patient_variables",
+            duration: Date.now() - startTime,
+          }
+        );
+      }
+    }
+
+    if (!Array.isArray(variables)) {
       return apiValidationError(
         [
           {

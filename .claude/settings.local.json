@@ -1,9 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir E:PortfolioWebprimasrcappdashboard)",
       "Bash(bun run lint:*)",
-      "Bash(bun lint:*)",
       "WebFetch(domain:docs.fonnte.com)",
       "WebFetch(domain:fonnte.com)",
       "WebSearch",
@@ -11,9 +9,9 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(bun run:*)",
       "Bash(timeout:*)",
-      "Bash(bunx eslint:*)"
+      "Bash(grep:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

@@ -32,7 +32,8 @@ export async function GET(
         visitDate: manualConfirmations.visitDate,
         visitTime: manualConfirmations.visitTime,
         confirmedAt: manualConfirmations.confirmedAt,
-        notes: manualConfirmations.notes
+        notes: manualConfirmations.notes,
+        medicationsTaken: manualConfirmations.medicationsTaken
       })
       .from(manualConfirmations)
       .where(eq(manualConfirmations.patientId, id))
@@ -81,13 +82,15 @@ export async function GET(
 
                // Extract medication details from custom message if available
                if (scheduleResult[0].customMessage) {
-                 medicationDetails = MedicationParser.parseFromReminder(scheduleResult[0].customMessage)
+                 medicationDetails = MedicationParser.parseFromReminder(undefined, scheduleResult[0].customMessage)
                }
              }
 
              // Get medication details from patient variables if not found in custom message
              if (!medicationDetails) {
                try {
+                 // Get all active patient variables, not just MEDICATION category
+                 // The parser will extract medication-related info from all variables
                  const variables = await db
                    .select({
                      variableName: patientVariables.variableName,
@@ -98,8 +101,7 @@ export async function GET(
                    .where(
                      and(
                        eq(patientVariables.patientId, id),
-                       eq(patientVariables.isActive, true),
-                       eq(patientVariables.variableCategory, 'MEDICATION')
+                       eq(patientVariables.isActive, true)
                      )
                    )
 
@@ -125,6 +127,7 @@ export async function GET(
           visitTime: confirmation.visitTime,
           confirmedAt: confirmation.confirmedAt,
           notes: confirmation.notes,
+          medicationsTaken: confirmation.medicationsTaken || [],
           customMessage,
           sentAt,
           medicationDetails
@@ -137,10 +140,8 @@ export async function GET(
       scheduledTime: reminder.visitTime,
       completedDate: reminder.visitDate.toISOString().split('T')[0],
       customMessage: reminder.customMessage,
-      confirmedAt: convertUTCToWIBString(reminder.confirmedAt),
-      sentAt: reminder.sentAt ? reminder.sentAt.toISOString() : null,
-      notes: reminder.notes,
-      medicationDetails: reminder.medicationDetails
+      medicationTaken: reminder.medicationsTaken.length > 0,
+      confirmedAt: convertUTCToWIBString(reminder.confirmedAt)
     }))
 
     return NextResponse.json(formattedReminders)

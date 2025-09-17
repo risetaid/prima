@@ -49,10 +49,10 @@ export const llmPromptTests = pgTable('llm_prompt_tests', {
 // LLM Prompt Test Variants table
 export const llmPromptTestVariants = pgTable('llm_prompt_test_variants', {
   id: uuid('id').primaryKey().defaultRandom(),
-  testId: text('test_id').notNull().references(() => llmPromptTests.id, { onDelete: 'cascade' }),
+  testId: uuid('test_id').notNull().references(() => llmPromptTests.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   variant: text('variant').notNull().$type<'A' | 'B' | 'C' | 'D'>(),
-  promptTemplateId: text('prompt_template_id').notNull().references(() => llmPromptTemplates.id),
+  promptTemplateId: uuid('prompt_template_id').notNull().references(() => llmPromptTemplates.id),
   weight: integer('weight').notNull().default(1), // Weight for traffic distribution
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
@@ -60,8 +60,8 @@ export const llmPromptTestVariants = pgTable('llm_prompt_test_variants', {
 // LLM Prompt Test Results table
 export const llmPromptTestResults = pgTable('llm_prompt_test_results', {
   id: uuid('id').primaryKey().defaultRandom(),
-  testId: text('test_id').notNull().references(() => llmPromptTests.id, { onDelete: 'cascade' }),
-  variantId: text('variant_id').notNull().references(() => llmPromptTestVariants.id, { onDelete: 'cascade' }),
+  testId: uuid('test_id').notNull().references(() => llmPromptTests.id, { onDelete: 'cascade' }),
+  variantId: uuid('variant_id').notNull().references(() => llmPromptTestVariants.id, { onDelete: 'cascade' }),
   patientId: text('patient_id').notNull(),
   conversationId: text('conversation_id'),
   request: jsonb('request').notNull(),
@@ -74,7 +74,7 @@ export const llmPromptTestResults = pgTable('llm_prompt_test_results', {
 // LLM Prompt Performance Metrics table
 export const llmPromptMetrics = pgTable('llm_prompt_metrics', {
   id: uuid('id').primaryKey().defaultRandom(),
-  promptTemplateId: text('prompt_template_id').notNull().references(() => llmPromptTemplates.id, { onDelete: 'cascade' }),
+  promptTemplateId: uuid('prompt_template_id').notNull().references(() => llmPromptTemplates.id, { onDelete: 'cascade' }),
   date: text('date').notNull(), // YYYY-MM-DD format for aggregation
   totalRequests: integer('total_requests').notNull().default(0),
   successfulResponses: integer('successful_responses').notNull().default(0),

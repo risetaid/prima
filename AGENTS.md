@@ -16,6 +16,7 @@
 - Start: `bun run start` — serve the production build.
 - Lint: `bun run lint` — ESLint (Next core-web-vitals).
 - DB: `bun run db:migrate`, `bun run db:generate`, `bun run db:studio`.
+- Test: No test framework configured; use `bun run build` for type checking.
 
 ## Coding Style & Naming Conventions
 
@@ -23,6 +24,9 @@
 - Files: kebab-case; React components `PascalCase` in `*.tsx`.
 - Variables/functions: `camelCase`; Drizzle columns `snake_case`, mapped to TS `camelCase`.
 - Validate inputs with Zod in `src/lib/validations.ts`; respect RBAC guards.
+- Imports: absolute paths from `src/`; group imports: third-party, then relative.
+- Error handling: use try-catch with proper logging; return consistent API responses.
+- Types: prefer explicit types; use Zod for runtime validation.
 
 ## Commit & Pull Request Guidelines
 
@@ -40,3 +44,5 @@
 - Prefer service layer over inline logic; keep API routes thin.
 - Invalidate Redis on patient/reminder/content changes; respect TTLs.
 - All time logic in WIB; store UTC, convert using `lib/timezone.ts`.
+- Always run `bun run lint` and `bun run build` before committing.
+- Use existing components from `src/components/ui/` before creating new ones.
