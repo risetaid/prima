@@ -11,6 +11,7 @@ import {
 } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { Patient, ReminderLog } from "@/db";
+import { llmService } from "@/services/llm/llm.service";
 
 interface WebhookBody {
   sender?: string;
@@ -38,10 +39,12 @@ interface WebhookBody {
 
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
+import { MessageProcessorService } from "@/services/message-processor.service";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 
 const whatsappService = new WhatsAppService();
+const messageProcessorService = new MessageProcessorService();
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -346,20 +349,178 @@ async function handleVerificationUnsubscribe(message: string, patient: Patient) 
 }
 
 /**
- * Handle verification text responses using enhanced intent detection
+ * Handle verification text responses using LLM-powered intent detection
  */
 async function handleVerificationResponse(
   message: string,
   patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
+  logger.info("Processing verification text response", {
+    originalMessage: message,
+    patientId: patient.id,
+    operation: "verification_response"
+  });
+
+  try {
+    // Try LLM-powered intent detection first
+    const llmResult = await processVerificationWithLLM(message, patient);
+    if (llmResult.processed) {
+      return llmResult;
+    }
+
+    logger.info("LLM verification processing failed, falling back to keyword detection", {
+      patientId: patient.id,
+      operation: "verification_response"
+    });
+
+  } catch (error) {
+    logger.warn("LLM verification processing failed, using keyword fallback", {
+      patientId: patient.id,
+      operation: "verification_response",
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  // Fallback to keyword-based detection
+  return handleVerificationWithKeywords(message, patient);
+}
+
+/**
+ * Process verification response using LLM intent detection
+ */
+async function processVerificationWithLLM(
+  message: string,
+  patient: Patient
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  try {
+    // Build conversation context for LLM
+    const llmContext = {
+      patientId: patient.id,
+      phoneNumber: patient.phoneNumber,
+      previousMessages: [], // No conversation history for verification typically
+      patientInfo: {
+        name: patient.name,
+        verificationStatus: patient.verificationStatus,
+        activeReminders: []
+      }
+    };
+
+    // Use LLM to detect intent
+    const intentResult = await llmService.detectIntent(message, llmContext);
+
+    logger.info("LLM verification intent detection result", {
+      patientId: patient.id,
+      llmIntent: intentResult.intent,
+      confidence: intentResult.confidence,
+      entities: intentResult.entities,
+      operation: "llm_verification_detection"
+    });
+
+    // Map LLM intent to verification actions
+    if (intentResult.confidence >= 0.6) {
+      switch (intentResult.intent) {
+        case "verification_response":
+          // LLM detected verification response, need to determine if it's YA or TIDAK
+          const verificationType = await determineVerificationTypeFromMessage(message, intentResult);
+          return await handleVerificationByType(verificationType, message, patient);
+        case "unsubscribe":
+          return handleVerificationUnsubscribe(message, patient);
+        case "emergency":
+          // Handle emergency in verification context
+          await sendAck(
+            patient.phoneNumber,
+            `Kami mendeteksi pesan darurat. Relawan PRIMA akan segera menghubungi Anda untuk membantu proses verifikasi. 🚨`
+          );
+          return {
+            processed: true,
+            action: "emergency_escalation",
+            message: "Emergency detected during verification - volunteer notified"
+          };
+        default:
+          logger.info("LLM returned non-verification intent", {
+            patientId: patient.id,
+            llmIntent: intentResult.intent,
+            operation: "llm_verification_detection"
+          });
+          return { processed: false };
+      }
+    }
+
+    return { processed: false };
+
+  } catch (error) {
+    logger.error("LLM verification processing failed", error as Error, {
+      patientId: patient.id,
+      operation: "llm_verification_detection"
+    });
+    return { processed: false };
+  }
+}
+
+/**
+ * Determine verification type (accept/decline) from message and LLM analysis
+ */
+async function determineVerificationTypeFromMessage(
+  message: string,
+  intentResult: any
+): Promise<"accept" | "decline"> {
+  // Check LLM entities first
+  if (intentResult.entities && typeof intentResult.entities === 'object') {
+    const entities = intentResult.entities as Record<string, any>;
+    if (entities.response_type === 'positive' || entities.response_type === 'accept') {
+      return "accept";
+    }
+    if (entities.response_type === 'negative' || entities.response_type === 'decline') {
+      return "decline";
+    }
+  }
+
+  // Fallback to keyword analysis within the message
+  const normalizedMessage = message.toLowerCase().trim();
+  const acceptPatterns = ["ya", "iya", "yes", "setuju", "boleh", "mau", "terima", "ok", "oke"];
+  const declinePatterns = ["tidak", "no", "tolak", "nanti", "belum", "ga", "gak", "engga"];
+
+  const hasAcceptPattern = acceptPatterns.some(pattern => normalizedMessage.includes(pattern));
+  const hasDeclinePattern = declinePatterns.some(pattern => normalizedMessage.includes(pattern));
+
+  if (hasAcceptPattern && !hasDeclinePattern) return "accept";
+  if (hasDeclinePattern && !hasAcceptPattern) return "decline";
+
+  // If both or neither are present, use LLM's confidence to decide
+  return "accept"; // Default to accept for ambiguous cases
+}
+
+/**
+ * Handle verification by determined type
+ */
+async function handleVerificationByType(
+  type: "accept" | "decline",
+  message: string,
+  patient: Patient
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  if (type === "accept") {
+    return handleVerificationAccept(message, patient);
+  } else {
+    return handleVerificationDecline(message, patient);
+  }
+}
+
+/**
+ * Handle verification text responses using keyword-based detection (fallback)
+ */
+async function handleVerificationWithKeywords(
+  message: string,
+  patient: Patient
+): Promise<{ processed: boolean; action?: string; message?: string }> {
   const intentResult = detectIntentEnhanced(message, "verification");
 
-  logger.info("Processing verification text response", {
+  logger.info("Processing verification with keyword fallback", {
     originalMessage: message,
     intent: intentResult.intent,
     confidence: intentResult.confidence,
     matchedWords: intentResult.matchedWords,
     patientId: patient.id,
+    operation: "keyword_verification_detection"
   });
 
   if (intentResult.confidence < 0.4) {
@@ -737,6 +898,91 @@ async function processMedicationResponse(message: string | undefined, patient: P
   return null;
 }
 
+async function processFollowupResponse(message: string | undefined, patient: Patient, sender: string) {
+  if (!message) return null;
+
+  logger.info("Processing potential followup response", {
+    patientId: patient.id,
+    hasMessage: Boolean(message),
+    message: message?.substring(0, 100) + (message && message.length > 100 ? "..." : ""),
+  });
+
+  try {
+    // Import FollowupService
+    const { FollowupService } = await import("@/services/reminder/followup.service");
+    const followupService = new FollowupService();
+
+    // Find active followups for this patient
+    const { db, reminderFollowups } = await import("@/db");
+    const { eq, and, isNull, gt } = await import("drizzle-orm");
+
+    const activeFollowups = await db
+      .select({
+        id: reminderFollowups.id,
+        followupType: reminderFollowups.followupType,
+        scheduledAt: reminderFollowups.scheduledAt,
+        message: reminderFollowups.message,
+      })
+      .from(reminderFollowups)
+      .where(
+        and(
+          eq(reminderFollowups.patientId, patient.id),
+          eq(reminderFollowups.status, "SENT"),
+          isNull(reminderFollowups.response),
+          gt(reminderFollowups.scheduledAt, new Date(Date.now() - 24 * 60 * 60 * 1000)) // Within last 24 hours
+        )
+      )
+      .orderBy(reminderFollowups.scheduledAt)
+      .limit(1);
+
+    if (activeFollowups.length === 0) {
+      logger.info("No active followups found for patient", {
+        patientId: patient.id,
+      });
+      return null;
+    }
+
+    const followup = activeFollowups[0];
+
+    // Process the followup response with emergency detection
+    const result = await followupService.processFollowupResponse(
+      patient.id,
+      patient.phoneNumber,
+      message,
+      followup.id
+    );
+
+    logger.info("Followup response processed", {
+      patientId: patient.id,
+      followupId: followup.id,
+      emergencyDetected: result.emergencyDetected,
+      escalated: result.escalated,
+      processed: result.processed,
+    });
+
+    // Send acknowledgment response
+    await sendAck(patient.phoneNumber, result.response);
+
+    return NextResponse.json({
+      ok: true,
+      processed: true,
+      action: result.emergencyDetected ? "emergency_detected" : "followup_responded",
+      source: "followup_response",
+      emergencyDetected: result.emergencyDetected,
+      escalated: result.escalated,
+    });
+
+  } catch (error) {
+    logger.error("Failed to process followup response", error as Error, {
+      patientId: patient.id,
+      message: message?.substring(0, 100),
+    });
+
+    // Return null to fall back to other handlers
+    return null;
+  }
+}
+
 async function handleUnrecognizedMessage(message: string | undefined, patient: Patient) {
   logger.info("Message not processed by specific handlers", {
     patientId: patient.id,
@@ -764,6 +1010,184 @@ async function handleUnrecognizedMessage(message: string | undefined, patient: P
         `Halo ${patient.name}, terima kasih atas pesannya.\n\nJika ada pertanyaan tentang obat, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`
       );
     }
+  }
+}
+
+/**
+ * Unified message processing using MessageProcessorService
+ * This provides consistent handling across all message types with LLM integration
+ */
+async function processMessageWithUnifiedProcessor(
+  message: string | undefined,
+  patient: Patient,
+  sender: string
+): Promise<{ processed: boolean; action?: string; message?: string }> {
+  try {
+    logger.info("Processing message with unified processor", {
+      patientId: patient.id,
+      verificationStatus: patient.verificationStatus,
+      messageLength: message?.length || 0,
+      operation: "unified_processing"
+    });
+
+    // Build message context for the processor
+    const messageContext = {
+      patientId: patient.id,
+      phoneNumber: patient.phoneNumber,
+      message: message || "",
+      timestamp: new Date(),
+      patientName: patient.name,
+      verificationStatus: patient.verificationStatus,
+    };
+
+    // Process message using the unified processor
+    const processedResult = await messageProcessorService.processMessage(messageContext);
+
+    logger.info("Unified processing completed", {
+      patientId: patient.id,
+      intent: processedResult.intent.primary,
+      confidence: processedResult.confidence,
+      requiresHumanIntervention: processedResult.requiresHumanIntervention,
+      operation: "unified_processing"
+    });
+
+    // Execute the recommended response actions
+    await executeResponseActions(processedResult.response, patient, processedResult.intent);
+
+    return {
+      processed: true,
+      action: processedResult.intent.primary,
+      message: `Processed via unified processor: ${processedResult.intent.primary}`
+    };
+
+  } catch (error) {
+    logger.error("Unified message processing failed", error as Error, {
+      patientId: patient.id,
+      message: message?.substring(0, 100),
+      operation: "unified_processing"
+    });
+
+    // Fall back to legacy processing
+    return {
+      processed: false,
+      message: "Unified processing failed, falling back to legacy handlers"
+    };
+  }
+}
+
+/**
+ * Execute response actions recommended by the MessageProcessorService
+ */
+async function executeResponseActions(
+  response: any,
+  patient: Patient,
+  intent: any
+): Promise<void> {
+  if (!response || !response.actions) {
+    return;
+  }
+
+  for (const action of response.actions) {
+    try {
+      switch (action.type) {
+        case "update_patient_status":
+          await updatePatientStatus(patient.id, action.data.status);
+          break;
+        case "log_confirmation":
+          await logConfirmationResponse(patient.id, action.data.status, action.data.response);
+          break;
+        case "send_followup":
+          await scheduleFollowup(patient.id, action.data.type, action.data.delay);
+          break;
+        case "notify_volunteer":
+          await notifyVolunteers(patient, action.data.priority, action.data.message);
+          break;
+        default:
+          logger.warn("Unknown action type", { actionType: action.type });
+      }
+    } catch (error) {
+      logger.error("Failed to execute response action", error as Error, {
+        actionType: action.type,
+        patientId: patient.id
+      });
+    }
+  }
+
+  // Send the response message if specified
+  if (response.message) {
+    await sendAck(patient.phoneNumber, response.message);
+  }
+}
+
+/**
+ * Helper functions for action execution
+ */
+async function updatePatientStatus(patientId: string, status: "pending_verification" | "verified" | "declined" | "expired" | "unsubscribed"): Promise<void> {
+  const { db, patients } = await import("@/db");
+  const { eq } = await import("drizzle-orm");
+  const { getWIBTime } = await import("@/lib/timezone");
+
+  await db
+    .update(patients)
+    .set({
+      verificationStatus: status,
+      updatedAt: getWIBTime(),
+    })
+    .where(eq(patients.id, patientId));
+}
+
+async function logConfirmationResponse(patientId: string, status: string, response: string): Promise<void> {
+  const { db, reminderLogs } = await import("@/db");
+  const { eq, and, desc } = await import("drizzle-orm");
+  const { getWIBTime } = await import("@/lib/timezone");
+
+  // Find the most recent pending reminder log
+  const pendingReminder = await db
+    .select()
+    .from(reminderLogs)
+    .where(
+      and(
+        eq(reminderLogs.patientId, patientId),
+        eq(reminderLogs.status, "SENT")
+      )
+    )
+    .orderBy(desc(reminderLogs.sentAt))
+    .limit(1);
+
+  if (pendingReminder.length > 0) {
+    await db
+      .update(reminderLogs)
+      .set({
+        status: status === "CONFIRMED" ? "DELIVERED" : "SENT",
+        confirmationResponse: response,
+      })
+      .where(eq(reminderLogs.id, pendingReminder[0].id));
+  }
+}
+
+async function scheduleFollowup(patientId: string, type: string, delay: number): Promise<void> {
+  const { FollowupService } = await import("@/services/reminder/followup.service");
+
+  // This would need the reminder log ID, so for now we'll just log
+  logger.info("Followup action requested", { patientId, type, delay });
+}
+
+async function notifyVolunteers(patient: Patient, priority: string, message: string): Promise<void> {
+  logger.info("Volunteer notification requested", {
+    patientId: patient.id,
+    priority,
+    message: message?.substring(0, 100)
+  });
+
+  // Implementation would depend on volunteer notification system
+  // For now, just log the emergency
+  if (priority === "urgent") {
+    logger.warn("Emergency escalation required", {
+      patientId: patient.id,
+      patientName: patient.name,
+      phoneNumber: patient.phoneNumber,
+      message
+    });
   }
 }
 
@@ -800,15 +1224,68 @@ export async function POST(request: NextRequest) {
 
   await logConversation(patient, sender, message || "");
 
-  // PRIORITY 1: Check if patient is awaiting verification
+  // PRIORITY 0: Try standardized response processor for all messages
+  try {
+    const { responseProcessorService } = await import("@/services/response-processor.service");
+    const context = responseProcessorService.createContext(
+      patient.id,
+      patient.phoneNumber,
+      message || "",
+      patient.verificationStatus,
+      "verification" // Default, will be refined by handlers
+    );
+
+    const standardResult = await responseProcessorService.processResponse(context);
+
+    if (standardResult.success) {
+      // Send response message if available
+      if (standardResult.data?.responseMessage) {
+        await sendAck(patient.phoneNumber, standardResult.data.responseMessage);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        processed: true,
+        action: standardResult.metadata?.action || "standard_response",
+        source: "standard_processor",
+        emergencyDetected: standardResult.metadata?.emergencyDetected,
+        escalated: standardResult.metadata?.escalated
+      });
+    }
+  } catch (error) {
+    logger.warn("Standard response processor failed, falling back to unified processor", {
+      patientId: patient.id,
+      operation: "standard_processor_fallback",
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  // PRIORITY 1: Try unified processor for all messages (fallback)
+  const unifiedResult = await processMessageWithUnifiedProcessor(message || "", patient, sender);
+  if (unifiedResult.processed) {
+    return NextResponse.json({
+      ok: true,
+      processed: true,
+      action: unifiedResult.action,
+      source: "unified_processor",
+    });
+  }
+
+  // PRIORITY 1: Check if patient is awaiting verification (legacy fallback)
   if (patient.verificationStatus === "pending_verification") {
     const result = await processVerificationResponse(message || "", patient);
     if (result) return result;
   }
 
-  // PRIORITY 2: Check for medication responses (if patient is verified)
+  // PRIORITY 2: Check for medication responses (if patient is verified) (legacy fallback)
   if (patient.verificationStatus === "verified") {
     const result = await processMedicationResponse(message || "", patient);
+    if (result) return result;
+  }
+
+  // PRIORITY 3: Check for followup responses (if patient is verified) (legacy fallback)
+  if (patient.verificationStatus === "verified") {
+    const result = await processFollowupResponse(message || "", patient, sender);
     if (result) return result;
   }
 

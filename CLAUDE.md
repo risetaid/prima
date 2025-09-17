@@ -13,6 +13,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 - `bun run build` - Production build with type checking
 - `bun run start` - Start production server
 - `bun run lint` - Run ESLint with Next.js core-web-vitals rules
+- `bunx tsc --noEmit` - Run TypeScript type checking
 
 ### Database Management (Drizzle ORM)
 - `bun run db:generate` - Generate Drizzle schema from schema.ts
@@ -23,6 +24,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 ### Administrative Scripts
 - `bun run nuke-recreate-db` - Nuclear option to recreate database (use with caution)
 - `bun run setup-first-user` - Set up initial admin user
+- `bun run start-message-worker` - Start background message processing worker
 
 ## Architecture Overview
 
@@ -38,23 +40,29 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 
 ### Key Service Layer Architecture
 
-The application follows a clean architecture with service layers:
+The application follows a clean architecture with domain-driven service layers:
 
-- **Services**: Located in `src/services/` with domain-specific modules:
+- **Domain Services**: Located in `src/services/` with business domain modules:
   - `patient/` - Patient management, compliance tracking, health notes
   - `reminder/` - Smart reminders, confirmations, scheduling
   - `whatsapp/` - WhatsApp Business API integration
   - `verification/` - Patient verification workflows
+  - `llm/` - OpenAI and Google Gemini integration for content
+  - `analytics/` - Compliance tracking and reporting
 
-- **Data Layer**: 
-  - `src/db/schema.ts` - Drizzle schema with comprehensive foreign key relationships
+- **Repository Pattern**: Each service has corresponding repository files for data access with transaction safety
+
+- **Data Layer**:
+  - Modular schema files in `src/db/` (core-schema.ts, patient-schema.ts, etc.)
   - All tables use soft deletes via `deletedAt` timestamp
-  - 15 optimized tables with proper indexing
+  - 16 optimized tables with comprehensive foreign key relationships
+  - Strategic indexing for common query patterns
 
-- **Authentication**: 
-  - `src/lib/auth-utils.ts` - Central auth utilities with Redis caching
-  - Role-based access control (SUPERADMIN/ADMIN/MEMBER)
+- **Authentication**:
+  - Multi-layer security with Clerk OAuth and database sync
+  - Role-based access control (DEVELOPER/ADMIN/RELAWAN)
   - Request deduplication to prevent race conditions
+  - Patient access control with permission checking
 
 ### Critical Timezone Handling
 
@@ -66,12 +74,29 @@ The system operates in WIB (UTC+7) timezone for Indonesian healthcare workers:
 ### WhatsApp Integration
 
 - Central WhatsApp service at `src/services/whatsapp/whatsapp.service.ts`
-- **Text-based confirmation system**: Simple text message interactions for patient responses
+- **Text-based confirmation system**: Simple text message interactions for patient responses (no polls/buttons)
 - **Response-driven workflows**: 15-minute follow-up messages based on patient text responses
+- **No timer-based auto-confirmation**: Always waits for explicit patient response
 - Automated medication reminders with content attachments
 - Patient verification workflows with retry logic
 - Template-based message management
 - Fonnte WhatsApp Business API for reliable message delivery
+- Conversation state management for context-aware interactions
+
+### LLM Integration
+
+- Multi-provider support (OpenAI and Google Gemini)
+- A/B testing framework for prompt optimization
+- Safety filtering for medical advice
+- Template-based prompt management system
+
+### Performance & Caching Strategy
+
+- **Redis Caching**: Smart TTLs (30s for patients, 5m for sessions, 3m for user data)
+- **Automatic Compression**: Large datasets (>1KB) compressed automatically
+- **Stale-While-Revalidate**: Background refresh for better performance
+- **Event-Driven Invalidation**: Automatic cache clearing after data modifications
+- **Performance Monitoring**: Comprehensive cache analytics and metrics
 
 ## File Structure Conventions
 
@@ -150,19 +175,20 @@ Essential environment variables (never commit actual values):
 - `TINYMCE_API_KEY` - Rich text editor
 - `CRON_SECRET` - Automated reminder system security
 
-## Performance Considerations
+## Important Architecture Patterns
 
-### Caching Strategy
-- Redis caching with specific TTL:
-  - User sessions: 3 minutes
-  - Patient data: 15 minutes
-- ISR for public content with 1-hour revalidation
-- Connection pooling for database operations
+### Error Handling Patterns
+- **Custom Error Types**: ValidationError, NotFoundError, ReminderError per service
+- **Exponential Backoff**: WhatsApp API retry logic
+- **Circuit Breakers**: Redis fallback patterns
+- **Graceful Degradation**: System continues with degraded capabilities
+- **Transaction Safety**: Critical operations wrapped in database transactions
 
 ### Database Optimization
 - Comprehensive indexing on frequently queried columns
 - Soft delete patterns maintain data integrity
 - Drizzle ORM with prepared statements for performance
+- Connection pooling (separate URLs for app vs. migrations)
 
 ### WhatsApp Rate Limiting
 - Built-in retry logic for failed message delivery

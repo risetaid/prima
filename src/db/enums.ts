@@ -73,6 +73,9 @@ export const followupStatusEnum = pgEnum("followup_status", [
   "FAILED",
   "COMPLETED",
   "CANCELLED",
+  "ESCALATED",
+  "NEEDS_ATTENTION",
+  "RESPONDED",
 ]);
 export const followupTypeEnum = pgEnum("followup_type", [
   "REMINDER_CONFIRMATION",

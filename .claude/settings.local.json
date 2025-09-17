@@ -10,7 +10,8 @@
       "Bash(bunx tsc:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(bun run:*)"
     ],
     "deny": [],
     "ask": []
