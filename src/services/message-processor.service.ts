@@ -228,9 +228,19 @@ export class MessageProcessorService {
     // Use intent detection for messages containing verification/confirmation keywords
     const verificationKeywords = ["ya", "tidak", "iya", "yes", "no"];
     const confirmationKeywords = [
-      "sudah", "belum", "udh", "blm",
-      "minum", "ambil obat", "makan obat", "telan", "konsumsi",
-      "keduanya", "semuanya", "obat", "pil"
+      "sudah",
+      "belum",
+      "udh",
+      "blm",
+      "minum",
+      "ambil obat",
+      "makan obat",
+      "telan",
+      "konsumsi",
+      "keduanya",
+      "semuanya",
+      "obat",
+      "pil",
     ];
 
     const hasVerificationKeywords = verificationKeywords.some((keyword) =>
@@ -696,10 +706,11 @@ export class MessageProcessorService {
                 activeReminders: patientContext.context.activeReminders.map(
                   (r) => {
                     // Parse structured medication data for LLM context
-                    const medicationDetails = MedicationParser.parseFromReminder(
-                      r.customMessage,
-                      r.customMessage
-                    );
+                    const medicationDetails =
+                      MedicationParser.parseFromReminder(
+                        r.customMessage,
+                        r.customMessage
+                      );
                     return {
                       medicationName: medicationDetails.name,
                       medicationDetails,
@@ -913,6 +924,18 @@ export class MessageProcessorService {
     entities: MessageEntity[],
     context: MessageContext
   ): Promise<RecommendedResponse> {
+    // For verification intents, always use template responses to ensure consistency
+    if (intent.primary === "accept" || intent.primary === "decline") {
+      switch (intent.primary) {
+        case "accept":
+          return this.generateAcceptResponse();
+        case "decline":
+          return this.generateDeclineResponse();
+        default:
+          break;
+      }
+    }
+
     // For high confidence intents, try to generate natural language response using LLM
     if ((intent.confidence ?? 0.5) >= this.CONFIDENCE_THRESHOLD) {
       try {
@@ -930,10 +953,6 @@ export class MessageProcessorService {
 
     // Fallback to template-based responses
     switch (intent.primary) {
-      case "accept":
-        return this.generateAcceptResponse();
-      case "decline":
-        return this.generateDeclineResponse();
       case "confirm_taken":
         return this.generateConfirmTakenResponse(context);
       case "confirm_missed":
@@ -1178,10 +1197,11 @@ export class MessageProcessorService {
                 activeReminders: patientContext.context.activeReminders.map(
                   (r) => {
                     // Parse structured medication data for LLM context
-                    const medicationDetails = MedicationParser.parseFromReminder(
-                      r.customMessage,
-                      r.customMessage
-                    );
+                    const medicationDetails =
+                      MedicationParser.parseFromReminder(
+                        r.customMessage,
+                        r.customMessage
+                      );
                     return {
                       medicationName: medicationDetails.name,
                       medicationDetails,
@@ -1351,131 +1371,32 @@ export class MessageProcessorService {
    */
   private buildDirectResponsePrompt(
     context: ConversationContext,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     fullPatientContext?: FullPatientContext
   ): string {
     const patientInfo = context.patientInfo;
     const activeReminders = patientInfo?.activeReminders || [];
 
-    // Build comprehensive patient information
-    let patientDetails = `PATIENT INFORMATION:
-- Name: ${patientInfo?.name || "Unknown Patient"}
-- Phone: ${context.phoneNumber}
-- Verification Status: ${patientInfo?.verificationStatus || "Unknown"}`;
+    // Build concise patient information
+    let patientDetails = `PATIENT: ${patientInfo?.name || "Unknown"}, Status: ${patientInfo?.verificationStatus || "Unknown"}`;
 
-    if (fullPatientContext) {
-      const patient = fullPatientContext.patient;
-      const todaysReminders = fullPatientContext.todaysReminders || [];
-      const medicalHistory = fullPatientContext.medicalHistory || {};
-      const recentHealthNotes = fullPatientContext.recentHealthNotes || [];
-      const patientVariables = fullPatientContext.patientVariables || [];
-
-      patientDetails += `
-- Age: ${
-        patient.birthDate
-          ? new Date().getFullYear() - new Date(patient.birthDate).getFullYear()
-          : "Unknown"
-      }
-- Cancer Stage: ${patient.cancerStage || "Unknown"}
-- Diagnosis Date: ${
-        patient.diagnosisDate
-          ? new Date(patient.diagnosisDate).toLocaleDateString("id-ID")
-          : "Unknown"
-      }
-- Doctor: ${patient.doctorName || "Unknown"}
-- Hospital: ${patient.hospitalName || "Unknown"}
-- Emergency Contact: ${patient.emergencyContactName || "Unknown"} (${
-        patient.emergencyContactPhone || "Unknown"
-      })
-- Address: ${patient.address || "Unknown"}
-- Notes: ${patient.notes || "None"}`;
-
-      if (todaysReminders.length > 0) {
-        patientDetails += `
-- Today's Reminders: ${todaysReminders
-          .map(
-            (r) => {
-              // Use structured medication data or fallback to existing logic
-              const medName = r.medicationDetails
-                ? r.medicationDetails.name
-                : r.medicationName || r.customMessage || "obat";
-              return `${medName} at ${r.scheduledTime}`;
-            }
-          )
-          .join(", ")}`;
-      }
-
-      if (activeReminders.length > 0) {
-        patientDetails += `
-- Active Medications: ${activeReminders
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((r: any) => {
-            // Use structured medication data when available
-            if (r.medicationDetails) {
-              return r.medicationDetails.displayName || r.medicationDetails.name;
-            }
-            return r.customMessage || "obat";
-          })
-          .join(", ")}`;
-      }
-
-      if (medicalHistory.symptoms && medicalHistory.symptoms.length > 0) {
-        patientDetails += `
-- Recent Symptoms: ${medicalHistory.symptoms
-          .slice(0, 3)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((s: any) => s.symptom)
-          .join(", ")}`;
-      }
-
-      if (recentHealthNotes.length > 0) {
-        patientDetails += `
-- Recent Health Notes: ${recentHealthNotes
-          .slice(0, 2)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((n: any) => n.note.substring(0, 50) + "...")
-          .join("; ")}`;
-      }
-
-      if (patientVariables.length > 0) {
-        patientDetails += `
-- Custom Variables: ${patientVariables
-          .slice(0, 3)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((v: any) => `${v.name}: ${v.value}`)
-          .join(", ")}`;
-      }
-    } else if (activeReminders.length > 0) {
-      patientDetails += `
-- Active Medications: ${activeReminders
+    if (activeReminders.length > 0) {
+      patientDetails += `, Active meds: ${activeReminders
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((r: any) => r.medicationName)
+        .map((r: any) => r.medicationName || r.customMessage || "obat")
         .join(", ")}`;
     }
 
-    return `You are a helpful healthcare assistant for PRIMA (Palliative Remote Integrated Monitoring and Assistance) system communicating with cancer patients via WhatsApp.
+    return `You are PRIMA healthcare assistant for cancer patients via WhatsApp.
 
 ${patientDetails}
 
-CONVERSATION CONTEXT:
-You have access to the previous conversation messages above. Use this context to provide relevant, personalized responses.
-
 RESPONSE GUIDELINES:
-- Always respond in Indonesian (Bahasa Indonesia)
-- Be friendly, empathetic, supportive, and professional
-- Provide comprehensive, informative responses that satisfy user questions
-- Share general educational information about palliative care, cancer support, and wellness
-- Explain concepts clearly with examples when helpful
-- Include practical tips and resources when appropriate
-- Never give personalized medical advice, diagnoses, or treatment recommendations
-- For medical concerns, always direct to consult healthcare professionals
-- For emergencies, immediately direct to appropriate help and alert volunteers
-- Include PRIMA branding and offer further assistance
-- Use simple, clear language that cancer patients can easily understand
-- Acknowledge emotions and provide emotional support
-- End responses by offering to connect with PRIMA volunteers for more personalized support
-
-RESPONSE FORMAT:
-Provide a comprehensive, natural response that fully addresses the patient's question or concern while maintaining safety and professionalism.`;
+- Respond in Indonesian, be friendly and professional
+- Never give medical advice, direct to professionals
+- For emergencies, alert volunteers immediately
+- Keep responses clear and supportive
+- End with PRIMA branding`;
   }
 
   /**
