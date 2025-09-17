@@ -5,8 +5,62 @@ import {
   WhatsAppMessageResult
 } from '@/lib/fonnte'
 import { ValidatedContent } from '@/services/reminder/reminder.types'
+import { logger } from '@/lib/logger'
 
 export class WhatsAppService {
+  private readonly MAX_RETRY_ATTEMPTS = 3;
+  private readonly RETRY_DELAY_MS = 1000; // 1 second base delay
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async sendWithRetry(
+    toPhoneNumber: string, 
+    message: string, 
+    attempt: number = 1
+  ): Promise<WhatsAppMessageResult> {
+    try {
+      const formatted = formatWhatsAppNumber(toPhoneNumber);
+      const result = await sendWhatsAppMessage({ to: formatted, body: message });
+      
+      if (result.success) {
+        logger.info('WhatsApp message sent successfully', { 
+          phoneNumber: toPhoneNumber, 
+          attempt,
+          messageId: result.messageId 
+        });
+        return result;
+      } else {
+        throw new Error(result.error || 'Unknown WhatsApp send error');
+      }
+    } catch (error) {
+      logger.warn('WhatsApp send attempt failed', { 
+        phoneNumber: toPhoneNumber, 
+        attempt, 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+
+      if (attempt < this.MAX_RETRY_ATTEMPTS) {
+        const delayMs = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Exponential backoff
+        logger.info('Retrying WhatsApp send', { 
+          phoneNumber: toPhoneNumber, 
+          attempt: attempt + 1, 
+          delayMs 
+        });
+        
+        await this.delay(delayMs);
+        return this.sendWithRetry(toPhoneNumber, message, attempt + 1);
+      } else {
+        logger.error('WhatsApp send failed after all retries', error instanceof Error ? error : new Error(String(error)), { 
+          phoneNumber: toPhoneNumber, 
+          attempts: this.MAX_RETRY_ATTEMPTS 
+        });
+        throw error;
+      }
+    }
+  }
+
   getContentPrefix(contentType: string): string {
     switch (contentType?.toLowerCase()) {
       case 'article':
@@ -56,8 +110,7 @@ export class WhatsAppService {
   }
 
   async send(toPhoneNumber: string, message: string) {
-    const formatted = formatWhatsAppNumber(toPhoneNumber)
-    return await sendWhatsAppMessage({ to: formatted, body: message })
+    return await this.sendWithRetry(toPhoneNumber, message)
   }
 
 
@@ -155,7 +208,7 @@ Segera hubungi pasien atau koordinasikan dengan tim medis.
 
     // TODO: Send to volunteer WhatsApp numbers
     // For now, return empty array
-    console.log('Emergency Alert:', alertMessage)
+    logger.warn('Emergency Alert (not implemented)', { alertMessage })
     return []
   }
 

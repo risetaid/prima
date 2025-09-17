@@ -63,3 +63,20 @@ export const contentStatusEnum = pgEnum("content_status", [
   "published",
   "archived",
 ]);
+
+// Followup Enums
+export const followupStatusEnum = pgEnum("followup_status", [
+  "PENDING",
+  "SCHEDULED",
+  "SENT",
+  "DELIVERED",
+  "FAILED",
+  "COMPLETED",
+  "CANCELLED",
+]);
+export const followupTypeEnum = pgEnum("followup_type", [
+  "REMINDER_CONFIRMATION",
+  "MEDICATION_COMPLIANCE",
+  "SYMPTOM_CHECK",
+  "GENERAL_WELLBEING",
+]);

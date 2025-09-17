@@ -71,7 +71,7 @@ async function executeResponseActions(
 
               const status = (action.data.status as string) || "CONFIRMED";
               const validStatuses = ["CONFIRMED", "MISSED", "PENDING", "SENT", "UNKNOWN"] as const;
-              const confirmationStatus = validStatuses.includes(status as any) ? status as "CONFIRMED" | "MISSED" | "PENDING" | "SENT" | "UNKNOWN" : "CONFIRMED";
+              const confirmationStatus = validStatuses.includes(status as typeof validStatuses[number]) ? status as "CONFIRMED" | "MISSED" | "PENDING" | "SENT" | "UNKNOWN" : "CONFIRMED";
 
               await db
                 .update(reminderLogs)

@@ -8,6 +8,8 @@ export * from "./core-schema";
 export * from "./patient-schema";
 export * from "./reminder-schema";
 export * from "./cms-schema";
+export * from "./llm-prompt-schema";
+export * from "./analytics-schema";
 
 // Import LLM cache table
 import { volunteerNotifications } from "./patient-schema";
@@ -26,10 +28,25 @@ import { reminderSchedules } from "./reminder-schema";
 import { reminderLogs } from "./reminder-schema";
 import { manualConfirmations } from "./reminder-schema";
 import { whatsappTemplates } from "./reminder-schema";
-import { reminderContentAttachments } from "./reminder-schema";
+import { reminderContentAttachments, reminderFollowups } from "./reminder-schema";
 
 import { cmsArticles } from "./cms-schema";
 import { cmsVideos } from "./cms-schema";
+
+// Import LLM prompt tables
+import { llmPromptTemplates } from "./llm-prompt-schema";
+import { llmPromptTests } from "./llm-prompt-schema";
+import { llmPromptTestVariants } from "./llm-prompt-schema";
+import { llmPromptTestResults } from "./llm-prompt-schema";
+import { llmPromptMetrics } from "./llm-prompt-schema";
+
+// Import analytics tables
+import { analyticsEvents } from "./analytics-schema";
+import { performanceMetrics } from "./analytics-schema";
+import { cohortAnalysis } from "./analytics-schema";
+import { auditLogs } from "./analytics-schema";
+import { dataAccessLogs } from "./analytics-schema";
+import { systemHealthMetrics } from "./analytics-schema";
 
 // ===== RELATIONS =====
 
@@ -133,7 +150,7 @@ export const reminderLogsRelations = relations(
       references: [patients.id],
     }),
     manualConfirmations: many(manualConfirmations),
-
+    followups: many(reminderFollowups),
   })
 );
 
@@ -243,6 +260,127 @@ export const volunteerNotificationsRelations = relations(
   })
 );
 
+export const reminderFollowupsRelations = relations(
+  reminderFollowups,
+  ({ one }) => ({
+    reminderLog: one(reminderLogs, {
+      fields: [reminderFollowups.reminderLogId],
+      references: [reminderLogs.id],
+    }),
+    patient: one(patients, {
+      fields: [reminderFollowups.patientId],
+      references: [patients.id],
+    }),
+  })
+);
+
+// LLM Prompt Template Relations
+export const llmPromptTemplatesRelations = relations(
+  llmPromptTemplates,
+  ({ one, many }) => ({
+    createdByUser: one(users, {
+      fields: [llmPromptTemplates.createdBy],
+      references: [users.id],
+    }),
+    testVariants: many(llmPromptTestVariants),
+    metrics: many(llmPromptMetrics),
+  })
+);
+
+export const llmPromptTestsRelations = relations(
+  llmPromptTests,
+  ({ one, many }) => ({
+    createdByUser: one(users, {
+      fields: [llmPromptTests.createdBy],
+      references: [users.id],
+    }),
+    variants: many(llmPromptTestVariants),
+    results: many(llmPromptTestResults),
+  })
+);
+
+export const llmPromptTestVariantsRelations = relations(
+  llmPromptTestVariants,
+  ({ one, many }) => ({
+    test: one(llmPromptTests, {
+      fields: [llmPromptTestVariants.testId],
+      references: [llmPromptTests.id],
+    }),
+    promptTemplate: one(llmPromptTemplates, {
+      fields: [llmPromptTestVariants.promptTemplateId],
+      references: [llmPromptTemplates.id],
+    }),
+    results: many(llmPromptTestResults),
+  })
+);
+
+export const llmPromptTestResultsRelations = relations(
+  llmPromptTestResults,
+  ({ one }) => ({
+    test: one(llmPromptTests, {
+      fields: [llmPromptTestResults.testId],
+      references: [llmPromptTests.id],
+    }),
+    variant: one(llmPromptTestVariants, {
+      fields: [llmPromptTestResults.variantId],
+      references: [llmPromptTestVariants.id],
+    }),
+  })
+);
+
+export const llmPromptMetricsRelations = relations(
+  llmPromptMetrics,
+  ({ one }) => ({
+    promptTemplate: one(llmPromptTemplates, {
+      fields: [llmPromptMetrics.promptTemplateId],
+      references: [llmPromptTemplates.id],
+    }),
+  })
+);
+
+// Analytics Relations
+export const analyticsEventsRelations = relations(
+  analyticsEvents,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [analyticsEvents.userId],
+      references: [users.id],
+    }),
+    patient: one(patients, {
+      fields: [analyticsEvents.patientId],
+      references: [patients.id],
+    }),
+  })
+);
+
+export const auditLogsRelations = relations(
+  auditLogs,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [auditLogs.userId],
+      references: [users.id],
+    }),
+    patient: one(patients, {
+      fields: [auditLogs.patientId],
+      references: [patients.id],
+    }),
+  })
+);
+
+export const dataAccessLogsRelations = relations(
+  dataAccessLogs,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [dataAccessLogs.userId],
+      references: [users.id],
+    }),
+    patient: one(patients, {
+      fields: [dataAccessLogs.patientId],
+      references: [patients.id],
+    }),
+  })
+);
+
 
 
 
@@ -278,4 +416,34 @@ export type NewCmsVideo = typeof cmsVideos.$inferInsert;
 // Volunteer Notification Types
 export type VolunteerNotification = typeof volunteerNotifications.$inferSelect;
 export type NewVolunteerNotification = typeof volunteerNotifications.$inferInsert;
+
+// Followup Types
+export type ReminderFollowup = typeof reminderFollowups.$inferSelect;
+export type NewReminderFollowup = typeof reminderFollowups.$inferInsert;
+
+// LLM Prompt Types
+export type LlmPromptTemplate = typeof llmPromptTemplates.$inferSelect;
+export type NewLlmPromptTemplate = typeof llmPromptTemplates.$inferInsert;
+export type LlmPromptTest = typeof llmPromptTests.$inferSelect;
+export type NewLlmPromptTest = typeof llmPromptTests.$inferInsert;
+export type LlmPromptTestVariant = typeof llmPromptTestVariants.$inferSelect;
+export type NewLlmPromptTestVariant = typeof llmPromptTestVariants.$inferInsert;
+export type LlmPromptTestResult = typeof llmPromptTestResults.$inferSelect;
+export type NewLlmPromptTestResult = typeof llmPromptTestResults.$inferInsert;
+export type LlmPromptMetric = typeof llmPromptMetrics.$inferSelect;
+export type NewLlmPromptMetric = typeof llmPromptMetrics.$inferInsert;
+
+// Analytics Types
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+export type NewAnalyticsEvent = typeof analyticsEvents.$inferInsert;
+export type PerformanceMetric = typeof performanceMetrics.$inferSelect;
+export type NewPerformanceMetric = typeof performanceMetrics.$inferInsert;
+export type CohortAnalysis = typeof cohortAnalysis.$inferSelect;
+export type NewCohortAnalysis = typeof cohortAnalysis.$inferInsert;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;
+export type DataAccessLog = typeof dataAccessLogs.$inferSelect;
+export type NewDataAccessLog = typeof dataAccessLogs.$inferInsert;
+export type SystemHealthMetric = typeof systemHealthMetrics.$inferSelect;
+export type NewSystemHealthMetric = typeof systemHealthMetrics.$inferInsert;
 

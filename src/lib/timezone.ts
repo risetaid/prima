@@ -85,3 +85,13 @@ export const convertUTCToWIBString = (utcDate: Date): string => {
   return wibDate.toISOString()
 }
 
+/**
+ * Add minutes to a date and return WIB time
+ * @param date Date to add minutes to
+ * @param minutes Number of minutes to add
+ * @returns WIB Date object
+ */
+export const addMinutesToWIB = (date: Date, minutes: number): Date => {
+  return new Date(date.getTime() + minutes * 60 * 1000)
+}
+

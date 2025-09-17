@@ -271,6 +271,22 @@ class RedisClient {
     }
   }
 
+  async hdel(key: string, ...fields: string[]): Promise<boolean> {
+    if (!this.client) return false
+
+    try {
+      await this.client.hdel(key, ...fields)
+      return true
+    } catch (error) {
+      logger.warn('IORedis HDEL failed', {
+        redis: true,
+        operation: 'hdel',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return false
+    }
+  }
+
   // Sorted set operations for message queue
   async zadd(key: string, score: number, member: string): Promise<boolean> {
     if (!this.client) return false

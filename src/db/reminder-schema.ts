@@ -15,7 +15,12 @@ import {
   confirmationStatusEnum,
   patientConditionEnum,
   templateCategoryEnum,
+  followupStatusEnum,
+  followupTypeEnum,
 } from "./enums";
+
+// Import patient table for foreign key reference
+import { patients } from "./patient-schema";
 
 // ===== REMINDER TABLES =====
 
@@ -23,7 +28,7 @@ export const reminderSchedules = pgTable(
   "reminder_schedules",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    patientId: uuid("patient_id").notNull(),
+    patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
     scheduledTime: text("scheduled_time").notNull(),
     frequency: frequencyEnum("frequency").notNull().default("CUSTOM"),
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
@@ -81,7 +86,7 @@ export const reminderLogs = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     reminderScheduleId: uuid("reminder_schedule_id"),
-    patientId: uuid("patient_id").notNull(),
+    patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
     message: text("message").notNull(),
     phoneNumber: text("phone_number").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
@@ -163,6 +168,7 @@ export const manualConfirmations = pgTable(
     notes: text("notes"),
     followUpNeeded: boolean("follow_up_needed").notNull().default(false),
     followUpNotes: text("follow_up_notes"),
+    medicationsTaken: text("medications_taken").array().default([]),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -230,6 +236,79 @@ export const whatsappTemplates = pgTable(
     ),
     deletedAtIdx: index("whatsapp_templates_deleted_at_idx").on(
       table.deletedAt
+    ),
+  })
+);
+
+// ===== FOLLOWUP TABLES =====
+
+export const reminderFollowups = pgTable(
+  "reminder_followups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reminderLogId: uuid("reminder_log_id")
+      .notNull()
+      .references(() => reminderLogs.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id")
+      .notNull()
+      .references(() => patients.id, { onDelete: "cascade" }),
+    followupType: followupTypeEnum("followup_type").notNull().default("REMINDER_CONFIRMATION"),
+    status: followupStatusEnum("status").notNull().default("PENDING"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    message: text("message").notNull(),
+    response: text("response"),
+    responseAt: timestamp("response_at", { withTimezone: true }),
+    retryCount: integer("retry_count").notNull().default(0),
+    maxRetries: integer("max_retries").notNull().default(3),
+    queueJobId: text("queue_job_id"),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    reminderLogIdIdx: index("reminder_followups_reminder_log_id_idx").on(
+      table.reminderLogId
+    ),
+    patientIdIdx: index("reminder_followups_patient_id_idx").on(table.patientId),
+    statusIdx: index("reminder_followups_status_idx").on(table.status),
+    followupTypeIdx: index("reminder_followups_followup_type_idx").on(
+      table.followupType
+    ),
+    scheduledAtIdx: index("reminder_followups_scheduled_at_idx").on(
+      table.scheduledAt
+    ),
+    patientStatusIdx: index("reminder_followups_patient_status_idx").on(
+      table.patientId,
+      table.status
+    ),
+    scheduledStatusIdx: index("reminder_followups_scheduled_status_idx").on(
+      table.scheduledAt,
+      table.status
+    ),
+    // Critical indexes for queue processing
+    pendingScheduledIdx: index("reminder_followups_pending_scheduled_idx").on(
+      table.status,
+      table.scheduledAt
+    ),
+    retryCountIdx: index("reminder_followups_retry_count_idx").on(
+      table.retryCount
+    ),
+    // For performance monitoring
+    sentAtIdx: index("reminder_followups_sent_at_idx").on(table.sentAt),
+    deliveredAtIdx: index("reminder_followups_delivered_at_idx").on(
+      table.deliveredAt
+    ),
+    // Composite indexes for common queries
+    patientTypeStatusIdx: index("reminder_followups_patient_type_status_idx").on(
+      table.patientId,
+      table.followupType,
+      table.status
     ),
   })
 );

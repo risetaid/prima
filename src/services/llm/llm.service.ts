@@ -347,7 +347,10 @@ export class LLMService {
     const reminderContext =
       activeReminders.length > 0
         ? `\nActive Medication Reminders: ${activeReminders
-            .map((r: any) => r.medicationName || r.customMessage || "obat")
+            .map((r: unknown) => {
+              const reminder = r as { medicationName?: string; customMessage?: string };
+              return reminder.medicationName || reminder.customMessage || "obat";
+            })
             .join(", ")}`
         : "";
 

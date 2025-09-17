@@ -210,7 +210,8 @@ export class MessageProcessorService {
   private shouldUseIntentDetection(
     message: string,
     conversationState: ConversationState,
-    context: MessageContext
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _context: MessageContext
   ): boolean {
     // Always use intent detection for verification and reminder contexts
     if (
