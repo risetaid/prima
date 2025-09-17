@@ -15,6 +15,7 @@ import {
 import { WhatsAppService } from "./whatsapp/whatsapp.service";
 import { safetyFilterService } from "./llm/safety-filter";
 import { logger } from "@/lib/logger";
+import { MedicationParser, MedicationDetails } from "@/lib/medication-parser";
 
 export interface MessageContext {
   patientId: string;
@@ -127,6 +128,7 @@ export interface FullPatientContext {
     frequency: string;
     medicationName?: string;
     customMessage?: string;
+    medicationDetails?: MedicationDetails;
     isCompleted?: boolean;
     lastCompletedAt?: Date;
   }>;
@@ -484,10 +486,18 @@ export class MessageProcessorService {
               verificationStatus:
                 patientContext.context.patient.verificationStatus,
               activeReminders: patientContext.context.activeReminders.map(
-                (r) => ({
-                  medicationName: r.customMessage || "obat",
-                  scheduledTime: r.scheduledTime,
-                })
+                (r) => {
+                  // Parse structured medication data for LLM context
+                  const medicationDetails = MedicationParser.parseFromReminder(
+                    r.customMessage,
+                    r.customMessage
+                  );
+                  return {
+                    medicationName: medicationDetails.name,
+                    medicationDetails,
+                    scheduledTime: r.scheduledTime,
+                  };
+                }
               ),
             }
           : undefined,
@@ -684,10 +694,18 @@ export class MessageProcessorService {
                 verificationStatus:
                   patientContext.context.patient.verificationStatus,
                 activeReminders: patientContext.context.activeReminders.map(
-                  (r) => ({
-                    medicationName: r.customMessage || "obat",
-                    scheduledTime: r.scheduledTime,
-                  })
+                  (r) => {
+                    // Parse structured medication data for LLM context
+                    const medicationDetails = MedicationParser.parseFromReminder(
+                      r.customMessage,
+                      r.customMessage
+                    );
+                    return {
+                      medicationName: medicationDetails.name,
+                      medicationDetails,
+                      scheduledTime: r.scheduledTime,
+                    };
+                  }
                 ),
               }
             : undefined,
@@ -1158,10 +1176,18 @@ export class MessageProcessorService {
                 verificationStatus:
                   patientContext.context.patient.verificationStatus,
                 activeReminders: patientContext.context.activeReminders.map(
-                  (r) => ({
-                    medicationName: r.customMessage || "obat",
-                    scheduledTime: r.scheduledTime,
-                  })
+                  (r) => {
+                    // Parse structured medication data for LLM context
+                    const medicationDetails = MedicationParser.parseFromReminder(
+                      r.customMessage,
+                      r.customMessage
+                    );
+                    return {
+                      medicationName: medicationDetails.name,
+                      medicationDetails,
+                      scheduledTime: r.scheduledTime,
+                    };
+                  }
                 ),
               }
             : undefined,
@@ -1367,10 +1393,13 @@ export class MessageProcessorService {
         patientDetails += `
 - Today's Reminders: ${todaysReminders
           .map(
-            (r) =>
-              `${r.medicationName || r.customMessage || "obat"} at ${
-                r.scheduledTime
-              }`
+            (r) => {
+              // Use structured medication data or fallback to existing logic
+              const medName = r.medicationDetails
+                ? r.medicationDetails.name
+                : r.medicationName || r.customMessage || "obat";
+              return `${medName} at ${r.scheduledTime}`;
+            }
           )
           .join(", ")}`;
       }
@@ -1379,7 +1408,13 @@ export class MessageProcessorService {
         patientDetails += `
 - Active Medications: ${activeReminders
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          .map((r: any) => r.customMessage || "obat")
+          .map((r: any) => {
+            // Use structured medication data when available
+            if (r.medicationDetails) {
+              return r.medicationDetails.displayName || r.medicationDetails.name;
+            }
+            return r.customMessage || "obat";
+          })
           .join(", ")}`;
       }
 

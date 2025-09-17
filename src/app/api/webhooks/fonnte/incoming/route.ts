@@ -8,10 +8,14 @@ import {
   verificationLogs,
   reminderSchedules,
   reminderLogs,
+  patientVariables,
 } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { Patient, ReminderLog } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
+import { MedicationParser, type MedicationDetails } from "@/lib/medication-parser";
+import type { IntentDetectionResult } from "@/services/llm/llm.types";
+import type { RecommendedResponse } from "@/services/message-processor.service";
 
 interface WebhookBody {
   sender?: string;
@@ -462,11 +466,11 @@ async function processVerificationWithLLM(
  */
 async function determineVerificationTypeFromMessage(
   message: string,
-  intentResult: any
+  intentResult: IntentDetectionResult
 ): Promise<"accept" | "decline"> {
   // Check LLM entities first
   if (intentResult.entities && typeof intentResult.entities === 'object') {
-    const entities = intentResult.entities as Record<string, any>;
+    const entities = intentResult.entities as Record<string, unknown>;
     if (entities.response_type === 'positive' || entities.response_type === 'accept') {
       return "accept";
     }
@@ -553,11 +557,75 @@ async function findPendingReminder(patientId: string) {
     .limit(1);
 }
 
+/**
+ * Get patient medication details for personalization
+ */
+async function getPatientMedicationDetails(patientId: string): Promise<MedicationDetails | null> {
+  try {
+    // Get patient variables to extract medication information
+    const variables = await db
+      .select({
+        variableName: patientVariables.variableName,
+        variableValue: patientVariables.variableValue,
+        variableCategory: patientVariables.variableCategory
+      })
+      .from(patientVariables)
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.isActive, true),
+          eq(patientVariables.variableCategory, 'MEDICATION')
+        )
+      );
+
+    // Convert to format expected by MedicationParser
+    const variableArray = variables.map(v => ({
+      name: v.variableName,
+      value: v.variableValue
+    }));
+
+    // Parse medication details from variables
+    return MedicationParser.parseFromVariables(variableArray);
+  } catch (error) {
+    logger.warn('Failed to get patient medication details', {
+      patientId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
+}
+
+/**
+ * Build personalized medication message
+ */
+function buildMedicationMessage(medication: MedicationDetails | null, template: string): string {
+  if (!medication) {
+    return template.replace(/obat/gi, 'medikasi');
+  }
+
+  return template
+    .replace(/obat/gi, medication.name || 'medikasi')
+    .replace(/\{name\}/gi, medication.name || 'medikasi')
+    .replace(/\{dosage\}/gi, medication.dosage || '')
+    .replace(/\{form\}/gi, medication.form || 'tablet');
+}
+
 async function handleMedicationLowConfidence(patient: Patient) {
-  await sendAck(
-    patient.phoneNumber,
-    `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`
-  );
+  // Get patient medication details for personalization
+  const medicationDetails = await getPatientMedicationDetails(patient.id);
+
+  const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+
+  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+
+  await sendAck(patient.phoneNumber, personalizedMessage);
+
+  logger.info('Medication low confidence response sent', {
+    patientId: patient.id,
+    medicationDetails: medicationDetails,
+    personalized: medicationDetails !== null
+  });
+
   return {
     processed: true,
     action: "clarification_requested",
@@ -569,10 +637,20 @@ async function handleMedicationNoPendingReminder(message: string, patient: Patie
   const intentResult = detectIntentEnhanced(message, "medication");
 
   if (intentResult.intent !== "other" && intentResult.confidence > 0.5) {
-    await sendAck(
-      patient.phoneNumber,
-      `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`
-    );
+    // Get patient medication details for personalization
+    const medicationDetails = await getPatientMedicationDetails(patient.id);
+
+    const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
+
+    const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+
+    await sendAck(patient.phoneNumber, personalizedMessage);
+
+    logger.info('No pending reminder response sent', {
+      patientId: patient.id,
+      medicationDetails: medicationDetails,
+      personalized: medicationDetails !== null
+    });
     return {
       processed: true,
       action: "no_pending_reminder",
@@ -584,6 +662,9 @@ async function handleMedicationNoPendingReminder(message: string, patient: Patie
 }
 
 async function handleMedicationTaken(message: string, reminder: ReminderLog, patient: Patient) {
+  // Get patient medication details for personalization
+  const medicationDetails = await getPatientMedicationDetails(patient.id);
+
   await db
     .update(reminderLogs)
     .set({
@@ -592,15 +673,21 @@ async function handleMedicationTaken(message: string, reminder: ReminderLog, pat
     })
     .where(eq(reminderLogs.id, reminder.id));
 
-  await sendAck(
-    patient.phoneNumber,
-    `Terima kasih ${
-      patient.name
-    }! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString(
-      "id-ID",
-      { timeZone: "Asia/Jakarta" }
-    )}\n\n💙 Tim PRIMA`
-  );
+  const baseMessage = `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString(
+    "id-ID",
+    { timeZone: "Asia/Jakarta" }
+    )}\n\n💙 Tim PRIMA`;
+
+  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+
+  await sendAck(patient.phoneNumber, personalizedMessage);
+
+  logger.info('Medication taken confirmation sent', {
+    patientId: patient.id,
+    reminderId: reminder.id,
+    medicationDetails: medicationDetails,
+    personalized: medicationDetails !== null
+  });
 
   return {
     processed: true,
@@ -610,6 +697,9 @@ async function handleMedicationTaken(message: string, reminder: ReminderLog, pat
 }
 
 async function handleMedicationPending(message: string, reminder: ReminderLog, patient: Patient) {
+  // Get patient medication details for personalization
+  const medicationDetails = await getPatientMedicationDetails(patient.id);
+
   await db
     .update(reminderLogs)
     .set({
@@ -617,10 +707,18 @@ async function handleMedicationPending(message: string, reminder: ReminderLog, p
     })
     .where(eq(reminderLogs.id, reminder.id));
 
-  await sendAck(
-    patient.phoneNumber,
-    `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
-  );
+  const baseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+
+  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+
+  await sendAck(patient.phoneNumber, personalizedMessage);
+
+  logger.info('Medication pending confirmation sent', {
+    patientId: patient.id,
+    reminderId: reminder.id,
+    medicationDetails: medicationDetails,
+    personalized: medicationDetails !== null
+  });
 
   return {
     processed: true,
@@ -898,7 +996,7 @@ async function processMedicationResponse(message: string | undefined, patient: P
   return null;
 }
 
-async function processFollowupResponse(message: string | undefined, patient: Patient, sender: string) {
+async function processFollowupResponse(message: string | undefined, patient: Patient) {
   if (!message) return null;
 
   logger.info("Processing potential followup response", {
@@ -992,6 +1090,9 @@ async function handleUnrecognizedMessage(message: string | undefined, patient: P
       message?.substring(0, 50) + (message && message.length > 50 ? "..." : ""),
   });
 
+  // Get patient medication details for personalization
+  const medicationDetails = await getPatientMedicationDetails(patient.id);
+
   if (patient.verificationStatus === "pending_verification") {
     await sendAck(
       patient.phoneNumber,
@@ -1000,10 +1101,17 @@ async function handleUnrecognizedMessage(message: string | undefined, patient: P
   } else if (patient.verificationStatus === "verified") {
     const intentResult = detectIntentEnhanced(message || "");
     if (intentResult.confidence > 0.3) {
-      await sendAck(
-        patient.phoneNumber,
-        `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`
-      );
+      const baseMessage = `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+
+      const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+
+      await sendAck(patient.phoneNumber, personalizedMessage);
+
+      logger.info('Verified patient unrecognized message response sent', {
+        patientId: patient.id,
+        medicationDetails: medicationDetails,
+        personalized: medicationDetails !== null
+      });
     } else {
       await sendAck(
         patient.phoneNumber,
@@ -1019,8 +1127,7 @@ async function handleUnrecognizedMessage(message: string | undefined, patient: P
  */
 async function processMessageWithUnifiedProcessor(
   message: string | undefined,
-  patient: Patient,
-  sender: string
+  patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
   try {
     logger.info("Processing message with unified processor", {
@@ -1052,7 +1159,7 @@ async function processMessageWithUnifiedProcessor(
     });
 
     // Execute the recommended response actions
-    await executeResponseActions(processedResult.response, patient, processedResult.intent);
+    await executeResponseActions(processedResult.response, patient);
 
     return {
       processed: true,
@@ -1079,9 +1186,8 @@ async function processMessageWithUnifiedProcessor(
  * Execute response actions recommended by the MessageProcessorService
  */
 async function executeResponseActions(
-  response: any,
-  patient: Patient,
-  intent: any
+  response: RecommendedResponse,
+  patient: Patient
 ): Promise<void> {
   if (!response || !response.actions) {
     return;
@@ -1091,16 +1197,16 @@ async function executeResponseActions(
     try {
       switch (action.type) {
         case "update_patient_status":
-          await updatePatientStatus(patient.id, action.data.status);
+          await updatePatientStatus(patient.id, action.data.status as "pending_verification" | "verified" | "declined" | "expired" | "unsubscribed");
           break;
         case "log_confirmation":
-          await logConfirmationResponse(patient.id, action.data.status, action.data.response);
+          await logConfirmationResponse(patient.id, action.data.status as string, action.data.response as string);
           break;
         case "send_followup":
-          await scheduleFollowup(patient.id, action.data.type, action.data.delay);
+          await scheduleFollowup(patient.id, action.data.type as string, action.data.delay as number);
           break;
         case "notify_volunteer":
-          await notifyVolunteers(patient, action.data.priority, action.data.message);
+          await notifyVolunteers(patient, action.data.priority as string, action.data.message as string);
           break;
         default:
           logger.warn("Unknown action type", { actionType: action.type });
@@ -1139,7 +1245,6 @@ async function updatePatientStatus(patientId: string, status: "pending_verificat
 async function logConfirmationResponse(patientId: string, status: string, response: string): Promise<void> {
   const { db, reminderLogs } = await import("@/db");
   const { eq, and, desc } = await import("drizzle-orm");
-  const { getWIBTime } = await import("@/lib/timezone");
 
   // Find the most recent pending reminder log
   const pendingReminder = await db
@@ -1166,8 +1271,6 @@ async function logConfirmationResponse(patientId: string, status: string, respon
 }
 
 async function scheduleFollowup(patientId: string, type: string, delay: number): Promise<void> {
-  const { FollowupService } = await import("@/services/reminder/followup.service");
-
   // This would need the reminder log ID, so for now we'll just log
   logger.info("Followup action requested", { patientId, type, delay });
 }
@@ -1261,7 +1364,7 @@ export async function POST(request: NextRequest) {
   }
 
   // PRIORITY 1: Try unified processor for all messages (fallback)
-  const unifiedResult = await processMessageWithUnifiedProcessor(message || "", patient, sender);
+  const unifiedResult = await processMessageWithUnifiedProcessor(message || "", patient);
   if (unifiedResult.processed) {
     return NextResponse.json({
       ok: true,
@@ -1285,7 +1388,7 @@ export async function POST(request: NextRequest) {
 
   // PRIORITY 3: Check for followup responses (if patient is verified) (legacy fallback)
   if (patient.verificationStatus === "verified") {
-    const result = await processFollowupResponse(message || "", patient, sender);
+    const result = await processFollowupResponse(message || "", patient);
     if (result) return result;
   }
 

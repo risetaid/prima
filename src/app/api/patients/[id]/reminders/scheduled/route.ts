@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments } from '@/db'
+import { db, reminderSchedules, patients, reminderLogs, reminderContentAttachments, patientVariables } from '@/db'
 import { eq, and, desc, asc, gte, lte, inArray, isNull } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/timezone'
 import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
+import { MedicationParser } from '@/lib/medication-parser'
 
 export async function GET(
   request: NextRequest,
@@ -155,6 +156,41 @@ export async function GET(
 
     // DEBUG: Log what we found after filtering
 
+    // Get medication details for all reminders
+    const medicationDetailsMap = new Map()
+    for (const reminder of filteredReminders) {
+      try {
+        // Get patient variables to extract medication information
+        const variables = await db
+          .select({
+            variableName: patientVariables.variableName,
+            variableValue: patientVariables.variableValue,
+            variableCategory: patientVariables.variableCategory
+          })
+          .from(patientVariables)
+          .where(
+            and(
+              eq(patientVariables.patientId, reminder.patientId),
+              eq(patientVariables.isActive, true),
+              eq(patientVariables.variableCategory, 'MEDICATION')
+            )
+          )
+
+        // Convert to format expected by MedicationParser
+        const variableArray = variables.map(v => ({
+          name: v.variableName,
+          value: v.variableValue
+        }))
+
+        // Parse medication details from variables
+        const medicationDetails = MedicationParser.parseFromVariables(variableArray)
+        medicationDetailsMap.set(reminder.id, medicationDetails)
+      } catch (error) {
+        console.warn(`Failed to get medication details for reminder ${reminder.id}:`, error)
+        medicationDetailsMap.set(reminder.id, null)
+      }
+    }
+
     // Transform to match frontend interface
     const formattedReminders = filteredReminders.map(reminder => ({
       id: reminder.id,
@@ -163,7 +199,8 @@ export async function GET(
       customMessage: reminder.customMessage,
       patient: patientMap.get(reminder.patientId) || null,
       reminderLogs: logsMap.get(reminder.id) || [],
-      attachedContent: contentAttachmentsMap.get(reminder.id) || []
+      attachedContent: contentAttachmentsMap.get(reminder.id) || [],
+      medicationDetails: medicationDetailsMap.get(reminder.id) || null
     }))
 
     return NextResponse.json(formattedReminders)

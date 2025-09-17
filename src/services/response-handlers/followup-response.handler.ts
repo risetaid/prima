@@ -5,9 +5,7 @@
 import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
 import { db, patients, reminderFollowups } from "@/db";
 import { eq, and, isNull, gt } from "drizzle-orm";
-import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
-import { safetyFilterService } from "@/services/llm/safety-filter";
 import { FollowupService } from "../reminder/followup.service";
 
 export class FollowupResponseHandler extends StandardResponseHandler {

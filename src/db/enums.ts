@@ -83,3 +83,71 @@ export const followupTypeEnum = pgEnum("followup_type", [
   "SYMPTOM_CHECK",
   "GENERAL_WELLBEING",
 ]);
+
+// Medication-related enums
+export const medicationCategoryEnum = pgEnum("medication_category", [
+  "CHEMOTHERAPY",
+  "TARGETED_THERAPY",
+  "IMMUNOTHERAPY",
+  "HORMONAL_THERAPY",
+  "PAIN_MANAGEMENT",
+  "ANTIEMETIC",
+  "ANTIBIOTIC",
+  "ANTIVIRAL",
+  "ANTIFUNGAL",
+  "SUPPLEMENT",
+  "OTHER",
+]);
+
+export const medicationFormEnum = pgEnum("medication_form", [
+  "TABLET",
+  "CAPSULE",
+  "LIQUID",
+  "INJECTION",
+  "INFUSION",
+  "CREAM",
+  "PATCH",
+  "INHALER",
+  "SPRAY",
+  "OTHER",
+]);
+
+export const medicationFrequencyEnum = pgEnum("medication_frequency", [
+  "ONCE_DAILY",
+  "TWICE_DAILY",
+  "THREE_TIMES_DAILY",
+  "FOUR_TIMES_DAILY",
+  "EVERY_8_HOURS",
+  "EVERY_12_HOURS",
+  "EVERY_24_HOURS",
+  "EVERY_WEEK",
+  "EVERY_MONTH",
+  "AS_NEEDED",
+  "CUSTOM",
+]);
+
+export const medicationTimingEnum = pgEnum("medication_timing", [
+  "BEFORE_MEAL",
+  "WITH_MEAL",
+  "AFTER_MEAL",
+  "BEDTIME",
+  "MORNING",
+  "AFTERNOON",
+  "EVENING",
+  "ANYTIME",
+]);
+
+export const medicationUnitEnum = pgEnum("medication_unit", [
+  "MG",
+  "G",
+  "ML",
+  "MCG",
+  "IU",
+  "TABLET",
+  "CAPSULE",
+  "DOSE",
+  "PUFF",
+  "DROP",
+  "PATCH",
+  "OTHER",
+]);

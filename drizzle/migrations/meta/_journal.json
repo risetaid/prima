@@ -50,6 +50,13 @@
       "when": 1758088769267,
       "tag": "0006_chemical_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1758106198745,
+      "tag": "0007_red_zuras",
+      "breakpoints": true
     }
   ]
 }

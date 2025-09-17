@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, cmsArticles, cmsVideos } from "@/db";
 import { eq } from "drizzle-orm";
+import { MedicationParser, MedicationDetails } from "@/lib/medication-parser";
+import { z } from "zod";
 
 // Enhanced reminder templates with CMS content integration
 export async function GET() {
@@ -16,16 +18,37 @@ export async function GET() {
     // const { searchParams } = new URL(request.url)
     // const type = searchParams.get('type') || 'all' // template, article, video, all
 
-    // Enhanced template suggestions with content integration
+    // Enhanced template suggestions with medication variable support
     const enhancedTemplates = [
       {
         id: "medication_with_article",
         name: "Pengingat Obat + Artikel",
-        category: "EDUCATIONAL",
+        category: "MEDICATION_EDUCATIONAL",
         template:
-          "Halo {nama}, saatnya minum obat {obat}! 💊\n\n📖 Baca tips kesehatan: {artikel_url}\n\nSemoga cepat sembuh! 🙏",
-        variables: ["{nama}", "{obat}", "{artikel_url}"],
-        description: "Pengingat obat dengan link artikel edukasi",
+          "Halo {nama}, saatnya minum {medicationName} {dosage}! 💊\n\n{timingInstructions}\n\n📖 Baca tips kesehatan: {artikel_url}\n\nSemoga cepat sembuh! 🙏",
+        variables: ["{nama}", "{medicationName}", "{dosage}", "{timingInstructions}", "{artikel_url}"],
+        description: "Pengingat obat personal dengan link artikel edukasi",
+        supportsMedication: true,
+      },
+      {
+        id: "medication_reminder_detailed",
+        name: "Pengingat Obat Detail",
+        category: "MEDICATION",
+        template:
+          "Halo {nama}! 💊⏰\n\n{reminderHeader}\n\n📋 *Detail Obat:*\n• Nama: {medicationName}\n• Dosis: {dosage}\n• Frekuensi: {frequency}\n• Waktu: {timing}\n\n{specialInstructions}\n\nApakah sudah minum obatnya? Balas \"SUDAH\" atau \"BELUM\".\n\n💙 Tim PRIMA",
+        variables: ["{nama}", "{reminderHeader}", "{medicationName}", "{dosage}", "{frequency}", "{timing}", "{specialInstructions}"],
+        description: "Pengingat obat dengan informasi lengkap",
+        supportsMedication: true,
+      },
+      {
+        id: "medication_side_effect_reminder",
+        name: "Pengingat Obat dengan Efek Samping",
+        category: "MEDICATION_SAFETY",
+        template:
+          "Halo {nama}! 💊⏰\n\nSaatnya minum {medicationName} {dosage}. {timingInstructions}\n\n⚠️ *Catatan:* Jika mengalami {sideEffects}, segera hubungi relawan PRIMA.\n\nApakah sudah minum obatnya? Balas \"SUDAH\" atau \"BELUM\".\n\n💙 Tim PRIMA",
+        variables: ["{nama}", "{medicationName}", "{dosage}", "{timingInstructions}", "{sideEffects}"],
+        description: "Pengingat obat dengan peringatan efek samping",
+        supportsMedication: true,
       },
       {
         id: "motivation_with_video",
@@ -35,6 +58,7 @@ export async function GET() {
           "Semangat {nama}! 💪\n\n🎬 Tonton video motivasi: {video_url}\n\nAnda tidak sendirian dalam perjuangan ini! ❤️",
         variables: ["{nama}", "{video_url}"],
         description: "Pesan motivasi dengan video inspiratif",
+        supportsMedication: false,
       },
       {
         id: "nutrition_reminder",
@@ -44,6 +68,7 @@ export async function GET() {
           "Halo {nama}, jangan lupa makan bergizi hari ini! 🥗\n\n📚 Tips nutrisi untuk pasien kanker: {artikel_url}\n\nMakan yang cukup ya! 😊",
         variables: ["{nama}", "{artikel_url}"],
         description: "Pengingat nutrisi dengan artikel panduan",
+        supportsMedication: false,
       },
       {
         id: "exercise_motivation",
@@ -53,6 +78,7 @@ export async function GET() {
           "Waktu olahraga ringan, {nama}! 🚶‍♀️\n\n🎥 Video gerakan sederhana: {video_url}\n\nTubuh sehat, jiwa kuat! 💪",
         variables: ["{nama}", "{video_url}"],
         description: "Motivasi olahraga dengan video panduan",
+        supportsMedication: false,
       },
     ];
 
@@ -108,7 +134,24 @@ export async function GET() {
   }
 }
 
-// Create enhanced reminder with content
+// Schema for template creation request
+const createTemplateSchema = z.object({
+  templateId: z.string(),
+  contentId: z.string().optional(),
+  contentType: z.enum(['article', 'video']).optional(),
+  patientData: z.record(z.string(), z.string()).optional(),
+  medicationData: z.object({
+    name: z.string(),
+    dosage: z.string().optional(),
+    frequency: z.string().optional(),
+    timing: z.string().optional(),
+    category: z.string().optional(),
+    instructions: z.string().optional(),
+    sideEffects: z.array(z.string()).optional(),
+  }).optional(),
+});
+
+// Create enhanced reminder with content and medication support
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -118,21 +161,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { templateId, contentId, contentType, patientData } = body;
+    const validatedData = createTemplateSchema.parse(body);
+    const { templateId, contentId, contentType, patientData, medicationData } = validatedData;
 
-    // Get the enhanced template
+    // Enhanced templates with medication support
     const enhancedTemplates = [
       {
         id: "medication_with_article",
         template:
-          "Halo {nama}, saatnya minum obat {obat}! 💊\n\n📖 Baca tips kesehatan: {artikel_url}\n\nSemoga cepat sembuh! 🙏",
-        variables: ["{nama}", "{obat}", "{artikel_url}"],
+          "Halo {nama}, saatnya minum {medicationName} {dosage}! 💊\n\n{timingInstructions}\n\n📖 Baca tips kesehatan: {artikel_url}\n\nSemoga cepat sembuh! 🙏",
+        variables: ["{nama}", "{medicationName}", "{dosage}", "{timingInstructions}", "{artikel_url}"],
+        supportsMedication: true,
+      },
+      {
+        id: "medication_reminder_detailed",
+        template:
+          "Halo {nama}! 💊⏰\n\n{reminderHeader}\n\n📋 *Detail Obat:*\n• Nama: {medicationName}\n• Dosis: {dosage}\n• Frekuensi: {frequency}\n• Waktu: {timing}\n\n{specialInstructions}\n\nApakah sudah minum obatnya? Balas \"SUDAH\" atau \"BELUM\".\n\n💙 Tim PRIMA",
+        variables: ["{nama}", "{reminderHeader}", "{medicationName}", "{dosage}", "{frequency}", "{timing}", "{specialInstructions}"],
+        supportsMedication: true,
+      },
+      {
+        id: "medication_side_effect_reminder",
+        template:
+          "Halo {nama}! 💊⏰\n\nSaatnya minum {medicationName} {dosage}. {timingInstructions}\n\n⚠️ *Catatan:* Jika mengalami {sideEffects}, segera hubungi relawan PRIMA.\n\nApakah sudah minum obatnya? Balas \"SUDAH\" atau \"BELUM\".\n\n💙 Tim PRIMA",
+        variables: ["{nama}", "{medicationName}", "{dosage}", "{timingInstructions}", "{sideEffects}"],
+        supportsMedication: true,
       },
       {
         id: "motivation_with_video",
         template:
           "Semangat {nama}! 💪\n\n🎬 Tonton video motivasi: {video_url}\n\nAnda tidak sendirian dalam perjuangan ini! ❤️",
         variables: ["{nama}", "{video_url}"],
+        supportsMedication: false,
       },
     ];
 
@@ -141,6 +201,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Template not found" },
         { status: 404 }
+      );
+    }
+
+    // Validate medication requirements
+    if (selectedTemplate.supportsMedication && !medicationData) {
+      return NextResponse.json(
+        { error: "Medication data required for this template" },
+        { status: 400 }
       );
     }
 
@@ -178,17 +246,56 @@ export async function POST(request: NextRequest) {
       Object.keys(patientData).forEach((key) => {
         const placeholder = `{${key}}`;
         if (finalMessage.includes(placeholder)) {
-          finalMessage = finalMessage.replace(
-            new RegExp(placeholder, "g"),
+          finalMessage = finalMessage.replaceAll(
+            placeholder,
             patientData[key] || ""
           );
         }
       });
     }
 
+    // Replace medication variables if medication data is provided
+    if (medicationData) {
+      const medicationDetails = MedicationParser.validateMedicationDetails({
+        name: medicationData.name,
+        dosage: medicationData.dosage || '',
+        frequency: (medicationData.frequency as 'ONCE_DAILY' | 'TWICE_DAILY' | 'THREE_TIMES_DAILY' | 'FOUR_TIMES_DAILY' | 'EVERY_8_HOURS' | 'EVERY_12_HOURS' | 'EVERY_24_HOURS' | 'EVERY_WEEK' | 'EVERY_MONTH' | 'AS_NEEDED' | 'CUSTOM') || 'ONCE_DAILY',
+        timing: (medicationData.timing as 'BEFORE_MEAL' | 'WITH_MEAL' | 'AFTER_MEAL' | 'BEDTIME' | 'MORNING' | 'AFTERNOON' | 'EVENING' | 'ANYTIME') || 'ANYTIME',
+        category: (medicationData.category as 'CHEMOTHERAPY' | 'TARGETED_THERAPY' | 'IMMUNOTHERAPY' | 'HORMONAL_THERAPY' | 'PAIN_MANAGEMENT' | 'ANTIEMETIC' | 'ANTIBIOTIC' | 'ANTIVIRAL' | 'ANTIFUNGAL' | 'SUPPLEMENT' | 'OTHER') || 'OTHER',
+        instructions: medicationData.instructions,
+        sideEffects: medicationData.sideEffects,
+      });
+
+      if (!medicationDetails) {
+        return NextResponse.json(
+          { error: "Invalid medication data" },
+          { status: 400 }
+        );
+      }
+
+      // Replace medication-specific variables
+      finalMessage = finalMessage.replaceAll(/{medicationName}/g, medicationDetails.name);
+      finalMessage = finalMessage.replaceAll(/{dosage}/g, medicationDetails.dosage);
+      finalMessage = finalMessage.replaceAll(/{frequency}/g, medicationDetails.frequency);
+      finalMessage = finalMessage.replaceAll(/{timing}/g, medicationDetails.timing);
+
+      // Generate contextual medication instructions
+      const timingInstructions = generateTimingInstructions(medicationDetails.timing);
+      finalMessage = finalMessage.replaceAll(/{timingInstructions}/g, timingInstructions);
+
+      const specialInstructions = generateSpecialInstructions(medicationDetails);
+      finalMessage = finalMessage.replaceAll(/{specialInstructions}/g, specialInstructions);
+
+      const sideEffects = medicationDetails.sideEffects?.join(', ') || '';
+      finalMessage = finalMessage.replaceAll(/{sideEffects}/g, sideEffects);
+
+      const reminderHeader = generateReminderHeader(medicationDetails);
+      finalMessage = finalMessage.replaceAll(/{reminderHeader}/g, reminderHeader);
+    }
+
     // Replace content URLs
-    finalMessage = finalMessage.replace(/{artikel_url}/g, contentUrl);
-    finalMessage = finalMessage.replace(/{video_url}/g, contentUrl);
+    finalMessage = finalMessage.replaceAll(/{artikel_url}/g, contentUrl);
+    finalMessage = finalMessage.replaceAll(/{video_url}/g, contentUrl);
 
     return NextResponse.json({
       success: true,
@@ -196,13 +303,65 @@ export async function POST(request: NextRequest) {
         message: finalMessage,
         contentUrl,
         template: selectedTemplate,
+        medicationData: medicationData ? {
+          name: medicationData.name,
+          dosage: medicationData.dosage,
+          frequency: medicationData.frequency,
+          timing: medicationData.timing,
+        } : undefined,
       },
     });
   } catch (error) {
     console.error("Error creating enhanced reminder:", error);
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation error", details: error.issues },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
+}
+
+// Helper functions for medication template generation
+function generateTimingInstructions(timing: string): string {
+  const timingMap: Record<string, string> = {
+    'BEFORE_MEAL': 'Minum 30 menit sebelum makan',
+    'WITH_MEAL': 'Minum saat makan',
+    'AFTER_MEAL': 'Minum 30 menit setelah makan',
+    'BEDTIME': 'Minum sebelum tidur',
+    'MORNING': 'Minum di pagi hari',
+    'AFTERNOON': 'Minum di siang hari',
+    'EVENING': 'Minum di sore hari',
+    'ANYTIME': 'Minum sesuai jadwal'
+  };
+
+  return timingMap[timing] || 'Minum sesuai jadwal';
+}
+
+function generateSpecialInstructions(medicationDetails: MedicationDetails): string {
+  const instructions = [];
+
+  if (medicationDetails.category === 'CHEMOTHERAPY') {
+    instructions.push('💉 Obat kemoterapi - pastikan istirahat yang cukup setelah minum obat.');
+  }
+
+  if (medicationDetails.sideEffects && medicationDetails.sideEffects.length > 0) {
+    instructions.push('⚠️ Perhatikan efek samping dan segera hubungi relawan jika diperlukan.');
+  }
+
+  if (medicationDetails.instructions) {
+    instructions.push(`📋 ${medicationDetails.instructions}`);
+  }
+
+  return instructions.join('\n') || '';
+}
+
+function generateReminderHeader(medicationDetails: MedicationDetails): string {
+  const highPriorityCategories = ['CHEMOTHERAPY', 'TARGETED_THERAPY', 'IMMUNOTHERAPY'];
+  return highPriorityCategories.includes(medicationDetails.category) ?
+    '⚠️ *Pengingat Obat Penting*' : '💊 *Pengingat Obat*';
 }

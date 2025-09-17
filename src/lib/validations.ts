@@ -51,6 +51,72 @@ export const ManualConfirmationCreateSchema = z.object({
   followUpNotes: z.string().max(500).optional()
 })
 
+// Medication validation schemas
+export const MedicationDetailsSchema = z.object({
+  name: z.string().min(1, 'Medication name is required'),
+  genericName: z.string().optional(),
+  category: z.enum(['CHEMOTHERAPY', 'TARGETED_THERAPY', 'IMMUNOTHERAPY', 'HORMONAL_THERAPY', 'PAIN_MANAGEMENT', 'ANTIEMETIC', 'ANTIBIOTIC', 'ANTIVIRAL', 'ANTIFUNGAL', 'SUPPLEMENT', 'OTHER']),
+  form: z.enum(['TABLET', 'CAPSULE', 'LIQUID', 'INJECTION', 'INFUSION', 'CREAM', 'PATCH', 'INHALER', 'SPRAY', 'OTHER']),
+  dosage: z.string().min(1, 'Dosage is required'),
+  dosageValue: z.number().optional(),
+  dosageUnit: z.enum(['MG', 'G', 'ML', 'MCG', 'IU', 'TABLET', 'CAPSULE', 'DOSE', 'PUFF', 'DROP', 'PATCH', 'OTHER']),
+  frequency: z.enum(['ONCE_DAILY', 'TWICE_DAILY', 'THREE_TIMES_DAILY', 'FOUR_TIMES_DAILY', 'EVERY_8_HOURS', 'EVERY_12_HOURS', 'EVERY_24_HOURS', 'EVERY_WEEK', 'EVERY_MONTH', 'AS_NEEDED', 'CUSTOM']),
+  timing: z.enum(['BEFORE_MEAL', 'WITH_MEAL', 'AFTER_MEAL', 'BEDTIME', 'MORNING', 'AFTERNOON', 'EVENING', 'ANYTIME']),
+  instructions: z.string().max(500).optional(),
+  prescribedBy: z.string().max(100).optional(),
+  pharmacy: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+  sideEffects: z.array(z.string().max(200)).optional(),
+  interactions: z.array(z.string().max(200)).optional(),
+})
+
+export const MedicationScheduleCreateSchema = z.object({
+  patientId: z.string().uuid(),
+  medicationName: z.string().min(1, 'Medication name is required'),
+  genericName: z.string().optional(),
+  category: z.enum(['CHEMOTHERAPY', 'TARGETED_THERAPY', 'IMMUNOTHERAPY', 'HORMONAL_THERAPY', 'PAIN_MANAGEMENT', 'ANTIEMETIC', 'ANTIBIOTIC', 'ANTIVIRAL', 'ANTIFUNGAL', 'SUPPLEMENT', 'OTHER']),
+  form: z.enum(['TABLET', 'CAPSULE', 'LIQUID', 'INJECTION', 'INFUSION', 'CREAM', 'PATCH', 'INHALER', 'SPRAY', 'OTHER']),
+  dosage: z.string().min(1, 'Dosage is required'),
+  dosageValue: z.number().optional(),
+  dosageUnit: z.enum(['MG', 'G', 'ML', 'MCG', 'IU', 'TABLET', 'CAPSULE', 'DOSE', 'PUFF', 'DROP', 'PATCH', 'OTHER']),
+  frequency: z.enum(['ONCE_DAILY', 'TWICE_DAILY', 'THREE_TIMES_DAILY', 'FOUR_TIMES_DAILY', 'EVERY_8_HOURS', 'EVERY_12_HOURS', 'EVERY_24_HOURS', 'EVERY_WEEK', 'EVERY_MONTH', 'AS_NEEDED', 'CUSTOM']),
+  timing: z.enum(['BEFORE_MEAL', 'WITH_MEAL', 'AFTER_MEAL', 'BEDTIME', 'MORNING', 'AFTERNOON', 'EVENING', 'ANYTIME']),
+  instructions: z.string().max(500).optional(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+  isActive: z.boolean().default(true),
+  prescribedBy: z.string().max(100).optional(),
+  pharmacy: z.string().max(100).optional(),
+  notes: z.string().max(500).optional(),
+  reminderScheduleId: z.string().uuid().optional(),
+})
+
+export const MedicationAdministrationLogCreateSchema = z.object({
+  patientId: z.string().uuid(),
+  medicationScheduleId: z.string().uuid().optional(),
+  reminderScheduleId: z.string().uuid().optional(),
+  reminderLogId: z.string().uuid().optional(),
+  medicationName: z.string().min(1, 'Medication name is required'),
+  scheduledDateTime: z.string().datetime(),
+  actualDateTime: z.string().datetime().optional(),
+  dosage: z.string().min(1, 'Dosage is required'),
+  dosageTaken: z.string().optional(),
+  status: z.enum(['TAKEN', 'MISSED', 'PARTIAL', 'REFUSED', 'DELAYED']),
+  administeredBy: z.enum(['PATIENT', 'CAREGIVER', 'HEALTHCARE_WORKER', 'SYSTEM']),
+  notes: z.string().max(500).optional(),
+  sideEffects: z.string().max(500).optional(),
+})
+
+// Patient variable validation schemas
+export const PatientVariableCreateSchema = z.object({
+  patientId: z.string().uuid(),
+  variableName: z.string().min(1, 'Variable name is required').max(50),
+  variableValue: z.string().min(1, 'Variable value is required').max(500),
+  variableCategory: z.enum(['PERSONAL', 'MEDICAL', 'MEDICATION', 'CAREGIVER', 'HOSPITAL', 'OTHER']).default('PERSONAL'),
+  variableMetadata: z.record(z.string(), z.any()).optional(),
+  isActive: z.boolean().default(true),
+})
+
 // Health notes validation schemas
 export const HealthNoteCreateSchema = z.object({
   patientId: z.string().uuid(),
@@ -111,4 +177,8 @@ export type HealthNoteCreateData = z.infer<typeof HealthNoteCreateSchema>
 export type ArticleCreateData = z.infer<typeof ArticleCreateSchema>
 export type VideoCreateData = z.infer<typeof VideoCreateSchema>
 export type UserProfileUpdateData = z.infer<typeof UserProfileUpdateSchema>
+export type MedicationDetailsData = z.infer<typeof MedicationDetailsSchema>
+export type MedicationScheduleCreateData = z.infer<typeof MedicationScheduleCreateSchema>
+export type MedicationAdministrationLogCreateData = z.infer<typeof MedicationAdministrationLogCreateSchema>
+export type PatientVariableCreateData = z.infer<typeof PatientVariableCreateSchema>
 

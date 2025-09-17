@@ -4,7 +4,7 @@
 
 import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
 import { db, patients, verificationLogs } from "@/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 import { safetyFilterService } from "@/services/llm/safety-filter";

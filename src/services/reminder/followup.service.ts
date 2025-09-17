@@ -6,11 +6,14 @@ import { getWIBTime, addMinutesToWIB } from "@/lib/timezone";
 import { FollowupQueueService } from "./followup-queue.service";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { NewReminderFollowup, ReminderFollowup } from "@/db";
+import { followupStatusEnum } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
 import { PatientContextService } from "@/services/patient/patient-context.service";
 import { ConversationContext } from "@/services/llm/llm.types";
 import { safetyFilterService } from "@/services/llm/safety-filter";
-import { MessageProcessorService } from "@/services/message-processor.service";
+import { MessageProcessorService, ProcessedMessage } from "@/services/message-processor.service";
+import { MedicationParser } from "@/lib/medication-parser";
+import { PatientContext } from "@/services/patient/patient-context.service";
 
 export class FollowupService {
   private queueService: FollowupQueueService;
@@ -324,10 +327,18 @@ export class FollowupService {
         patientInfo: patientContext.found && patientContext.context ? {
           name: patientContext.context.patient.name,
           verificationStatus: patientContext.context.patient.verificationStatus,
-          activeReminders: patientContext.context.activeReminders?.map(r => ({
-            medicationName: r.customMessage || "obat",
-            scheduledTime: r.scheduledTime
-          })) || []
+          activeReminders: patientContext.context.activeReminders?.map(r => {
+            // Parse structured medication data for LLM context
+            const medicationDetails = MedicationParser.parseFromReminder(
+              r.customMessage,
+              r.customMessage
+            );
+            return {
+              medicationName: medicationDetails.name,
+              medicationDetails,
+              scheduledTime: r.scheduledTime
+            };
+          }) || []
         } : undefined
       };
 
@@ -398,21 +409,21 @@ export class FollowupService {
 
       // Recent health notes
       if (recentNotes.length > 0) {
-        context += `- Recent Health Notes: ${recentNotes.map((n: any) => `${n.note.substring(0, 30)}... (${new Date(n.noteDate).toLocaleDateString('id-ID')})`).join('; ')}\n`;
+        context += `- Recent Health Notes: ${recentNotes.map((n) => `${n.note.substring(0, 30)}... (${new Date(n.noteDate).toLocaleDateString('id-ID')})`).join('; ')}\n`;
       }
 
       // Medical history context
       if (medicalHistory.medications && medicalHistory.medications.length > 0) {
-        context += `- Current Medications: ${medicalHistory.medications.slice(0, 3).map((m: any) => m.name).join(', ')}\n`;
+        context += `- Current Medications: ${medicalHistory.medications?.slice(0, 3).map((m) => m.name).join(', ') || ''}\n`;
       }
 
       if (medicalHistory.symptoms && medicalHistory.symptoms.length > 0) {
-        context += `- Recent Symptoms: ${medicalHistory.symptoms.slice(0, 2).map((s: any) => s.symptom).join(', ')}\n`;
+        context += `- Recent Symptoms: ${medicalHistory.symptoms?.slice(0, 2).map((s) => s.symptom).join(', ') || ''}\n`;
       }
 
       // Patient variables (custom fields)
       if (patientVariables.length > 0) {
-        context += `- Patient Preferences: ${patientVariables.slice(0, 3).map((v: any) => `${v.name}: ${v.value}`).join(', ')}\n`;
+        context += `- Patient Preferences: ${patientVariables.slice(0, 3).map((v) => `${v.name}: ${v.value}`).join(', ')}\n`;
       }
 
       // Conversation context
@@ -453,7 +464,7 @@ export class FollowupService {
    */
   private async buildIntelligentFollowupContext(
     followupType: string,
-    patientContext: any
+    patientContext: PatientContext
   ): Promise<string> {
     let context = '';
     const patient = patientContext.patient;
@@ -461,7 +472,7 @@ export class FollowupService {
     const medicalHistory = patientContext.medicalHistory || {};
 
     // Analyze recent notes for concerns
-    const hasRecentConcerns = recentNotes.some((note: any) =>
+    const hasRecentConcerns = recentNotes.some((note: { note: string }) =>
       note.note.toLowerCase().includes('sakit') ||
       note.note.toLowerCase().includes('nyeri') ||
       note.note.toLowerCase().includes('demam') ||
@@ -469,7 +480,7 @@ export class FollowupService {
       note.note.toLowerCase().includes('lemah')
     );
 
-    const hasPositiveResponses = recentNotes.some((note: any) =>
+    const hasPositiveResponses = recentNotes.some((note: { note: string }) =>
       note.note.toLowerCase().includes('baik') ||
       note.note.toLowerCase().includes('sehat') ||
       note.note.toLowerCase().includes('membaik')
@@ -606,10 +617,18 @@ export class FollowupService {
         patientInfo: patientContext.found && patientContext.context ? {
           name: patientContext.context.patient.name,
           verificationStatus: patientContext.context.patient.verificationStatus,
-          activeReminders: patientContext.context.activeReminders?.map(r => ({
-            medicationName: r.customMessage || "obat",
-            scheduledTime: r.scheduledTime
-          })) || []
+          activeReminders: patientContext.context.activeReminders?.map(r => {
+            // Parse structured medication data for LLM context
+            const medicationDetails = MedicationParser.parseFromReminder(
+              r.customMessage,
+              r.customMessage
+            );
+            return {
+              medicationName: medicationDetails.name,
+              medicationDetails,
+              scheduledTime: r.scheduledTime
+            };
+          }) || []
         } : undefined
       };
 
@@ -620,8 +639,8 @@ export class FollowupService {
       );
 
       // Process the message through unified processor if no emergency detected
-      let processedResponse: any;
-      let escalated = safetyResult.escalationRequired;
+      let processedResponse: { content: string; actions: string[] } | ProcessedMessage;
+      const escalated = safetyResult.escalationRequired;
 
       if (emergencyResult.isEmergency) {
         logger.warn("Emergency detected in followup response", {
@@ -635,7 +654,12 @@ export class FollowupService {
         // Emergency is already handled by safety filter (volunteer notification sent)
         processedResponse = {
           content: "⚠️ *Darurat Terdeteksi*\n\nTim kami telah menerima pesan darurat Anda dan segera menghubungi Anda. Jika ini adalah keadaan darurat medis, segera hubungi layanan darurat terdekat atau hubungi nomor darurat.",
-          actions: ["emergency_handled"]
+          actions: ["emergency_handled"],
+          intent: "emergency",
+          confidence: 1.0,
+          entities: [],
+          response: { content: "", actions: [] },
+          context: { patientId: "", phoneNumber: "", message: "", timestamp: new Date(), patientName: "", verificationStatus: "" }
         };
       } else {
         // Use message processor for normal responses
@@ -655,7 +679,7 @@ export class FollowupService {
       return {
         processed: true,
         emergencyDetected: emergencyResult.isEmergency,
-        response: processedResponse.content,
+        response: 'content' in processedResponse ? processedResponse.content : processedResponse.response.content,
         escalated
       };
     } catch (error) {
@@ -684,7 +708,12 @@ export class FollowupService {
     isEmergency: boolean
   ): Promise<void> {
     try {
-      const updateData: any = {
+      const updateData: {
+        response: string;
+        responseAt: Date;
+        updatedAt: Date;
+        status?: typeof followupStatusEnum.enumValues[number];
+      } = {
         response: patientResponse,
         responseAt: getWIBTime(),
         updatedAt: getWIBTime()

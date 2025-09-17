@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db, reminderSchedules, patients, reminderLogs } from "@/db";
+import { db, reminderSchedules, patients, reminderLogs, patientVariables } from "@/db";
 import { eq, and, gte, lte, notExists, or, count, isNull } from "drizzle-orm";
 import {
   shouldSendReminderNow,
@@ -13,6 +13,7 @@ import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { isDuplicateEvent } from "@/lib/idempotency";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { MedicationParser, type MedicationDetails } from "@/lib/medication-parser";
 // Rate limiter temporarily disabled
 
 const whatsappService = new WhatsAppService();
@@ -51,6 +52,59 @@ function createWIBDateRange(dateString: string) {
   endOfDay.setDate(endOfDay.getDate() + 1);
 
   return { startOfDay, endOfDay };
+}
+
+/**
+ * Get patient medication details for personalization
+ */
+async function getPatientMedicationDetails(patientId: string): Promise<MedicationDetails | null> {
+  try {
+    // Get patient variables to extract medication information
+    const variables = await db
+      .select({
+        variableName: patientVariables.variableName,
+        variableValue: patientVariables.variableValue,
+        variableCategory: patientVariables.variableCategory
+      })
+      .from(patientVariables)
+      .where(
+        and(
+          eq(patientVariables.patientId, patientId),
+          eq(patientVariables.isActive, true),
+          eq(patientVariables.variableCategory, 'MEDICATION')
+        )
+      );
+
+    // Convert to format expected by MedicationParser
+    const variableArray = variables.map(v => ({
+      name: v.variableName,
+      value: v.variableValue
+    }));
+
+    // Parse medication details from variables
+    return MedicationParser.parseFromVariables(variableArray);
+  } catch (error) {
+    logger.warn('Failed to get patient medication details for cron', {
+      patientId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return null;
+  }
+}
+
+/**
+ * Build personalized medication message
+ */
+function buildMedicationMessage(medication: MedicationDetails | null, template: string): string {
+  if (!medication) {
+    return template.replace(/obat Anda/gi, 'medikasi Anda');
+  }
+
+  return template
+    .replace(/obat Anda/gi, `${medication.name} Anda`)
+    .replace(/\{name\}/gi, medication.name || 'medikasi')
+    .replace(/\{dosage\}/gi, medication.dosage || '')
+    .replace(/\{form\}/gi, medication.form || 'tablet');
 }
 
 async function validateEnvironment() {
@@ -256,6 +310,9 @@ async function processSchedule(schedule: ReminderSchedule, attachmentsBySchedule
       // Get attachments for this schedule
       const attachments = attachmentsByScheduleId[schedule.id] || [];
 
+      // Get patient medication details for personalization
+      const medicationDetails = await getPatientMedicationDetails(schedule.patientId);
+
       // Build message: use customMessage if available, otherwise fallback to template
       let messageToSend: string;
       if (schedule.customMessage) {
@@ -265,7 +322,7 @@ async function processSchedule(schedule: ReminderSchedule, attachmentsBySchedule
           attachments
         );
       } else {
-        // Fallback to template message
+        // Build personalized template message
         const templateMessage = `💚 *Pengingat Kesehatan*
 
 Halo ${schedule.patientName}!
@@ -280,10 +337,13 @@ Saatnya menjalankan rutinitas kesehatan:
 
 💙 Tim PRIMA`;
 
+        // Personalize message with medication details
+        const personalizedMessage = buildMedicationMessage(medicationDetails, templateMessage);
+
         messageToSend =
           attachments.length > 0
-            ? whatsappService.buildMessage(templateMessage, attachments)
-            : templateMessage;
+            ? whatsappService.buildMessage(personalizedMessage, attachments)
+            : personalizedMessage;
       }
 
       const result = await whatsappService.send(
@@ -294,14 +354,16 @@ Saatnya menjalankan rutinitas kesehatan:
       const providerLogMessage = `🔍 FONNTE result for ${schedule.patientName}: success=${result.success}, messageId=${result.messageId}, error=${result.error}`;
       debugLogs.push(providerLogMessage);
 
+      // Get medication details for logging
+      const medicationDetailsForLogging = await getPatientMedicationDetails(schedule.patientId);
+      const medicationDisplay = buildMedicationMessage(medicationDetailsForLogging, 'obat Anda');
+
       // Add comprehensive details about the sent reminder
       if (result.success) {
         debugLogs.push(`✅ Reminder sent successfully:`);
         debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
         debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
-        debugLogs.push(
-          `   💊 Medication: obat Anda`
-        );
+        debugLogs.push(`   💊 Medication: ${medicationDisplay}`);
         debugLogs.push(`   ⏰ Scheduled: ${schedule.scheduledTime}`);
         debugLogs.push(
           `   📝 Custom Message: ${
@@ -314,9 +376,7 @@ Saatnya menjalankan rutinitas kesehatan:
         debugLogs.push(`❌ Failed to send reminder:`);
         debugLogs.push(`   👤 Patient: ${schedule.patientName}`);
         debugLogs.push(`   📱 WhatsApp: ${schedule.patientPhoneNumber}`);
-        debugLogs.push(
-          `   💊 Medication: obat Anda`
-        );
+        debugLogs.push(`   💊 Medication: ${medicationDisplay}`);
         debugLogs.push(`   ❌ Error: ${result.error}`);
       }
 

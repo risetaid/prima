@@ -169,6 +169,8 @@ export const patientVariables = pgTable(
       .references(() => patients.id),
     variableName: text("variable_name").notNull(), // nama, obat, dosis, dokter, etc
     variableValue: text("variable_value").notNull(),
+    variableCategory: text("variable_category").notNull().$type<"PERSONAL" | "MEDICAL" | "MEDICATION" | "CAREGIVER" | "HOSPITAL" | "OTHER">().default("PERSONAL"),
+    variableMetadata: jsonb("variable_metadata"), // Additional structured data
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -190,6 +192,12 @@ export const patientVariables = pgTable(
       table.isActive
     ),
     deletedAtIdx: index("patient_variables_deleted_at_idx").on(table.deletedAt),
+    // Medication-specific indexes
+    variableCategoryIdx: index("patient_variables_category_idx").on(table.variableCategory),
+    patientCategoryIdx: index("patient_variables_patient_category_idx").on(table.patientId, table.variableCategory),
+    patientCategoryActiveIdx: index("patient_variables_patient_category_active_idx").on(table.patientId, table.variableCategory, table.isActive),
+    // Performance indexes
+    nameCategoryIdx: index("patient_variables_name_category_idx").on(table.variableName, table.variableCategory),
   })
 );
 

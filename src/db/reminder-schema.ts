@@ -6,6 +6,8 @@ import {
   uuid,
   integer,
   index,
+  jsonb,
+  decimal,
 } from "drizzle-orm/pg-core";
 
 // Import enums
@@ -17,6 +19,11 @@ import {
   templateCategoryEnum,
   followupStatusEnum,
   followupTypeEnum,
+  medicationCategoryEnum,
+  medicationFormEnum,
+  medicationFrequencyEnum,
+  medicationTimingEnum,
+  medicationUnitEnum,
 } from "./enums";
 
 // Import patient table for foreign key reference
@@ -34,6 +41,7 @@ export const reminderSchedules = pgTable(
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }),
     customMessage: text("custom_message"),
+    medicationDetails: jsonb("medication_details"), // Structured medication data
     isActive: boolean("is_active").notNull().default(true),
     createdById: uuid("created_by_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -310,6 +318,94 @@ export const reminderFollowups = pgTable(
       table.followupType,
       table.status
     ),
+  })
+);
+
+// ===== MEDICATION ADMINISTRATION LOGS TABLE =====
+
+export const medicationAdministrationLogs = pgTable(
+  "medication_administration_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+    medicationScheduleId: uuid("medication_schedule_id").references(() => medicationSchedules.id, { onDelete: "set null" }),
+    reminderScheduleId: uuid("reminder_schedule_id").references(() => reminderSchedules.id, { onDelete: "set null" }),
+    reminderLogId: uuid("reminder_log_id").references(() => reminderLogs.id, { onDelete: "set null" }),
+    medicationName: text("medication_name").notNull(),
+    scheduledDateTime: timestamp("scheduled_date_time", { withTimezone: true }).notNull(),
+    actualDateTime: timestamp("actual_date_time", { withTimezone: true }),
+    dosage: text("dosage").notNull(),
+    dosageTaken: text("dosage_taken"),
+    status: text("status").notNull().$type<"TAKEN" | "MISSED" | "PARTIAL" | "REFUSED" | "DELAYED">(),
+    administeredBy: text("administered_by").notNull().$type<"PATIENT" | "CAREGIVER" | "HEALTHCARE_WORKER" | "SYSTEM">(),
+    notes: text("notes"),
+    sideEffects: text("side_effects"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    patientIdIdx: index("medication_admin_logs_patient_id_idx").on(table.patientId),
+    medicationScheduleIdIdx: index("medication_admin_logs_medication_schedule_id_idx").on(table.medicationScheduleId),
+    reminderScheduleIdIdx: index("medication_admin_logs_reminder_schedule_id_idx").on(table.reminderScheduleId),
+    reminderLogIdIdx: index("medication_admin_logs_reminder_log_id_idx").on(table.reminderLogId),
+    scheduledDateTimeIdx: index("medication_admin_logs_scheduled_date_time_idx").on(table.scheduledDateTime),
+    actualDateTimeIdx: index("medication_admin_logs_actual_date_time_idx").on(table.actualDateTime),
+    statusIdx: index("medication_admin_logs_status_idx").on(table.status),
+    administeredByIdx: index("medication_admin_logs_administered_by_idx").on(table.administeredBy),
+    patientScheduledIdx: index("medication_admin_logs_patient_scheduled_idx").on(table.patientId, table.scheduledDateTime),
+    patientStatusIdx: index("medication_admin_logs_patient_status_idx").on(table.patientId, table.status),
+    scheduledStatusIdx: index("medication_admin_logs_scheduled_status_idx").on(table.scheduledDateTime, table.status),
+    // Performance indexes for compliance tracking
+    patientDateStatusIdx: index("medication_admin_logs_patient_date_status_idx").on(table.patientId, table.scheduledDateTime, table.status),
+    createdAtIdx: index("medication_admin_logs_created_at_idx").on(table.createdAt),
+  })
+);
+
+// ===== MEDICATION SCHEDULES TABLE =====
+
+export const medicationSchedules = pgTable(
+  "medication_schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+    reminderScheduleId: uuid("reminder_schedule_id").references(() => reminderSchedules.id, { onDelete: "set null" }),
+    medicationName: text("medication_name").notNull(),
+    genericName: text("generic_name"),
+    category: medicationCategoryEnum("category").notNull().default("OTHER"),
+    form: medicationFormEnum("form").notNull().default("TABLET"),
+    dosage: text("dosage").notNull(), // e.g., "500mg", "2 tablets"
+    dosageValue: decimal("dosage_value", { precision: 10, scale: 3 }), // Numeric value for calculations
+    dosageUnit: medicationUnitEnum("dosage_unit").notNull().default("MG"),
+    frequency: medicationFrequencyEnum("frequency").notNull().default("ONCE_DAILY"),
+    timing: medicationTimingEnum("timing").notNull().default("ANYTIME"),
+    instructions: text("instructions"),
+    startDate: timestamp("start_date", { withTimezone: true }).notNull(),
+    endDate: timestamp("end_date", { withTimezone: true }),
+    isActive: boolean("is_active").notNull().default(true),
+    prescribedBy: text("prescribed_by"), // Doctor's name
+    pharmacy: text("pharmacy"),
+    notes: text("notes"),
+    createdBy: uuid("created_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => ({
+    patientIdIdx: index("medication_schedules_patient_id_idx").on(table.patientId),
+    reminderScheduleIdIdx: index("medication_schedules_reminder_schedule_id_idx").on(table.reminderScheduleId),
+    categoryIdx: index("medication_schedules_category_idx").on(table.category),
+    formIdx: index("medication_schedules_form_idx").on(table.form),
+    frequencyIdx: index("medication_schedules_frequency_idx").on(table.frequency),
+    isActiveIdx: index("medication_schedules_is_active_idx").on(table.isActive),
+    startDateIdx: index("medication_schedules_start_date_idx").on(table.startDate),
+    endDateIdx: index("medication_schedules_end_date_idx").on(table.endDate),
+    patientActiveIdx: index("medication_schedules_patient_active_idx").on(table.patientId, table.isActive),
+    patientDateActiveIdx: index("medication_schedules_patient_date_active_idx").on(table.patientId, table.startDate, table.isActive),
+    deletedAtIdx: index("medication_schedules_deleted_at_idx").on(table.deletedAt),
+    // Performance indexes for common queries
+    activeStartDateIdx: index("medication_schedules_active_start_date_idx").on(table.isActive, table.startDate),
+    patientCategoryIdx: index("medication_schedules_patient_category_idx").on(table.patientId, table.category),
+    patientFrequencyIdx: index("medication_schedules_patient_frequency_idx").on(table.patientId, table.frequency),
   })
 );
 

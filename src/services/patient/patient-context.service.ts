@@ -21,6 +21,7 @@ import {
   invalidateCache,
 } from "@/lib/cache";
 import { generatePhoneAlternatives } from "@/lib/phone-utils";
+import { MedicationParser } from "@/lib/medication-parser";
 
 export interface PatientContext {
   patient: {
@@ -300,15 +301,24 @@ export class PatientContextService {
         .orderBy(reminderSchedules.scheduledTime)
         .limit(10);
 
-      return reminders.map((reminder) => ({
-        id: reminder.id,
-        scheduledTime: reminder.scheduledTime,
-        frequency: reminder.frequency,
-        medicationName: reminder.customMessage || "obat",
-        customMessage: reminder.customMessage || undefined,
-        isCompleted: false, // TODO: Check from reminder_logs
-        lastCompletedAt: undefined, // TODO: Get from reminder_logs
-      }));
+      return reminders.map((reminder) => {
+        // Parse structured medication data
+        const medicationDetails = MedicationParser.parseFromReminder(
+          'Unknown Medication',
+          reminder.customMessage || undefined
+        );
+
+        return {
+          id: reminder.id,
+          scheduledTime: reminder.scheduledTime,
+          frequency: reminder.frequency,
+          medicationName: medicationDetails.name,
+          customMessage: reminder.customMessage || undefined,
+          medicationDetails,
+          isCompleted: false, // TODO: Check from reminder_logs
+          lastCompletedAt: undefined, // TODO: Get from reminder_logs
+        };
+      });
     } catch (error) {
       logger.error("Failed to get today's reminders", error as Error, {
         patientId,
@@ -378,7 +388,7 @@ export class PatientContextService {
         }
       }
 
-      // Get medications from patient variables or medical records
+      // Get medications from patient variables using structured parsing
       const medicationVars = await db
         .select({
           variableName: patientVariables.variableName,
@@ -393,19 +403,18 @@ export class PatientContextService {
           )
         );
 
-      const medications = medicationVars
-        .filter(
-          (v) =>
-            v.variableName.toLowerCase().includes("obat") ||
-            v.variableName.toLowerCase().includes("med")
-        )
-        .map((v) => ({
-          name: v.variableValue,
-          dosage: undefined, // Could be parsed from value
-          frequency: undefined, // Could be parsed from value
-          startDate: undefined,
-          notes: v.variableName,
-        }));
+      // Parse medications using the new medication parser
+      const medications = MedicationParser.parseMultipleFromVariables(
+        medicationVars.map(v => ({ name: v.variableName, value: v.variableValue }))
+      );
+
+      const medicationsList = medications.map(med => ({
+        name: med.name,
+        dosage: med.dosage,
+        frequency: med.frequency,
+        startDate: undefined, // Could be parsed from value
+        notes: med.instructions,
+      }));
 
       const patient = patientData[0] || {};
 
@@ -415,7 +424,7 @@ export class PatientContextService {
         doctorName: patient.doctorName || undefined,
         hospitalName: patient.hospitalName || undefined,
         symptoms: symptoms.slice(0, 10), // Limit to 10 most recent
-        medications: medications.slice(0, 5), // Limit to 5 medications
+        medications: medicationsList.slice(0, 5), // Limit to 5 medications
       };
     } catch (error) {
       logger.error("Failed to get medical history", error as Error, {

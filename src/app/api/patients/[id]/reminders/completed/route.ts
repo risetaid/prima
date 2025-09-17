@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
+import { db, reminderSchedules, reminderLogs, manualConfirmations, patientVariables } from '@/db'
 import { eq, desc, isNull, and } from 'drizzle-orm'
 import { convertUTCToWIBString } from '@/lib/timezone'
+import { MedicationParser, type MedicationDetails } from '@/lib/medication-parser'
 
 export async function GET(
   request: NextRequest,
@@ -42,8 +43,9 @@ export async function GET(
     // Get associated data for each confirmation
     const completedReminders = []
     for (const confirmation of confirmations) {
-      let customMessage = 'Pengingat obat'
+      let customMessage = 'Pengingat medikasi'
       let sentAt = null
+      let medicationDetails: MedicationDetails | null = null
 
       // Get reminder log details if available
       if (confirmation.reminderLogId) {
@@ -76,6 +78,40 @@ export async function GET(
 
              if (scheduleResult.length > 0) {
                customMessage = scheduleResult[0].customMessage || customMessage
+
+               // Extract medication details from custom message if available
+               if (scheduleResult[0].customMessage) {
+                 medicationDetails = MedicationParser.parseFromReminder(scheduleResult[0].customMessage)
+               }
+             }
+
+             // Get medication details from patient variables if not found in custom message
+             if (!medicationDetails) {
+               try {
+                 const variables = await db
+                   .select({
+                     variableName: patientVariables.variableName,
+                     variableValue: patientVariables.variableValue,
+                     variableCategory: patientVariables.variableCategory
+                   })
+                   .from(patientVariables)
+                   .where(
+                     and(
+                       eq(patientVariables.patientId, id),
+                       eq(patientVariables.isActive, true),
+                       eq(patientVariables.variableCategory, 'MEDICATION')
+                     )
+                   )
+
+                 const variableArray = variables.map(v => ({
+                   name: v.variableName,
+                   value: v.variableValue
+                 }))
+
+                 medicationDetails = MedicationParser.parseFromVariables(variableArray)
+               } catch (error) {
+                 console.warn('Failed to get medication details for completed reminder:', error)
+               }
              }
            }
         }
@@ -90,7 +126,8 @@ export async function GET(
           confirmedAt: confirmation.confirmedAt,
           notes: confirmation.notes,
           customMessage,
-          sentAt
+          sentAt,
+          medicationDetails
         })
     }
 
@@ -102,7 +139,8 @@ export async function GET(
       customMessage: reminder.customMessage,
       confirmedAt: convertUTCToWIBString(reminder.confirmedAt),
       sentAt: reminder.sentAt ? reminder.sentAt.toISOString() : null,
-      notes: reminder.notes
+      notes: reminder.notes,
+      medicationDetails: reminder.medicationDetails
     }))
 
     return NextResponse.json(formattedReminders)
