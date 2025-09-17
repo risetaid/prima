@@ -207,6 +207,14 @@ export class MessageProcessorService {
   private readonly LOW_CONFIDENCE_THRESHOLD = 0.3;
 
   /**
+   * Check if message is an accept response (for verification context)
+   */
+  private isAcceptResponse(message: string): boolean {
+    const normalized = message.toLowerCase().trim();
+    return this.ACCEPT_KEYWORDS.some((keyword) => normalized.includes(keyword));
+  }
+
+  /**
    * Determine if message needs intent detection based on keywords and context
    */
   private shouldUseIntentDetection(
@@ -427,6 +435,12 @@ export class MessageProcessorService {
   async processMessage(context: MessageContext): Promise<ProcessedMessage> {
     const normalizedMessage = this.normalizeMessage(context.message);
 
+    // Declare variables at function scope
+    let intent: MessageIntent;
+    let entities: MessageEntity[] = [];
+    let llmResponse: ProcessedLLMResponse | null = null;
+    let needsIntentDetection = false;
+
     // Get or create conversation state for continuity
     let conversationState =
       await this.conversationStateService.findByPhoneNumber(
@@ -448,32 +462,49 @@ export class MessageProcessorService {
         20 // Last 20 messages for context
       );
 
-    // Determine if this message needs intent classification
-    const needsIntentDetection = this.shouldUseIntentDetection(
-      normalizedMessage,
-      conversationState,
-      context
-    );
-
-    let intent: MessageIntent;
-    let entities: MessageEntity[] = [];
-    let llmResponse: ProcessedLLMResponse | null = null;
-
-    if (needsIntentDetection) {
-      // Use intent detection for verification and confirmation messages
-      intent = await this.detectIntent(
-        normalizedMessage,
-        context,
-        conversationHistory
-      );
-      entities = this.extractEntities(normalizedMessage);
+    // Special handling for verification context - always treat "ya" variations as acceptance
+    if (conversationState.currentContext === "verification") {
+      const isAcceptResponse = this.isAcceptResponse(normalizedMessage);
+      if (isAcceptResponse) {
+        intent = {
+          primary: "accept",
+          sentiment: "positive",
+          confidence: 1.0,
+        };
+        entities = [];
+      } else {
+        // For verification context, if not "ya", treat as decline
+        intent = {
+          primary: "decline",
+          sentiment: "negative",
+          confidence: 1.0,
+        };
+        entities = [];
+      }
     } else {
-      // Use direct LLM response for general inquiries
-      intent = {
-        primary: "inquiry",
-        sentiment: "neutral",
-        confidence: 1.0,
-      };
+      // Determine if this message needs intent classification
+      needsIntentDetection = this.shouldUseIntentDetection(
+        normalizedMessage,
+        conversationState,
+        context
+      );
+
+      if (needsIntentDetection) {
+        // Use intent detection for verification and confirmation messages
+        intent = await this.detectIntent(
+          normalizedMessage,
+          context,
+          conversationHistory
+        );
+        entities = this.extractEntities(normalizedMessage);
+      } else {
+        // Use direct LLM response for general inquiries
+        intent = {
+          primary: "inquiry",
+          sentiment: "neutral",
+          confidence: 1.0,
+        };
+      }
     }
 
     // Get patient context for LLM
@@ -1378,7 +1409,9 @@ export class MessageProcessorService {
     const activeReminders = patientInfo?.activeReminders || [];
 
     // Build concise patient information
-    let patientDetails = `PATIENT: ${patientInfo?.name || "Unknown"}, Status: ${patientInfo?.verificationStatus || "Unknown"}`;
+    let patientDetails = `PATIENT: ${patientInfo?.name || "Unknown"}, Status: ${
+      patientInfo?.verificationStatus || "Unknown"
+    }`;
 
     if (activeReminders.length > 0) {
       patientDetails += `, Active meds: ${activeReminders

@@ -53,3 +53,5 @@ prima_backup.sql
 
 # archived files
 _archive/
+
+convo.tmp
