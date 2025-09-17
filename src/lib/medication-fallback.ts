@@ -261,7 +261,7 @@ export class MedicationFallbackResolver {
         level: 5,
         description: "Contextual generation",
         confidence: 0.5,
-        applicable: (_context) => true,
+        applicable: () => true,
         resolve: (context) => this.resolveContextual(context),
       },
     ];
