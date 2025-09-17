@@ -6,7 +6,7 @@
 export interface StandardResponse {
   success: boolean;
   message: string;
-  data?: any;
+  data?: Record<string, unknown>;
   error?: string;
   metadata?: ResponseMetadata;
 }
@@ -135,7 +135,7 @@ export const responseHandlerRegistry = new DefaultResponseHandlerRegistry();
 // Helper functions for creating standard responses
 export function createSuccessResponse(
   message: string,
-  data?: any,
+  data?: Record<string, unknown>,
   metadata?: Partial<ResponseMetadata>
 ): StandardResponse {
   return {

@@ -514,7 +514,7 @@ export class FollowupService {
 
         // Check for cancer stage-specific considerations
         if (patient.cancerStage && ['3', '4', 'advanced'].some(stage =>
-          patient.cancerStage.toLowerCase().includes(stage))) {
+          patient.cancerStage!.toLowerCase().includes(stage))) {
           context += `- Special Consideration: Advanced cancer stage - monitor closely\n`;
         }
         break;
@@ -655,10 +655,10 @@ export class FollowupService {
         processedResponse = {
           content: "⚠️ *Darurat Terdeteksi*\n\nTim kami telah menerima pesan darurat Anda dan segera menghubungi Anda. Jika ini adalah keadaan darurat medis, segera hubungi layanan darurat terdekat atau hubungi nomor darurat.",
           actions: ["emergency_handled"],
-          intent: "emergency",
+          intent: { primary: "emergency", sentiment: "neutral", confidence: 1.0 },
           confidence: 1.0,
           entities: [],
-          response: { content: "", actions: [] },
+          response: { message: "", actions: [], type: "auto_reply", priority: "urgent" },
           context: { patientId: "", phoneNumber: "", message: "", timestamp: new Date(), patientName: "", verificationStatus: "" }
         };
       } else {
@@ -679,7 +679,7 @@ export class FollowupService {
       return {
         processed: true,
         emergencyDetected: emergencyResult.isEmergency,
-        response: 'content' in processedResponse ? processedResponse.content : processedResponse.response.content,
+        response: 'content' in processedResponse ? processedResponse.content : processedResponse.response.message || "",
         escalated
       };
     } catch (error) {

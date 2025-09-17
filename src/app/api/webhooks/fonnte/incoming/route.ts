@@ -1342,7 +1342,7 @@ export async function POST(request: NextRequest) {
 
     if (standardResult.success) {
       // Send response message if available
-      if (standardResult.data?.responseMessage) {
+      if (standardResult.data?.responseMessage && typeof standardResult.data.responseMessage === 'string') {
         await sendAck(patient.phoneNumber, standardResult.data.responseMessage);
       }
 
