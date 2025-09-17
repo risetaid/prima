@@ -138,7 +138,8 @@ async function fetchReminderSchedules(todayWIB: string, endOfDay: Date, todaySta
             .where(
               and(
                 eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                eq(reminderLogs.status, "DELIVERED"),
+                // Check for both SENT and DELIVERED statuses to exclude already processed reminders
+                eq(reminderLogs.status, "SENT"),
                 gte(reminderLogs.sentAt, todayStart)
               )
             )
