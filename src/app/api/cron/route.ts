@@ -126,6 +126,8 @@ async function fetchReminderSchedules(todayWIB: string, endOfDay: Date, todaySta
       and(
         eq(reminderSchedules.isActive, true),
         isNull(reminderSchedules.deletedAt), // Exclude deleted reminders
+        // Only get reminders for TODAY (not yesterday or future dates)
+        gte(reminderSchedules.startDate, todayStart),
         lte(reminderSchedules.startDate, endOfDay),
         eq(patients.isActive, true),
         eq(patients.verificationStatus, "verified"),
@@ -403,6 +405,7 @@ function buildSummary(startTime: number, processedCount: number, sentCount: numb
         processedCount > 0 && sentCount >= 0
           ? `${Math.round((sentCount / processedCount) * 100)}%`
           : "0%",
+      note: "Only processing reminders that have NOT been delivered yet (Terjadwal status)"
     },
     details:
       debugLogs.length > 0 ? debugLogs : ["No detailed logs available"],
