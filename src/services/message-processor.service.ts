@@ -558,7 +558,15 @@ export class MessageProcessorService {
 
     // Generate response based on intent detection result
     let recommendedResponse: RecommendedResponse;
-    if (
+
+    // Special handling for verification context - NEVER use LLM for response generation
+    if (conversationState.currentContext === "verification") {
+      recommendedResponse = await this.generateResponse(
+        intent,
+        entities,
+        context
+      );
+    } else if (
       needsIntentDetection &&
       intent.confidence &&
       intent.confidence >= this.CONFIDENCE_THRESHOLD
@@ -955,7 +963,8 @@ export class MessageProcessorService {
     entities: MessageEntity[],
     context: MessageContext
   ): Promise<RecommendedResponse> {
-    // For verification intents, always use template responses to ensure consistency
+    // For verification intents, ALWAYS use template responses to ensure consistency
+    // NEVER use LLM for verification response generation
     if (intent.primary === "accept" || intent.primary === "decline") {
       switch (intent.primary) {
         case "accept":
@@ -1204,6 +1213,17 @@ export class MessageProcessorService {
     intent: MessageIntent,
     context: MessageContext
   ): Promise<RecommendedResponse | null> {
+    // CRITICAL: Never use LLM for verification response generation
+    // Verification responses must use templates to ensure consistency and avoid inappropriate content
+    if (intent.primary === "accept" || intent.primary === "decline") {
+      logger.warn("LLM response generation blocked for verification intent", {
+        intent: intent.primary,
+        patientId: context.patientId,
+        operation: "verification_response_protection",
+      });
+      return null; // Force fallback to template responses
+    }
+
     try {
       // Get patient context for LLM
       const patientContext = await this.patientContextService.getPatientContext(
@@ -1277,19 +1297,8 @@ export class MessageProcessorService {
       const actions: ResponseAction[] = [];
 
       // Add appropriate actions based on intent
+      // Note: accept/decline cases are handled by template responses, not LLM
       switch (intent.primary) {
-        case "accept":
-          actions.push({
-            type: "update_patient_status",
-            data: { status: "verified" },
-          });
-          break;
-        case "decline":
-          actions.push({
-            type: "update_patient_status",
-            data: { status: "declined" },
-          });
-          break;
         case "confirm_taken":
           actions.push({
             type: "log_confirmation",

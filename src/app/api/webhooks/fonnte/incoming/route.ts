@@ -13,7 +13,10 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import type { Patient, ReminderLog } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
-import { MedicationParser, type MedicationDetails } from "@/lib/medication-parser";
+import {
+  MedicationParser,
+  type MedicationDetails,
+} from "@/lib/medication-parser";
 import type { IntentDetectionResult } from "@/services/llm/llm.types";
 import type { RecommendedResponse } from "@/services/message-processor.service";
 
@@ -145,10 +148,16 @@ function detectIntentEnhanced(
     ],
     confirmation_taken: [
       { words: ["sudah", "udah", "done", "selesai"], weight: 10 },
-      { words: ["sudah lakukan", "sudah selesai", "sudah dilakukan"], weight: 9 },
+      {
+        words: ["sudah lakukan", "sudah selesai", "sudah dilakukan"],
+        weight: 9,
+      },
       { words: ["oke", "ok", "siap", "good"], weight: 7 },
       // Phrases
-      { words: ["sudah selesai", "sudah lakukan", "sudah dilakukan"], weight: 15 },
+      {
+        words: ["sudah selesai", "sudah lakukan", "sudah dilakukan"],
+        weight: 15,
+      },
       { words: ["sudah beres", "sudah selesai"], weight: 14 },
     ],
     confirmation_pending: [
@@ -176,7 +185,7 @@ function detectIntentEnhanced(
   };
 
   for (const [intentKey, patternList] of Object.entries(patterns)) {
-    const intent = intentKey as IntentResult['intent'];
+    const intent = intentKey as IntentResult["intent"];
     let totalScore = 0;
     const matchedWords: string[] = [];
 
@@ -223,8 +232,6 @@ function detectIntentEnhanced(
 
   return bestMatch;
 }
-
-
 
 async function sendAck(phoneNumber: string, message: string) {
   try {
@@ -312,7 +319,10 @@ async function handleVerificationDecline(message: string, patient: Patient) {
   };
 }
 
-async function handleVerificationUnsubscribe(message: string, patient: Patient) {
+async function handleVerificationUnsubscribe(
+  message: string,
+  patient: Patient
+) {
   logger.info("Processing unsubscribe request", { patientId: patient.id });
 
   await db
@@ -362,7 +372,7 @@ async function handleVerificationResponse(
   logger.info("Processing verification text response", {
     originalMessage: message,
     patientId: patient.id,
-    operation: "verification_response"
+    operation: "verification_response",
   });
 
   try {
@@ -372,16 +382,18 @@ async function handleVerificationResponse(
       return llmResult;
     }
 
-    logger.info("LLM verification processing failed, falling back to keyword detection", {
-      patientId: patient.id,
-      operation: "verification_response"
-    });
-
+    logger.info(
+      "LLM verification processing failed, falling back to keyword detection",
+      {
+        patientId: patient.id,
+        operation: "verification_response",
+      }
+    );
   } catch (error) {
     logger.warn("LLM verification processing failed, using keyword fallback", {
       patientId: patient.id,
       operation: "verification_response",
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 
@@ -405,8 +417,8 @@ async function processVerificationWithLLM(
       patientInfo: {
         name: patient.name,
         verificationStatus: patient.verificationStatus,
-        activeReminders: []
-      }
+        activeReminders: [],
+      },
     };
 
     // Use LLM to detect intent
@@ -417,7 +429,7 @@ async function processVerificationWithLLM(
       llmIntent: intentResult.intent,
       confidence: intentResult.confidence,
       entities: intentResult.entities,
-      operation: "llm_verification_detection"
+      operation: "llm_verification_detection",
     });
 
     // Map LLM intent to verification actions
@@ -425,8 +437,15 @@ async function processVerificationWithLLM(
       switch (intentResult.intent) {
         case "verification_response":
           // LLM detected verification response, need to determine if it's YA or TIDAK
-          const verificationType = await determineVerificationTypeFromMessage(message, intentResult);
-          return await handleVerificationByType(verificationType, message, patient);
+          const verificationType = await determineVerificationTypeFromMessage(
+            message,
+            intentResult
+          );
+          return await handleVerificationByType(
+            verificationType,
+            message,
+            patient
+          );
         case "unsubscribe":
           return handleVerificationUnsubscribe(message, patient);
         case "emergency":
@@ -438,24 +457,24 @@ async function processVerificationWithLLM(
           return {
             processed: true,
             action: "emergency_escalation",
-            message: "Emergency detected during verification - volunteer notified"
+            message:
+              "Emergency detected during verification - volunteer notified",
           };
         default:
           logger.info("LLM returned non-verification intent", {
             patientId: patient.id,
             llmIntent: intentResult.intent,
-            operation: "llm_verification_detection"
+            operation: "llm_verification_detection",
           });
           return { processed: false };
       }
     }
 
     return { processed: false };
-
   } catch (error) {
     logger.error("LLM verification processing failed", error as Error, {
       patientId: patient.id,
-      operation: "llm_verification_detection"
+      operation: "llm_verification_detection",
     });
     return { processed: false };
   }
@@ -469,23 +488,52 @@ async function determineVerificationTypeFromMessage(
   intentResult: IntentDetectionResult
 ): Promise<"accept" | "decline"> {
   // Check LLM entities first
-  if (intentResult.entities && typeof intentResult.entities === 'object') {
+  if (intentResult.entities && typeof intentResult.entities === "object") {
     const entities = intentResult.entities as Record<string, unknown>;
-    if (entities.response_type === 'positive' || entities.response_type === 'accept') {
+    if (
+      entities.response_type === "positive" ||
+      entities.response_type === "accept"
+    ) {
       return "accept";
     }
-    if (entities.response_type === 'negative' || entities.response_type === 'decline') {
+    if (
+      entities.response_type === "negative" ||
+      entities.response_type === "decline"
+    ) {
       return "decline";
     }
   }
 
   // Fallback to keyword analysis within the message
   const normalizedMessage = message.toLowerCase().trim();
-  const acceptPatterns = ["ya", "iya", "yes", "setuju", "boleh", "mau", "terima", "ok", "oke"];
-  const declinePatterns = ["tidak", "no", "tolak", "nanti", "belum", "ga", "gak", "engga"];
+  const acceptPatterns = [
+    "ya",
+    "iya",
+    "yes",
+    "setuju",
+    "boleh",
+    "mau",
+    "terima",
+    "ok",
+    "oke",
+  ];
+  const declinePatterns = [
+    "tidak",
+    "no",
+    "tolak",
+    "nanti",
+    "belum",
+    "ga",
+    "gak",
+    "engga",
+  ];
 
-  const hasAcceptPattern = acceptPatterns.some(pattern => normalizedMessage.includes(pattern));
-  const hasDeclinePattern = declinePatterns.some(pattern => normalizedMessage.includes(pattern));
+  const hasAcceptPattern = acceptPatterns.some((pattern) =>
+    normalizedMessage.includes(pattern)
+  );
+  const hasDeclinePattern = declinePatterns.some((pattern) =>
+    normalizedMessage.includes(pattern)
+  );
 
   if (hasAcceptPattern && !hasDeclinePattern) return "accept";
   if (hasDeclinePattern && !hasAcceptPattern) return "decline";
@@ -524,7 +572,7 @@ async function handleVerificationWithKeywords(
     confidence: intentResult.confidence,
     matchedWords: intentResult.matchedWords,
     patientId: patient.id,
-    operation: "keyword_verification_detection"
+    operation: "keyword_verification_detection",
   });
 
   if (intentResult.confidence < 0.4) {
@@ -560,36 +608,38 @@ async function findPendingReminder(patientId: string) {
 /**
  * Get patient medication details for personalization
  */
-async function getPatientMedicationDetails(patientId: string): Promise<MedicationDetails | null> {
+async function getPatientMedicationDetails(
+  patientId: string
+): Promise<MedicationDetails | null> {
   try {
     // Get patient variables to extract medication information
     const variables = await db
       .select({
         variableName: patientVariables.variableName,
         variableValue: patientVariables.variableValue,
-        variableCategory: patientVariables.variableCategory
+        variableCategory: patientVariables.variableCategory,
       })
       .from(patientVariables)
       .where(
         and(
           eq(patientVariables.patientId, patientId),
           eq(patientVariables.isActive, true),
-          eq(patientVariables.variableCategory, 'MEDICATION')
+          eq(patientVariables.variableCategory, "MEDICATION")
         )
       );
 
     // Convert to format expected by MedicationParser
-    const variableArray = variables.map(v => ({
+    const variableArray = variables.map((v) => ({
       name: v.variableName,
-      value: v.variableValue
+      value: v.variableValue,
     }));
 
     // Parse medication details from variables
     return MedicationParser.parseFromVariables(variableArray);
   } catch (error) {
-    logger.warn('Failed to get patient medication details', {
+    logger.warn("Failed to get patient medication details", {
       patientId,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
@@ -598,16 +648,19 @@ async function getPatientMedicationDetails(patientId: string): Promise<Medicatio
 /**
  * Build personalized medication message
  */
-function buildMedicationMessage(medication: MedicationDetails | null, template: string): string {
+function buildMedicationMessage(
+  medication: MedicationDetails | null,
+  template: string
+): string {
   if (!medication) {
-    return template.replace(/obat/gi, 'medikasi');
+    return template.replace(/obat/gi, "medikasi");
   }
 
   return template
-    .replace(/obat/gi, medication.name || 'medikasi')
-    .replace(/\{name\}/gi, medication.name || 'medikasi')
-    .replace(/\{dosage\}/gi, medication.dosage || '')
-    .replace(/\{form\}/gi, medication.form || 'tablet');
+    .replace(/obat/gi, medication.name || "medikasi")
+    .replace(/\{name\}/gi, medication.name || "medikasi")
+    .replace(/\{dosage\}/gi, medication.dosage || "")
+    .replace(/\{form\}/gi, medication.form || "tablet");
 }
 
 async function handleMedicationLowConfidence(patient: Patient) {
@@ -616,14 +669,17 @@ async function handleMedicationLowConfidence(patient: Patient) {
 
   const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+  const personalizedMessage = buildMedicationMessage(
+    medicationDetails,
+    baseMessage
+  );
 
   await sendAck(patient.phoneNumber, personalizedMessage);
 
-  logger.info('Medication low confidence response sent', {
+  logger.info("Medication low confidence response sent", {
     patientId: patient.id,
     medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null
+    personalized: medicationDetails !== null,
   });
 
   return {
@@ -633,7 +689,10 @@ async function handleMedicationLowConfidence(patient: Patient) {
   };
 }
 
-async function handleMedicationNoPendingReminder(message: string, patient: Patient) {
+async function handleMedicationNoPendingReminder(
+  message: string,
+  patient: Patient
+) {
   const intentResult = detectIntentEnhanced(message, "medication");
 
   if (intentResult.intent !== "other" && intentResult.confidence > 0.5) {
@@ -642,14 +701,17 @@ async function handleMedicationNoPendingReminder(message: string, patient: Patie
 
     const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
 
-    const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+    const personalizedMessage = buildMedicationMessage(
+      medicationDetails,
+      baseMessage
+    );
 
     await sendAck(patient.phoneNumber, personalizedMessage);
 
-    logger.info('No pending reminder response sent', {
+    logger.info("No pending reminder response sent", {
       patientId: patient.id,
       medicationDetails: medicationDetails,
-      personalized: medicationDetails !== null
+      personalized: medicationDetails !== null,
     });
     return {
       processed: true,
@@ -661,7 +723,11 @@ async function handleMedicationNoPendingReminder(message: string, patient: Patie
   return { processed: false, message: "No pending reminder found" };
 }
 
-async function handleMedicationTaken(message: string, reminder: ReminderLog, patient: Patient) {
+async function handleMedicationTaken(
+  message: string,
+  reminder: ReminderLog,
+  patient: Patient
+) {
   // Get patient medication details for personalization
   const medicationDetails = await getPatientMedicationDetails(patient.id);
 
@@ -673,20 +739,25 @@ async function handleMedicationTaken(message: string, reminder: ReminderLog, pat
     })
     .where(eq(reminderLogs.id, reminder.id));
 
-  const baseMessage = `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString(
+  const baseMessage = `Terima kasih ${
+    patient.name
+  }! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString(
     "id-ID",
     { timeZone: "Asia/Jakarta" }
-    )}\n\n💙 Tim PRIMA`;
+  )}\n\n💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+  const personalizedMessage = buildMedicationMessage(
+    medicationDetails,
+    baseMessage
+  );
 
   await sendAck(patient.phoneNumber, personalizedMessage);
 
-  logger.info('Medication taken confirmation sent', {
+  logger.info("Medication taken confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
     medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null
+    personalized: medicationDetails !== null,
   });
 
   return {
@@ -696,7 +767,11 @@ async function handleMedicationTaken(message: string, reminder: ReminderLog, pat
   };
 }
 
-async function handleMedicationPending(message: string, reminder: ReminderLog, patient: Patient) {
+async function handleMedicationPending(
+  message: string,
+  reminder: ReminderLog,
+  patient: Patient
+) {
   // Get patient medication details for personalization
   const medicationDetails = await getPatientMedicationDetails(patient.id);
 
@@ -709,15 +784,18 @@ async function handleMedicationPending(message: string, reminder: ReminderLog, p
 
   const baseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+  const personalizedMessage = buildMedicationMessage(
+    medicationDetails,
+    baseMessage
+  );
 
   await sendAck(patient.phoneNumber, personalizedMessage);
 
-  logger.info('Medication pending confirmation sent', {
+  logger.info("Medication pending confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
     medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null
+    personalized: medicationDetails !== null,
   });
 
   return {
@@ -727,7 +805,11 @@ async function handleMedicationPending(message: string, reminder: ReminderLog, p
   };
 }
 
-async function handleMedicationHelp(message: string, reminder: ReminderLog, patient: Patient) {
+async function handleMedicationHelp(
+  message: string,
+  reminder: ReminderLog,
+  patient: Patient
+) {
   await db
     .update(reminderLogs)
     .set({
@@ -819,7 +901,11 @@ async function parseWebhookBody(request: NextRequest) {
   return { parsed, contentType };
 }
 
-function logWebhookPayload(parsed: WebhookBody, request: NextRequest, contentType: string) {
+function logWebhookPayload(
+  parsed: WebhookBody,
+  request: NextRequest,
+  contentType: string
+) {
   logger.info("Raw Fonnte webhook payload received", {
     timestamp: new Date().toISOString(),
     method: request.method,
@@ -860,7 +946,12 @@ async function validateAndNormalizePayload(parsed: WebhookBody) {
   return result.data;
 }
 
-async function checkIdempotency(data: { id?: string; sender: string; timestamp?: string | number; message: string }) {
+async function checkIdempotency(data: {
+  id?: string;
+  sender: string;
+  timestamp?: string | number;
+  message: string;
+}) {
   const fallbackId = hashFallbackId([
     data.id,
     data.sender,
@@ -899,7 +990,11 @@ async function findPatient(sender: string, parsed: WebhookBody) {
   return found.patient;
 }
 
-async function logConversation(patient: Patient, sender: string, message: string | undefined) {
+async function logConversation(
+  patient: Patient,
+  sender: string,
+  message: string | undefined
+) {
   try {
     const conv = new ConversationStateService();
     const state = await conv.getOrCreateConversationState(
@@ -918,7 +1013,10 @@ async function logConversation(patient: Patient, sender: string, message: string
   } catch {}
 }
 
-async function processVerificationResponse(message: string | undefined, patient: Patient) {
+async function processVerificationResponse(
+  message: string | undefined,
+  patient: Patient
+) {
   logger.info("Processing verification response", {
     patientId: patient.id,
     hasMessage: Boolean(message),
@@ -928,7 +1026,10 @@ async function processVerificationResponse(message: string | undefined, patient:
   });
 
   try {
-    const verificationResult = await handleVerificationResponse(message || "", patient);
+    const verificationResult = await handleVerificationResponse(
+      message || "",
+      patient
+    );
 
     if (verificationResult.processed) {
       logger.info("Verification response processed successfully", {
@@ -957,7 +1058,10 @@ async function processVerificationResponse(message: string | undefined, patient:
   return null;
 }
 
-async function processMedicationResponse(message: string | undefined, patient: Patient) {
+async function processMedicationResponse(
+  message: string | undefined,
+  patient: Patient
+) {
   logger.info("Processing potential medication response", {
     patientId: patient.id,
     hasMessage: Boolean(message),
@@ -967,7 +1071,10 @@ async function processMedicationResponse(message: string | undefined, patient: P
   });
 
   try {
-    const medicationResult = await handleMedicationResponse(message || "", patient);
+    const medicationResult = await handleMedicationResponse(
+      message || "",
+      patient
+    );
 
     if (medicationResult.processed) {
       logger.info("Medication response processed successfully", {
@@ -996,18 +1103,25 @@ async function processMedicationResponse(message: string | undefined, patient: P
   return null;
 }
 
-async function processFollowupResponse(message: string | undefined, patient: Patient) {
+async function processFollowupResponse(
+  message: string | undefined,
+  patient: Patient
+) {
   if (!message) return null;
 
   logger.info("Processing potential followup response", {
     patientId: patient.id,
     hasMessage: Boolean(message),
-    message: message?.substring(0, 100) + (message && message.length > 100 ? "..." : ""),
+    message:
+      message?.substring(0, 100) +
+      (message && message.length > 100 ? "..." : ""),
   });
 
   try {
     // Import FollowupService
-    const { FollowupService } = await import("@/services/reminder/followup.service");
+    const { FollowupService } = await import(
+      "@/services/reminder/followup.service"
+    );
     const followupService = new FollowupService();
 
     // Find active followups for this patient
@@ -1027,7 +1141,10 @@ async function processFollowupResponse(message: string | undefined, patient: Pat
           eq(reminderFollowups.patientId, patient.id),
           eq(reminderFollowups.status, "SENT"),
           isNull(reminderFollowups.response),
-          gt(reminderFollowups.scheduledAt, new Date(Date.now() - 24 * 60 * 60 * 1000)) // Within last 24 hours
+          gt(
+            reminderFollowups.scheduledAt,
+            new Date(Date.now() - 24 * 60 * 60 * 1000)
+          ) // Within last 24 hours
         )
       )
       .orderBy(reminderFollowups.scheduledAt)
@@ -1064,12 +1181,13 @@ async function processFollowupResponse(message: string | undefined, patient: Pat
     return NextResponse.json({
       ok: true,
       processed: true,
-      action: result.emergencyDetected ? "emergency_detected" : "followup_responded",
+      action: result.emergencyDetected
+        ? "emergency_detected"
+        : "followup_responded",
       source: "followup_response",
       emergencyDetected: result.emergencyDetected,
       escalated: result.escalated,
     });
-
   } catch (error) {
     logger.error("Failed to process followup response", error as Error, {
       patientId: patient.id,
@@ -1081,7 +1199,10 @@ async function processFollowupResponse(message: string | undefined, patient: Pat
   }
 }
 
-async function handleUnrecognizedMessage(message: string | undefined, patient: Patient) {
+async function handleUnrecognizedMessage(
+  message: string | undefined,
+  patient: Patient
+) {
   logger.info("Message not processed by specific handlers", {
     patientId: patient.id,
     verificationStatus: patient.verificationStatus,
@@ -1103,14 +1224,17 @@ async function handleUnrecognizedMessage(message: string | undefined, patient: P
     if (intentResult.confidence > 0.3) {
       const baseMessage = `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
-      const personalizedMessage = buildMedicationMessage(medicationDetails, baseMessage);
+      const personalizedMessage = buildMedicationMessage(
+        medicationDetails,
+        baseMessage
+      );
 
       await sendAck(patient.phoneNumber, personalizedMessage);
 
-      logger.info('Verified patient unrecognized message response sent', {
+      logger.info("Verified patient unrecognized message response sent", {
         patientId: patient.id,
         medicationDetails: medicationDetails,
-        personalized: medicationDetails !== null
+        personalized: medicationDetails !== null,
       });
     } else {
       await sendAck(
@@ -1129,12 +1253,25 @@ async function processMessageWithUnifiedProcessor(
   message: string | undefined,
   patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
+  // Skip unified processor for verification context to avoid LLM misuse
+  if (patient.verificationStatus === "pending_verification") {
+    logger.info("Skipping unified processor for verification context", {
+      patientId: patient.id,
+      verificationStatus: patient.verificationStatus,
+      operation: "verification_context_protection",
+    });
+    return {
+      processed: false,
+      message: "Verification context - using legacy handlers",
+    };
+  }
+
   try {
     logger.info("Processing message with unified processor", {
       patientId: patient.id,
       verificationStatus: patient.verificationStatus,
       messageLength: message?.length || 0,
-      operation: "unified_processing"
+      operation: "unified_processing",
     });
 
     // Build message context for the processor
@@ -1148,14 +1285,16 @@ async function processMessageWithUnifiedProcessor(
     };
 
     // Process message using the unified processor
-    const processedResult = await messageProcessorService.processMessage(messageContext);
+    const processedResult = await messageProcessorService.processMessage(
+      messageContext
+    );
 
     logger.info("Unified processing completed", {
       patientId: patient.id,
       intent: processedResult.intent.primary,
       confidence: processedResult.confidence,
       requiresHumanIntervention: processedResult.requiresHumanIntervention,
-      operation: "unified_processing"
+      operation: "unified_processing",
     });
 
     // Execute the recommended response actions
@@ -1164,20 +1303,19 @@ async function processMessageWithUnifiedProcessor(
     return {
       processed: true,
       action: processedResult.intent.primary,
-      message: `Processed via unified processor: ${processedResult.intent.primary}`
+      message: `Processed via unified processor: ${processedResult.intent.primary}`,
     };
-
   } catch (error) {
     logger.error("Unified message processing failed", error as Error, {
       patientId: patient.id,
       message: message?.substring(0, 100),
-      operation: "unified_processing"
+      operation: "unified_processing",
     });
 
     // Fall back to legacy processing
     return {
       processed: false,
-      message: "Unified processing failed, falling back to legacy handlers"
+      message: "Unified processing failed, falling back to legacy handlers",
     };
   }
 }
@@ -1197,16 +1335,36 @@ async function executeResponseActions(
     try {
       switch (action.type) {
         case "update_patient_status":
-          await updatePatientStatus(patient.id, action.data.status as "pending_verification" | "verified" | "declined" | "expired" | "unsubscribed");
+          await updatePatientStatus(
+            patient.id,
+            action.data.status as
+              | "pending_verification"
+              | "verified"
+              | "declined"
+              | "expired"
+              | "unsubscribed"
+          );
           break;
         case "log_confirmation":
-          await logConfirmationResponse(patient.id, action.data.status as string, action.data.response as string);
+          await logConfirmationResponse(
+            patient.id,
+            action.data.status as string,
+            action.data.response as string
+          );
           break;
         case "send_followup":
-          await scheduleFollowup(patient.id, action.data.type as string, action.data.delay as number);
+          await scheduleFollowup(
+            patient.id,
+            action.data.type as string,
+            action.data.delay as number
+          );
           break;
         case "notify_volunteer":
-          await notifyVolunteers(patient, action.data.priority as string, action.data.message as string);
+          await notifyVolunteers(
+            patient,
+            action.data.priority as string,
+            action.data.message as string
+          );
           break;
         default:
           logger.warn("Unknown action type", { actionType: action.type });
@@ -1214,7 +1372,7 @@ async function executeResponseActions(
     } catch (error) {
       logger.error("Failed to execute response action", error as Error, {
         actionType: action.type,
-        patientId: patient.id
+        patientId: patient.id,
       });
     }
   }
@@ -1228,7 +1386,15 @@ async function executeResponseActions(
 /**
  * Helper functions for action execution
  */
-async function updatePatientStatus(patientId: string, status: "pending_verification" | "verified" | "declined" | "expired" | "unsubscribed"): Promise<void> {
+async function updatePatientStatus(
+  patientId: string,
+  status:
+    | "pending_verification"
+    | "verified"
+    | "declined"
+    | "expired"
+    | "unsubscribed"
+): Promise<void> {
   const { db, patients } = await import("@/db");
   const { eq } = await import("drizzle-orm");
   const { getWIBTime } = await import("@/lib/timezone");
@@ -1242,7 +1408,11 @@ async function updatePatientStatus(patientId: string, status: "pending_verificat
     .where(eq(patients.id, patientId));
 }
 
-async function logConfirmationResponse(patientId: string, status: string, response: string): Promise<void> {
+async function logConfirmationResponse(
+  patientId: string,
+  status: string,
+  response: string
+): Promise<void> {
   const { db, reminderLogs } = await import("@/db");
   const { eq, and, desc } = await import("drizzle-orm");
 
@@ -1270,16 +1440,24 @@ async function logConfirmationResponse(patientId: string, status: string, respon
   }
 }
 
-async function scheduleFollowup(patientId: string, type: string, delay: number): Promise<void> {
+async function scheduleFollowup(
+  patientId: string,
+  type: string,
+  delay: number
+): Promise<void> {
   // This would need the reminder log ID, so for now we'll just log
   logger.info("Followup action requested", { patientId, type, delay });
 }
 
-async function notifyVolunteers(patient: Patient, priority: string, message: string): Promise<void> {
+async function notifyVolunteers(
+  patient: Patient,
+  priority: string,
+  message: string
+): Promise<void> {
   logger.info("Volunteer notification requested", {
     patientId: patient.id,
     priority,
-    message: message?.substring(0, 100)
+    message: message?.substring(0, 100),
   });
 
   // Implementation would depend on volunteer notification system
@@ -1289,7 +1467,7 @@ async function notifyVolunteers(patient: Patient, priority: string, message: str
       patientId: patient.id,
       patientName: patient.name,
       phoneNumber: patient.phoneNumber,
-      message
+      message,
     });
   }
 }
@@ -1304,15 +1482,14 @@ export async function POST(request: NextRequest) {
   const validationResult = await validateAndNormalizePayload(parsed);
   if (validationResult instanceof NextResponse) return validationResult;
 
-  const {
-    sender,
-    message,
-    device,
-    id,
-    timestamp,
-  } = validationResult;
+  const { sender, message, device, id, timestamp } = validationResult;
 
-  const duplicateCheck = await checkIdempotency({ id, sender, timestamp, message });
+  const duplicateCheck = await checkIdempotency({
+    id,
+    sender,
+    timestamp,
+    message,
+  });
   if (duplicateCheck) return duplicateCheck;
 
   logger.info("Fonnte incoming webhook received", {
@@ -1327,44 +1504,68 @@ export async function POST(request: NextRequest) {
 
   await logConversation(patient, sender, message || "");
 
-  // PRIORITY 0: Try standardized response processor for all messages
-  try {
-    const { responseProcessorService } = await import("@/services/response-processor.service");
-    const context = responseProcessorService.createContext(
-      patient.id,
-      patient.phoneNumber,
-      message || "",
-      patient.verificationStatus,
-      "verification" // Default, will be refined by handlers
-    );
+  // PRIORITY 0: Skip standardized response processor for verification context to avoid LLM misuse
+  if (patient.verificationStatus !== "pending_verification") {
+    try {
+      const { responseProcessorService } = await import(
+        "@/services/response-processor.service"
+      );
+      const context = responseProcessorService.createContext(
+        patient.id,
+        patient.phoneNumber,
+        message || "",
+        patient.verificationStatus,
+        "verification" // Default, will be refined by handlers
+      );
 
-    const standardResult = await responseProcessorService.processResponse(context);
+      const standardResult = await responseProcessorService.processResponse(
+        context
+      );
 
-    if (standardResult.success) {
-      // Send response message if available
-      if (standardResult.data?.responseMessage && typeof standardResult.data.responseMessage === 'string') {
-        await sendAck(patient.phoneNumber, standardResult.data.responseMessage);
+      if (standardResult.success) {
+        // Send response message if available
+        if (
+          standardResult.data?.responseMessage &&
+          typeof standardResult.data.responseMessage === "string"
+        ) {
+          await sendAck(
+            patient.phoneNumber,
+            standardResult.data.responseMessage
+          );
+        }
+
+        return NextResponse.json({
+          ok: true,
+          processed: true,
+          action: standardResult.metadata?.action || "standard_response",
+          source: "standard_processor",
+          emergencyDetected: standardResult.metadata?.emergencyDetected,
+          escalated: standardResult.metadata?.escalated,
+        });
       }
-
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action: standardResult.metadata?.action || "standard_response",
-        source: "standard_processor",
-        emergencyDetected: standardResult.metadata?.emergencyDetected,
-        escalated: standardResult.metadata?.escalated
-      });
+    } catch (error) {
+      logger.warn(
+        "Standard response processor failed, falling back to unified processor",
+        {
+          patientId: patient.id,
+          operation: "standard_processor_fallback",
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
-  } catch (error) {
-    logger.warn("Standard response processor failed, falling back to unified processor", {
-      patientId: patient.id,
-      operation: "standard_processor_fallback",
-      error: error instanceof Error ? error.message : String(error)
-    });
+  }
+
+  // PRIORITY 1: Check if patient is awaiting verification (process BEFORE unified processor)
+  if (patient.verificationStatus === "pending_verification") {
+    const result = await processVerificationResponse(message || "", patient);
+    if (result) return result;
   }
 
   // PRIORITY 1: Try unified processor for all messages (fallback)
-  const unifiedResult = await processMessageWithUnifiedProcessor(message || "", patient);
+  const unifiedResult = await processMessageWithUnifiedProcessor(
+    message || "",
+    patient
+  );
   if (unifiedResult.processed) {
     return NextResponse.json({
       ok: true,
@@ -1372,12 +1573,6 @@ export async function POST(request: NextRequest) {
       action: unifiedResult.action,
       source: "unified_processor",
     });
-  }
-
-  // PRIORITY 1: Check if patient is awaiting verification (legacy fallback)
-  if (patient.verificationStatus === "pending_verification") {
-    const result = await processVerificationResponse(message || "", patient);
-    if (result) return result;
   }
 
   // PRIORITY 2: Check for medication responses (if patient is verified) (legacy fallback)
