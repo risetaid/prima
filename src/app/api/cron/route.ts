@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db, reminderSchedules, patients, reminderLogs } from "@/db";
-import { eq, and, gte, lte, notExists, count, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, notExists, or, count, isNull } from "drizzle-orm";
 import {
   shouldSendReminderNow,
   getWIBTime,
@@ -138,8 +138,8 @@ async function fetchReminderSchedules(todayWIB: string, endOfDay: Date, todaySta
             .where(
               and(
                 eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-                // Check for both SENT and DELIVERED statuses to exclude already processed reminders
-                eq(reminderLogs.status, "SENT"),
+                // Check for both SENT and DELIVERED statuses to exclude all processed reminders
+                or(eq(reminderLogs.status, "SENT"), eq(reminderLogs.status, "DELIVERED")),
                 gte(reminderLogs.sentAt, todayStart)
               )
             )
