@@ -9,8 +9,9 @@ import { logger } from "@/lib/logger";
 import { FollowupService } from "../reminder/followup.service";
 import { llmService } from "../llm/llm.service";
 import { getFollowupResponsePrompt, getResponseGenerationPrompt } from "../llm/prompts";
-import { ConversationContext, ProcessedLLMResponse } from "../llm/llm.types";
-import { PatientContextService } from "../patient-context.service";
+import { followupStatusEnum } from "@/db/enums";
+import { ConversationContext } from "../llm/llm.types";
+import { PatientContextService } from "../patient/patient-context.service";
 import { safetyFilterService } from "../llm/safety-filter";
 import { VolunteerNotificationService } from "../notification/volunteer-notification.service";
 
@@ -129,7 +130,8 @@ export class FollowupResponseHandler extends StandardResponseHandler {
         {
           patientId: context.patientId,
           phoneNumber: context.phoneNumber,
-          conversationId: followup.id.toString()
+          conversationId: followup.id.toString(),
+          previousMessages: []
         }
       );
 
@@ -138,7 +140,7 @@ export class FollowupResponseHandler extends StandardResponseHandler {
         logger.warn("Emergency detected in followup response", {
           patientId: context.patientId,
           followupId: followup.id,
-          emergencyIndicators: safetyResult.emergencyResult.indicators,
+          analysisResult: safetyResult.emergencyResult.indicators,
           operation: "emergency_detection"
         });
 
@@ -156,7 +158,7 @@ export class FollowupResponseHandler extends StandardResponseHandler {
             action: "emergency_detected",
             emergencyDetected: true,
             escalated: true,
-            emergencyIndicators: safetyResult.emergencyResult.indicators
+            analysisResult: safetyResult.emergencyResult.indicators
           }
         );
       }
@@ -274,9 +276,8 @@ export class FollowupResponseHandler extends StandardResponseHandler {
         patientInfo: patientContext.found && patientContext.context ? {
           name: patientContext.context.patient.name,
           verificationStatus: patientContext.context.patient.verificationStatus,
-          activeReminders: patientContext.context.activeReminders?.map(r => ({
-            medicationName: r.medicationName || r.medicationDetails?.name || 'obat',
-            medicationDetails: r.medicationDetails,
+          activeReminders: patientContext.context.activeReminders?.map((r: { medicationName?: string; scheduledTime: string }) => ({
+            medicationName: r.medicationName || 'obat',
             scheduledTime: r.scheduledTime
           })) || []
         } : undefined,
@@ -308,6 +309,7 @@ export class FollowupResponseHandler extends StandardResponseHandler {
     patientMessage: string
   ): Promise<FollowupAnalysisResult> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const prompt = getFollowupResponsePrompt(context, followupType);
       const llmResponse = await llmService.generatePatientResponse(
         'followup',
@@ -372,6 +374,7 @@ Issues: ${analysis.issues_reported.join(', ')}
 
 Original Reason: ${analysis.reason}`;
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const prompt = getResponseGenerationPrompt(context, intentResult, additionalContext);
       const llmResponse = await llmService.generatePatientResponse(
         'response',
@@ -407,19 +410,7 @@ Original Reason: ${analysis.reason}`;
         .set({
           response: patientMessage,
           responseAt: new Date(),
-          status: analysis.needs_human_help ? "ESCALATED" : "COMPLETED",
-          additionalInfo: {
-            analysis: {
-              medication_status: analysis.medication_status,
-              health_condition: analysis.health_condition,
-              side_effects: analysis.side_effects,
-              issues_reported: analysis.issues_reported,
-              urgency: analysis.urgency,
-              confidence: analysis.confidence,
-              followup_required: analysis.followup_required
-            },
-            processedAt: new Date().toISOString()
-          }
+          status: (analysis.needs_human_help ? "ESCALATED" : "COMPLETED") as typeof followupStatusEnum.enumValues[number]
         })
         .where(eq(reminderFollowups.id, followupId));
 
@@ -441,7 +432,7 @@ Original Reason: ${analysis.reason}`;
         .set({
           response: message,
           responseAt: new Date(),
-          status
+          status: status as typeof followupStatusEnum.enumValues[number]
         })
         .where(eq(reminderFollowups.id, followupId));
     } catch (error) {
@@ -460,6 +451,7 @@ Original Reason: ${analysis.reason}`;
     message: string,
     followupId: string,
     analysis: FollowupAnalysisResult,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     patientName: string
   ): Promise<void> {
     try {

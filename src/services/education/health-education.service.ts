@@ -6,8 +6,20 @@
 
 import { logger } from "@/lib/logger";
 import { db, cmsArticles, patients, medicationSchedules } from "@/db";
-import { eq, and, isNull, ilike, or, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, isNull, ilike, desc, or } from "drizzle-orm";
 import { ConversationContext } from "@/services/llm/llm.types";
+import { contentCategoryEnum } from "@/db/enums";
+
+// TypeScript interfaces for type safety
+interface PatientProfile {
+  activeConditions: string[];
+  cancerStage?: string;
+  age?: number;
+  gender?: string;
+  treatmentPhase?: string;
+}
+
+type ContentCategory = typeof contentCategoryEnum.enumValues[number];
 
 export interface EducationContent {
   id: string;
@@ -300,11 +312,20 @@ export class HealthEducationService {
    * Analyze conversation context for relevant topics
    */
   private analyzeContextForTopics(context?: ConversationContext): string[] {
-    if (!context || !context.message) {
+    if (!context || !context.previousMessages || context.previousMessages.length === 0) {
       return [];
     }
 
-    const normalizedMessage = context.message.toLowerCase();
+    // Get the most recent user message
+    const lastUserMessage = context.previousMessages
+      .filter(msg => msg.role === 'user')
+      .pop();
+
+    if (!lastUserMessage) {
+      return [];
+    }
+
+    const normalizedMessage = lastUserMessage.content.toLowerCase();
     const topics: string[] = [];
 
     // Topic keywords mapping
@@ -331,7 +352,7 @@ export class HealthEducationService {
   private async generateRecommendations(
     patientId: string,
     preferences: EducationPreferences,
-    profile: any,
+    profile: PatientProfile,
     contextTopics: string[]
   ): Promise<EducationRecommendation[]> {
     const recommendations: EducationRecommendation[] = [];
@@ -388,7 +409,8 @@ export class HealthEducationService {
   private async getProactiveContent(
     patientId: string,
     preferences: EducationPreferences,
-    profile: any,
+    profile: PatientProfile,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     contentType: "daily_tip" | "weekly_roundup"
   ): Promise<EducationContent | null> {
     try {
@@ -410,7 +432,7 @@ export class HealthEducationService {
             isNull(cmsArticles.deletedAt),
             eq(cmsArticles.status, "published"),
             // Prefer patient's preferred categories
-            ...relevantCategories.map(cat => eq(cmsArticles.category, cat as any))
+            ...relevantCategories.map(cat => eq(cmsArticles.category, cat as ContentCategory))
           )
         )
         .orderBy(desc(cmsArticles.publishedAt))
@@ -447,7 +469,17 @@ export class HealthEducationService {
    */
   private identifyEducationTriggers(context: ConversationContext): string[] {
     const triggers: string[] = [];
-    const normalizedMessage = context.message.toLowerCase();
+
+    // Get the most recent user message
+    const lastUserMessage = context.previousMessages
+      ?.filter(msg => msg.role === 'user')
+      .pop();
+
+    if (!lastUserMessage) {
+      return [];
+    }
+
+    const normalizedMessage = lastUserMessage.content.toLowerCase();
 
     // Education trigger patterns
     const triggerPatterns: Record<string, RegExp[]> = {
@@ -489,7 +521,7 @@ export class HealthEducationService {
             isNull(cmsArticles.deletedAt),
             eq(cmsArticles.status, "published"),
             or(
-              eq(cmsArticles.category, trigger as any),
+              eq(cmsArticles.category, trigger as ContentCategory),
               ilike(cmsArticles.tags, `%${trigger}%`)
             )
           )
@@ -536,7 +568,7 @@ export class HealthEducationService {
             isNull(cmsArticles.deletedAt),
             eq(cmsArticles.status, "published"),
             or(
-              eq(cmsArticles.category, topic as any),
+              eq(cmsArticles.category, topic as ContentCategory),
               ilike(cmsArticles.tags, `%${topic}%`)
             )
           )
@@ -582,7 +614,7 @@ export class HealthEducationService {
           and(
             isNull(cmsArticles.deletedAt),
             eq(cmsArticles.status, "published"),
-            eq(cmsArticles.category, category as any)
+            eq(cmsArticles.category, category as ContentCategory)
           )
         )
         .orderBy(desc(cmsArticles.publishedAt))
@@ -624,7 +656,7 @@ export class HealthEducationService {
   /**
    * Get relevant categories for patient
    */
-  private getRelevantCategories(profile: any, preferences: EducationPreferences): string[] {
+  private getRelevantCategories(profile: PatientProfile, preferences: EducationPreferences): string[] {
     const categories = new Set(preferences.preferredCategories);
 
     // Add categories based on conditions

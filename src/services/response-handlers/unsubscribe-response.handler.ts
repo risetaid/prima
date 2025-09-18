@@ -2,7 +2,14 @@
  * Unsubscribe response handler for LLM-powered unsubscribe intent recognition and processing
  */
 
-import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
+import {
+  StandardResponseHandler,
+  ResponseContext,
+  StandardResponse,
+  createSuccessResponse,
+  createErrorResponse,
+  createEmergencyResponse,
+} from "../response-handler";
 import { db, patients, verificationLogs } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
@@ -10,6 +17,7 @@ import { logger } from "@/lib/logger";
 import { safetyFilterService } from "@/services/llm/safety-filter";
 import { llmService } from "@/services/llm/llm.service";
 import { getUnsubscribePrompt } from "@/services/llm/prompts";
+import { ConversationContext } from "@/services/llm/llm.types";
 
 export interface UnsubscribeAnalysisResult {
   intent: "BERHENTI" | "LANJUTKAN" | "TIDAK_PASTI";
@@ -34,7 +42,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         patientId: context.patientId,
         phoneNumber: context.phoneNumber,
         message: context.message,
-        operation: "unsubscribe_analysis"
+        operation: "unsubscribe_analysis",
       });
 
       // Get patient details
@@ -52,7 +60,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
             patientId: context.patientId,
             processingTimeMs: Date.now() - startTime,
             source: "unsubscribe_handler",
-            action: "patient_not_found"
+            action: "patient_not_found",
           }
         );
       }
@@ -60,30 +68,31 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
       const patientData = patient[0];
 
       // Build conversation context for LLM analysis
-      const conversationContext = {
+      const conversationContext: ConversationContext = {
         patientId: context.patientId,
         phoneNumber: context.phoneNumber,
         previousMessages: [],
         patientInfo: {
           name: patientData.name,
           verificationStatus: patientData.verificationStatus,
-          status: patientData.isActive ? "Aktif" : "Nonaktif",
-          activeReminders: []
-        }
+          activeReminders: [],
+        },
+        conversationId: `unsubscribe_${Date.now()}`,
       };
 
       // Check for emergency content first
-      const { emergencyResult, safetyResult } = await safetyFilterService.analyzePatientMessage(
-        context.message,
-        conversationContext
-      );
+      const { emergencyResult, safetyResult } =
+        await safetyFilterService.analyzePatientMessage(
+          context.message,
+          conversationContext
+        );
 
       if (emergencyResult.isEmergency) {
         logger.warn("Emergency detected in unsubscribe request", {
           patientId: context.patientId,
           emergencyConfidence: emergencyResult.confidence,
           emergencyIndicators: emergencyResult.indicators,
-          operation: "unsubscribe_emergency"
+          operation: "unsubscribe_emergency",
         });
 
         return createEmergencyResponse(
@@ -96,7 +105,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
             source: "unsubscribe_handler",
             action: "emergency_detected",
             emergencyDetected: true,
-            escalated: safetyResult.escalationRequired
+            escalated: safetyResult.escalationRequired,
           }
         );
       }
@@ -111,7 +120,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         patientId: context.patientId,
         analysisResult: unsubscribeAnalysis,
         processingTimeMs: Date.now() - startTime,
-        operation: "llm_analysis_completed"
+        operation: "llm_analysis_completed",
       });
 
       // Process based on LLM analysis
@@ -138,12 +147,15 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
           startTime
         );
       }
-
     } catch (error) {
-      logger.error("Failed to process unsubscribe request", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "unsubscribe_analysis"
-      });
+      logger.error(
+        "Failed to process unsubscribe request",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "unsubscribe_analysis",
+        }
+      );
 
       return createErrorResponse(
         "Failed to process unsubscribe request",
@@ -152,7 +164,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
           patientId: context.patientId,
           processingTimeMs: Date.now() - startTime,
           source: "unsubscribe_handler",
-          action: "processing_error"
+          action: "processing_error",
         }
       );
     }
@@ -163,17 +175,17 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
    */
   private async performLLMUnsubscribeAnalysis(
     message: string,
-    context: any
+    context: ConversationContext
   ): Promise<UnsubscribeAnalysisResult> {
     try {
       const prompt = getUnsubscribePrompt(context);
       const llmRequest = {
         messages: [
-          { role: "system", content: prompt.systemPrompt },
-          { role: "user", content: message }
+          { role: "system" as const, content: prompt.systemPrompt },
+          { role: "user" as const, content: message },
         ],
         maxTokens: prompt.maxTokens,
-        temperature: prompt.temperature
+        temperature: prompt.temperature,
       };
 
       const response = await llmService.generateResponse(llmRequest);
@@ -186,10 +198,13 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         urgency: parsedResponse.urgency || "sedang",
         needsHumanHelp: parsedResponse.needs_human_help || false,
         confirmationRequired: parsedResponse.confirmation_required || false,
-        sentiment: parsedResponse.sentiment || "netral"
+        sentiment: parsedResponse.sentiment || "netral",
       };
     } catch (error) {
-      logger.error("LLM unsubscribe analysis failed", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "LLM unsubscribe analysis failed",
+        error instanceof Error ? error : new Error(String(error))
+      );
 
       // Fallback analysis
       return this.performFallbackAnalysis(message);
@@ -203,14 +218,25 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
     const normalizedMessage = message.toLowerCase();
 
     // Simple keyword-based fallback
-    const strongUnsubscribeIndicators = ["berhenti", "stop", "matikan", "hentikan", "tidak mau lagi"];
-    const softUnsubscribeIndicators = ["sudah sembuh", "tidak sakit lagi", "cukup", "keluar"];
+    const strongUnsubscribeIndicators = [
+      "berhenti",
+      "stop",
+      "matikan",
+      "hentikan",
+      "tidak mau lagi",
+    ];
+    const softUnsubscribeIndicators = [
+      "sudah sembuh",
+      "tidak sakit lagi",
+      "cukup",
+      "keluar",
+    ];
 
-    const hasStrongIndicator = strongUnsubscribeIndicators.some(indicator =>
+    const hasStrongIndicator = strongUnsubscribeIndicators.some((indicator) =>
       normalizedMessage.includes(indicator)
     );
 
-    const hasSoftIndicator = softUnsubscribeIndicators.some(indicator =>
+    const hasSoftIndicator = softUnsubscribeIndicators.some((indicator) =>
       normalizedMessage.includes(indicator)
     );
 
@@ -222,7 +248,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         urgency: "sedang",
         needsHumanHelp: false,
         confirmationRequired: true,
-        sentiment: "negatif"
+        sentiment: "negatif",
       };
     } else if (hasSoftIndicator) {
       return {
@@ -232,7 +258,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         urgency: "rendah",
         needsHumanHelp: false,
         confirmationRequired: true,
-        sentiment: "netral"
+        sentiment: "netral",
       };
     } else {
       return {
@@ -242,7 +268,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         urgency: "rendah",
         needsHumanHelp: false,
         confirmationRequired: false,
-        sentiment: "netral"
+        sentiment: "netral",
       };
     }
   }
@@ -252,7 +278,11 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
    */
   private async processUnsubscribeRequest(
     context: ResponseContext,
-    patientData: any,
+    patientData: {
+      name: string;
+      isActive: boolean;
+      verificationStatus: string;
+    },
     analysis: UnsubscribeAnalysisResult,
     startTime: number
   ): Promise<StandardResponse> {
@@ -262,14 +292,18 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         "Confirmation required for unsubscribe request",
         {
           requiresConfirmation: true,
-          confirmationMessage: `🤔 *Konfirmasi Penghentian Layanan*\n\nHalo ${patientData.name}, kami ingin memastikan bahwa Anda ingin berhenti dari layanan PRIMA.\n\nAlasan: ${analysis.reason || 'Tidak disebutkan'}\n\nJika Anda yakin ingin berhenti, balas dengan "YA, BERHENTI".\n\nJika ingin melanjutkan layanan, balas "LANJUTKAN".\n\n💙 Tim PRIMA`
+          confirmationMessage: `🤔 *Konfirmasi Penghentian Layanan*\n\nHalo ${
+            patientData.name
+          }, kami ingin memastikan bahwa Anda ingin berhenti dari layanan PRIMA.\n\nAlasan: ${
+            analysis.reason || "Tidak disebutkan"
+          }\n\nJika Anda yakin ingin berhenti, balas dengan "YA, BERHENTI".\n\nJika ingin melanjutkan layanan, balas "LANJUTKAN".\n\n💙 Tim PRIMA`,
         },
         {
           patientId: context.patientId,
           processingTimeMs: Date.now() - startTime,
           source: "unsubscribe_handler",
           action: "confirmation_required",
-          analysisResult: analysis
+          analysisResult: analysis,
         }
       );
     }
@@ -282,46 +316,48 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         verificationStatus: "declined",
         unsubscribedAt: getWIBTime(),
         unsubscribeReason: analysis.reason,
-        updatedAt: getWIBTime()
+        updatedAt: getWIBTime(),
       })
       .where(eq(patients.id, context.patientId));
 
     // Log unsubscribe event
-    await db
-      .insert(verificationLogs)
-      .values({
-        patientId: context.patientId,
-        action: "UNSUBSCRIBE",
-        messageSent: context.message,
-        patientResponse: context.message,
-        verificationResult: "declined",
-        processedBy: "llm_analysis",
-        additionalInfo: {
-          analysis: analysis,
-          method: "llm_powered"
-        },
-        createdAt: getWIBTime()
-      });
+    await db.insert(verificationLogs).values({
+      patientId: context.patientId,
+      action: "UNSUBSCRIBE",
+      messageSent: context.message,
+      patientResponse: context.message,
+      verificationResult: "declined",
+      processedBy: "llm_analysis",
+      additionalInfo: {
+        analysis: analysis,
+        method: "llm_powered",
+      },
+      createdAt: getWIBTime(),
+    });
 
     logger.info("Patient unsubscribed successfully via LLM analysis", {
       patientId: context.patientId,
       analysis,
       processingTimeMs: Date.now() - startTime,
-      operation: "unsubscribe_completed"
+      operation: "unsubscribe_completed",
     });
 
     return createSuccessResponse(
       "Unsubscribe request processed successfully",
       {
         unsubscribed: true,
-        responseMessage: `🛑 *Berhenti dari Layanan PRIMA*\n\nTerima kasih ${patientData.name} atas kepercayaan Anda selama ini.\n\nKami menghormati keputusan Anda untuk berhenti dari layanan pengingat obat dan dukungan kesehatan PRIMA.\n\n${analysis.reason ? `Alasan: ${analysis.reason}\n\n` : ''}Jika suatu saat nanti Anda atau orang terdekat membutuhkan dukungan kesehatan, PRIMA akan selalu siap membantu.\n\nJangan ragu untuk menghubungi kami kembali kapan saja.\n\nSemoga Anda selalu sehat dan berbahagia! 🙏💙\n\n---\nPRIMA - Palliative Remote Integrated Monitoring and Assistance`
+        responseMessage: `🛑 *Berhenti dari Layanan PRIMA*\n\nTerima kasih ${
+          patientData.name
+        } atas kepercayaan Anda selama ini.\n\nKami menghormati keputusan Anda untuk berhenti dari layanan pengingat obat dan dukungan kesehatan PRIMA.\n\n${
+          analysis.reason ? `Alasan: ${analysis.reason}\n\n` : ""
+        }Jika suatu saat nanti Anda atau orang terdekat membutuhkan dukungan kesehatan, PRIMA akan selalu siap membantu.\n\nJangan ragu untuk menghubungi kami kembali kapan saja.\n\nSemoga Anda selalu sehat dan berbahagia! 🙏💙\n\n---\nPRIMA - Palliative Remote Integrated Monitoring and Assistance`,
       },
       {
         patientId: context.patientId,
         processingTimeMs: Date.now() - startTime,
         source: "unsubscribe_handler",
         action: "unsubscribe_completed",
-        analysisResult: analysis
+        analysisResult: analysis,
       }
     );
   }
@@ -331,28 +367,32 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
    */
   private async processContinueRequest(
     context: ResponseContext,
-    patientData: any,
+    patientData: {
+      name: string;
+      isActive: boolean;
+      verificationStatus: string;
+    },
     analysis: UnsubscribeAnalysisResult,
     startTime: number
   ): Promise<StandardResponse> {
     logger.info("Patient chose to continue service", {
       patientId: context.patientId,
       analysis,
-      operation: "continue_service"
+      operation: "continue_service",
     });
 
     return createSuccessResponse(
       "Continue request processed successfully",
       {
         unsubscribed: false,
-        responseMessage: `✅ *Layanan PRIMA Dilanjutkan*\n\nTerima kasih ${patientData.name}! Kami senang Anda masih ingin melanjutkan layanan PRIMA.\n\nAnda akan terus menerima pengingat obat dan dukungan kesehatan dari kami.\n\nJika ada pertanyaan atau butuh bantuan, jangan ragu untuk menghubungi kami.\n\n💙 Tim PRIMA`
+        responseMessage: `✅ *Layanan PRIMA Dilanjutkan*\n\nTerima kasih ${patientData.name}! Kami senang Anda masih ingin melanjutkan layanan PRIMA.\n\nAnda akan terus menerima pengingat obat dan dukungan kesehatan dari kami.\n\nJika ada pertanyaan atau butuh bantuan, jangan ragu untuk menghubungi kami.\n\n💙 Tim PRIMA`,
       },
       {
         patientId: context.patientId,
         processingTimeMs: Date.now() - startTime,
         source: "unsubscribe_handler",
         action: "continue_service",
-        analysisResult: analysis
+        analysisResult: analysis,
       }
     );
   }
@@ -362,14 +402,18 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
    */
   private async processUnclearRequest(
     context: ResponseContext,
-    patientData: any,
+    patientData: {
+      name: string;
+      isActive: boolean;
+      verificationStatus: string;
+    },
     analysis: UnsubscribeAnalysisResult,
     startTime: number
   ): Promise<StandardResponse> {
     logger.info("Unclear unsubscribe request detected", {
       patientId: context.patientId,
       analysis,
-      operation: "unclear_request"
+      operation: "unclear_request",
     });
 
     // If needs human help, escalate
@@ -378,14 +422,14 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         "Human intervention required for unclear unsubscribe request",
         {
           requiresHumanHelp: true,
-          responseMessage: `❓ *Butuh Bantuan*\n\nHalo ${patientData.name}, kami kurang yakin dengan permintaan Anda.\n\nTim kami akan segera menghubungi Anda untuk membantu memahami kebutuhan Anda.\n\nMohon ditunggu ya! 🙏💙\n\n---\nPRIMA - Palliative Remote Integrated Monitoring and Assistance`
+          responseMessage: `❓ *Butuh Bantuan*\n\nHalo ${patientData.name}, kami kurang yakin dengan permintaan Anda.\n\nTim kami akan segera menghubungi Anda untuk membantu memahami kebutuhan Anda.\n\nMohon ditunggu ya! 🙏💙\n\n---\nPRIMA - Palliative Remote Integrated Monitoring and Assistance`,
         },
         {
           patientId: context.patientId,
           processingTimeMs: Date.now() - startTime,
           source: "unsubscribe_handler",
           action: "human_intervention_required",
-          analysisResult: analysis
+          analysisResult: analysis,
         }
       );
     }
@@ -395,14 +439,14 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
       "Clarification needed for unsubscribe request",
       {
         requiresClarification: true,
-        responseMessage: `❓ *Mohon Konfirmasi*\n\nHalo ${patientData.name}, mohon maaf kami kurang yakin dengan pesan Anda.\n\nApakah Anda ingin:\n1. BERHENTI dari layanan PRIMA\n2. MELANJUTKAN layanan PRIMA\n\nSilakan balas dengan angka 1 atau 2, atau jelaskan lebih detail kebutuhan Anda.\n\n💙 Tim PRIMA`
+        responseMessage: `❓ *Mohon Konfirmasi*\n\nHalo ${patientData.name}, mohon maaf kami kurang yakin dengan pesan Anda.\n\nApakah Anda ingin:\n1. BERHENTI dari layanan PRIMA\n2. MELANJUTKAN layanan PRIMA\n\nSilakan balas dengan angka 1 atau 2, atau jelaskan lebih detail kebutuhan Anda.\n\n💙 Tim PRIMA`,
       },
       {
         patientId: context.patientId,
         processingTimeMs: Date.now() - startTime,
         source: "unsubscribe_handler",
         action: "clarification_needed",
-        analysisResult: analysis
+        analysisResult: analysis,
       }
     );
   }

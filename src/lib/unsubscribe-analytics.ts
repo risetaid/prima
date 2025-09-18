@@ -8,6 +8,13 @@ import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 
+// TypeScript interfaces for analysis data
+interface UnsubscribeAnalysis {
+  confidence: number;
+  sentiment: string;
+  urgency: string;
+}
+
 export interface UnsubscribeAnalyticsData {
   totalUnsubscribes: number;
   unsubscribeRate: number;
@@ -56,7 +63,9 @@ export class UnsubscribeAnalyticsService {
   /**
    * Get comprehensive unsubscribe analytics
    */
-  async getAnalytics(options: UnsubscribeFilterOptions = {}): Promise<UnsubscribeAnalyticsData> {
+  async getAnalytics(
+    options: UnsubscribeFilterOptions = {}
+  ): Promise<UnsubscribeAnalyticsData> {
     try {
       const startDate = options.startDate || this.getDefaultStartDate();
       const endDate = options.endDate || getWIBTime();
@@ -66,26 +75,38 @@ export class UnsubscribeAnalyticsService {
         unsubscribeReasons,
         methodDistribution,
         timeSeriesData,
-        weeklyTrends
+        weeklyTrends,
       ] = await Promise.all([
         this.getTotalUnsubscribes(startDate, endDate, options),
-        this.getCommonReasons(startDate, endDate, options),
-        this.getMethodDistribution(startDate, endDate, options),
+        this.getCommonReasons(startDate, endDate),
+        this.getMethodDistribution(startDate, endDate),
         this.getTimeSeriesData(startDate, endDate),
-        this.getWeeklyTrends(startDate, endDate, options)
+        this.getWeeklyTrends(startDate, endDate),
       ]);
 
       const totalActivePatients = await this.getTotalActivePatients(startDate);
-      const unsubscribeRate = totalActivePatients > 0 ? (totalUnsubscribes / totalActivePatients) * 100 : 0;
-      const averageConfidence = await this.getAverageConfidence(startDate, endDate, options);
-      const sentimentDistribution = await this.getSentimentDistribution(startDate, endDate, options);
-      const urgencyDistribution = await this.getUrgencyDistribution(startDate, endDate, options);
+      const unsubscribeRate =
+        totalActivePatients > 0
+          ? (totalUnsubscribes / totalActivePatients) * 100
+          : 0;
+      const averageConfidence = await this.getAverageConfidence(
+        startDate,
+        endDate
+      );
+      const sentimentDistribution = await this.getSentimentDistribution(
+        startDate,
+        endDate
+      );
+      const urgencyDistribution = await this.getUrgencyDistribution(
+        startDate,
+        endDate
+      );
 
       logger.info("Unsubscribe analytics retrieved successfully", {
         period: { startDate, endDate },
         totalUnsubscribes,
         unsubscribeRate,
-        averageConfidence
+        averageConfidence,
       });
 
       return {
@@ -97,10 +118,13 @@ export class UnsubscribeAnalyticsService {
         sentimentDistribution,
         urgencyDistribution,
         timeSeriesData,
-        weeklyTrends
+        weeklyTrends,
       };
     } catch (error) {
-      logger.error("Failed to get unsubscribe analytics", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Failed to get unsubscribe analytics",
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -113,22 +137,30 @@ export class UnsubscribeAnalyticsService {
     endDate: Date,
     options: UnsubscribeFilterOptions
   ): Promise<number> {
-    const baseQuery = db
-      .select({ count: sql<number>`count(*)` })
-      .from(patients)
-      .where(
-        and(
-          gte(patients.unsubscribedAt, startDate),
-          lte(patients.unsubscribedAt, endDate),
-          eq(patients.isActive, false)
-        )
-      );
+    const whereConditions = [
+      gte(patients.unsubscribedAt, startDate),
+      lte(patients.unsubscribedAt, endDate),
+      eq(patients.isActive, false),
+    ];
 
     if (options.method) {
-      baseQuery.where(eq(patients.unsubscribeMethod, options.method as any));
+      whereConditions.push(
+        eq(
+          patients.unsubscribeMethod,
+          options.method as
+            | "manual"
+            | "llm_analysis"
+            | "keyword_detection"
+            | "api"
+        )
+      );
     }
 
-    const result = await baseQuery;
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(patients)
+      .where(and(...whereConditions));
+
     return result[0]?.count || 0;
   }
 
@@ -140,10 +172,7 @@ export class UnsubscribeAnalyticsService {
       .select({ count: sql<number>`count(*)` })
       .from(patients)
       .where(
-        and(
-          lte(patients.createdAt, startDate),
-          eq(patients.isActive, true)
-        )
+        and(lte(patients.createdAt, startDate), eq(patients.isActive, true))
       );
 
     return result[0]?.count || 0;
@@ -154,13 +183,12 @@ export class UnsubscribeAnalyticsService {
    */
   private async getCommonReasons(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
+    endDate: Date
   ): Promise<Array<{ reason: string; count: number; percentage: number }>> {
     const baseQuery = db
       .select({
         reason: patients.unsubscribeReason,
-        count: sql<number>`count(*)`
+        count: sql<number>`count(*)`,
       })
       .from(patients)
       .where(
@@ -178,10 +206,10 @@ export class UnsubscribeAnalyticsService {
     const results = await baseQuery;
     const total = results.reduce((sum, item) => sum + item.count, 0);
 
-    return results.map(item => ({
+    return results.map((item) => ({
       reason: item.reason || "Unknown",
       count: item.count,
-      percentage: total > 0 ? (item.count / total) * 100 : 0
+      percentage: total > 0 ? (item.count / total) * 100 : 0,
     }));
   }
 
@@ -190,13 +218,12 @@ export class UnsubscribeAnalyticsService {
    */
   private async getMethodDistribution(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
+    endDate: Date
   ): Promise<Array<{ method: string; count: number; percentage: number }>> {
     const baseQuery = db
       .select({
         method: patients.unsubscribeMethod,
-        count: sql<number>`count(*)`
+        count: sql<number>`count(*)`,
       })
       .from(patients)
       .where(
@@ -211,10 +238,10 @@ export class UnsubscribeAnalyticsService {
     const results = await baseQuery;
     const total = results.reduce((sum, item) => sum + item.count, 0);
 
-    return results.map(item => ({
+    return results.map((item) => ({
       method: item.method || "unknown",
       count: item.count,
-      percentage: total > 0 ? (item.count / total) * 100 : 0
+      percentage: total > 0 ? (item.count / total) * 100 : 0,
     }));
   }
 
@@ -223,13 +250,12 @@ export class UnsubscribeAnalyticsService {
    */
   private async getAverageConfidence(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
+    endDate: Date
   ): Promise<number> {
     // Extract confidence from verification logs for LLM-based unsubscribes
     const results = await db
       .select({
-        additionalInfo: verificationLogs.additionalInfo
+        additionalInfo: verificationLogs.additionalInfo,
       })
       .from(verificationLogs)
       .where(
@@ -242,13 +268,13 @@ export class UnsubscribeAnalyticsService {
 
     const confidenceScores: number[] = [];
 
-    results.forEach(result => {
+    results.forEach((result) => {
       try {
-        const additionalInfo = result.additionalInfo as any;
-        if (additionalInfo?.analysis?.confidence) {
-          confidenceScores.push(additionalInfo.analysis.confidence);
+        const additionalInfo = result.additionalInfo as UnsubscribeAnalysis;
+        if (additionalInfo?.confidence) {
+          confidenceScores.push(additionalInfo.confidence);
         }
-      } catch (error) {
+      } catch {
         // Skip invalid JSON
       }
     });
@@ -264,12 +290,11 @@ export class UnsubscribeAnalyticsService {
    */
   private async getSentimentDistribution(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
+    endDate: Date
   ): Promise<Array<{ sentiment: string; count: number; percentage: number }>> {
     const results = await db
       .select({
-        additionalInfo: verificationLogs.additionalInfo
+        additionalInfo: verificationLogs.additionalInfo,
       })
       .from(verificationLogs)
       .where(
@@ -282,24 +307,27 @@ export class UnsubscribeAnalyticsService {
 
     const sentimentCounts: Record<string, number> = {};
 
-    results.forEach(result => {
+    results.forEach((result) => {
       try {
-        const additionalInfo = result.additionalInfo as any;
-        if (additionalInfo?.analysis?.sentiment) {
-          const sentiment = additionalInfo.analysis.sentiment;
+        const additionalInfo = result.additionalInfo as UnsubscribeAnalysis;
+        if (additionalInfo?.sentiment) {
+          const sentiment = additionalInfo.sentiment;
           sentimentCounts[sentiment] = (sentimentCounts[sentiment] || 0) + 1;
         }
-      } catch (error) {
+      } catch {
         // Skip invalid JSON
       }
     });
 
-    const total = Object.values(sentimentCounts).reduce((sum, count) => sum + count, 0);
+    const total = Object.values(sentimentCounts).reduce(
+      (sum, count) => sum + count,
+      0
+    );
 
     return Object.entries(sentimentCounts).map(([sentiment, count]) => ({
       sentiment,
       count,
-      percentage: total > 0 ? (count / total) * 100 : 0
+      percentage: total > 0 ? (count / total) * 100 : 0,
     }));
   }
 
@@ -308,12 +336,11 @@ export class UnsubscribeAnalyticsService {
    */
   private async getUrgencyDistribution(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
+    endDate: Date
   ): Promise<Array<{ urgency: string; count: number; percentage: number }>> {
     const results = await db
       .select({
-        additionalInfo: verificationLogs.additionalInfo
+        additionalInfo: verificationLogs.additionalInfo,
       })
       .from(verificationLogs)
       .where(
@@ -326,24 +353,27 @@ export class UnsubscribeAnalyticsService {
 
     const urgencyCounts: Record<string, number> = {};
 
-    results.forEach(result => {
+    results.forEach((result) => {
       try {
-        const additionalInfo = result.additionalInfo as any;
-        if (additionalInfo?.analysis?.urgency) {
-          const urgency = additionalInfo.analysis.urgency;
+        const additionalInfo = result.additionalInfo as UnsubscribeAnalysis;
+        if (additionalInfo?.urgency) {
+          const urgency = additionalInfo.urgency;
           urgencyCounts[urgency] = (urgencyCounts[urgency] || 0) + 1;
         }
-      } catch (error) {
+      } catch {
         // Skip invalid JSON
       }
     });
 
-    const total = Object.values(urgencyCounts).reduce((sum, count) => sum + count, 0);
+    const total = Object.values(urgencyCounts).reduce(
+      (sum, count) => sum + count,
+      0
+    );
 
     return Object.entries(urgencyCounts).map(([urgency, count]) => ({
       urgency,
       count,
-      percentage: total > 0 ? (count / total) * 100 : 0
+      percentage: total > 0 ? (count / total) * 100 : 0,
     }));
   }
 
@@ -357,7 +387,7 @@ export class UnsubscribeAnalyticsService {
     const results = await db
       .select({
         date: sql<string>`DATE(${patients.unsubscribedAt})`,
-        count: sql<number>`count(*)`
+        count: sql<number>`count(*)`,
       })
       .from(patients)
       .where(
@@ -371,12 +401,12 @@ export class UnsubscribeAnalyticsService {
       .orderBy(sql<string>`DATE(${patients.unsubscribedAt})`);
 
     let cumulative = 0;
-    return results.map(result => {
+    return results.map((result) => {
       cumulative += result.count;
       return {
         date: result.date,
         count: result.count,
-        cumulative
+        cumulative,
       };
     });
   }
@@ -386,13 +416,14 @@ export class UnsubscribeAnalyticsService {
    */
   private async getWeeklyTrends(
     startDate: Date,
-    endDate: Date,
-    options: UnsubscribeFilterOptions
-  ): Promise<Array<{ week: string; count: number; averageConfidence: number }>> {
+    endDate: Date
+  ): Promise<
+    Array<{ week: string; count: number; averageConfidence: number }>
+  > {
     const results = await db
       .select({
         week: sql<string>`DATE_TRUNC('week', ${patients.unsubscribedAt})`,
-        count: sql<number>`count(*)`
+        count: sql<number>`count(*)`,
       })
       .from(patients)
       .where(
@@ -406,10 +437,10 @@ export class UnsubscribeAnalyticsService {
       .orderBy(sql<string>`DATE_TRUNC('week', ${patients.unsubscribedAt})`);
 
     // TODO: Add confidence calculation per week
-    return results.map(result => ({
+    return results.map((result) => ({
       week: result.week,
       count: result.count,
-      averageConfidence: 0 // Placeholder for now
+      averageConfidence: 0, // Placeholder for now
     }));
   }
 
@@ -439,10 +470,13 @@ export class UnsubscribeAnalyticsService {
       // This method can be expanded to store detailed analytics events
       logger.info("Recording unsubscribe analytics event", {
         patientId,
-        analysis
+        analysis,
       });
     } catch (error) {
-      logger.error("Failed to record unsubscribe analytics event", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Failed to record unsubscribe analytics event",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -452,29 +486,40 @@ export class UnsubscribeAnalyticsService {
   async exportToCSV(options: UnsubscribeFilterOptions = {}): Promise<string> {
     const analytics = await this.getAnalytics(options);
 
-    const headers = [
-      "Metric",
-      "Value",
-      "Details"
-    ];
+    const headers = ["Metric", "Value", "Details"];
 
     const rows = [
       ["Total Unsubscribes", analytics.totalUnsubscribes.toString(), ""],
-      ["Unsubscribe Rate", `${analytics.unsubscribeRate.toFixed(2)}%`, "Percentage of active patients"],
-      ["Average Confidence", analytics.averageConfidence.toFixed(3), "LLM confidence score"],
+      [
+        "Unsubscribe Rate",
+        `${analytics.unsubscribeRate.toFixed(2)}%`,
+        "Percentage of active patients",
+      ],
+      [
+        "Average Confidence",
+        analytics.averageConfidence.toFixed(3),
+        "LLM confidence score",
+      ],
       ["", "", ""],
       ["Common Reasons", "", ""],
-      ...analytics.commonReasons.map(reason =>
-        ["Reason", reason.reason, `${reason.count} (${reason.percentage.toFixed(1)}%)`]
-      ),
+      ...analytics.commonReasons.map((reason) => [
+        "Reason",
+        reason.reason,
+        `${reason.count} (${reason.percentage.toFixed(1)}%)`,
+      ]),
       ["", "", ""],
       ["Method Distribution", "", ""],
-      ...analytics.methodDistribution.map(method =>
-        ["Method", method.method, `${method.count} (${method.percentage.toFixed(1)}%)`]
-      )
+      ...analytics.methodDistribution.map((method) => [
+        "Method",
+        method.method,
+        `${method.count} (${method.percentage.toFixed(1)}%)`,
+      ]),
     ];
 
-    return [headers.join(","), ...rows.map(row => row.map(cell => `"${cell}"`).join(","))].join("\n");
+    return [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
   }
 }
 

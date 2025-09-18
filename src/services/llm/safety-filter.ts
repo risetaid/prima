@@ -281,7 +281,8 @@ export class SafetyFilterService {
   /**
    * Analyze unsubscribe-specific safety concerns
    */
-  private analyzeUnsubscribeSafety(message: string, context: ConversationContext): UnsubscribeSafetyResult {
+  private analyzeUnsubscribeSafety(message: string, // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  context: ConversationContext): UnsubscribeSafetyResult {
     const normalizedMessage = message.toLowerCase();
     const reasons: string[] = [];
     let confidence = 0;

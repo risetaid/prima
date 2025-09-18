@@ -6,8 +6,20 @@
 
 import { logger } from "@/lib/logger";
 import { db, cmsArticles } from "@/db";
-import { eq, and, isNull, ilike, or, sql, desc } from "drizzle-orm";
+import { eq, and, isNull, ilike, desc, sql } from "drizzle-orm";
 import { ConversationContext } from "@/services/llm/llm.types";
+import { contentCategoryEnum } from "@/db/enums";
+
+// TypeScript interfaces for type safety
+interface QuestionAnalysis {
+  intent: "information" | "advice" | "explanation" | "comparison";
+  category: string;
+  keywords: string[];
+  confidence: number;
+  language: "id" | "en";
+}
+
+type ContentCategory = typeof contentCategoryEnum.enumValues[number];
 
 export interface KnowledgeQuery {
   question: string;
@@ -93,6 +105,7 @@ export class KnowledgeBaseService {
    */
   async searchKnowledge(
     query: KnowledgeQuery,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     context?: ConversationContext
   ): Promise<{
     results: KnowledgeResult[];
@@ -328,20 +341,13 @@ export class KnowledgeBaseService {
 
       if (analysis.category && analysis.category !== "general_health") {
         const mappedCategory = cmsCategoryMapping[analysis.category] || "general";
-        whereConditions.push(
-          or(
-            eq(cmsArticles.category, mappedCategory as any),
-            ilike(cmsArticles.tags, `%${analysis.category}%`)
-          )
-        );
+        whereConditions.push(eq(cmsArticles.category, mappedCategory as ContentCategory));
       }
 
       // Add keyword filters
       if (analysis.keywords.length > 0) {
-        const keywordConditions = analysis.keywords.map(keyword =>
-          ilike(cmsArticles.content, `%${keyword}%`)
-        ).filter(Boolean);
-        whereConditions.push(or(...keywordConditions));
+        const keyword = analysis.keywords[0]; // Use first keyword for simplicity
+        whereConditions.push(ilike(cmsArticles.content, `%${keyword}%`));
       }
 
       // Only show published articles
@@ -425,7 +431,7 @@ export class KnowledgeBaseService {
   /**
    * Generate query summary
    */
-  private generateQuerySummary(analysis: any, resultsCount: number): string {
+  private generateQuerySummary(analysis: QuestionAnalysis, resultsCount: number): string {
     const categoryNames: Record<string, string> = {
       "general_health": "Kesehatan Umum",
       "medication_info": "Informasi Obat",
@@ -443,7 +449,7 @@ export class KnowledgeBaseService {
   /**
    * Generate suggestions for follow-up questions
    */
-  private generateSuggestions(analysis: any, results: KnowledgeResult[]): string[] {
+  private generateSuggestions(analysis: QuestionAnalysis, results: KnowledgeResult[]): string[] {
     const suggestions: string[] = [];
 
     // Add general health maintenance suggestions

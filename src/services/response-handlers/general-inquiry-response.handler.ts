@@ -3,13 +3,23 @@
  * Handles natural language queries for health notes, reminders, and general information
  */
 
-import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
+import {
+  StandardResponseHandler,
+  ResponseContext,
+  StandardResponse,
+  createSuccessResponse,
+  createErrorResponse,
+  createEmergencyResponse,
+} from "../response-handler";
 import { db, patients } from "@/db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { llmService } from "../llm/llm.service";
-import { getGeneralInquiryPrompt, getResponseGenerationPrompt } from "../llm/prompts";
-import { ConversationContext, ProcessedLLMResponse } from "../llm/llm.types";
+import {
+  getGeneralInquiryPrompt,
+  getResponseGenerationPrompt,
+} from "../llm/prompts";
+import { ConversationContext } from "../llm/llm.types";
 import { PatientContextService } from "../patient/patient-context.service";
 import { safetyFilterService } from "../llm/safety-filter";
 import { dataAccessValidationService } from "../security/data-access-validation.service";
@@ -19,14 +29,27 @@ import { HealthNoteService } from "../patient/health-note.service";
 import { VolunteerNotificationService } from "../notification/volunteer-notification.service";
 import { healthEducationService } from "../education/health-education.service";
 
+interface HealthNotesQuery {
+  time_range: string;
+  keywords: string[];
+  limit: number;
+}
+
+interface MedicationQuery {
+  time_range: string;
+  medication_name?: string;
+  include_info: boolean;
+  limit: number;
+}
+
 interface GeneralInquiryResult {
   intent: string;
   response_type: string;
   topic: string;
   data_access_required: boolean;
   patient_data_type?: string;
-  health_notes_query?: any;
-  medication_query?: any;
+  health_notes_query?: HealthNotesQuery;
+  medication_query?: MedicationQuery;
   needs_human_help: boolean;
   follow_up_required: boolean;
   reason: string;
@@ -54,7 +77,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
         phoneNumber: context.phoneNumber,
         verificationStatus: context.verificationStatus,
         messageLength: context.message.length,
-        operation: "enhanced_general_inquiry"
+        operation: "enhanced_general_inquiry",
       });
 
       // Check if patient is verified
@@ -66,7 +89,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
             patientId: context.patientId,
             processingTimeMs: Date.now() - startTime,
             source: "general_inquiry_handler",
-            action: "not_verified"
+            action: "not_verified",
           }
         );
       }
@@ -86,7 +109,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
             patientId: context.patientId,
             processingTimeMs: Date.now() - startTime,
             source: "general_inquiry_handler",
-            action: "patient_not_found"
+            action: "patient_not_found",
           }
         );
       }
@@ -99,7 +122,10 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
         {
           patientId: context.patientId,
           phoneNumber: context.phoneNumber,
-          conversationId: context.additionalData?.conversationId as string || "general_inquiry"
+          conversationId:
+            (context.additionalData?.conversationId as string) ||
+            "general_inquiry",
+          previousMessages: [],
         }
       );
 
@@ -107,8 +133,8 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
       if (safetyResult.emergencyResult.isEmergency) {
         logger.warn("Emergency detected in general inquiry", {
           patientId: context.patientId,
-          emergencyIndicators: safetyResult.emergencyResult.indicators,
-          operation: "emergency_detection"
+          emergencyDetected: safetyResult.emergencyResult.isEmergency,
+          operation: "emergency_detection",
         });
 
         return createEmergencyResponse(
@@ -122,7 +148,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
             action: "emergency_detected",
             emergencyDetected: true,
             escalated: true,
-            emergencyIndicators: safetyResult.emergencyResult.indicators
+            analysisResult: safetyResult.emergencyResult.indicators,
           }
         );
       }
@@ -150,36 +176,38 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
 
       logger.info("Enhanced general inquiry processed", {
         patientId: context.patientId,
-        responseType: analysisResult.response_type,
+        responseResult: analysisResult.response_type,
         topic: analysisResult.topic,
         dataAccessRequired: analysisResult.data_access_required,
         patientDataType: analysisResult.patient_data_type,
         needsHumanHelp: analysisResult.needs_human_help,
         confidence: analysisResult.confidence,
         processingTimeMs: Date.now() - startTime,
-        operation: "enhanced_general_inquiry_completed"
+        operation: "enhanced_general_inquiry_completed",
       });
 
       return {
         ...response,
         metadata: {
+          timestamp: new Date().toISOString(),
           ...(response.metadata || {}),
           patientId: context.patientId,
           processingTimeMs: Date.now() - startTime,
           source: "general_inquiry_handler",
           action: "inquiry_processed",
-          responseType: analysisResult.response_type,
-          topic: analysisResult.topic,
+          responseResult: analysisResult.response_type,
           dataAccessRequired: analysisResult.data_access_required,
-          needsHumanHelp: analysisResult.needs_human_help
-        }
+        },
       };
-
     } catch (error) {
-      logger.error("Failed to process enhanced general inquiry", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "enhanced_general_inquiry"
-      });
+      logger.error(
+        "Failed to process enhanced general inquiry",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "enhanced_general_inquiry",
+        }
+      );
 
       return createErrorResponse(
         "Failed to process general inquiry",
@@ -188,7 +216,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
           patientId: context.patientId,
           processingTimeMs: Date.now() - startTime,
           source: "general_inquiry_handler",
-          action: "processing_error"
+          action: "processing_error",
         }
       );
     }
@@ -200,58 +228,55 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
   private async buildEnhancedGeneralInquiryContext(
     patientId: string,
     phoneNumber: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     message: string
   ): Promise<ConversationContext> {
     try {
-      const patientContext = await this.patientContextService.getPatientContext(patientId);
+      const patientContext = await this.patientContextService.getPatientContext(
+        patientId
+      );
 
       return {
         patientId,
         phoneNumber,
-        previousMessages: patientContext.found && patientContext.context ?
-          patientContext.context.recentConversationHistory?.map(msg => ({
-            role: msg.direction === "inbound" ? "user" : "assistant",
-            content: msg.message
-          })) || [] : [],
-        patientInfo: patientContext.found && patientContext.context ? {
-          name: patientContext.context.patient.name,
-          verificationStatus: patientContext.context.patient.verificationStatus,
-          status: patientContext.context.patient.isActive ? 'Aktif' : 'Nonaktif',
-          activeReminders: patientContext.context.activeReminders?.map(r => ({
-            medicationName: r.medicationName || r.medicationDetails?.name || 'obat',
-            medicationDetails: r.medicationDetails,
-            scheduledTime: r.scheduledTime
-          })) || [],
-          healthNotes: patientContext.context.recentHealthNotes?.map(note => ({
-            id: note.id,
-            note: note.note,
-            noteDate: note.noteDate,
-            recordedBy: note.recordedBy
-          })) || [],
-          medications: patientContext.context.activeMedications?.map(med => ({
-            id: med.id,
-            medicationName: med.medicationName,
-            dosage: med.dosage,
-            frequency: med.frequency,
-            isActive: med.isActive,
-            scheduledTimes: med.scheduledTimes
-          })) || []
-        } : undefined,
-        conversationId: `general_inquiry_${Date.now()}`
+        previousMessages:
+          patientContext.found && patientContext.context
+            ? patientContext.context.recentConversationHistory?.map((msg) => ({
+                role: msg.direction === "inbound" ? "user" : "assistant",
+                content: msg.message,
+              })) || []
+            : [],
+        patientInfo:
+          patientContext.found && patientContext.context
+            ? {
+                name: patientContext.context.patient.name,
+                verificationStatus:
+                  patientContext.context.patient.verificationStatus,
+                activeReminders:
+                  patientContext.context.activeReminders?.map((r) => ({
+                    medicationName: r.customMessage || "obat",
+                    scheduledTime: r.scheduledTime,
+                  })) || [],
+              }
+            : undefined,
+        conversationId: `general_inquiry_${Date.now()}`,
       };
     } catch (error) {
-      logger.warn("Failed to build enhanced general inquiry context, using basic context", {
-        patientId,
-        error: error instanceof Error ? error.message : String(error),
-        operation: "build_general_inquiry_context"
-      });
+      logger.warn(
+        "Failed to build enhanced general inquiry context, using basic context",
+        {
+          patientId,
+          error: error instanceof Error ? error.message : String(error),
+          operation: "build_general_inquiry_context",
+        }
+      );
 
       return {
         patientId,
         phoneNumber,
         previousMessages: [],
         patientInfo: undefined,
-        conversationId: `general_inquiry_${Date.now()}`
+        conversationId: `general_inquiry_${Date.now()}`,
       };
     }
   }
@@ -264,9 +289,10 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
     patientMessage: string
   ): Promise<GeneralInquiryResult> {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const prompt = getGeneralInquiryPrompt(context);
       const llmResponse = await llmService.generatePatientResponse(
-        'general',
+        "general",
         context,
         patientMessage
       );
@@ -285,14 +311,13 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
         needs_human_help: Boolean(analysis.needs_human_help),
         follow_up_required: Boolean(analysis.follow_up_required),
         reason: analysis.reason || "General inquiry analysis",
-        confidence: Math.min(Math.max(analysis.confidence || 0.5, 0), 1)
+        confidence: Math.min(Math.max(analysis.confidence || 0.5, 0), 1),
       };
-
     } catch (error) {
       logger.warn("LLM analysis failed for general inquiry, using fallback", {
         patientId: context.patientId,
         error: error instanceof Error ? error.message : String(error),
-        operation: "llm_analysis_fallback"
+        operation: "llm_analysis_fallback",
       });
 
       // Fallback analysis based on simple keyword matching
@@ -321,12 +346,22 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
 
     // Validate data access before handling any data requests
     if (analysis.data_access_required && analysis.patient_data_type) {
-      const validationResult = await dataAccessValidationService.validateDataAccess({
-        patientId: context.patientId,
-        requestedDataType: analysis.patient_data_type,
-        requestContext: "patient_initiated",
-        conversationId: llmContext.conversationId
-      }, llmContext);
+      const validationResult =
+        await dataAccessValidationService.validateDataAccess(
+          {
+            patientId: context.patientId,
+            requestedDataType: analysis.patient_data_type as
+              | "health_notes"
+              | "medication_info"
+              | "medication_schedule"
+              | "medication_compliance"
+              | "reminder"
+              | "general",
+            requestContext: "patient_initiated",
+            conversationId: llmContext.conversationId,
+          },
+          llmContext
+        );
 
       if (!validationResult.isAuthorized) {
         logger.warn("Data access request denied", {
@@ -334,19 +369,22 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
           requestedDataType: analysis.patient_data_type,
           riskLevel: validationResult.riskLevel,
           violations: validationResult.violations,
-          operation: "data_access_denied"
+          operation: "data_access_denied",
         });
 
         // Return appropriate error response based on risk level
-        if (validationResult.riskLevel === "critical" || validationResult.riskLevel === "high") {
+        if (
+          validationResult.riskLevel === "critical" ||
+          validationResult.riskLevel === "high"
+        ) {
           return createErrorResponse(
             "Access denied",
             "Your request cannot be processed at this time. Please contact support.",
             {
               patientId: context.patientId,
               action: "data_access_denied_high_risk",
-              riskLevel: validationResult.riskLevel,
-              requiresEscalation: validationResult.requiresEscalation
+              analysisResult: validationResult,
+              escalated: validationResult.requiresEscalation,
             }
           );
         } else if (validationResult.requiresConsent) {
@@ -356,7 +394,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
             {
               patientId: context.patientId,
               action: "data_access_consent_required",
-              requiresConsent: true
+              dataAccessRequired: true,
             }
           );
         } else {
@@ -365,7 +403,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
             "You don't have permission to access this information. Please verify your account or contact support.",
             {
               patientId: context.patientId,
-              action: "data_access_denied"
+              action: "data_access_denied",
             }
           );
         }
@@ -376,12 +414,15 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
         patientId: context.patientId,
         requestedDataType: analysis.patient_data_type,
         riskLevel: validationResult.riskLevel,
-        operation: "data_access_granted"
+        operation: "data_access_granted",
       });
     }
 
     // Handle health notes queries
-    if (analysis.patient_data_type === "health_notes" && analysis.health_notes_query) {
+    if (
+      analysis.patient_data_type === "health_notes" &&
+      analysis.health_notes_query
+    ) {
       return await this.handleHealthNotesQuery(
         context,
         llmContext,
@@ -391,7 +432,10 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
     }
 
     // Handle medication queries
-    if (analysis.patient_data_type === "medication_info" && analysis.medication_query) {
+    if (
+      analysis.patient_data_type === "medication_info" &&
+      analysis.medication_query
+    ) {
       return await this.handleMedicationQuery(
         context,
         llmContext,
@@ -449,7 +493,8 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
   ): Promise<StandardResponse> {
     try {
       // Parse natural language query
-      const healthNotesQuery = healthNotesQueryService.parseNaturalLanguageQuery(context.message);
+      const healthNotesQuery =
+        healthNotesQueryService.parseNaturalLanguageQuery(context.message);
 
       // Execute query
       const queryResult = await healthNotesQueryService.queryHealthNotes(
@@ -458,17 +503,19 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
       );
 
       // Format notes for LLM response
-      const formattedNotes = healthNotesQueryService.formatNotesForLLM(queryResult.notes);
+      const formattedNotes = healthNotesQueryService.formatNotesForLLM(
+        queryResult.notes
+      );
 
       // Generate natural response
       const intentResult = {
-        intent: 'health_notes_inquiry',
+        intent: "health_notes_inquiry",
         confidence: analysis.confidence,
         entities: {
-          queryType: analysis.health_notes_query?.time_range || 'semuanya',
+          queryType: analysis.health_notes_query?.time_range || "semuanya",
           notesFound: queryResult.notes.length,
-          keywords: analysis.health_notes_query?.keywords || []
-        }
+          keywords: analysis.health_notes_query?.keywords || [],
+        },
       };
 
       const additionalContext = `Health Notes Query Results:
@@ -476,13 +523,18 @@ ${formattedNotes}
 
 Query Summary: ${queryResult.querySummary}
 Time Range: ${queryResult.timeRange}
-Keywords: ${queryResult.keywords.join(', ')}
+Keywords: ${queryResult.keywords.join(", ")}
 
 Original Query: ${context.message}`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -495,32 +547,35 @@ Original Query: ${context.message}`;
             notesFound: queryResult.notes.length,
             totalCount: queryResult.totalCount,
             timeRange: queryResult.timeRange,
-            keywords: queryResult.keywords
+            keywords: queryResult.keywords,
           },
           generatedResponse: llmResponse.content,
           dataAccessed: true,
-          processed: true
+          processed: true,
         },
         {
           patientId: context.patientId,
           dataAccessRequired: true,
           patientDataType: "health_notes",
-          notesFound: queryResult.notes.length
+          notesFound: queryResult.notes.length,
         }
       );
-
     } catch (error) {
-      logger.error("Failed to handle health notes query", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "health_notes_query_failed"
-      });
+      logger.error(
+        "Failed to handle health notes query",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "health_notes_query_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to retrieve health notes",
         error instanceof Error ? error.message : String(error),
         {
           patientId: context.patientId,
-          action: "health_notes_query_failed"
+          action: "health_notes_query_failed",
         }
       );
     }
@@ -537,7 +592,9 @@ Original Query: ${context.message}`;
   ): Promise<StandardResponse> {
     try {
       // Parse natural language query
-      const medicationQuery = medicationQueryService.parseNaturalLanguageQuery(context.message);
+      const medicationQuery = medicationQueryService.parseNaturalLanguageQuery(
+        context.message
+      );
 
       // Execute query
       const queryResult = await medicationQueryService.queryMedications(
@@ -546,28 +603,34 @@ Original Query: ${context.message}`;
       );
 
       // Format medications for LLM response
-      const formattedMedications = medicationQueryService.formatMedicationsForLLM(queryResult.medications);
+      const formattedMedications =
+        medicationQueryService.formatMedicationsForLLM(queryResult.medications);
 
       // Generate natural response
       const intentResult = {
-        intent: 'medication_inquiry',
+        intent: "medication_inquiry",
         confidence: analysis.confidence,
         entities: {
           medicationCount: queryResult.medications.length,
           hasActiveMedications: queryResult.hasActiveMedications,
-          timeRange: queryResult.timeRange
-        }
+          timeRange: queryResult.timeRange,
+        },
       };
 
       const additionalContext = `Medication Query Results:
 ${formattedMedications}
 
 Query Summary: ${queryResult.querySummary}
-Active Medications: ${queryResult.hasActiveMedications ? 'Yes' : 'No'}`;
+Active Medications: ${queryResult.hasActiveMedications ? "Yes" : "No"}`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -577,7 +640,7 @@ Active Medications: ${queryResult.hasActiveMedications ? 'Yes' : 'No'}`;
         medicationsFound: queryResult.medications.length,
         hasActiveMedications: queryResult.hasActiveMedications,
         timeRange: queryResult.timeRange,
-        operation: "medication_query_completed"
+        operation: "medication_query_completed",
       });
 
       return createSuccessResponse(
@@ -588,33 +651,36 @@ Active Medications: ${queryResult.hasActiveMedications ? 'Yes' : 'No'}`;
             medicationsFound: queryResult.medications.length,
             totalCount: queryResult.totalCount,
             timeRange: queryResult.timeRange,
-            hasActiveMedications: queryResult.hasActiveMedications
+            hasActiveMedications: queryResult.hasActiveMedications,
           },
           generatedResponse: llmResponse.content,
           dataAccessed: true,
-          processed: true
+          processed: true,
         },
         {
           patientId: context.patientId,
           dataAccessRequired: true,
           patientDataType: "medication_info",
           medicationsFound: queryResult.medications.length,
-          hasActiveMedications: queryResult.hasActiveMedications
+          hasActiveMedications: queryResult.hasActiveMedications,
         }
       );
-
     } catch (error) {
-      logger.error("Failed to handle medication query", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "medication_query_failed"
-      });
+      logger.error(
+        "Failed to handle medication query",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "medication_query_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to retrieve medication information",
         error instanceof Error ? error.message : String(error),
         {
           patientId: context.patientId,
-          action: "medication_query_failed"
+          action: "medication_query_failed",
         }
       );
     }
@@ -631,24 +697,32 @@ Active Medications: ${queryResult.hasActiveMedications ? 'Yes' : 'No'}`;
   ): Promise<StandardResponse> {
     try {
       // Get medication schedule summary
-      const scheduleSummary = await medicationQueryService.getMedicationScheduleSummary(context.patientId);
+      const scheduleSummary =
+        await medicationQueryService.getMedicationScheduleSummary(
+          context.patientId
+        );
 
       // Generate natural response
       const intentResult = {
-        intent: 'medication_schedule_inquiry',
+        intent: "medication_schedule_inquiry",
         confidence: analysis.confidence,
         entities: {
           hasSchedule: scheduleSummary.includes("Tidak ada jadwal obat aktif"),
-          scheduleSummary: scheduleSummary
-        }
+          scheduleSummary: scheduleSummary,
+        },
       };
 
       const additionalContext = `Medication Schedule:
 ${scheduleSummary}`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -656,7 +730,7 @@ ${scheduleSummary}`;
       logger.info("Medication schedule query processed successfully", {
         patientId: context.patientId,
         hasSchedule: !scheduleSummary.includes("Tidak ada jadwal obat aktif"),
-        operation: "medication_schedule_query_completed"
+        operation: "medication_schedule_query_completed",
       });
 
       return createSuccessResponse(
@@ -666,28 +740,31 @@ ${scheduleSummary}`;
           scheduleSummary,
           generatedResponse: llmResponse.content,
           dataAccessed: true,
-          processed: true
+          processed: true,
         },
         {
           patientId: context.patientId,
           dataAccessRequired: true,
           patientDataType: "medication_schedule",
-          hasSchedule: !scheduleSummary.includes("Tidak ada jadwal obat aktif")
+          hasSchedule: !scheduleSummary.includes("Tidak ada jadwal obat aktif"),
         }
       );
-
     } catch (error) {
-      logger.error("Failed to handle medication schedule query", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "medication_schedule_query_failed"
-      });
+      logger.error(
+        "Failed to handle medication schedule query",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "medication_schedule_query_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to retrieve medication schedule",
         error instanceof Error ? error.message : String(error),
         {
           patientId: context.patientId,
-          action: "medication_schedule_query_failed"
+          action: "medication_schedule_query_failed",
         }
       );
     }
@@ -704,7 +781,9 @@ ${scheduleSummary}`;
   ): Promise<StandardResponse> {
     try {
       // Get patient context for reminders
-      const patientContext = await this.patientContextService.getPatientContext(context.patientId);
+      const patientContext = await this.patientContextService.getPatientContext(
+        context.patientId
+      );
 
       if (!patientContext.found || !patientContext.context) {
         return createErrorResponse(
@@ -712,7 +791,7 @@ ${scheduleSummary}`;
           "Could not retrieve patient reminder information",
           {
             patientId: context.patientId,
-            action: "patient_context_not_found"
+            action: "patient_context_not_found",
           }
         );
       }
@@ -721,16 +800,19 @@ ${scheduleSummary}`;
       const activeReminders = patientContext.context.activeReminders || [];
 
       // Format reminder information
-      const reminderInfo = this.formatRemindersForLLM(reminders, activeReminders);
+      const reminderInfo = this.formatRemindersForLLM(
+        reminders,
+        activeReminders
+      );
 
       // Generate natural response
       const intentResult = {
-        intent: 'reminder_inquiry',
+        intent: "reminder_inquiry",
         confidence: analysis.confidence,
         entities: {
           todayReminders: reminders.length,
-          activeReminders: activeReminders.length
-        }
+          activeReminders: activeReminders.length,
+        },
       };
 
       const additionalContext = `Reminder Information:
@@ -741,9 +823,14 @@ Active Reminders: ${activeReminders.length}
 
 Original Query: ${context.message}`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -755,35 +842,38 @@ Original Query: ${context.message}`;
           reminderInfo: {
             todayReminders: reminders.length,
             activeReminders: activeReminders.length,
-            todaysSchedule: reminders.map(r => ({
+            todaysSchedule: reminders.map((r) => ({
               time: r.scheduledTime,
-              medication: r.medicationName
-            }))
+              medication: r.medicationName,
+            })),
           },
           generatedResponse: llmResponse.content,
           dataAccessed: true,
-          processed: true
+          processed: true,
         },
         {
           patientId: context.patientId,
           dataAccessRequired: true,
           patientDataType: "reminder",
-          remindersFound: reminders.length
+          remindersFound: reminders.length,
         }
       );
-
     } catch (error) {
-      logger.error("Failed to handle reminder query", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "reminder_query_failed"
-      });
+      logger.error(
+        "Failed to handle reminder query",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "reminder_query_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to retrieve reminder information",
         error instanceof Error ? error.message : String(error),
         {
           patientId: context.patientId,
-          action: "reminder_query_failed"
+          action: "reminder_query_failed",
         }
       );
     }
@@ -800,24 +890,34 @@ Original Query: ${context.message}`;
   ): Promise<StandardResponse> {
     try {
       // Get medication compliance summary
-      const complianceSummary = await medicationQueryService.getMedicationComplianceSummary(context.patientId);
+      const complianceSummary =
+        await medicationQueryService.getMedicationComplianceSummary(
+          context.patientId
+        );
 
       // Generate natural response
       const intentResult = {
-        intent: 'medication_compliance_inquiry',
+        intent: "medication_compliance_inquiry",
         confidence: analysis.confidence,
         entities: {
-          hasComplianceData: !complianceSummary.includes("Tidak ada obat aktif"),
-          complianceSummary: complianceSummary
-        }
+          hasComplianceData: !complianceSummary.includes(
+            "Tidak ada obat aktif"
+          ),
+          complianceSummary: complianceSummary,
+        },
       };
 
       const additionalContext = `Medication Compliance:
 ${complianceSummary}`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -825,7 +925,7 @@ ${complianceSummary}`;
       logger.info("Medication compliance query processed successfully", {
         patientId: context.patientId,
         hasComplianceData: !complianceSummary.includes("Tidak ada obat aktif"),
-        operation: "medication_compliance_query_completed"
+        operation: "medication_compliance_query_completed",
       });
 
       return createSuccessResponse(
@@ -835,28 +935,33 @@ ${complianceSummary}`;
           complianceSummary,
           generatedResponse: llmResponse.content,
           dataAccessed: true,
-          processed: true
+          processed: true,
         },
         {
           patientId: context.patientId,
           dataAccessRequired: true,
           patientDataType: "medication_compliance",
-          hasComplianceData: !complianceSummary.includes("Tidak ada obat aktif")
+          hasComplianceData: !complianceSummary.includes(
+            "Tidak ada obat aktif"
+          ),
         }
       );
-
     } catch (error) {
-      logger.error("Failed to handle medication compliance query", error instanceof Error ? error : new Error(String(error)), {
-        patientId: context.patientId,
-        operation: "medication_compliance_query_failed"
-      });
+      logger.error(
+        "Failed to handle medication compliance query",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: context.patientId,
+          operation: "medication_compliance_query_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to retrieve medication compliance information",
         error instanceof Error ? error.message : String(error),
         {
           patientId: context.patientId,
-          action: "medication_compliance_query_failed"
+          action: "medication_compliance_query_failed",
         }
       );
     }
@@ -871,13 +976,14 @@ ${complianceSummary}`;
     patientName: string
   ): Promise<StandardResponse> {
     try {
+      const contextualEducation: unknown[] = [];
       const intentResult = {
-        intent: 'general_inquiry',
+        intent: "general_inquiry",
         confidence: analysis.confidence,
         entities: {
-          responseType: analysis.response_type,
-          topic: analysis.topic
-        }
+          responseResult: analysis.response_type,
+          topic: analysis.topic,
+        },
       };
 
       const additionalContext = `General Inquiry Context:
@@ -886,11 +992,19 @@ Topic: ${analysis.topic}
 Reason: ${analysis.reason}
 Data Access Required: ${analysis.data_access_required}
 
-Original Message: ${llmContext.previousMessages[llmContext.previousMessages.length - 1]?.content || ''}`;
+Original Message: ${
+        llmContext.previousMessages[llmContext.previousMessages.length - 1]
+          ?.content || ""
+      }`;
 
-      const prompt = getResponseGenerationPrompt(llmContext, intentResult, additionalContext);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const prompt = getResponseGenerationPrompt(
+        llmContext,
+        intentResult,
+        additionalContext
+      );
       const llmResponse = await llmService.generatePatientResponse(
-        'response',
+        "response",
         llmContext,
         additionalContext
       );
@@ -901,22 +1015,28 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
 
       try {
         // Get contextual education content based on the conversation
-        const contextualEducation = await healthEducationService.getContextualEducation(
-          llmContext.patientId,
-          llmContext
-        );
+        const contextualEducation =
+          await healthEducationService.getContextualEducation(
+            llmContext.patientId,
+            llmContext
+          );
 
-        if (contextualEducation.length > 0 && Math.random() > 0.7) { // 30% chance to add education
+        if (contextualEducation.length > 0 && Math.random() > 0.7) {
+          // 30% chance to add education
           const selectedContent = contextualEducation[0]; // Use most relevant
-          educationContent = "\n\n💡 **Tips Kesehatan Hari Ini:**\n" +
-                           healthEducationService.formatContentForDelivery(selectedContent, "whatsapp");
+          educationContent =
+            "\n\n💡 **Tips Kesehatan Hari Ini:**\n" +
+            healthEducationService.formatContentForDelivery(
+              selectedContent,
+              "whatsapp"
+            );
 
           // Track education delivery
           await healthEducationService.trackEducationSession({
             patientId: llmContext.patientId,
             contentId: selectedContent.id,
             sessionType: "reactive_education",
-            engagementScore: 0 // Will be updated based on patient response
+            engagementScore: 0, // Will be updated based on patient response
           });
 
           enhancedResponse += educationContent;
@@ -924,7 +1044,7 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
       } catch (error) {
         logger.warn("Failed to add education content", {
           patientId: llmContext.patientId,
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
 
@@ -932,36 +1052,40 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
         enhancedResponse,
         {
           patientName,
-          responseType: analysis.response_type,
-          topic: analysis.topic,
+          responseResult: analysis.response_type,
           generatedResponse: llmResponse.content,
           educationContentAdded: educationContent.length > 0,
-          educationTopics: educationContent.length > 0 ?
-            contextualEducation?.map(c => c.category) : [],
+          educationTopics:
+            contextualEducation.length > 0
+              ? (contextualEducation as { category: string }[]).map(
+                  (c: { category: string }) => c.category
+                )
+              : [],
           dataAccessed: analysis.data_access_required,
-          processed: true
+          processed: true,
         },
         {
           patientId: llmContext.patientId,
           dataAccessRequired: analysis.data_access_required,
-          responseType: analysis.response_type,
-          topic: analysis.topic,
-          educationDelivered: educationContent.length > 0
+          responseResult: analysis.response_type,
         }
       );
-
     } catch (error) {
-      logger.error("Failed to generate general response", error instanceof Error ? error : new Error(String(error)), {
-        patientId: llmContext.patientId,
-        operation: "general_response_generation_failed"
-      });
+      logger.error(
+        "Failed to generate general response",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: llmContext.patientId,
+          operation: "general_response_generation_failed",
+        }
+      );
 
       return createErrorResponse(
         "Failed to generate response",
         error instanceof Error ? error.message : String(error),
         {
           patientId: llmContext.patientId,
-          action: "general_response_failed"
+          action: "general_response_failed",
         }
       );
     }
@@ -970,7 +1094,10 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
   /**
    * Format reminders for LLM consumption
    */
-  private formatRemindersForLLM(todaysReminders: any[], activeReminders: any[]): string {
+  private formatRemindersForLLM(
+    todaysReminders: { scheduledTime: string; medicationName?: string }[],
+    activeReminders: { scheduledTime: string; medicationName?: string }[]
+  ): string {
     if (todaysReminders.length === 0 && activeReminders.length === 0) {
       return "Tidak ada pengingat obat terjadwal.";
     }
@@ -980,7 +1107,9 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
     if (todaysReminders.length > 0) {
       result += "Pengingat Hari Ini:\n";
       todaysReminders.forEach((reminder, index) => {
-        result += `${index + 1}. ${reminder.scheduledTime} - ${reminder.medicationName || 'Obat'}\n`;
+        result += `${index + 1}. ${reminder.scheduledTime} - ${
+          reminder.medicationName || "Obat"
+        }\n`;
       });
     }
 
@@ -988,7 +1117,9 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
       if (result) result += "\n";
       result += "Pengingat Aktif:\n";
       activeReminders.forEach((reminder, index) => {
-        result += `${index + 1}. ${reminder.scheduledTime} - ${reminder.medicationName || 'Obat'} (${reminder.frequency})\n`;
+        result += `${index + 1}. ${reminder.scheduledTime} - ${
+          reminder.medicationName || "Obat"
+        }\n`;
       });
     }
 
@@ -1002,6 +1133,7 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
     patientId: string,
     message: string,
     analysis: GeneralInquiryResult,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     patientName: string
   ): Promise<void> {
     try {
@@ -1014,22 +1146,25 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
           inquiryType: analysis.response_type,
           topic: analysis.topic,
           reason: analysis.reason,
-          confidence: analysis.confidence
-        }
+          confidence: analysis.confidence,
+        },
       });
 
       logger.info("General inquiry escalated to volunteer", {
         patientId,
-        responseType: analysis.response_type,
+        responseResult: analysis.response_type,
         topic: analysis.topic,
-        operation: "general_inquiry_escalation"
+        operation: "general_inquiry_escalation",
       });
-
     } catch (error) {
-      logger.error("Failed to escalate general inquiry to volunteer", error instanceof Error ? error : new Error(String(error)), {
-        patientId,
-        operation: "escalation_failed"
-      });
+      logger.error(
+        "Failed to escalate general inquiry to volunteer",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+          operation: "escalation_failed",
+        }
+      );
     }
   }
 
@@ -1040,24 +1175,62 @@ Original Message: ${llmContext.previousMessages[llmContext.previousMessages.leng
     const normalizedMessage = message.toLowerCase();
 
     // Simple keyword-based analysis
-    const healthNotesKeywords = ["catatan", "kesehatan", "riwayat", "record", "note"];
-    const reminderKeywords = ["pengingat", "reminder", "jadwal", "obat", "minum"];
-    const emergencyKeywords = ["darurat", "emergency", "tolong", "bantuan", "sakitt"];
+    const healthNotesKeywords = [
+      "catatan",
+      "kesehatan",
+      "riwayat",
+      "record",
+      "note",
+    ];
+    const reminderKeywords = [
+      "pengingat",
+      "reminder",
+      "jadwal",
+      "obat",
+      "minum",
+    ];
+    const emergencyKeywords = [
+      "darurat",
+      "emergency",
+      "tolong",
+      "bantuan",
+      "sakitt",
+    ];
 
-    const isHealthNotesQuery = healthNotesKeywords.some(keyword => normalizedMessage.includes(keyword));
-    const isReminderQuery = reminderKeywords.some(keyword => normalizedMessage.includes(keyword));
-    const isEmergency = emergencyKeywords.some(keyword => normalizedMessage.includes(keyword));
+    const isHealthNotesQuery = healthNotesKeywords.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
+    const isReminderQuery = reminderKeywords.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
+    const isEmergency = emergencyKeywords.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
 
     return {
       intent: "general_inquiry",
-      response_type: isEmergency ? "eskalasi" : isHealthNotesQuery ? "data_pasien" : isReminderQuery ? "data_pasien" : "informasi",
-      topic: isHealthNotesQuery ? "catatan_kesehatan" : isReminderQuery ? "pengingat_obat" : "umum",
+      response_type: isEmergency
+        ? "eskalasi"
+        : isHealthNotesQuery
+        ? "data_pasien"
+        : isReminderQuery
+        ? "data_pasien"
+        : "informasi",
+      topic: isHealthNotesQuery
+        ? "catatan_kesehatan"
+        : isReminderQuery
+        ? "pengingat_obat"
+        : "umum",
       data_access_required: isHealthNotesQuery || isReminderQuery,
-      patient_data_type: isHealthNotesQuery ? "health_notes" : isReminderQuery ? "reminder" : undefined,
+      patient_data_type: isHealthNotesQuery
+        ? "health_notes"
+        : isReminderQuery
+        ? "reminder"
+        : undefined,
       needs_human_help: isEmergency,
       follow_up_required: false,
       reason: "Fallback analysis due to LLM failure",
-      confidence: 0.6
+      confidence: 0.6,
     };
   }
 }

@@ -10,8 +10,17 @@ import { ConversationContext } from "@/services/llm/llm.types";
 
 export interface DataAccessRequest {
   patientId: string;
-  requestedDataType: "health_notes" | "medication_info" | "medication_schedule" | "medication_compliance" | "reminder" | "general";
-  requestContext: "patient_initiated" | "system_initiated" | "volunteer_initiated";
+  requestedDataType:
+    | "health_notes"
+    | "medication_info"
+    | "medication_schedule"
+    | "medication_compliance"
+    | "reminder"
+    | "general";
+  requestContext:
+    | "patient_initiated"
+    | "system_initiated"
+    | "volunteer_initiated";
   conversationId?: string;
   messageId?: string;
 }
@@ -69,17 +78,17 @@ export class DataAccessValidationService {
   private readonly RATE_LIMIT_WINDOW = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_REQUESTS_PER_WINDOW = 10; // Max requests per window
   private readonly HIGH_RISK_PATTERNS = [
-    /data.*pasien.*lain/i,  // Other patient's data
-    /bocoran.*data/i,      // Data leak requests
-    /hack.*data/i,         // Hacking attempts
-    /password.*data/i,     // Password-related data requests
+    /data.*pasien.*lain/i, // Other patient's data
+    /bocoran.*data/i, // Data leak requests
+    /hack.*data/i, // Hacking attempts
+    /password.*data/i, // Password-related data requests
   ];
 
   private readonly SUSPICIOUS_REQUEST_PATTERNS = [
-    /semua.*data/i,        // All data requests
-    /ekspor.*data/i,       // Data export requests
-    /download.*data/i,     // Data download requests
-    /bulk.*data/i,         // Bulk data requests
+    /semua.*data/i, // All data requests
+    /ekspor.*data/i, // Data export requests
+    /download.*data/i, // Data download requests
+    /bulk.*data/i, // Bulk data requests
   ];
 
   /**
@@ -94,17 +103,26 @@ export class DataAccessValidationService {
         patientId: request.patientId,
         requestedDataType: request.requestedDataType,
         requestContext: request.requestContext,
-        operation: "data_access_validation"
+        operation: "data_access_validation",
       });
 
       // Get patient access profile
-      const patientProfile = await this.getPatientAccessProfile(request.patientId);
+      const patientProfile = await this.getPatientAccessProfile(
+        request.patientId
+      );
 
       // Perform comprehensive validation
-      const violations = await this.performValidationChecks(request, patientProfile, conversationContext);
+      const violations = await this.performValidationChecks(
+        request,
+        patientProfile,
+        conversationContext
+      );
 
       // Determine authorization result
-      const validationResult = this.determineValidationResult(violations, patientProfile);
+      const validationResult = this.determineValidationResult(
+        violations,
+        patientProfile
+      );
 
       // Log access attempt for audit
       if (validationResult.auditLogRequired) {
@@ -116,16 +134,19 @@ export class DataAccessValidationService {
         isAuthorized: validationResult.isAuthorized,
         riskLevel: validationResult.riskLevel,
         violationsCount: violations.length,
-        operation: "data_access_validation_completed"
+        operation: "data_access_validation_completed",
       });
 
       return validationResult;
-
     } catch (error) {
-      logger.error("Failed to validate data access request", error instanceof Error ? error : new Error(String(error)), {
-        patientId: request.patientId,
-        requestedDataType: request.requestedDataType
-      });
+      logger.error(
+        "Failed to validate data access request",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: request.patientId,
+          requestedDataType: request.requestedDataType,
+        }
+      );
 
       // Fail securely - deny access on validation errors
       return {
@@ -135,13 +156,13 @@ export class DataAccessValidationService {
           {
             type: "suspicious_request_pattern",
             severity: "high",
-            description: "Data access validation system error"
-          }
+            description: "Data access validation system error",
+          },
         ],
         requiresConsent: false,
         requiresEscalation: true,
         auditLogRequired: true,
-        reason: "System error during validation"
+        reason: "System error during validation",
       };
     }
   }
@@ -149,22 +170,19 @@ export class DataAccessValidationService {
   /**
    * Get patient access profile with permissions and risk factors
    */
-  private async getPatientAccessProfile(patientId: string): Promise<PatientDataAccessProfile> {
+  private async getPatientAccessProfile(
+    patientId: string
+  ): Promise<PatientDataAccessProfile> {
     try {
       const patient = await db
         .select({
           id: patients.id,
           isActive: patients.isActive,
           verificationStatus: patients.verificationStatus,
-          createdAt: patients.createdAt
+          createdAt: patients.createdAt,
         })
         .from(patients)
-        .where(
-          and(
-            eq(patients.id, patientId),
-            isNull(patients.deletedAt)
-          )
-        )
+        .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
         .limit(1);
 
       if (!patient.length) {
@@ -198,13 +216,16 @@ export class DataAccessValidationService {
         accessHistory: {
           recentRequests: 0, // Would track from access logs
           suspiciousPatterns: [],
-        }
+        },
       };
-
     } catch (error) {
-      logger.error("Failed to get patient access profile", error instanceof Error ? error : new Error(String(error)), {
-        patientId
-      });
+      logger.error(
+        "Failed to get patient access profile",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+        }
+      );
       throw error;
     }
   }
@@ -225,12 +246,29 @@ export class DataAccessValidationService {
         type: "unauthorized_patient_access",
         severity: "high",
         description: "Patient account is not active",
-        context: { patientId: request.patientId, status: patientProfile.isActive }
+        context: {
+          patientId: request.patientId,
+          status: patientProfile.isActive,
+        },
       });
     }
 
     // Check 2: Data type permissions
-    const hasPermission = patientProfile.dataAccessPermissions[request.requestedDataType];
+    const permissionMap = {
+      general: "generalInfo",
+      health_notes: "healthNotes",
+      medication_info: "medicationInfo",
+      medication_schedule: "medicationSchedule",
+      medication_compliance: "medicationCompliance",
+      reminder: "reminders",
+    };
+
+    const permissionKey =
+      permissionMap[request.requestedDataType] || request.requestedDataType;
+    const hasPermission =
+      patientProfile.dataAccessPermissions[
+        permissionKey as keyof typeof patientProfile.dataAccessPermissions
+      ];
     if (!hasPermission) {
       violations.push({
         type: "data_type_mismatch",
@@ -238,28 +276,38 @@ export class DataAccessValidationService {
         description: `Patient lacks permission for ${request.requestedDataType} access`,
         context: {
           requestedDataType: request.requestedDataType,
-          verificationStatus: patientProfile.verificationStatus
-        }
+          verificationStatus: patientProfile.verificationStatus,
+        },
       });
     }
 
     // Check 3: Verification status requirements
-    const requiresVerification = ["health_notes", "medication_info", "medication_schedule", "medication_compliance"];
-    if (requiresVerification.includes(request.requestedDataType) &&
-        patientProfile.verificationStatus !== "verified") {
+    const requiresVerification = [
+      "health_notes",
+      "medication_info",
+      "medication_schedule",
+      "medication_compliance",
+    ];
+    if (
+      requiresVerification.includes(request.requestedDataType) &&
+      patientProfile.verificationStatus !== "verified"
+    ) {
       violations.push({
         type: "consent_required",
         severity: "medium",
         description: "Data type requires patient verification",
         context: {
           requestedDataType: request.requestedDataType,
-          verificationStatus: patientProfile.verificationStatus
-        }
+          verificationStatus: patientProfile.verificationStatus,
+        },
       });
     }
 
     // Check 4: Suspicious request patterns
-    const suspiciousPatterns = this.checkSuspiciousPatterns(request, conversationContext);
+    const suspiciousPatterns = this.checkSuspiciousPatterns(
+      request,
+      conversationContext
+    );
     violations.push(...suspiciousPatterns);
 
     // Check 5: Rate limiting (simplified - would need Redis for proper implementation)
@@ -267,7 +315,10 @@ export class DataAccessValidationService {
     violations.push(...rateLimitViolations);
 
     // Check 6: Data sensitivity validation
-    const sensitivityViolations = this.checkDataSensitivity(request, patientProfile);
+    const sensitivityViolations = this.checkDataSensitivity(
+      request,
+      patientProfile
+    );
     violations.push(...sensitivityViolations);
 
     return violations;
@@ -286,8 +337,8 @@ export class DataAccessValidationService {
     if (conversationContext?.previousMessages) {
       const recentMessages = conversationContext.previousMessages
         .slice(-5) // Check last 5 messages
-        .map(msg => msg.content.toLowerCase())
-        .join(' ');
+        .map((msg) => msg.content.toLowerCase())
+        .join(" ");
 
       for (const pattern of this.HIGH_RISK_PATTERNS) {
         if (pattern.test(recentMessages)) {
@@ -295,7 +346,7 @@ export class DataAccessValidationService {
             type: "suspicious_request_pattern",
             severity: "critical",
             description: "High-risk request pattern detected",
-            context: { pattern: pattern.toString() }
+            context: { pattern: pattern.toString() },
           });
         }
       }
@@ -306,7 +357,7 @@ export class DataAccessValidationService {
             type: "suspicious_request_pattern",
             severity: "high",
             description: "Suspicious bulk data request pattern detected",
-            context: { pattern: pattern.toString() }
+            context: { pattern: pattern.toString() },
           });
         }
       }
@@ -318,7 +369,9 @@ export class DataAccessValidationService {
   /**
    * Check rate limiting (simplified implementation)
    */
-  private async checkRateLimiting(request: DataAccessRequest): Promise<DataAccessViolation[]> {
+  private async checkRateLimiting(
+    request: DataAccessRequest
+  ): Promise<DataAccessViolation[]> {
     const violations: DataAccessViolation[] = [];
 
     // This is a simplified implementation - in production, you'd use Redis
@@ -326,6 +379,7 @@ export class DataAccessValidationService {
 
     // For now, we'll implement a basic check that could be enhanced
     const currentTime = Date.now();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const windowStart = currentTime - this.RATE_LIMIT_WINDOW;
 
     // Placeholder for actual rate limit checking
@@ -340,8 +394,9 @@ export class DataAccessValidationService {
         context: {
           recentRequestCount,
           maxAllowed: this.MAX_REQUESTS_PER_WINDOW,
-          windowMinutes: this.RATE_LIMIT_WINDOW / (60 * 1000)
-        }
+          windowMinutes: this.RATE_LIMIT_WINDOW / (60 * 1000),
+          patientId: request.patientId,
+        },
       });
     }
 
@@ -368,8 +423,9 @@ export class DataAccessValidationService {
           description: "Sensitive data type requires explicit consent",
           context: {
             requestedDataType: request.requestedDataType,
-            requiresExtraConsent: patientProfile.riskFactors.requiresExtraConsent
-          }
+            requiresExtraConsent:
+              patientProfile.riskFactors.requiresExtraConsent,
+          },
         });
       }
     }
@@ -382,8 +438,11 @@ export class DataAccessValidationService {
    */
   private determineValidationResult(
     violations: DataAccessViolation[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     patientProfile: PatientDataAccessProfile
   ): DataAccessValidationResult {
+    // Note: patientProfile is kept for future extensibility but not currently used
+    // in the basic validation logic. It could be used for more sophisticated risk assessment.
     if (violations.length === 0) {
       return {
         isAuthorized: true,
@@ -392,12 +451,14 @@ export class DataAccessValidationService {
         requiresConsent: false,
         requiresEscalation: false,
         auditLogRequired: true,
-        reason: "Access request validated successfully"
+        reason: "Access request validated successfully",
       };
     }
 
     // Check for critical violations
-    const criticalViolations = violations.filter(v => v.severity === "critical");
+    const criticalViolations = violations.filter(
+      (v) => v.severity === "critical"
+    );
     if (criticalViolations.length > 0) {
       return {
         isAuthorized: false,
@@ -406,12 +467,12 @@ export class DataAccessValidationService {
         requiresConsent: false,
         requiresEscalation: true,
         auditLogRequired: true,
-        reason: "Critical security violations detected"
+        reason: "Critical security violations detected",
       };
     }
 
     // Check for high violations
-    const highViolations = violations.filter(v => v.severity === "high");
+    const highViolations = violations.filter((v) => v.severity === "high");
     if (highViolations.length > 0) {
       return {
         isAuthorized: false,
@@ -420,15 +481,15 @@ export class DataAccessValidationService {
         requiresConsent: false,
         requiresEscalation: true,
         auditLogRequired: true,
-        reason: "High-risk security violations detected"
+        reason: "High-risk security violations detected",
       };
     }
 
     // Check for medium violations
-    const mediumViolations = violations.filter(v => v.severity === "medium");
+    const mediumViolations = violations.filter((v) => v.severity === "medium");
     if (mediumViolations.length > 0) {
-      const consentRequired = mediumViolations.some(v =>
-        v.type === "consent_required" || v.type === "data_sensitivity"
+      const consentRequired = mediumViolations.some(
+        (v) => v.type === "consent_required" || v.type === "data_sensitivity"
       );
 
       return {
@@ -438,7 +499,9 @@ export class DataAccessValidationService {
         requiresConsent: consentRequired,
         requiresEscalation: false,
         auditLogRequired: true,
-        reason: consentRequired ? "Consent required for data access" : "Medium-risk violations detected"
+        reason: consentRequired
+          ? "Consent required for data access"
+          : "Medium-risk violations detected",
       };
     }
 
@@ -449,8 +512,8 @@ export class DataAccessValidationService {
       violations,
       requiresConsent: false,
       requiresEscalation: false,
-        auditLogRequired: true,
-      reason: "Low-risk violations detected, access granted"
+      auditLogRequired: true,
+      reason: "Low-risk violations detected, access granted",
     };
   }
 
@@ -471,14 +534,14 @@ export class DataAccessValidationService {
         isAuthorized: result.isAuthorized,
         riskLevel: result.riskLevel,
         violationsCount: violations.length,
-        violations: violations.map(v => ({
+        violations: violations.map((v) => ({
           type: v.type,
           severity: v.severity,
-          description: v.description
+          description: v.description,
         })),
         requiresEscalation: result.requiresEscalation,
         conversationId: request.conversationId,
-        messageId: request.messageId
+        messageId: request.messageId,
       };
 
       // In a real implementation, you'd save this to your audit log database
@@ -488,11 +551,14 @@ export class DataAccessValidationService {
       if (result.requiresEscalation) {
         await this.escalateSecurityConcern(request, result, violations);
       }
-
     } catch (error) {
-      logger.error("Failed to log access attempt", error instanceof Error ? error : new Error(String(error)), {
-        patientId: request.patientId
-      });
+      logger.error(
+        "Failed to log access attempt",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: request.patientId,
+        }
+      );
     }
   }
 
@@ -508,10 +574,10 @@ export class DataAccessValidationService {
       const escalationDetails = {
         patientId: request.patientId,
         riskLevel: result.riskLevel,
-        violationTypes: violations.map(v => v.type),
+        violationTypes: violations.map((v) => v.type),
         description: `Security concern: ${result.reason}`,
         timestamp: new Date().toISOString(),
-        requiresImmediateAttention: result.riskLevel === "critical"
+        requiresImmediateAttention: result.riskLevel === "critical",
       };
 
       // In a real implementation, you'd send this to your security monitoring system
@@ -519,9 +585,11 @@ export class DataAccessValidationService {
 
       // Could integrate with existing volunteer notification service
       // if security team uses the same notification system
-
     } catch (error) {
-      logger.error("Failed to escalate security concern", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Failed to escalate security concern",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
@@ -535,8 +603,14 @@ export class DataAccessValidationService {
   ): Promise<boolean> {
     const request: DataAccessRequest = {
       patientId,
-      requestedDataType: dataType as any,
-      requestContext: "patient_initiated"
+      requestedDataType: dataType as
+        | "health_notes"
+        | "medication_info"
+        | "medication_schedule"
+        | "medication_compliance"
+        | "reminder"
+        | "general",
+      requestContext: "patient_initiated",
     };
 
     const result = await this.validateDataAccess(request, context);
@@ -561,14 +635,20 @@ export class DataAccessValidationService {
         isActive: profile.isActive,
         verificationStatus: profile.verificationStatus,
         permissions: profile.dataAccessPermissions,
-        riskLevel: profile.riskFactors.isHighRiskPatient ? "high" :
-                     profile.riskFactors.hasSensitiveConditions ? "medium" : "low"
+        riskLevel: profile.riskFactors.isHighRiskPatient
+          ? "high"
+          : profile.riskFactors.hasSensitiveConditions
+          ? "medium"
+          : "low",
       };
-
     } catch (error) {
-      logger.error("Failed to get permission summary", error instanceof Error ? error : new Error(String(error)), {
-        patientId
-      });
+      logger.error(
+        "Failed to get permission summary",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+        }
+      );
       throw error;
     }
   }

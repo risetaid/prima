@@ -22,8 +22,8 @@ export interface ResponseMetadata {
   escalated?: boolean;
   dataAccessRequired?: boolean;
   patientDataType?: string;
-  responseResult?: any;
-  analysisResult?: any;
+  responseResult?: unknown;
+  analysisResult?: unknown;
   notesFound?: number;
   medicationsFound?: number;
   hasActiveMedications?: boolean;
@@ -50,6 +50,7 @@ export interface ResponseContext {
   timestamp: Date;
   verificationStatus: string;
   interactionType: InteractionType;
+  conversationId?: string;
   additionalData?: Record<string, unknown>;
 }
 

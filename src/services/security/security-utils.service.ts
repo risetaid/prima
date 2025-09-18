@@ -47,22 +47,44 @@ export interface PatientSecurityProfile {
 
 export class SecurityUtilsService {
   private readonly HIGH_RISK_KEYWORDS = [
-    "bocor", "leak", "hack", "crack", "password", "pin", "token",
-    "data lain", "pasien lain", "orang lain", "semua pasien",
-    "ekspor", "export", "download", "bulk", "massal"
+    "bocor",
+    "leak",
+    "hack",
+    "crack",
+    "password",
+    "pin",
+    "token",
+    "data lain",
+    "pasien lain",
+    "orang lain",
+    "semua pasien",
+    "ekspor",
+    "export",
+    "download",
+    "bulk",
+    "massal",
   ];
 
   private readonly SENSITIVE_DATA_PATTERNS = [
-    /no\.?rek/i, /no.?rekening/i, /rekening/i,
-    /nik/i, /ktp/i, /passport/i,
-    /alamat.*rumah/i, /no.?hp.*lain/i,
-    /kartu.*kredit/i, /cvv/i, /kode.*pos/i
+    /no\.?rek/i,
+    /no.?rekening/i,
+    /rekening/i,
+    /nik/i,
+    /ktp/i,
+    /passport/i,
+    /alamat.*rumah/i,
+    /no.?hp.*lain/i,
+    /kartu.*kredit/i,
+    /cvv/i,
+    /kode.*pos/i,
   ];
 
   /**
    * Validate patient authentication and authorization
    */
-  async validatePatientAccess(securityContext: SecurityContext): Promise<ValidationResult> {
+  async validatePatientAccess(
+    securityContext: SecurityContext
+  ): Promise<ValidationResult> {
     try {
       const reasons: string[] = [];
       let riskScore = 0;
@@ -74,7 +96,7 @@ export class SecurityUtilsService {
           id: patients.id,
           isActive: patients.isActive,
           verificationStatus: patients.verificationStatus,
-          createdAt: patients.createdAt
+          createdAt: patients.createdAt,
         })
         .from(patients)
         .where(
@@ -95,7 +117,7 @@ export class SecurityUtilsService {
           riskScore,
           confidence,
           reasons,
-          recommendations: ["Verify patient identity and contact information"]
+          recommendations: ["Verify patient identity and contact information"],
         };
       }
 
@@ -133,20 +155,23 @@ export class SecurityUtilsService {
         riskScore: Math.min(riskScore, 100),
         confidence,
         reasons,
-        recommendations: this.getSecurityRecommendations(riskScore, isVerified)
+        recommendations: this.getSecurityRecommendations(riskScore, isVerified),
       };
-
     } catch (error) {
-      logger.error("Failed to validate patient access", error instanceof Error ? error : new Error(String(error)), {
-        patientId: securityContext.patientId
-      });
+      logger.error(
+        "Failed to validate patient access",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId: securityContext.patientId,
+        }
+      );
 
       return {
         isValid: false,
         riskScore: 90,
         confidence: 0.7,
         reasons: ["System error during validation"],
-        recommendations: ["Contact system administrator"]
+        recommendations: ["Contact system administrator"],
       };
     }
   }
@@ -154,22 +179,19 @@ export class SecurityUtilsService {
   /**
    * Get comprehensive patient security profile
    */
-  async getPatientSecurityProfile(patientId: string): Promise<PatientSecurityProfile> {
+  async getPatientSecurityProfile(
+    patientId: string
+  ): Promise<PatientSecurityProfile> {
     try {
       const patient = await db
         .select({
           id: patients.id,
           isActive: patients.isActive,
           verificationStatus: patients.verificationStatus,
-          createdAt: patients.createdAt
+          createdAt: patients.createdAt,
         })
         .from(patients)
-        .where(
-          and(
-            eq(patients.id, patientId),
-            isNull(patients.deletedAt)
-          )
-        )
+        .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
         .limit(1);
 
       if (!patient.length) {
@@ -197,7 +219,7 @@ export class SecurityUtilsService {
         canAccessMedicationInfo: isVerified,
         canAccessScheduleInfo: isVerified,
         canAccessComplianceData: isVerified,
-        canShareData: false // Never allow data sharing by default
+        canShareData: false, // Never allow data sharing by default
       };
 
       return {
@@ -210,15 +232,18 @@ export class SecurityUtilsService {
           isHighRisk: false, // Could be enhanced with patient condition data
           hasSensitiveConditions: false, // Could be determined from medical history
           recentSuspiciousActivity: false, // Would track from security logs
-          dataBreachRisk: dataSensitivity === "high"
+          dataBreachRisk: dataSensitivity === "high",
         },
-        permissions
+        permissions,
       };
-
     } catch (error) {
-      logger.error("Failed to get patient security profile", error instanceof Error ? error : new Error(String(error)), {
-        patientId
-      });
+      logger.error(
+        "Failed to get patient security profile",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+        }
+      );
       throw error;
     }
   }
@@ -226,7 +251,10 @@ export class SecurityUtilsService {
   /**
    * Analyze message content for security risks
    */
-  analyzeMessageSecurity(message: string, context?: ConversationContext): ValidationResult {
+  analyzeMessageSecurity(
+    message: string,
+    context?: ConversationContext
+  ): ValidationResult {
     const reasons: string[] = [];
     let riskScore = 0;
     const normalizedMessage = message.toLowerCase();
@@ -256,7 +284,7 @@ export class SecurityUtilsService {
     // Check for repeated requests (if context available)
     if (context?.previousMessages) {
       const recentMessages = context.previousMessages.slice(-3);
-      const similarRequests = recentMessages.filter(msg =>
+      const similarRequests = recentMessages.filter((msg) =>
         msg.content.toLowerCase().includes(normalizedMessage.substring(0, 50))
       );
 
@@ -275,7 +303,7 @@ export class SecurityUtilsService {
       riskScore: finalRiskScore,
       confidence: 0.85,
       reasons,
-      recommendations: this.getMessageSecurityRecommendations(finalRiskScore)
+      recommendations: this.getMessageSecurityRecommendations(finalRiskScore),
     };
   }
 
@@ -298,7 +326,7 @@ export class SecurityUtilsService {
         riskScore,
         confidence: 0.95,
         reasons,
-        recommendations: ["Contact healthcare provider to activate account"]
+        recommendations: ["Contact healthcare provider to activate account"],
       };
     }
 
@@ -357,34 +385,42 @@ export class SecurityUtilsService {
       riskScore: Math.min(riskScore, 100),
       confidence: 0.9,
       reasons,
-      recommendations: this.getDataAccessRecommendations(requestedDataType, securityProfile.verificationStatus)
+      recommendations: this.getDataAccessRecommendations(
+        requestedDataType,
+        securityProfile.verificationStatus
+      ),
     };
   }
 
   /**
    * Generate security recommendations based on risk score
    */
-  private getSecurityRecommendations(riskScore: number, isVerified: boolean): string[] {
+  private getSecurityRecommendations(
+    riskScore: number,
+    isVerified: boolean
+  ): string[] {
     if (riskScore >= 70) {
       return [
         "Immediate verification required",
         "Contact healthcare provider",
-        "Review account security settings"
+        "Review account security settings",
       ];
     } else if (riskScore >= 50) {
       return [
-        isVerified ? "Additional verification recommended" : "Complete account verification",
-        "Review recent account activity"
+        isVerified
+          ? "Additional verification recommended"
+          : "Complete account verification",
+        "Review recent account activity",
       ];
     } else if (riskScore >= 30) {
       return [
         "Monitor account activity",
-        "Enable additional security features if available"
+        "Enable additional security features if available",
       ];
     } else {
       return [
         "Standard security practices maintained",
-        "Regular account review recommended"
+        "Regular account review recommended",
       ];
     }
   }
@@ -397,30 +433,31 @@ export class SecurityUtilsService {
       return [
         "Message flagged for security review",
         "Avoid sharing sensitive information",
-        "Contact support if you believe this is an error"
+        "Contact support if you believe this is an error",
       ];
     } else if (riskScore >= 30) {
       return [
         "Be cautious with sensitive information",
-        "Verify recipient before sharing personal data"
+        "Verify recipient before sharing personal data",
       ];
     } else {
-      return [
-        "Standard communication security maintained"
-      ];
+      return ["Standard communication security maintained"];
     }
   }
 
   /**
    * Generate data access recommendations
    */
-  private getDataAccessRecommendations(dataType: string, verificationStatus: string): string[] {
+  private getDataAccessRecommendations(
+    dataType: string,
+    verificationStatus: string
+  ): string[] {
     const isVerified = verificationStatus === "verified";
 
     if (!isVerified) {
       return [
         "Complete account verification to access this information",
-        "Contact healthcare provider for verification assistance"
+        "Contact healthcare provider for verification assistance",
       ];
     }
 
@@ -431,17 +468,17 @@ export class SecurityUtilsService {
         return [
           "This information is sensitive and protected",
           "Ensure you are in a private environment when viewing",
-          "Do not share this information with unauthorized parties"
+          "Do not share this information with unauthorized parties",
         ];
       case "medication_schedule":
         return [
           "Keep your medication schedule private",
-          "Only share with authorized caregivers"
+          "Only share with authorized caregivers",
         ];
       default:
         return [
           "Follow standard data protection practices",
-          "Report any suspicious account activity"
+          "Report any suspicious account activity",
         ];
     }
   }
@@ -449,7 +486,10 @@ export class SecurityUtilsService {
   /**
    * Check if patient can perform sensitive operations
    */
-  async canPerformSensitiveOperation(patientId: string, operation: string): Promise<boolean> {
+  async canPerformSensitiveOperation(
+    patientId: string,
+    operation: string
+  ): Promise<boolean> {
     try {
       const securityProfile = await this.getPatientSecurityProfile(patientId);
 
@@ -468,7 +508,7 @@ export class SecurityUtilsService {
         "data_export",
         "data_sharing",
         "account_changes",
-        "consent_withdrawal"
+        "consent_withdrawal",
       ];
 
       if (sensitiveOperations.includes(operation)) {
@@ -476,12 +516,15 @@ export class SecurityUtilsService {
       }
 
       return true;
-
     } catch (error) {
-      logger.error("Failed to check sensitive operation permission", error instanceof Error ? error : new Error(String(error)), {
-        patientId,
-        operation
-      });
+      logger.error(
+        "Failed to check sensitive operation permission",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+          operation,
+        }
+      );
       return false;
     }
   }
@@ -490,7 +533,11 @@ export class SecurityUtilsService {
    * Create security audit log entry
    */
   async logSecurityEvent(
-    eventType: "access_attempt" | "permission_denied" | "suspicious_activity" | "data_access",
+    eventType:
+      | "access_attempt"
+      | "permission_denied"
+      | "suspicious_activity"
+      | "data_access",
     patientId: string,
     details: Record<string, unknown>
   ): Promise<void> {
@@ -502,29 +549,37 @@ export class SecurityUtilsService {
         details,
         riskScore: details.riskScore || 0,
         ipAddress: details.ipAddress || "unknown",
-        userAgent: details.userAgent || "unknown"
+        userAgent: details.userAgent || "unknown",
       };
 
       // In production, this would be saved to a security audit log database
       logger.info("Security audit event", auditEntry);
 
       // Could trigger real-time alerts for high-risk events
-      if (details.riskScore && details.riskScore > 70) {
+      if (typeof details.riskScore === "number" && details.riskScore > 70) {
         await this.triggerSecurityAlert(auditEntry);
       }
-
     } catch (error) {
-      logger.error("Failed to log security event", error instanceof Error ? error : new Error(String(error)), {
-        patientId,
-        eventType
-      });
+      logger.error(
+        "Failed to log security event",
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          patientId,
+          eventType,
+        }
+      );
     }
   }
 
   /**
    * Trigger security alert for high-risk events
    */
-  private async triggerSecurityAlert(auditEntry: any): Promise<void> {
+  private async triggerSecurityAlert(auditEntry: {
+    patientId: string;
+    eventType: string;
+    riskScore: number | unknown;
+    timestamp: string;
+  }): Promise<void> {
     try {
       // In production, this would integrate with your security monitoring system
       logger.warn("Security alert triggered", {
@@ -532,14 +587,16 @@ export class SecurityUtilsService {
         patientId: auditEntry.patientId,
         eventType: auditEntry.eventType,
         riskScore: auditEntry.riskScore,
-        timestamp: auditEntry.timestamp
+        timestamp: auditEntry.timestamp,
       });
 
       // Could send notifications to security team
       // Could implement automatic account restrictions
-
     } catch (error) {
-      logger.error("Failed to trigger security alert", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Failed to trigger security alert",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 }

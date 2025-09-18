@@ -3,25 +3,28 @@
  * Contains templates for different conversation contexts with safety guidelines
  */
 
-import { ConversationContext } from './llm.types'
+import { ConversationContext } from "./llm.types";
 
 interface ActiveReminder {
-  medicationName?: string
-  scheduledTime?: string
+  medicationName?: string;
+  scheduledTime?: string;
+  medicationDetails?: {
+    name?: string;
+  };
 }
 
 interface IntentResult {
-  intent: string
-  confidence: number
-  entities?: Record<string, unknown>
+  intent: string;
+  confidence: number;
+  entities?: Record<string, unknown>;
 }
 
 export interface PromptTemplate {
-  systemPrompt: string
-  userPrompt?: string
-  responseFormat: 'json' | 'text'
-  maxTokens: number
-  temperature: number
+  systemPrompt: string;
+  userPrompt?: string;
+  responseFormat: "json" | "text";
+  maxTokens: number;
+  temperature: number;
 }
 
 /**
@@ -38,19 +41,23 @@ KEBIJAKAN KEAMANAN KRITIS:
 - Gunakan bahasa yang sopan, empati, dan profesional
 - Jika ragu, minta bantuan manusia daripada memberikan jawaban yang salah
 
-DISCLAIMER: Saya adalah asisten AI PRIMA, bukan pengganti tenaga medis profesional.`
+DISCLAIMER: Saya adalah asisten AI PRIMA, bukan pengganti tenaga medis profesional.`;
 
 /**
  * Verification context prompt
  * Used when patient is responding to verification messages
  */
-export function getVerificationPrompt(context: ConversationContext): PromptTemplate {
+export function getVerificationPrompt(
+  context: ConversationContext
+): PromptTemplate {
   const systemPrompt = `Anda adalah asisten verifikasi untuk sistem kesehatan PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Verifikasi Saat Ini: ${context.patientInfo?.verificationStatus || 'Belum diverifikasi'}
+- Status Verifikasi Saat Ini: ${
+    context.patientInfo?.verificationStatus || "Belum diverifikasi"
+  }
 
 TUGAS ANDA:
 Analisis pesan pasien dan tentukan apakah mereka menyetujui verifikasi nomor WhatsApp mereka.
@@ -72,30 +79,41 @@ PEDOMAN ANALISIS:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan dan mudah dipahami.`
+INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan dan mudah dipahami.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 200,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  };
 }
 
 /**
  * Medication confirmation prompt
  * Used when checking if patient has taken their medication
  */
-export function getMedicationConfirmationPrompt(context: ConversationContext): PromptTemplate {
-  const activeReminders = context.patientInfo?.activeReminders as ActiveReminder[] || []
-  const reminderInfo = activeReminders.length > 0
-    ? activeReminders.map((r: ActiveReminder) => `- ${r.medicationName || 'Obat'} pada ${r.scheduledTime || 'waktu yang dijadwalkan'}`).join('\n')
-    : 'Tidak ada pengingat aktif'
+export function getMedicationConfirmationPrompt(
+  context: ConversationContext
+): PromptTemplate {
+  const activeReminders =
+    (context.patientInfo?.activeReminders as ActiveReminder[]) || [];
+  const reminderInfo =
+    activeReminders.length > 0
+      ? activeReminders
+          .map(
+            (r: ActiveReminder) =>
+              `- ${r.medicationName || "Obat"} pada ${
+                r.scheduledTime || "waktu yang dijadwalkan"
+              }`
+          )
+          .join("\n")
+      : "Tidak ada pengingat aktif";
 
   const systemPrompt = `Anda adalah asisten konfirmasi pengobatan untuk sistem kesehatan PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
 - Pengingat Aktif Saat Ini:
 ${reminderInfo}
@@ -121,27 +139,31 @@ PEDOMAN ANALISIS:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan dan mendukung.`
+INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan dan mendukung.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 250,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  };
 }
 
 /**
  * Unsubscribe request prompt
  * Used when patient wants to stop receiving reminders
  */
-export function getUnsubscribePrompt(context: ConversationContext): PromptTemplate {
+export function getUnsubscribePrompt(
+  context: ConversationContext
+): PromptTemplate {
   const systemPrompt = `Anda adalah asisten penghentian layanan untuk sistem kesehatan PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Layanan: ${context.patientInfo?.isActive !== false ? 'Aktif' : 'Nonaktif'}
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diverifikasi"
+  }
 
 TUGAS ANDA:
 Analisis pesan pasien untuk menentukan apakah mereka ingin berhenti dari layanan pengingat obat dan dukungan PRIMA.
@@ -186,25 +208,27 @@ SAFETY PROTOCOL:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang empati, membantu, dan sensitif terhadap kondisi pasien.`
+INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang empati, membantu, dan sensitif terhadap kondisi pasien.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 250,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  };
 }
 
 /**
  * Emergency detection prompt
  * Used to identify urgent medical situations
  */
-export function getEmergencyPrompt(context: ConversationContext): PromptTemplate {
+export function getEmergencyPrompt(
+  context: ConversationContext
+): PromptTemplate {
   const systemPrompt = `Anda adalah detektor darurat medis untuk sistem kesehatan PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
 
 TUGAS ANDA:
@@ -228,36 +252,51 @@ TINGKAT DARURAT:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang jelas dan tenang.`
+INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang jelas dan tenang.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 300,
-    temperature: 0.2
-  }
+    temperature: 0.2,
+  };
 }
 
 /**
  * General inquiry prompt
  * Used for general questions and conversations with enhanced patient data access
  */
-export function getGeneralInquiryPrompt(context: ConversationContext): PromptTemplate {
+export function getGeneralInquiryPrompt(
+  context: ConversationContext
+): PromptTemplate {
   const systemPrompt = `Anda adalah asisten kesehatan PRIMA yang membantu pasien dengan pertanyaan sehari-hari, akses data pribadi, dan informasi kesehatan.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Verifikasi: ${context.patientInfo?.verificationStatus || 'Tidak diketahui'}
-- Status Layanan: ${context.patientInfo?.isActive !== false ? 'Aktif' : 'Nonaktif'}
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diketahui"
+  }
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diverifikasi"
+  }
 
 DATA PRIBADI YANG TERSEDIA:
-${context.patientInfo?.activeReminders && context.patientInfo.activeReminders.length > 0 ?
-  `- Pengingat Obat: ${context.patientInfo.activeReminders.map((r: any) => `${r.medicationName || r.medicationDetails?.name || 'obat'} (${r.scheduledTime})`).join(', ')}` :
-  '- Tidak ada pengingat obat aktif'}
-${context.patientInfo?.healthNotes && (context.patientInfo.healthNotes as any[])?.length > 0 ?
-  `- Catatan Kesehatan: ${(context.patientInfo.healthNotes as any[]).length} catatan tersedia` :
-  '- Tidak ada catatan kesehatan tercatat'}
+${
+  context.patientInfo?.activeReminders &&
+  context.patientInfo.activeReminders.length > 0
+    ? `- Pengingat Obat: ${(
+        context.patientInfo.activeReminders as ActiveReminder[]
+      )
+        .map(
+          (r: ActiveReminder) =>
+            `${r.medicationName || r.medicationDetails?.name || "obat"} (${
+              r.scheduledTime
+            })`
+        )
+        .join(", ")}`
+    : "- Tidak ada pengingat obat aktif"
+}
 
 TUGAS ANDA:
 Bantu pasien dengan berbagai jenis pertanyaan termasuk informasi PRIMA, data kesehatan pribadi, catatan kesehatan, pengingat obat, dan pertanyaan kesehatan umum.
@@ -348,14 +387,14 @@ PEDOMAN RESPON UNTUK BERBAGAI JENIS PERTANYAAN:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang ramah, empati, dan mudah dipahami. Untuk pertanyaan data pribadi, pastikan respons akurat dan hanya memberikan informasi yang relevan dengan pasien tersebut. Untuk catatan kesehatan, berikan informasi yang sudah ada tanpa menambah interpretasi medis.`
+INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang ramah, empati, dan mudah dipahami. Untuk pertanyaan data pribadi, pastikan respons akurat dan hanya memberikan informasi yang relevan dengan pasien tersebut. Untuk catatan kesehatan, berikan informasi yang sudah ada tanpa menambah interpretasi medis.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 350,
-    temperature: 0.5
-  }
+    temperature: 0.5,
+  };
 }
 
 /**
@@ -370,7 +409,7 @@ export function getResponseGenerationPrompt(
   const systemPrompt = `Anda adalah asisten kesehatan PRIMA yang membantu pasien melalui WhatsApp.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Pasien yang terhormat'}
+- Nama: ${context.patientInfo?.name || "Pasien yang terhormat"}
 - Nomor Telepon: ${context.phoneNumber}
 
 INTENT TERDETEKSI: ${intentResult.intent}
@@ -383,39 +422,51 @@ PEDOMAN RESPON:
 - Sertakan branding PRIMA secara natural
 - Akhiri dengan penawaran bantuan lebih lanjut jika relevan
 
-${additionalContext ? `KONTEKS TAMBAHAN: ${additionalContext}` : ''}
+${additionalContext ? `KONTEKS TAMBAHAN: ${additionalContext}` : ""}
 
 ${SAFETY_GUIDELINES}
 
-HASILKAN respons alami dan membantu berdasarkan intent yang terdeteksi.`
+HASILKAN respons alami dan membantu berdasarkan intent yang terdeteksi.`;
 
   return {
     systemPrompt,
-    responseFormat: 'text',
+    responseFormat: "text",
     maxTokens: 400,
-    temperature: 0.7
-  }
+    temperature: 0.7,
+  };
 }
 
 /**
  * Followup response analysis prompt
  * Used when analyzing patient responses to medication followup messages
  */
-export function getFollowupResponsePrompt(context: ConversationContext, followupType?: string): PromptTemplate {
+export function getFollowupResponsePrompt(
+  context: ConversationContext,
+  followupType?: string
+): PromptTemplate {
   const systemPrompt = `Anda adalah analis respons pengingat obat untuk sistem kesehatan PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Verifikasi: ${context.patientInfo?.verificationStatus || 'Tidak diketahui'}
-- Tipe Followup: ${followupType || 'MEDICATION_REMINDER'}
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diketahui"
+  }
+- Tipe Followup: ${followupType || "MEDICATION_REMINDER"}
 
 DATA OBAT TERKAIT:
-${context.patientInfo?.activeReminders && context.patientInfo.activeReminders.length > 0 ?
-  context.patientInfo.activeReminders.map((r: any) =>
-    `- ${r.medicationName || r.medicationDetails?.name || 'obat'} (${r.scheduledTime})`
-  ).join('\n') :
-  '- Tidak ada data obat aktif'
+${
+  context.patientInfo?.activeReminders &&
+  context.patientInfo.activeReminders.length > 0
+    ? (context.patientInfo.activeReminders as ActiveReminder[])
+        .map(
+          (r: ActiveReminder) =>
+            `- ${r.medicationName || r.medicationDetails?.name || "obat"} (${
+              r.scheduledTime
+            })`
+        )
+        .join("\n")
+    : "- Tidak ada data obat aktif"
 }
 
 TUGAS ANDA:
@@ -466,27 +517,31 @@ PEDOMAN ANALISIS:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang empati, mendukung, dan mudah dipahami.`
+INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang empati, mendukung, dan mudah dipahami.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 400,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  };
 }
 
 /**
  * Knowledge base query prompt
  * Used for general health information questions that don't require patient data access
  */
-export function getKnowledgeBasePrompt(context: ConversationContext): PromptTemplate {
+export function getKnowledgeBasePrompt(
+  context: ConversationContext
+): PromptTemplate {
   const systemPrompt = `Anda adalah asisten pengetahuan kesehatan untuk sistem PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Verifikasi: ${context.patientInfo?.verificationStatus || 'Tidak diketahui'}
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diketahui"
+  }
 
 TUGAS ANDA:
 Analisis pertanyaan pasien tentang informasi kesehatan umum dan berikan jawaban yang informatif namun aman.
@@ -545,29 +600,38 @@ KRITERIA KATEGORI:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan, empati, dan mudah dipahami.`
+INSTRUKSI BAHASA: Selalu gunakan Bahasa Indonesia yang sopan, empati, dan mudah dipahami.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 500,
-    temperature: 0.3
-  }
+    temperature: 0.3,
+  };
 }
 
 /**
  * Health education prompt
  * Used for delivering educational content and health tips
  */
-export function getHealthEducationPrompt(context: ConversationContext, contentType: "proactive" | "reactive" = "proactive"): PromptTemplate {
+export function getHealthEducationPrompt(
+  context: ConversationContext,
+  contentType: "proactive" | "reactive" = "proactive"
+): PromptTemplate {
   const systemPrompt = `Anda adalah asisten edukasi kesehatan untuk sistem PRIMA.
 
 INFORMASI PASIEN:
-- Nama: ${context.patientInfo?.name || 'Tidak diketahui'}
+- Nama: ${context.patientInfo?.name || "Tidak diketahui"}
 - Nomor Telepon: ${context.phoneNumber}
-- Status Verifikasi: ${context.patientInfo?.verificationStatus || 'Tidak diketahui'}
+- Status Verifikasi: ${
+    context.patientInfo?.verificationStatus || "Tidak diketahui"
+  }
 
-TIPE KONTEN: ${contentType === "proactive" ? "Proaktif (Tips Harian)" : "Reaktif (Berdasarkan Percakapan)"}
+TIPE KONTEN: ${
+    contentType === "proactive"
+      ? "Proaktif (Tips Harian)"
+      : "Reaktif (Berdasarkan Percakapan)"
+  }
 
 TUGAS ANDA:
 Analisis kesempatan edukasi kesehatan dalam percakapan dan berikan konten edukasi yang relevan dan personal.
@@ -622,48 +686,61 @@ PEDOMAN EDUKASI KESEHATAN:
 
 ${SAFETY_GUIDELINES}
 
-INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang hangat, mendukung, dan edukatif.`
+INSTRUKSI BAHASA: Gunakan Bahasa Indonesia yang hangat, mendukung, dan edukatif.`;
 
   return {
     systemPrompt,
-    responseFormat: 'json',
+    responseFormat: "json",
     maxTokens: 600,
-    temperature: 0.4
-  }
+    temperature: 0.4,
+  };
 }
 
 /**
  * Get appropriate prompt template based on conversation context
  */
 export function getPromptForContext(
-  contextType: 'verification' | 'medication' | 'unsubscribe' | 'emergency' | 'general' | 'response' | 'followup' | 'knowledge' | 'education',
+  contextType:
+    | "verification"
+    | "medication"
+    | "unsubscribe"
+    | "emergency"
+    | "general"
+    | "response"
+    | "followup"
+    | "knowledge"
+    | "education",
   context: ConversationContext,
   intentResult?: IntentResult,
   additionalContext?: string
 ): PromptTemplate {
   switch (contextType) {
-    case 'verification':
-      return getVerificationPrompt(context)
-    case 'medication':
-      return getMedicationConfirmationPrompt(context)
-    case 'unsubscribe':
-      return getUnsubscribePrompt(context)
-    case 'emergency':
-      return getEmergencyPrompt(context)
-    case 'general':
-      return getGeneralInquiryPrompt(context)
-    case 'response':
+    case "verification":
+      return getVerificationPrompt(context);
+    case "medication":
+      return getMedicationConfirmationPrompt(context);
+    case "unsubscribe":
+      return getUnsubscribePrompt(context);
+    case "emergency":
+      return getEmergencyPrompt(context);
+    case "general":
+      return getGeneralInquiryPrompt(context);
+    case "response":
       if (!intentResult) {
-        throw new Error('intentResult is required for response context type')
+        throw new Error("intentResult is required for response context type");
       }
-      return getResponseGenerationPrompt(context, intentResult, additionalContext)
-    case 'followup':
-      return getFollowupResponsePrompt(context, additionalContext)
-    case 'knowledge':
-      return getKnowledgeBasePrompt(context)
-    case 'education':
-      return getHealthEducationPrompt(context)
+      return getResponseGenerationPrompt(
+        context,
+        intentResult,
+        additionalContext
+      );
+    case "followup":
+      return getFollowupResponsePrompt(context, additionalContext);
+    case "knowledge":
+      return getKnowledgeBasePrompt(context);
+    case "education":
+      return getHealthEducationPrompt(context);
     default:
-      return getGeneralInquiryPrompt(context)
+      return getGeneralInquiryPrompt(context);
   }
 }

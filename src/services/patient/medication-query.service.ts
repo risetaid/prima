@@ -3,11 +3,9 @@
  * Handles natural language queries for patient medication information with intelligent filtering
  */
 
-import { db, medicationSchedules, patients } from "@/db";
-import { eq, and, isNull, desc, ilike, or, sql, gte } from "drizzle-orm";
+import { db, medicationSchedules } from "@/db";
+import { eq, and, isNull, desc, ilike, gte, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
-import { MedicationDetails, MedicationSchedule } from "@/lib/medication-parser";
-import { HealthNoteDTO } from "@/services/patient/patient.types";
 
 export interface MedicationQuery {
   timeRange?: "hari_ini" | "minggu_ini" | "bulan_ini" | "semuanya" | "aktif" | "selesai";
@@ -102,11 +100,7 @@ export class MedicationQueryService {
           startDate: medicationSchedules.startDate,
           endDate: medicationSchedules.endDate,
           isActive: medicationSchedules.isActive,
-          scheduledTimes: medicationSchedules.scheduledTimes,
-          additionalInfo: medicationSchedules.additionalInfo,
-          reminderCount: medicationSchedules.reminderCount,
-          lastReminder: medicationSchedules.lastReminder,
-          createdAt: medicationSchedules.createdAt,
+                    createdAt: medicationSchedules.createdAt,
           updatedAt: medicationSchedules.updatedAt
         })
         .from(medicationSchedules)
@@ -123,14 +117,10 @@ export class MedicationQueryService {
         medicationName: record.medicationName,
         dosage: record.dosage,
         frequency: record.frequency,
-        instructions: record.instructions,
+        instructions: record.instructions || undefined,
         startDate: record.startDate,
-        endDate: record.endDate,
-        isActive: record.isActive,
-        scheduledTimes: record.scheduledTimes as string[] || [],
-        additionalInfo: record.additionalInfo as Record<string, unknown> || {},
-        reminderCount: record.reminderCount || 0,
-        lastReminder: record.lastReminder
+        endDate: record.endDate || undefined,
+        isActive: record.isActive
       }));
 
       // Generate query summary
@@ -246,14 +236,10 @@ export class MedicationQueryService {
         medicationName: record.medicationName,
         dosage: record.dosage,
         frequency: record.frequency,
-        instructions: record.instructions,
+        instructions: record.instructions || undefined,
         startDate: record.startDate,
-        endDate: record.endDate,
-        isActive: record.isActive,
-        scheduledTimes: record.scheduledTimes as string[] || [],
-        additionalInfo: record.additionalInfo as Record<string, unknown> || {},
-        reminderCount: record.reminderCount || 0,
-        lastReminder: record.lastReminder
+        endDate: record.endDate || undefined,
+        isActive: record.isActive
       };
     } catch (error) {
       logger.error("Failed to get medication details", error instanceof Error ? error : new Error(String(error)), {
@@ -340,9 +326,7 @@ export class MedicationQueryService {
       });
 
       const statusText = med.isActive ? "Aktif" : "Selesai";
-      const scheduleText = med.scheduledTimes?.length > 0
-        ? ` (Jadwal: ${med.scheduledTimes.join(', ')})`
-        : '';
+      const scheduleText = ''; // scheduledTimes not available in current schema
 
       return `${index + 1}. ${med.medicationName} - ${med.dosage}, ${med.frequency}${scheduleText}\n` +
              `   Status: ${statusText} | Mulai: ${startDate}` +
@@ -366,19 +350,8 @@ export class MedicationQueryService {
         return "Tidak ada jadwal obat aktif saat ini.";
       }
 
-      // Group by scheduled times
+      // Schedule grouping not available - scheduledTimes not in current schema
       const scheduleMap = new Map<string, string[]>();
-
-      for (const med of activeMeds.medications) {
-        if (med.scheduledTimes) {
-          for (const time of med.scheduledTimes) {
-            if (!scheduleMap.has(time)) {
-              scheduleMap.set(time, []);
-            }
-            scheduleMap.get(time)!.push(med.medicationName);
-          }
-        }
-      }
 
       // Format schedule summary
       const sortedTimes = Array.from(scheduleMap.keys()).sort();

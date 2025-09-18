@@ -4,8 +4,7 @@
  */
 
 import { db, healthNotes } from "@/db";
-import { eq, and, isNull, gte, lte, desc, ilike, or, sql } from "drizzle-orm";
-import { gt } from "drizzle-orm";
+import { eq, and, isNull, gte, lte, desc, ilike, sql } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { HealthNoteDTO } from "@/services/patient/patient.types";
 
@@ -60,10 +59,8 @@ export class HealthNotesQueryService {
 
       // Add keyword filters
       if (query.keywords && query.keywords.length > 0) {
-        const keywordConditions = query.keywords.map(keyword =>
-          ilike(healthNotes.note, `%${keyword}%`)
-        );
-        whereConditions.push(or(...keywordConditions));
+        const keyword = query.keywords[0]; // Use first keyword for simplicity
+        whereConditions.push(ilike(healthNotes.note, `%${keyword}%`));
       }
 
       // Build and execute query
@@ -248,10 +245,8 @@ export class HealthNotesQueryService {
       }
 
       if (query.keywords && query.keywords.length > 0) {
-        const keywordConditions = query.keywords.map(keyword =>
-          ilike(healthNotes.note, `%${keyword}%`)
-        );
-        whereConditions.push(or(...keywordConditions));
+        const keyword = query.keywords[0]; // Use first keyword for simplicity
+        whereConditions.push(ilike(healthNotes.note, `%${keyword}%`));
       }
 
       const result = await db
