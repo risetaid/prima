@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { conversationMessages } from "@/db/schema";
 import { and, gte, lte, sql, count, sum, avg, desc } from "drizzle-orm";
 import { logger } from "@/lib/logger";
+import { tokenizerService } from "@/lib/tokenizer";
 
 export interface LLMUsageStats {
   totalRequests: number;
@@ -274,6 +275,7 @@ export class LLMAnalyticsService {
 
   /**
    * Calculate cost per token for different models
+   * @deprecated Use tokenizerService.estimateCost() instead
    */
   getCostPerToken(model: string): number {
     // Google Gemini pricing (approximate)
@@ -289,10 +291,10 @@ export class LLMAnalyticsService {
 
   /**
    * Estimate cost for a given number of tokens
+   * @deprecated Use tokenizerService.estimateCost() instead
    */
   estimateCost(tokens: number, model: string): number {
-    const costPerThousand = this.getCostPerToken(model);
-    return (tokens / 1000) * costPerThousand;
+    return tokenizerService.estimateCost(tokens, model);
   }
 
   /**

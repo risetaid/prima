@@ -31,7 +31,7 @@ export async function GET() {
     let tableTest = "❌ Failed";
     try {
       // Check multiple core tables to verify schema
-      const tableChecks = await Promise.all([
+      await Promise.all([
         db.execute(sql`SELECT COUNT(*) FROM patients LIMIT 1`),
         db.execute(sql`SELECT COUNT(*) FROM reminders LIMIT 1`),
         db.execute(sql`SELECT COUNT(*) FROM users LIMIT 1`),

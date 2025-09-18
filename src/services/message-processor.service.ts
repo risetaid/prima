@@ -16,6 +16,9 @@ import { WhatsAppService } from "./whatsapp/whatsapp.service";
 import { safetyFilterService } from "./llm/safety-filter";
 import { logger } from "@/lib/logger";
 import { MedicationParser, MedicationDetails } from "@/lib/medication-parser";
+import { tokenizerService } from "@/lib/tokenizer";
+import { costMonitor } from "@/lib/cost-monitor";
+import { CostBreakdown } from "@/lib/enhanced-cost-manager";
 
 export interface MessageContext {
   patientId: string;
@@ -702,7 +705,23 @@ export class MessageProcessorService {
 
     // Store LLM response if generated
     if (llmResponse) {
-      await this.conversationStateService.addMessage(conversationState.id, {
+      // Track cost for the LLM response
+      const costTrackingEvent = await costMonitor.trackMessageCost(
+        conversationState.id,
+        `msg_${Date.now()}`, // Generate message ID
+        context.patientId,
+        normalizedMessage, // Input text
+        llmResponse.content, // Output text
+        llmResponse.model,
+        this.mapIntentToOperationType(intent.primary),
+        {
+          intent: intent.primary,
+          confidence: intent.confidence,
+          responseTime: llmResponse.responseTime
+        }
+      );
+
+      const outboundMessageData = await this.conversationStateService.addMessage(conversationState.id, {
         message: llmResponse.content,
         direction: "outbound",
         messageType: this.mapIntentToMessageType(intent.primary),
@@ -713,9 +732,18 @@ export class MessageProcessorService {
         llmResponseId: llmResponse.model,
         llmModel: llmResponse.model,
         llmTokensUsed: llmResponse.tokensUsed,
-        llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
+        llmCost: costTrackingEvent.cost, // Use tracked cost instead of calculated
         llmResponseTimeMs: llmResponse.responseTime,
         processedAt: new Date(),
+      });
+
+      // Log cost tracking for monitoring
+      logger.debug("LLM response cost tracked", {
+        conversationId: conversationState.id,
+        messageId: outboundMessageData.id,
+        cost: costTrackingEvent.cost,
+        tokens: costTrackingEvent.tokensUsed,
+        operationType: costTrackingEvent.operationType
       });
     }
 
@@ -792,6 +820,29 @@ export class MessageProcessorService {
         return "general"; // Emergency gets special handling
       default:
         return "general";
+    }
+  }
+
+  /**
+   * Map intent to operation type for cost tracking
+   */
+  private mapIntentToOperationType(
+    intent: MessageIntent["primary"]
+  ): CostBreakdown["operationType"] {
+    switch (intent) {
+      case "accept":
+      case "decline":
+        return "intent_detection";
+      case "confirm_taken":
+      case "confirm_missed":
+      case "confirm_later":
+        return "response_generation";
+      case "emergency":
+        return "safety_filter";
+      case "inquiry":
+        return "direct_response";
+      default:
+        return "response_generation";
     }
   }
 
@@ -1441,6 +1492,22 @@ export class MessageProcessorService {
 
       // Store LLM response metadata in conversation
       if (llmResponse) {
+        // Track cost for the LLM response
+        const costTrackingEvent = await costMonitor.trackMessageCost(
+          context.conversationState?.id || "",
+          `msg_${Date.now()}`,
+          context.patientId,
+          "", // No specific input text for direct response
+          llmResponse.content,
+          llmResponse.model,
+          'direct_response',
+          {
+            intent: intent.primary,
+            confidence: intent.confidence,
+            responseTime: llmResponse.responseTime
+          }
+        );
+
         await this.conversationStateService.addMessage(
           context.conversationState?.id || "",
           {
@@ -1454,7 +1521,7 @@ export class MessageProcessorService {
             llmResponseId: llmResponse.model, // Use model as response ID for now
             llmModel: llmResponse.model,
             llmTokensUsed: llmResponse.tokensUsed,
-            llmCost: this.calculateLLMCost(llmResponse.tokensUsed),
+            llmCost: costTrackingEvent.cost, // Use tracked cost
             llmResponseTimeMs: llmResponse.responseTime,
             processedAt: new Date(),
           }
@@ -1559,6 +1626,23 @@ export class MessageProcessorService {
             safetyResult.violations
           ),
         };
+      }
+
+      // Track cost for direct LLM response
+      if (finalResponse) {
+        await costMonitor.trackMessageCost(
+          context.conversationId || "",
+          `direct_${Date.now()}`,
+          context.patientId,
+          message, // Input message
+          finalResponse.content,
+          finalResponse.model,
+          'direct_response',
+          {
+            safetyFiltered: !safetyResult.isSafe,
+            violations: safetyResult.violations.length
+          }
+        );
       }
 
       return finalResponse;
@@ -1669,10 +1753,9 @@ RESPONSE GUIDELINES:
   /**
    * Calculate LLM cost based on tokens and model
    */
-  private calculateLLMCost(tokensUsed: number): number {
-    // Gemini pricing (approximate)
-    const costPerThousandTokens = 0.0005; // $0.0005 per 1K tokens for gemini-2.0-flash-exp
-    return (tokensUsed / 1000) * costPerThousandTokens;
+  private calculateLLMCost(tokensUsed: number, model?: string): number {
+    // Use tokenizer service for accurate cost calculation
+    return tokenizerService.estimateCost(tokensUsed, model || "gemini-2.0-flash-exp");
   }
 
   /**

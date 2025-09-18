@@ -11,6 +11,7 @@ import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from "@/lib/circuit-breaker";
 import { withRetry, DEFAULT_RETRY_CONFIGS } from "@/lib/retry";
 import { messageQueueService } from "@/services/message-queue.service";
 import { usageLimits } from "@/lib/usage-limits";
+import { tokenizerService } from "@/lib/tokenizer";
 import {
   LLMConfig,
   LLMRequest,
@@ -116,10 +117,11 @@ export class LLMService {
         return result;
       });
 
-      const responseTime = Date.now() - startTime;
-      const content = response.text || "";
-      const tokensUsed = this.estimateTokens(content); // Gemini doesn't provide token count directly
-      const finishReason = "stop"; // Gemini doesn't provide finish reason in the same way
+        const responseTime = Date.now() - startTime;
+        const content = response.text || "";
+        const tokenCount = tokenizerService.countTokens(content, this.config.model);
+        const tokensUsed = tokenCount.tokens;
+        const finishReason = "stop"; // Gemini doesn't provide finish reason in the same way
 
       logger.info("Gemini LLM response generated successfully", {
         tokensUsed,
@@ -682,13 +684,7 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
       .join("\n\n");
   }
 
-  /**
-   * Estimate token count (rough approximation)
-   */
-  private estimateTokens(text: string): number {
-    // Rough estimation: ~4 characters per token for English/Indonesian text
-    return Math.ceil(text.length / 4);
-  }
+
 
   /**
    * Get current configuration and circuit breaker stats (for debugging)

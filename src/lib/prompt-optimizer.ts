@@ -3,6 +3,8 @@
  * Reduces token usage while maintaining response quality
  */
 
+import { tokenizerService } from "./tokenizer";
+
 
 
 export interface OptimizedPrompt {
@@ -27,7 +29,7 @@ export class PromptOptimizerService {
    * Optimize a system prompt for cost efficiency
    */
   optimizeSystemPrompt(prompt: string): PromptOptimizationResult {
-    const originalTokens = this.estimateTokens(prompt)
+    const originalTokens = tokenizerService.countTokens(prompt, "gemini-2.0-flash-exp").tokens
 
     // Apply various optimization techniques
     let optimized = prompt
@@ -49,7 +51,7 @@ export class PromptOptimizerService {
       optimized = this.truncateSmartly(optimized, this.MAX_PROMPT_LENGTH)
     }
 
-    const optimizedTokens = this.estimateTokens(optimized)
+    const optimizedTokens = tokenizerService.countTokens(optimized, "gemini-2.0-flash-exp").tokens
     const savings = originalTokens - optimizedTokens
     const savingsPercentage = originalTokens > 0 ? (savings / originalTokens) * 100 : 0
 
@@ -225,13 +227,7 @@ export class PromptOptimizerService {
       .replace(/^(.{100}).*$/, '$1...') // Truncate very long messages
   }
 
-  /**
-   * Estimate token count (rough approximation)
-   */
-  private estimateTokens(text: string): number {
-    // Rough estimation: ~4 characters per token for English/Indonesian text
-    return Math.ceil(text.length / 4)
-  }
+
 
   /**
    * Get optimization statistics

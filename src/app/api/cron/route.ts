@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
 }
 
 async function processReminders() {
-  logger.info('Processing scheduled reminders via cron job');
+  logger.info('Processing scheduled reminders and followups via cron job');
 
   try {
     // Import dependencies
@@ -54,7 +54,6 @@ async function processReminders() {
     const { getWIBTime } = await import('@/lib/timezone');
 
     const now = new Date();
-    const today = now.toISOString().split('T')[0]; // YYYY-MM-DD format
     const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
 
     // Find reminders that should be sent now:
@@ -168,17 +167,21 @@ async function processReminders() {
       errors: errors.length
     });
 
+    // Process followups
+    const followupResult = await processFollowups();
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
-      stats: {
+      reminders: {
         totalFound: remindersDue.length,
         processed: processedCount,
         successful: successCount,
         failed: failedCount,
         errors: errors.slice(0, 5) // Only show first 5 errors
       },
-      message: `Processed ${processedCount} reminders: ${successCount} sent, ${failedCount} failed`
+      followups: followupResult,
+      message: `Processed ${processedCount} reminders (${successCount} sent, ${failedCount} failed) and ${followupResult.processed || 0} followups`
     });
 
   } catch (error) {
@@ -189,5 +192,39 @@ async function processReminders() {
       details: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 });
+  }
+}
+
+async function processFollowups() {
+  try {
+    const { FollowupService } = await import('@/services/reminder/followup.service');
+
+    const followupService = new FollowupService();
+    const results = await followupService.processPendingFollowups();
+
+    const processed = results.length;
+    const successful = results.filter(r => r.processed).length;
+    const failed = processed - successful;
+
+    logger.info('Followups processed', {
+      processed,
+      successful,
+      failed
+    });
+
+    return {
+      processed,
+      successful,
+      failed,
+      results: results.slice(0, 5) // Only return first 5 results
+    };
+  } catch (error) {
+    logger.error('Failed to process followups in cron', error as Error);
+    return {
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
   }
 }

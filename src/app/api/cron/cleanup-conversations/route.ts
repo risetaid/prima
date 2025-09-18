@@ -31,9 +31,8 @@ export async function GET(request: NextRequest) {
       const { db, conversationStates, conversationMessages } = await import('@/db')
       const { and, lt, eq, isNull, count } = await import('drizzle-orm')
       
-      // Cleanup parameters
-      const EXPIRED_CUTOFF = new Date(Date.now() - 24 * 60 * 60 * 1000) // 24 hours ago
-      const INACTIVE_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
+       // Cleanup parameters
+       const INACTIVE_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
       
       let expiredStatesCount = 0
       let deletedMessagesCount = 0
@@ -51,15 +50,14 @@ export async function GET(request: NextRequest) {
           )
         )
       
-      for (const state of expiredStates) {
-        // Soft delete messages first
-        const messagesResult = await db
-          .update(conversationMessages)
-          .set({ deletedAt: new Date() })
-          .where(eq(conversationMessages.conversationStateId, state.id))
-          .returning({ id: conversationMessages.id })
-        
-        deletedMessagesCount += messagesResult.length
+       for (const state of expiredStates) {
+         // Delete messages first (hard delete since no deletedAt column)
+         const messagesResult = await db
+           .delete(conversationMessages)
+           .where(eq(conversationMessages.conversationStateId, state.id))
+           .returning({ id: conversationMessages.id })
+
+         deletedMessagesCount += messagesResult.length
         
         // Soft delete conversation state
         await db
@@ -88,20 +86,14 @@ export async function GET(request: NextRequest) {
         )
         .limit(100) // Process max 100 at a time
       
-      for (const state of inactiveStates) {
-        // Soft delete messages first
-        const messagesResult = await db
-          .update(conversationMessages)
-          .set({ deletedAt: new Date() })
-          .where(
-            and(
-              eq(conversationMessages.conversationStateId, state.id),
-              isNull(conversationMessages.deletedAt)
-            )
-          )
-          .returning({ id: conversationMessages.id })
-        
-        deletedMessagesCount += messagesResult.length
+       for (const state of inactiveStates) {
+         // Delete messages first (hard delete since no deletedAt column)
+         const messagesResult = await db
+           .delete(conversationMessages)
+           .where(eq(conversationMessages.conversationStateId, state.id))
+           .returning({ id: conversationMessages.id })
+
+         deletedMessagesCount += messagesResult.length
         
         // Soft delete conversation state
         await db
@@ -115,15 +107,14 @@ export async function GET(request: NextRequest) {
         inactiveStatesCount++
       }
       
-      // Get summary stats
-      const [activeCount, totalMessages] = await Promise.all([
-        db.select({ count: count() })
-          .from(conversationStates)
-          .where(isNull(conversationStates.deletedAt)),
-        db.select({ count: count() })
-          .from(conversationMessages)
-          .where(isNull(conversationMessages.deletedAt))
-      ])
+       // Get summary stats
+       const [activeCount, totalMessages] = await Promise.all([
+         db.select({ count: count() })
+           .from(conversationStates)
+           .where(isNull(conversationStates.deletedAt)),
+         db.select({ count: count() })
+           .from(conversationMessages)
+       ])
       
       const result = {
         success: true,

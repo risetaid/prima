@@ -1078,80 +1078,6 @@ async function processMedicationResponse(
   return null;
 }
 
-async function processFollowupResponse(
-  message: string | undefined,
-  patient: Patient
-) {
-  if (!message) return null;
-
-  logger.info("Processing potential followup response", {
-    patientId: patient.id,
-    hasMessage: Boolean(message),
-    message:
-      message?.substring(0, 100) +
-      (message && message.length > 100 ? "..." : ""),
-  });
-
-  try {
-    // Import FollowupService
-    const { FollowupService } = await import(
-      "@/services/reminder/followup.service"
-    );
-    const followupService = new FollowupService();
-
-    // Find active followups for this patient
-    // Note: reminderFollowups table doesn't exist in current schema
-    // This functionality may need to be implemented differently
-    const activeFollowups: Array<Record<string, unknown>> = [];
-
-    if (activeFollowups.length === 0) {
-      logger.info("No active followups found for patient", {
-        patientId: patient.id,
-      });
-      return null;
-    }
-
-    const followup = activeFollowups[0];
-
-    // Process the followup response with emergency detection
-    const result = await followupService.processFollowupResponse(
-      patient.id,
-      patient.phoneNumber,
-      message,
-      String(followup.id || 'unknown')
-    );
-
-    logger.info("Followup response processed", {
-      patientId: patient.id,
-      followupId: followup.id,
-      emergencyDetected: result.emergencyDetected,
-      escalated: result.escalated,
-      processed: result.processed,
-    });
-
-    // Send acknowledgment response
-    await sendAck(patient.phoneNumber, result.response);
-
-    return NextResponse.json({
-      ok: true,
-      processed: true,
-      action: result.emergencyDetected
-        ? "emergency_detected"
-        : "followup_responded",
-      source: "followup_response",
-      emergencyDetected: result.emergencyDetected,
-      escalated: result.escalated,
-    });
-  } catch (error) {
-    logger.error("Failed to process followup response", error as Error, {
-      patientId: patient.id,
-      message: message?.substring(0, 100),
-    });
-
-    // Return null to fall back to other handlers
-    return null;
-  }
-}
 
 async function handleUnrecognizedMessage(
   message: string | undefined,
@@ -1471,6 +1397,51 @@ async function logVerificationEvent(
     action,
     verificationResult,
   });
+}
+
+/**
+ * Process followup responses from patients
+ */
+async function processFollowupResponse(
+  message: string,
+  patient: Patient
+): Promise<NextResponse | null> {
+  try {
+    const { FollowupService } = await import("@/services/reminder/followup.service");
+    const followupService = new FollowupService();
+
+    const result = await followupService.processFollowupResponse(
+      patient.id,
+      patient.phoneNumber || "",
+      message
+    );
+
+    if (result.processed) {
+      logger.info("Followup response processed", {
+        patientId: patient.id,
+        processed: result.processed,
+        emergencyDetected: result.emergencyDetected,
+        escalated: result.escalated,
+        operation: "process_followup_response"
+      });
+
+      return NextResponse.json({
+        ok: true,
+        processed: true,
+        action: "followup_response",
+        emergencyDetected: result.emergencyDetected,
+        escalated: result.escalated,
+      });
+    }
+
+    return null; // Not a followup response, continue to other processors
+  } catch (error) {
+    logger.error("Failed to process followup response", error as Error, {
+      patientId: patient.id,
+      operation: "process_followup_response"
+    });
+    return null; // Don't fail the webhook, continue processing
+  }
 }
 
 export async function POST(request: NextRequest) {
