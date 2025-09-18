@@ -17,7 +17,8 @@ interface PatientDisplayStatus {
 }
 
 function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatus {
-  const verificationStatus = input.verificationStatus
+  // Normalize verification status to handle case mismatch between database (UPPERCASE) and UI expectations (lowercase)
+  const normalizedStatus = input.verificationStatus?.toLowerCase()
   const isActive = input.isActive ?? true
 
   if (!isActive) {
@@ -29,7 +30,22 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
     }
   }
 
-  switch (verificationStatus) {
+  // Handle different status formats and special mappings:
+  // Database: VERIFIED, PENDING, DECLINED, EXPIRED (uppercase)
+  // UI expects: verified, pending_verification, declined, expired, unsubscribed (lowercase)
+  let mappedStatus = normalizedStatus
+  
+  // Map database enum values to UI expected values
+  switch (normalizedStatus) {
+    case 'pending':
+      mappedStatus = 'pending_verification'
+      break
+    // Add other mappings as needed
+    default:
+      mappedStatus = normalizedStatus
+  }
+
+  switch (mappedStatus) {
     case 'verified':
       return {
         badgeColor: 'bg-green-100 text-green-800 border-green-300',
@@ -58,12 +74,21 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
         displayStatus: 'Menunggu Verifikasi',
         description: 'Menunggu verifikasi'
       }
+    case 'unsubscribed':
+      return {
+        badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+        badgeIcon: '🚫',
+        displayStatus: 'Berhenti',
+        description: 'Pasien telah berhenti dari layanan'
+      }
     default:
+      // Add debug info to help identify unmapped statuses
+      console.warn('Unmapped verification status:', input.verificationStatus, '(normalized:', normalizedStatus, ')')
       return {
         badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
         badgeIcon: '❓',
-        displayStatus: 'Tidak Dikenal',
-        description: 'Status tidak dikenal'
+        displayStatus: 'Status Tidak Dikenal',
+        description: `Status tidak dikenal: ${input.verificationStatus}`
       }
   }
 }
@@ -115,6 +140,7 @@ export function getVerificationStatusTitle(status: string, isActive: boolean = t
   // Map display status to detailed titles
   const titleMap: Record<string, string> = {
     'BERHENTI': 'Berhenti dari Layanan',
+    'Berhenti': 'Berhenti dari Layanan',
     'Terverifikasi': 'Telah Disetujui',
     'Menolak': 'Ditolak Pasien',
     'Kedaluwarsa': 'Tidak Ada Respon',
