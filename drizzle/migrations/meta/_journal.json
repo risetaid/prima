@@ -5,71 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1757699805397,
-      "tag": "0000_complete_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1757739701029,
-      "tag": "0001_furry_omega_red",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1757771710621,
-      "tag": "0002_last_molecule_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1757771710622,
-      "tag": "0003_drop_patient_medications",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1758038709333,
-      "tag": "0004_woozy_absorbing_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1758039000000,
-      "tag": "0005_llm_tables_only",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1758088769267,
-      "tag": "0006_chemical_roland_deschain",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1758106198745,
-      "tag": "0007_red_zuras",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1758190000000,
-      "tag": "0008_fix_missing_columns",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1758123143060,
-      "tag": "0009_broken_zuras",
+      "when": 1758195177629,
+      "tag": "0000_safe_lightspeed",
       "breakpoints": true
     }
   ]
