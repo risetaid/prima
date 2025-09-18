@@ -272,6 +272,25 @@ export class MessageProcessorService {
     );
   }
 
+  /**
+   * Check if message should use LLM-based unsubscribe detection
+   */
+  private shouldUseLLMUnsubscribeDetection(message: string): boolean {
+    const normalizedMessage = message.toLowerCase();
+
+    // Extended unsubscribe keywords that need LLM analysis for better context
+    const unsubscribeIndicators = [
+      "berhenti", "stop", "matikan", "hentikan", "cukup", "tidak mau lagi",
+      "sudah sembuh", "tidak sakit lagi", "obat habis", "tidak butuh lagi",
+      "berhenti dong", "cukup sampai sini", "saya sudah tidak sakit",
+      "boleh berhenti", "maaf mau berhenti", "terima kasih mau berhenti",
+      "keluar", "batal", "cancel", "unsubscribe", "tidak ingin",
+      "mau berhenti", "hentikan", "stop dulu", "berhenti dulu"
+    ];
+
+    return unsubscribeIndicators.some((keyword) => normalizedMessage.includes(keyword));
+  }
+
   // Indonesian keyword mappings for fallback (kept for emergency cases)
   private readonly ACCEPT_KEYWORDS = [
     "ya",
@@ -513,41 +532,62 @@ export class MessageProcessorService {
       }
     } else {
       // Always check for unsubscribe keywords first, regardless of context
-      const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some((keyword) =>
-        normalizedMessage.includes(keyword)
-      );
+      const shouldUseLLMForUnsubscribe = this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
 
-      if (hasUnsubscribeKeywords) {
-        // Force unsubscribe intent detection for messages with unsubscribe keywords
-        intent = {
-          primary: "unsubscribe",
-          sentiment: "negative",
-          confidence: 0.9, // High confidence for keyword-based detection
-        };
-        entities = this.extractEntities(normalizedMessage);
-      } else {
-        // Determine if this message needs intent classification
-        needsIntentDetection = this.shouldUseIntentDetection(
+      if (shouldUseLLMForUnsubscribe) {
+        // Use LLM-based unsubscribe detection for better understanding
+        intent = await this.detectIntent(
           normalizedMessage,
-          conversationState,
-          context
+          context,
+          conversationHistory
+        );
+        entities = this.extractEntities(normalizedMessage);
+        needsIntentDetection = true;
+
+        // Override intent if LLM detection results in unsubscribe
+        if (intent.primary === "unsubscribe") {
+          // Keep the LLM-detected intent with enhanced confidence
+          intent.confidence = Math.max(intent.confidence || 0.7, 0.8);
+          intent.sentiment = "negative";
+        }
+      } else {
+        // Fallback to original keyword-based unsubscribe detection
+        const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some((keyword) =>
+          normalizedMessage.includes(keyword)
         );
 
-        if (needsIntentDetection) {
-          // Use intent detection for verification and confirmation messages
-          intent = await this.detectIntent(
-            normalizedMessage,
-            context,
-            conversationHistory
-          );
+        if (hasUnsubscribeKeywords) {
+          // Force unsubscribe intent detection for messages with unsubscribe keywords
+          intent = {
+            primary: "unsubscribe",
+            sentiment: "negative",
+            confidence: 0.9, // High confidence for keyword-based detection
+          };
           entities = this.extractEntities(normalizedMessage);
         } else {
-          // Use direct LLM response for general inquiries
-          intent = {
-            primary: "inquiry",
-            sentiment: "neutral",
-            confidence: 1.0,
-          };
+          // Determine if this message needs intent classification
+          needsIntentDetection = this.shouldUseIntentDetection(
+            normalizedMessage,
+            conversationState,
+            context
+          );
+
+          if (needsIntentDetection) {
+            // Use intent detection for verification and confirmation messages
+            intent = await this.detectIntent(
+              normalizedMessage,
+              context,
+              conversationHistory
+            );
+            entities = this.extractEntities(normalizedMessage);
+          } else {
+            // Use direct LLM response for general inquiries
+            intent = {
+              primary: "inquiry",
+              sentiment: "neutral",
+              confidence: 1.0,
+            };
+          }
         }
       }
     }

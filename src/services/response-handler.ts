@@ -20,6 +20,18 @@ export interface ResponseMetadata {
   patientId?: string;
   emergencyDetected?: boolean;
   escalated?: boolean;
+  dataAccessRequired?: boolean;
+  patientDataType?: string;
+  responseResult?: any;
+  analysisResult?: any;
+  notesFound?: number;
+  medicationsFound?: number;
+  hasActiveMedications?: boolean;
+  hasSchedule?: boolean;
+  hasComplianceData?: boolean;
+  remindersFound?: number;
+  medicationStatus?: string;
+  healthCondition?: string;
 }
 
 export interface ResponseActions {

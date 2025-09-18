@@ -6,6 +6,9 @@ import { ResponseContext, StandardResponse, responseHandlerRegistry, ResponseHan
 import { VerificationResponseHandler } from "./response-handlers/verification-response.handler";
 import { MedicationResponseHandler } from "./response-handlers/medication-response.handler";
 import { FollowupResponseHandler } from "./response-handlers/followup-response.handler";
+import { UnsubscribeResponseHandler } from "./response-handlers/unsubscribe-response.handler";
+import { GeneralInquiryResponseHandler } from "./response-handlers/general-inquiry-response.handler";
+import { KnowledgeResponseHandler } from "./response-handlers/knowledge-response.handler";
 import { logger } from "@/lib/logger";
 
 export class ResponseProcessorService {
@@ -21,7 +24,10 @@ export class ResponseProcessorService {
     // Register handlers in priority order
     responseHandlerRegistry.registerHandler(new VerificationResponseHandler());
     responseHandlerRegistry.registerHandler(new MedicationResponseHandler());
+    responseHandlerRegistry.registerHandler(new UnsubscribeResponseHandler());
     responseHandlerRegistry.registerHandler(new FollowupResponseHandler());
+    responseHandlerRegistry.registerHandler(new GeneralInquiryResponseHandler());
+    responseHandlerRegistry.registerHandler(new KnowledgeResponseHandler());
 
     logger.info("Response handlers initialized", {
       handlerCount: responseHandlerRegistry.getAllHandlers().length,

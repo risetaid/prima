@@ -34,6 +34,16 @@ export interface EmergencyDetectionResult {
   recommendedAction: string;
 }
 
+export interface UnsubscribeSafetyResult {
+  isUnsubscribeRequest: boolean;
+  confidence: number;
+  requiresConfirmation: boolean;
+  requiresHumanIntervention: boolean;
+  riskLevel: "low" | "medium" | "high";
+  reasons: string[];
+  recommendedAction: "proceed" | "confirm" | "escalate" | "ignore";
+}
+
 export class SafetyFilterService {
   private volunteerNotificationService: VolunteerNotificationService;
 
@@ -138,6 +148,7 @@ export class SafetyFilterService {
   ): Promise<{
     emergencyResult: EmergencyDetectionResult;
     safetyResult: SafetyFilterResult;
+    unsubscribeResult?: UnsubscribeSafetyResult;
   }> {
     // Detect emergencies
     const emergencyResult = this.detectEmergency(message);
@@ -147,12 +158,16 @@ export class SafetyFilterService {
     const profanityViolations = this.detectProfanity(message);
     violations.push(...profanityViolations);
 
+    // Analyze unsubscribe-specific safety concerns
+    const unsubscribeResult = this.analyzeUnsubscribeSafety(message, context);
+
     const isSafe = violations.length === 0;
     const escalationRequired =
       emergencyResult.isEmergency ||
       violations.some(
         (v) => v.severity === "high" || v.severity === "critical"
-      );
+      ) ||
+      unsubscribeResult.requiresHumanIntervention;
 
     // Log violations
     if (violations.length > 0 || emergencyResult.isEmergency) {
@@ -192,9 +207,12 @@ export class SafetyFilterService {
         escalationReason: escalationRequired
           ? emergencyResult.isEmergency
             ? "Emergency detected"
-            : "Inappropriate content detected"
+            : unsubscribeResult.requiresHumanIntervention
+              ? "Unsubscribe requires human intervention"
+              : "Inappropriate content detected"
           : undefined,
       },
+      unsubscribeResult,
     };
   }
 
@@ -257,6 +275,153 @@ export class SafetyFilterService {
       recommendedAction: isEmergency
         ? "Immediate volunteer notification and potential emergency services contact"
         : "Monitor and respond normally",
+    };
+  }
+
+  /**
+   * Analyze unsubscribe-specific safety concerns
+   */
+  private analyzeUnsubscribeSafety(message: string, context: ConversationContext): UnsubscribeSafetyResult {
+    const normalizedMessage = message.toLowerCase();
+    const reasons: string[] = [];
+    let confidence = 0;
+    let requiresConfirmation = false;
+    let requiresHumanIntervention = false;
+    let riskLevel: "low" | "medium" | "high" = "low";
+
+    // Check for unsubscribe keywords
+    const unsubscribeKeywords = [
+      "berhenti", "stop", "matikan", "hentikan", "cukup", "tidak mau lagi",
+      "sudah sembuh", "tidak sakit lagi", "obat habis", "tidak butuh lagi"
+    ];
+
+    const hasUnsubscribeKeyword = unsubscribeKeywords.some(keyword =>
+      normalizedMessage.includes(keyword)
+    );
+
+    if (!hasUnsubscribeKeyword) {
+      return {
+        isUnsubscribeRequest: false,
+        confidence: 0,
+        requiresConfirmation: false,
+        requiresHumanIntervention: false,
+        riskLevel: "low",
+        reasons: [],
+        recommendedAction: "ignore"
+      };
+    }
+
+    // Calculate confidence based on keyword strength
+    const strongKeywords = ["berhenti", "stop", "matikan", "hentikan"];
+    const softKeywords = ["cukup", "tidak mau lagi", "sudah sembuh", "tidak sakit lagi"];
+
+    if (strongKeywords.some(keyword => normalizedMessage.includes(keyword))) {
+      confidence += 60;
+    }
+    if (softKeywords.some(keyword => normalizedMessage.includes(keyword))) {
+      confidence += 40;
+    }
+
+    // Check for distress indicators
+    const distressPatterns = [
+      /\b(sakit|nyeri|sedih|nangis|stres|depresi)\b/i,
+      /\b(tidak tahan|sudah tidak kuat|mendesak)\b/i,
+      /\b(tolong|bantuan|help)\b/i
+    ];
+
+    const hasDistress = distressPatterns.some(pattern => pattern.test(normalizedMessage));
+    if (hasDistress) {
+      reasons.push("Distress indicators detected");
+      confidence += 20;
+      requiresHumanIntervention = true;
+      riskLevel = "high";
+    }
+
+    // Check for medical reasons that might need human review
+    const medicalReasons = [
+      /\b(sakit|kanker|kemoterapi|operasi|obat)\b/i,
+      /\b(dokter|rumah sakit|rs)\b/i
+    ];
+
+    const hasMedicalReasons = medicalReasons.some(pattern => pattern.test(normalizedMessage));
+    if (hasMedicalReasons) {
+      reasons.push("Medical reasons mentioned");
+      confidence += 15;
+      requiresConfirmation = true;
+      riskLevel = riskLevel === "high" ? "high" : "medium";
+    }
+
+    // Check for hesitation or uncertainty
+    const hesitationPatterns = [
+      /\b(mungkin|kayaknya|rada|agak)\b/i,
+      /\b(\?\)|\?\?\?)/i,
+      /\b(bolehkah|bisa tidak|apakah bisa)\b/i
+    ];
+
+    const hasHesitation = hesitationPatterns.some(pattern => pattern.test(normalizedMessage));
+    if (hasHesitation) {
+      reasons.push("Uncertainty or hesitation detected");
+      confidence = Math.max(confidence - 20, 20);
+      requiresConfirmation = true;
+    }
+
+    // Check for polite requests
+    const politePatterns = [
+      /\b(terima kasih|makasih|maaf|mohon)\b/i,
+      /\b(tolong|bisa tolong)\b/i
+    ];
+
+    const hasPolitePatterns = politePatterns.some(pattern => pattern.test(normalizedMessage));
+    if (hasPolitePatterns) {
+      reasons.push("Polite request detected");
+      confidence += 10;
+    }
+
+    // Adjust confidence based on message length
+    if (normalizedMessage.length < 10) {
+      confidence = Math.max(confidence - 15, 20);
+      reasons.push("Very short message - unclear intent");
+    } else if (normalizedMessage.length > 100) {
+      confidence += 10;
+      reasons.push("Detailed explanation provided");
+    }
+
+    // Determine risk level and requirements
+    if (confidence >= 80 && !requiresHumanIntervention) {
+      riskLevel = "low";
+      requiresConfirmation = false;
+    } else if (confidence >= 60 && !requiresHumanIntervention) {
+      riskLevel = "medium";
+      requiresConfirmation = true;
+    } else {
+      riskLevel = "high";
+      requiresHumanIntervention = true;
+    }
+
+    // Determine recommended action
+    let recommendedAction: "proceed" | "confirm" | "escalate" | "ignore";
+    if (confidence < 40) {
+      recommendedAction = "ignore";
+    } else if (requiresHumanIntervention) {
+      recommendedAction = "escalate";
+    } else if (requiresConfirmation) {
+      recommendedAction = "confirm";
+    } else {
+      recommendedAction = "proceed";
+    }
+
+    if (reasons.length === 0) {
+      reasons.push("Standard unsubscribe request detected");
+    }
+
+    return {
+      isUnsubscribeRequest: true,
+      confidence: Math.min(confidence, 100),
+      requiresConfirmation,
+      requiresHumanIntervention,
+      riskLevel,
+      reasons,
+      recommendedAction
     };
   }
 

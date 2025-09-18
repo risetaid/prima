@@ -60,6 +60,10 @@ export const patients = pgTable(
       withTimezone: true,
     }),
     lastReactivatedAt: timestamp("last_reactivated_at", { withTimezone: true }),
+    // Unsubscribe tracking fields
+    unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
+    unsubscribeReason: text("unsubscribe_reason"),
+    unsubscribeMethod: text("unsubscribe_method").$type<"manual" | "llm_analysis" | "keyword_detection" | "api">(),
   },
   (table) => ({
     isActiveIdx: index("patients_is_active_idx").on(table.isActive),
@@ -320,6 +324,7 @@ export const verificationLogs = pgTable(
     patientResponse: text("patient_response"),
     verificationResult: verificationStatusEnum("verification_result"),
     processedBy: uuid("processed_by"), // volunteer who processed manual verification
+    additionalInfo: jsonb("additional_info"), // Store LLM analysis results and other metadata
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
