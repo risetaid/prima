@@ -313,6 +313,21 @@ export class ConversationStateService {
         updatedAt: new Date(),
       }
 
+      // Set expected response type based on context
+      switch (newContext) {
+        case 'verification':
+          updates.expectedResponseType = 'yes_no';
+          break;
+        case 'reminder_confirmation':
+          updates.expectedResponseType = 'confirmation';
+          break;
+        case 'general_inquiry':
+        case 'emergency':
+        default:
+          updates.expectedResponseType = 'text';
+          break;
+      }
+
       // Set new expiration time based on context
       const newExpiresAt = this.calculateExpirationTime(newContext)
       updates.expiresAt = newExpiresAt

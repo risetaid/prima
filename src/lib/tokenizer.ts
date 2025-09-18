@@ -22,9 +22,10 @@ export interface TokenUsage {
 export class TokenizerService {
   private static instance: TokenizerService;
   private encodings: Map<string, ReturnType<typeof get_encoding>> = new Map();
+  private initializationError: Error | null = null;
 
   private constructor() {
-    // Initialize common encodings
+    // Initialize common encodings lazily
     this.initializeEncodings();
   }
 
@@ -52,10 +53,11 @@ export class TokenizerService {
 
       logger.info("Tokenizer encodings initialized successfully");
     } catch (error) {
-      logger.error("Failed to initialize tokenizer encodings", error as Error, {
+      logger.warn("Failed to initialize tokenizer encodings, will use fallback methods", {
         message: (error as Error).message,
       });
-      throw new Error("Tokenizer initialization failed");
+      this.initializationError = error as Error;
+      // Don't throw - allow the service to continue with fallback methods
     }
   }
 
@@ -63,6 +65,21 @@ export class TokenizerService {
    * Count tokens in a text string
    */
   public countTokens(text: string, model: string = "default"): TokenCount {
+    // If initialization failed, use fallback immediately
+    if (this.initializationError || this.encodings.size === 0) {
+      logger.debug("Using fallback token counting due to initialization error", {
+        model,
+        textLength: text.length,
+        error: this.initializationError?.message,
+      });
+
+      return {
+        tokens: Math.ceil(text.length / 4),
+        characters: text.length,
+        model: `${model}-fallback`,
+      };
+    }
+
     try {
       const encoding = this.encodings.get(model) || this.encodings.get("default");
       if (!encoding) {

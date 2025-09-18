@@ -507,6 +507,22 @@ export class MessageProcessorService {
         );
     }
 
+    // Check if patient is already verified but conversation is still in verification context
+    // If so, switch to general_inquiry context for proper LLM processing
+    if (conversationState.currentContext === "verification" &&
+        context.verificationStatus === "VERIFIED") {
+      logger.info("Switching verified patient conversation from verification to general_inquiry context", {
+        patientId: context.patientId,
+        phoneNumber: context.phoneNumber,
+        conversationStateId: conversationState.id
+      });
+
+      conversationState = await this.conversationStateService.switchContext(
+        conversationState.id,
+        "general_inquiry"
+      );
+    }
+
     // Get conversation history for context
     const conversationHistory =
       await this.conversationStateService.getConversationHistory(
