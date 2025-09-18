@@ -30,10 +30,22 @@ export async function GET() {
     // Test 3: Simple table existence check
     let tableTest = "❌ Failed";
     try {
-      await db.execute(
-        sql`SELECT COUNT(*) FROM reminder_schedules`
-      );
-      tableTest = "✅ Tables accessible";
+      // Check multiple core tables to verify schema
+      const tableChecks = await Promise.all([
+        db.execute(sql`SELECT COUNT(*) FROM patients LIMIT 1`),
+        db.execute(sql`SELECT COUNT(*) FROM reminders LIMIT 1`),
+        db.execute(sql`SELECT COUNT(*) FROM users LIMIT 1`),
+        db.execute(sql`SELECT COUNT(*) FROM conversation_states LIMIT 1`)
+      ]);
+      
+      const tableResults = [
+        'patients: ✅',
+        'reminders: ✅', 
+        'users: ✅',
+        'conversation_states: ✅'
+      ];
+      
+      tableTest = `✅ Core tables accessible - ${tableResults.join(', ')}`;
     } catch (tableError) {
       tableTest = `❌ Table error: ${
         tableError instanceof Error ? tableError.message : "Unknown"
