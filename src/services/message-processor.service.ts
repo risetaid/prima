@@ -1581,7 +1581,7 @@ export class MessageProcessorService {
 
       return {
         type: "auto_reply",
-        message: llmResponse.content,
+        message: this.convertMarkdownToWhatsApp(llmResponse.content),
         actions,
         priority: (intent.primary as string) === "emergency" ? "urgent" : "low",
       };
@@ -1697,10 +1697,28 @@ ${patientDetails}
 
 RESPONSE GUIDELINES:
 - Respond in Indonesian, be friendly and professional
+- Address patients by their first name only (e.g., "David" not "Bapak David" or "Ibu David")
 - Never give medical advice, direct to professionals
 - For emergencies, alert volunteers immediately
 - Keep responses clear and supportive
+- Use WhatsApp-compatible formatting (*bold* instead of **bold**)
 - End with PRIMA branding`;
+  }
+
+  /**
+   * Convert markdown formatting to WhatsApp compatible format
+   */
+  private convertMarkdownToWhatsApp(text: string): string {
+    return text
+      // Convert **bold** to *bold* (WhatsApp format)
+      .replace(/\*\*(.*?)\*\*/g, '*$1*')
+      // Convert _italic_ to _italic_ (already WhatsApp compatible)
+      // Convert ```code``` to ```code``` (already WhatsApp compatible)
+      // Remove any other markdown that WhatsApp doesn't support
+      .replace(/#{1,6}\s/g, '') // Remove headers
+      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Convert links to just text
+      .replace(/^\s*[-*+]\s/gm, '• ') // Convert list items to bullet points
+      .replace(/^\s*\d+\.\s/gm, '$1 ') // Keep numbered lists but clean them up
   }
 
   /**
@@ -1750,7 +1768,7 @@ RESPONSE GUIDELINES:
     if (llmResponse) {
       return {
         type: "auto_reply",
-        message: llmResponse.content,
+        message: this.convertMarkdownToWhatsApp(llmResponse.content),
         actions: [],
         priority: "low",
       };
