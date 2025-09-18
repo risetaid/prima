@@ -43,54 +43,54 @@ async function executeResponseActions(
     try {
       switch (action.type) {
         case "log_confirmation":
-          // Log the confirmation in reminder logs
+          // Log the confirmation in reminders table
           try {
-            const { db, reminderLogs } = await import("@/db");
+            const { db, reminders } = await import("@/db");
             const { eq, and } = await import("drizzle-orm");
 
-            // Find the most recent reminder log for this patient that needs confirmation
-            const recentLogs = await db
+            // Find the most recent reminder for this patient that needs confirmation
+            const recentReminders = await db
               .select({
-                id: reminderLogs.id,
-                confirmationStatus: reminderLogs.confirmationStatus,
-                sentAt: reminderLogs.sentAt,
+                id: reminders.id,
+                confirmationStatus: reminders.confirmationStatus,
+                sentAt: reminders.sentAt,
               })
-              .from(reminderLogs)
+              .from(reminders)
               .where(
                 and(
-                  eq(reminderLogs.patientId, patientId),
-                  eq(reminderLogs.confirmationStatus, "PENDING")
+                  eq(reminders.patientId, patientId),
+                  eq(reminders.confirmationStatus, "PENDING")
                 )
               )
-              .orderBy(reminderLogs.sentAt)
+              .orderBy(reminders.sentAt)
               .limit(5); // Get last 5 pending confirmations
 
-            if (recentLogs.length > 0) {
+            if (recentReminders.length > 0) {
               // Update the most recent pending confirmation
-              const logToUpdate = recentLogs[recentLogs.length - 1]; // Most recent
+              const reminderToUpdate = recentReminders[recentReminders.length - 1]; // Most recent
 
               const status = (action.data.status as string) || "CONFIRMED";
-              const validStatuses = ["CONFIRMED", "MISSED", "PENDING", "SENT", "UNKNOWN"] as const;
-              const confirmationStatus = validStatuses.includes(status as typeof validStatuses[number]) ? status as "CONFIRMED" | "MISSED" | "PENDING" | "SENT" | "UNKNOWN" : "CONFIRMED";
+              const validStatuses = ["CONFIRMED", "MISSED", "PENDING"] as const;
+              const confirmationStatus = validStatuses.includes(status as typeof validStatuses[number]) ? status as "CONFIRMED" | "MISSED" | "PENDING" : "CONFIRMED";
 
               await db
-                .update(reminderLogs)
+                .update(reminders)
                 .set({
                   confirmationStatus,
                   confirmationResponse:
                     (action.data.response as string) || message,
                   confirmationResponseAt: new Date(),
                 })
-                .where(eq(reminderLogs.id, logToUpdate.id));
+                .where(eq(reminders.id, reminderToUpdate.id));
 
               logger.info("Confirmation logged in database", {
                 patientId,
-                reminderLogId: logToUpdate.id,
+                reminderId: reminderToUpdate.id,
                 status: action.data.status || "CONFIRMED",
                 response: action.data.response || message,
               });
             } else {
-              logger.warn("No pending reminder logs found for confirmation", {
+              logger.warn("No pending reminders found for confirmation", {
                 patientId,
                 actionData: action.data,
               });

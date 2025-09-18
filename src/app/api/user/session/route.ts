@@ -155,7 +155,7 @@ export async function POST() {
     // If user not found in database, create/sync from Clerk
     if (!user) {
       try {
-        // Check if this is the first user (should be DEVELOPER) - optimized query
+        // Check if this is the first user (should be ADMIN) - optimized query
         const userCountResult = await db
           .select({ count: count(users.id) })
           .from(users)
@@ -170,7 +170,7 @@ export async function POST() {
           email: clerkUser.primaryEmailAddress?.emailAddress || "",
           firstName: clerkUser.firstName || "",
           lastName: clerkUser.lastName || "",
-          role: isFirstUser ? "DEVELOPER" : "RELAWAN",
+          role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser,
           approvedAt: isFirstUser ? new Date() : null,
         });

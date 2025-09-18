@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, patients, verificationLogs } from "@/db";
+import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
 
 // Manual verification by volunteer
@@ -17,10 +17,10 @@ export async function POST(
 
     const { id: patientId } = await params;
     const body = await request.json();
-    const { status, reason } = body;
+    const { status } = body;
 
     // Validate status
-    if (!["verified", "declined", "pending_verification"].includes(status)) {
+    if (!["VERIFIED", "DECLINED", "PENDING"].includes(status)) {
       return NextResponse.json(
         { error: "Invalid verification status" },
         { status: 400 }
@@ -43,11 +43,10 @@ export async function POST(
     // Update patient verification status
     const updateData: {
       verificationStatus:
-        | "pending_verification"
-        | "verified"
-        | "declined"
-        | "expired"
-        | "unsubscribed";
+        | "PENDING"
+        | "VERIFIED"
+        | "DECLINED"
+        | "EXPIRED";
       updatedAt: Date;
       verificationResponseAt?: Date | null;
       verificationExpiresAt?: Date | null;
@@ -56,11 +55,11 @@ export async function POST(
       updatedAt: new Date(),
     };
 
-    if (status === "verified" || status === "declined") {
+    if (status === "VERIFIED" || status === "DECLINED") {
       updateData.verificationResponseAt = new Date();
     }
 
-    if (status === "pending_verification") {
+    if (status === "PENDING") {
       // Reset verification when setting back to pending
       updateData.verificationResponseAt = null;
       updateData.verificationExpiresAt = null;
@@ -68,17 +67,10 @@ export async function POST(
 
     await db.update(patients).set(updateData).where(eq(patients.id, patientId));
 
-    // Log manual verification
-    await db.insert(verificationLogs).values({
-      patientId: patientId,
-      action: "manual_verified",
-      patientResponse: reason || `Manual ${status} by volunteer`,
-      verificationResult: status,
-      processedBy: user.id,
-    });
+    // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
 
     // Send confirmation message to patient if verified or declined
-    if (status === "verified" || status === "declined") {
+    if (status === "VERIFIED" || status === "DECLINED") {
       const confirmationMessage = generateConfirmationMessage(patient, status);
       await sendConfirmationMessage(patient.phoneNumber, confirmationMessage);
     }

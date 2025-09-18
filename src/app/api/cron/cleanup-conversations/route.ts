@@ -1,11 +1,9 @@
 /**
  * Cron Job: Cleanup Expired Conversations
- * This endpoint is called by a cron job to clean up expired conversation states
- * and associated messages to maintain database performance
+ * DISABLED: This endpoint is disabled because conversation tables were removed in schema cleanup
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { ConversationCleanupService } from '../../../../../scripts/cleanup-expired-conversations'
 import { logger } from '@/lib/logger'
 
 // Cron secret for authentication
@@ -26,38 +24,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    logger.info('Starting scheduled conversation cleanup')
-
-    const cleanupService = new ConversationCleanupService()
-
-    // Get stats before cleanup
-    const preStats = await cleanupService.getCleanupStats()
-
-    // Clean up expired conversations
-    const expiredCleanup = await cleanupService.cleanupExpiredConversations()
-
-    // Clean up old inactive conversations (older than 30 days)
-    const oldCleanup = await cleanupService.cleanupOldInactiveConversations(30)
-
-    // Get stats after cleanup
-    const postStats = await cleanupService.getCleanupStats()
+    logger.info('Conversation cleanup requested but DISABLED - tables removed in schema cleanup')
 
     const result = {
-      success: true,
+      success: false,
+      disabled: true,
+      reason: 'Conversation tables were removed during schema cleanup',
       timestamp: new Date().toISOString(),
-      preCleanup: preStats,
-      cleanupResults: {
-        expiredConversations: expiredCleanup,
-        oldInactiveConversations: oldCleanup
-      },
-      postCleanup: postStats,
-      totalCleaned: {
-        states: expiredCleanup.expiredStatesCount + oldCleanup.deletedStatesCount,
-        messages: expiredCleanup.deletedMessagesCount + oldCleanup.deletedMessagesCount
-      }
+      message: 'This functionality is no longer available'
     }
 
-    logger.info('Conversation cleanup completed', result)
+    logger.info('Conversation cleanup disabled', result)
 
     return NextResponse.json(result)
 

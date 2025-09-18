@@ -49,7 +49,7 @@ export const GET = createApiHandler(
     };
 
     // For non-admin users, filter by their assigned patients using consolidated access control
-    if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
+    if (user.role !== "ADMIN") {
       filters.assignedVolunteerId = user.id;
     }
 

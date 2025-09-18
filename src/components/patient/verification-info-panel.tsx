@@ -10,16 +10,16 @@ interface VerificationInfoPanelProps {
 export default function VerificationInfoPanel({ patient }: VerificationInfoPanelProps) {
   // Simple status derivation based on patient verification status
   const getPatientDisplayStatus = (patient: Patient) => {
-    if (!patient.isActive || patient.verificationStatus === 'unsubscribed') {
+    if (!patient.isActive) {
       return { displayStatus: 'BERHENTI' }
     }
-    if (patient.verificationStatus === 'verified') {
+    if (patient.verificationStatus === 'VERIFIED') {
       return { displayStatus: 'Terverifikasi' }
     }
-    if (patient.verificationStatus === 'declined') {
+    if (patient.verificationStatus === 'DECLINED') {
       return { displayStatus: 'Menolak' }
     }
-    if (patient.verificationStatus === 'expired') {
+    if (patient.verificationStatus === 'EXPIRED') {
       return { displayStatus: 'Kedaluwarsa' }
     }
     return { displayStatus: 'Menunggu Verifikasi' }

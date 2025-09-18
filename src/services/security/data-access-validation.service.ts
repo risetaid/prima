@@ -192,7 +192,7 @@ export class DataAccessValidationService {
       const patientData = patient[0];
 
       // Determine base permissions based on verification status
-      const isVerified = patientData.verificationStatus === "verified";
+      const isVerified = patientData.verificationStatus === "VERIFIED";
       const isActive = patientData.isActive;
 
       return {

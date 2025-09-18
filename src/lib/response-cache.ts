@@ -16,7 +16,7 @@ export interface CacheKey {
 
 export interface CachedResponse {
   id: string
-  response: string
+  response: string | Record<string, unknown> // jsonb type from database - can be string or object
   createdAt: Date
   expiresAt: Date
 }
@@ -82,7 +82,7 @@ export class ResponseCacheService {
 
       return {
         id: cacheEntry.id,
-        response: cacheEntry.response as string,
+        response: cacheEntry.response as string | Record<string, unknown>,
         createdAt: cacheEntry.createdAt,
         expiresAt: cacheEntry.expiresAt
       }

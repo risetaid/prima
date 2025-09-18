@@ -3,7 +3,7 @@
  */
 
 import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
-import { db, patients, verificationLogs } from "@/db";
+import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
@@ -105,14 +105,14 @@ export class VerificationResponseHandler extends StandardResponseHandler {
 
       // Process verification response
       const message = context.message.toLowerCase();
-      let verificationStatus: "verified" | "declined" | "expired";
+      let verificationStatus: "VERIFIED" | "DECLINED" | "EXPIRED";
       let responseMessage: string;
 
       if (message.includes("ya") || message.includes("sudah") || message.includes("benar")) {
-        verificationStatus = "verified";
+        verificationStatus = "VERIFIED";
         responseMessage = `✅ *Verifikasi Berhasil*\n\nTerima kasih ${patientData.name}! Nomor WhatsApp Anda telah berhasil diverifikasi.\n\nSekarang Anda dapat menerima pengingat obat dan layanan kesehatan lainnya dari PRIMA.\n\n💙 Tim PRIMA`;
       } else if (message.includes("tidak") || message.includes("belum") || message.includes("salah")) {
-        verificationStatus = "declined";
+        verificationStatus = "DECLINED";
         responseMessage = `❌ *Verifikasi Dibatalkan*\n\nMaaf ${patientData.name}, verifikasi dibatalkan sesuai permintaan Anda.\n\nJika ini adalah kesalahan, silakan hubungi relawan kami untuk bantuan.\n\n💙 Tim PRIMA`;
       } else {
         // Unrecognized response
@@ -139,18 +139,14 @@ export class VerificationResponseHandler extends StandardResponseHandler {
         })
         .where(eq(patients.id, context.patientId));
 
-      // Log verification response
-      await db
-        .insert(verificationLogs)
-        .values({
-          patientId: context.patientId,
-          action: "RESPONSE_RECEIVED",
-          messageSent: context.message,
-          patientResponse: context.message,
-          verificationResult: verificationStatus,
-          processedBy: context.patientId, // Self-processed
-          createdAt: getWIBTime()
-        });
+      // Verification logs table was removed from schema
+      // Log verification response using logger instead
+      logger.info("Verification response logged", {
+        patientId: context.patientId,
+        action: "RESPONSE_RECEIVED",
+        verificationResult: verificationStatus,
+        processedBy: context.patientId
+      });
 
       logger.info("Verification response processed successfully", {
         patientId: context.patientId,

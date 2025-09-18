@@ -326,22 +326,22 @@ export class KnowledgeBaseService {
     try {
       const whereConditions = [
         isNull(cmsArticles.deletedAt),
-        eq(cmsArticles.status, "published")
+        eq(cmsArticles.status, "PUBLISHED")
       ];
 
       // Add category filter - map to CMS categories
-      const cmsCategoryMapping: Record<string, string> = {
-        "general_health": "general",
-        "medication_info": "medical",
-        "first_aid": "medical",
-        "chronic_conditions": "medical",
-        "mental_health": "psychological",
-        "cancer_care": "medical"
+      const cmsCategoryMapping: Record<string, ContentCategory> = {
+        "general_health": "GENERAL",
+        "medication_info": "MEDICAL",
+        "first_aid": "MEDICAL",
+        "chronic_conditions": "MEDICAL",
+        "mental_health": "GENERAL",
+        "cancer_care": "MEDICAL"
       };
 
       if (analysis.category && analysis.category !== "general_health") {
-        const mappedCategory = cmsCategoryMapping[analysis.category] || "general";
-        whereConditions.push(eq(cmsArticles.category, mappedCategory as ContentCategory));
+        const mappedCategory = cmsCategoryMapping[analysis.category] || "GENERAL";
+        whereConditions.push(eq(cmsArticles.category, mappedCategory));
       }
 
       // Add keyword filters
@@ -349,9 +349,6 @@ export class KnowledgeBaseService {
         const keyword = analysis.keywords[0]; // Use first keyword for simplicity
         whereConditions.push(ilike(cmsArticles.content, `%${keyword}%`));
       }
-
-      // Only show published articles
-      whereConditions.push(eq(cmsArticles.status, "published"));
 
       const results = await db
         .select({

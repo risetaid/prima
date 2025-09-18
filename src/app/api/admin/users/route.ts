@@ -17,10 +17,10 @@ export async function GET() {
       );
     }
 
-    // Only developers can access user management
-    if (currentUser.role !== "DEVELOPER") {
+    // Only admins and developers can access user management
+    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
       return createErrorResponse(
-        "Superadmin access required",
+        "Admin access required",
         403,
         undefined,
         "AUTHORIZATION_ERROR"

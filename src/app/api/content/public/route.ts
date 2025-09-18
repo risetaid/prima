@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         .from(cmsArticles)
         .leftJoin(users, eq(cmsArticles.createdBy, users.clerkId))
         .where(and(
-          eq(cmsArticles.status, 'published'), // Only published content
+          eq(cmsArticles.status, 'PUBLISHED'), // Only published content
           isNull(cmsArticles.deletedAt) // Exclude deleted content
         ))
         .orderBy(desc(cmsArticles.publishedAt))
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
         .from(cmsVideos)
         .leftJoin(users, eq(cmsVideos.createdBy, users.clerkId))
         .where(and(
-          eq(cmsVideos.status, 'published'), // Only published content
+          eq(cmsVideos.status, 'PUBLISHED'), // Only published content
           isNull(cmsVideos.deletedAt) // Exclude deleted content
         ))
         .orderBy(desc(cmsVideos.publishedAt))

@@ -2,17 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import {
   db,
-  reminderSchedules,
+  reminders,
   patients,
-  reminderLogs,
-  reminderContentAttachments,
-  patientVariables,
   manualConfirmations,
 } from "@/db";
 import { eq, and, desc, asc, gte, lte, inArray, isNull } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
-import { MedicationParser } from "@/lib/medication-parser";
 
 export async function GET(
   request: NextRequest,
@@ -35,9 +31,9 @@ export async function GET(
 
     // Build conditions array with soft delete filter
     const conditions = [
-      eq(reminderSchedules.patientId, id),
-      eq(reminderSchedules.isActive, true),
-      isNull(reminderSchedules.deletedAt), // Critical: soft delete filter
+      eq(reminders.patientId, id),
+      eq(reminders.isActive, true),
+      isNull(reminders.deletedAt), // Critical: soft delete filter
     ];
 
     // Add date range filter if provided for startDate - use consistent timezone logic
@@ -57,30 +53,30 @@ export async function GET(
 
       const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
       conditions.push(
-        gte(reminderSchedules.startDate, startOfDay),
-        lte(reminderSchedules.startDate, endOfDay)
+        gte(reminders.startDate, startOfDay),
+        lte(reminders.startDate, endOfDay)
       );
     }
 
     // Build base query for scheduled reminders
     const baseQuery = db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
-        startDate: reminderSchedules.startDate,
-        endDate: reminderSchedules.endDate,
-        customMessage: reminderSchedules.customMessage,
-        isActive: reminderSchedules.isActive,
-        createdAt: reminderSchedules.createdAt,
-        updatedAt: reminderSchedules.updatedAt,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        endDate: reminders.endDate,
+        customMessage: reminders.message,
+        isActive: reminders.isActive,
+        createdAt: reminders.createdAt,
+        updatedAt: reminders.updatedAt,
       })
-      .from(reminderSchedules)
+      .from(reminders)
       .where(and(...conditions));
 
     // Execute query with pagination
     const scheduledReminders = await baseQuery
-      .orderBy(asc(reminderSchedules.startDate))
+      .orderBy(asc(reminders.startDate))
       .limit(limit)
       .offset(offset);
 
@@ -104,14 +100,13 @@ export async function GET(
       reminderIds.length > 0
         ? await db
             .select({
-              id: reminderLogs.id,
-              reminderScheduleId: reminderLogs.reminderScheduleId,
-              status: reminderLogs.status,
-              sentAt: reminderLogs.sentAt,
+              id: reminders.id,
+              status: reminders.status,
+              sentAt: reminders.sentAt,
             })
-            .from(reminderLogs)
-            .where(inArray(reminderLogs.reminderScheduleId, reminderIds))
-            .orderBy(desc(reminderLogs.sentAt))
+            .from(reminders)
+            .where(inArray(reminders.id, reminderIds))
+            .orderBy(desc(reminders.sentAt))
             .limit(reminderIds.length * 5)
         : [];
 
@@ -121,34 +116,22 @@ export async function GET(
         ? await db
             .select({
               id: manualConfirmations.id,
-              reminderLogId: manualConfirmations.reminderLogId,
-              reminderScheduleId: manualConfirmations.reminderScheduleId,
+              reminderId: manualConfirmations.reminderId,
             })
             .from(manualConfirmations)
-            .where(inArray(manualConfirmations.reminderScheduleId, reminderIds))
+            .where(inArray(manualConfirmations.reminderId, reminderIds))
         : [];
 
-    // Get content attachments for reminders
+    // Get content attachments for reminders (from medicationDetails JSON)
     const contentAttachments =
       reminderIds.length > 0
         ? await db
             .select({
-              id: reminderContentAttachments.id,
-              reminderScheduleId: reminderContentAttachments.reminderScheduleId,
-              contentType: reminderContentAttachments.contentType,
-              contentId: reminderContentAttachments.contentId,
-              contentTitle: reminderContentAttachments.contentTitle,
-              contentUrl: reminderContentAttachments.contentUrl,
-              attachmentOrder: reminderContentAttachments.attachmentOrder,
+              id: reminders.id,
+              medicationDetails: reminders.medicationDetails,
             })
-            .from(reminderContentAttachments)
-            .where(
-              inArray(
-                reminderContentAttachments.reminderScheduleId,
-                reminderIds
-              )
-            )
-            .orderBy(asc(reminderContentAttachments.attachmentOrder))
+            .from(reminders)
+            .where(inArray(reminders.id, reminderIds))
         : [];
 
     // Create lookup maps
@@ -159,25 +142,31 @@ export async function GET(
 
     const logsMap = new Map();
     recentLogs.forEach((log) => {
-      if (!logsMap.has(log.reminderScheduleId)) {
-        logsMap.set(log.reminderScheduleId, []);
+      if (!logsMap.has(log.id)) {
+        logsMap.set(log.id, []);
       }
-      logsMap.get(log.reminderScheduleId).push(log);
+      logsMap.get(log.id).push(log);
     });
 
     const contentAttachmentsMap = new Map();
     contentAttachments.forEach((attachment) => {
-      if (!contentAttachmentsMap.has(attachment.reminderScheduleId)) {
-        contentAttachmentsMap.set(attachment.reminderScheduleId, []);
+      if (!contentAttachmentsMap.has(attachment.id)) {
+        contentAttachmentsMap.set(attachment.id, []);
       }
-      contentAttachmentsMap.get(attachment.reminderScheduleId).push({
-        id: attachment.contentId,
-        type: attachment.contentType,
-        title: attachment.contentTitle,
-        url: attachment.contentUrl,
-        slug: attachment.contentUrl.split("/").pop(), // Extract slug from URL
-        order: attachment.attachmentOrder,
-      });
+      // Extract attachments from medicationDetails JSON
+      const medicationDetails = attachment.medicationDetails as Record<string, unknown> | null;
+      if (medicationDetails?.attachments && Array.isArray(medicationDetails.attachments)) {
+        medicationDetails.attachments.forEach((content: Record<string, unknown>, index: number) => {
+          contentAttachmentsMap.get(attachment.id).push({
+            id: String(content.id || ''),
+            type: String(content.type || ''),
+            title: String(content.title || ''),
+            url: `/content/${String(content.type || '')}s/${String(content.id || '')}`,
+            slug: String(content.id || ''),
+            order: index + 1,
+          });
+        });
+      }
     });
 
     // Filter reminders using the same logic as the stats API
@@ -196,8 +185,7 @@ export async function GET(
       for (const log of logs) {
         // Type guard for confirmation objects
         const logConfirmation = allConfirmations.find(
-          (conf): conf is typeof conf & { reminderLogId: string } =>
-            conf.reminderLogId === log.id
+          (conf) => conf.reminderId === log.id
         );
 
         if (logConfirmation) {
@@ -225,30 +213,10 @@ export async function GET(
     const medicationDetailsMap = new Map();
     for (const reminder of filteredReminders) {
       try {
-        // Get patient variables to extract medication information
-        const variables = await db
-          .select({
-            variableName: patientVariables.variableName,
-            variableValue: patientVariables.variableValue,
-          })
-          .from(patientVariables)
-          .where(
-            and(
-              eq(patientVariables.patientId, reminder.patientId),
-              eq(patientVariables.isActive, true)
-            )
-          );
-
-        // Convert to format expected by MedicationParser
-        const variableArray = variables.map((v) => ({
-          name: v.variableName,
-          value: v.variableValue,
-        }));
-
-        // Parse medication details from variables
-        const medicationDetails =
-          MedicationParser.parseFromVariables(variableArray);
-        medicationDetailsMap.set(reminder.id, medicationDetails);
+        // Get medication details from reminder (new schema approach)
+        // Parse medication details - disabled since MedicationParser was removed
+        const parsedMedicationDetails = null;
+        medicationDetailsMap.set(reminder.id, parsedMedicationDetails);
       } catch (error) {
         console.warn(
           `Failed to get medication details for reminder ${reminder.id}:`,
@@ -301,7 +269,7 @@ export async function DELETE(
 
     // Soft delete multiple scheduled reminders by setting deletedAt timestamp
     const deleteResult = await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set({
         deletedAt: getWIBTime(),
         isActive: false,
@@ -309,13 +277,13 @@ export async function DELETE(
       })
       .where(
         and(
-          inArray(reminderSchedules.id, reminderIds),
-          eq(reminderSchedules.patientId, id),
-          eq(reminderSchedules.isActive, true)
+          inArray(reminders.id, reminderIds),
+          eq(reminders.patientId, id),
+          eq(reminders.isActive, true)
         )
       )
       .returning({
-        id: reminderSchedules.id,
+        id: reminders.id,
       });
 
     // Invalidate cache after bulk deletion

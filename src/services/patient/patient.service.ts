@@ -71,7 +71,8 @@ export class PatientService {
   async getVerificationHistory(patientId: string) {
     if (!patientId) throw new ValidationError("Missing patientId");
     await this.verifyPatientExists(patientId);
-    return await this.repo.getVerificationHistoryRows(patientId);
+    // Verification logs table was removed - return empty array
+    return [];
   }
 
   async getDetail(patientId: string, user?: { id: string; role: string }) {
@@ -288,7 +289,7 @@ export class PatientService {
     const now = new Date();
     const updateData = {
       isActive: true,
-      verificationStatus: "pending_verification" as const,
+      verificationStatus: "PENDING" as const,
       verificationSentAt: null,
       verificationResponseAt: null,
       verificationMessage: null,
@@ -305,20 +306,21 @@ export class PatientService {
       `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() ||
       currentUser.email ||
       currentUser.id;
-    await this.repo.insertVerificationLog({
-      patientId: id,
-      action: "reactivated",
-      patientResponse: `Patient reactivated by: ${processedByName}`,
-      verificationResult: "pending_verification",
-      processedBy: currentUser.id,
-    });
+    // Verification logs table was removed - skip logging
+    // await this.repo.insertVerificationLog({
+    //   patientId: id,
+    //   action: "reactivated",
+    //   patientResponse: `Patient reactivated by: ${processedByName}`,
+    //   verificationResult: "PENDING",
+    //   processedBy: currentUser.id,
+    // });
 
     await invalidateAfterPatientOperation(id, "reactivate");
 
     return {
       success: true,
       message: "Patient berhasil diaktifkan kembali",
-      newStatus: "pending_verification",
+      newStatus: "PENDING",
       processedBy: processedByName,
       nextStep: "Patient siap untuk menerima pesan verifikasi ulang",
     };

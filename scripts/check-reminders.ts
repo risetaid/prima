@@ -1,4 +1,4 @@
-import { db, reminderSchedules, reminderLogs, patients } from '@/db/index.js'
+import { db, reminders, patients } from '@/db/index.js'
 import { eq, and, sql, isNull } from 'drizzle-orm'
 import { getWIBDateString } from '@/lib/timezone.js'
 
@@ -10,70 +10,71 @@ async function checkReminders() {
     // Get today's active reminders
     const todayReminders = await db
       .select({
-        id: reminderSchedules.id,
+        id: reminders.id,
         patientName: patients.name,
-        scheduledTime: reminderSchedules.scheduledTime,
-        startDate: reminderSchedules.startDate,
-        isActive: reminderSchedules.isActive
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        isActive: reminders.isActive,
+        status: reminders.status
       })
-      .from(reminderSchedules)
-      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+      .from(reminders)
+      .leftJoin(patients, eq(reminders.patientId, patients.id))
       .where(
         and(
-          eq(reminderSchedules.isActive, true),
-          eq(sql`DATE(${reminderSchedules.startDate})`, getWIBDateString()),
-          isNull(reminderSchedules.deletedAt),
+          eq(reminders.isActive, true),
+          eq(sql`DATE(${reminders.startDate})`, getWIBDateString()),
+          isNull(reminders.deletedAt),
           isNull(patients.deletedAt)
         )
       )
 
     console.log(`\n📋 Found ${todayReminders.length} active reminders for today:`)
     todayReminders.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime}`)
+      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime} (${reminder.status})`)
     })
 
-    // Get today's reminder logs
-    const todayLogs = await db
+    // Get today's sent reminders
+    const todaySent = await db
       .select({
-        id: reminderLogs.id,
-        reminderScheduleId: reminderLogs.reminderScheduleId,
-        status: reminderLogs.status,
-        sentAt: reminderLogs.sentAt,
-        message: reminderLogs.message
+        id: reminders.id,
+        patientName: patients.name,
+        status: reminders.status,
+        sentAt: reminders.sentAt,
+        message: reminders.message
       })
-      .from(reminderLogs)
+      .from(reminders)
+      .leftJoin(patients, eq(reminders.patientId, patients.id))
       .where(
-        eq(sql`DATE(${reminderLogs.sentAt})`, getWIBDateString())
+        and(
+          eq(sql`DATE(${reminders.sentAt})`, getWIBDateString()),
+          isNull(reminders.deletedAt),
+          isNull(patients.deletedAt)
+        )
       )
 
-    console.log(`\n📨 Found ${todayLogs.length} reminder logs for today:`)
-    todayLogs.forEach((log, index) => {
-      console.log(`  ${index + 1}. Schedule ${log.reminderScheduleId} - ${log.status} at ${log.sentAt}`)
+    console.log(`\n📨 Found ${todaySent.length} reminders sent today:`)
+    todaySent.forEach((reminder, index) => {
+      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.status} at ${reminder.sentAt}`)
     })
 
     // Check which reminders would be sent with our new logic
     console.log('\n🎯 Testing smart duplicate prevention:')
     const remindersToSend = await db
       .select({
-        id: reminderSchedules.id,
+        id: reminders.id,
         patientName: patients.name,
-        scheduledTime: reminderSchedules.scheduledTime
+        scheduledTime: reminders.scheduledTime
       })
-      .from(reminderSchedules)
-      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+      .from(reminders)
+      .leftJoin(patients, eq(reminders.patientId, patients.id))
       .where(
         and(
-          eq(reminderSchedules.isActive, true),
-          eq(sql`DATE(${reminderSchedules.startDate})`, getWIBDateString()),
-          isNull(reminderSchedules.deletedAt),
+          eq(reminders.isActive, true),
+          eq(sql`DATE(${reminders.startDate})`, getWIBDateString()),
+          isNull(reminders.deletedAt),
           isNull(patients.deletedAt),
           // SMART DUPLICATE PREVENTION: Only send reminders that haven't been delivered today
-          sql`NOT EXISTS (
-            SELECT 1 FROM ${reminderLogs}
-            WHERE ${reminderLogs.reminderScheduleId} = ${reminderSchedules.id}
-            AND ${reminderLogs.status} = 'DELIVERED'
-            AND DATE(${reminderLogs.sentAt}) = ${getWIBDateString()}
-          )`
+          sql`(${reminders.status} != 'DELIVERED' OR ${reminders.sentAt} IS NULL OR DATE(${reminders.sentAt}) != ${getWIBDateString()})`
         )
       )
 

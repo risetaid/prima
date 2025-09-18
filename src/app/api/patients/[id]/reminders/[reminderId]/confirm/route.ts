@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminderLogs, manualConfirmations } from "@/db";
+import { db, manualConfirmations, reminders } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
@@ -70,47 +70,46 @@ export async function PUT(
       confirmed,
     });
 
-    // Get the reminder log using separate queries
-    console.log("🔍 Querying reminder log:", { logId, patientId: id });
-    const reminderLog = await db
+    // Get the reminder using separate queries
+    console.log("🔍 Querying reminder:", { reminderId: logId, patientId: id });
+    const reminderData = await db
       .select({
-        id: reminderLogs.id,
-        patientId: reminderLogs.patientId,
-        reminderScheduleId: reminderLogs.reminderScheduleId,
-        message: reminderLogs.message,
-        status: reminderLogs.status,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        message: reminders.message,
+        status: reminders.status,
       })
-      .from(reminderLogs)
-      .where(and(eq(reminderLogs.id, logId), eq(reminderLogs.patientId, id)))
+      .from(reminders)
+      .where(and(eq(reminders.id, logId), eq(reminders.patientId, id)))
       .limit(1);
 
-    console.log("📊 Reminder log query result:", {
-      found: reminderLog.length > 0,
-      data: reminderLog[0],
+    console.log("📊 Reminder query result:", {
+      found: reminderData.length > 0,
+      data: reminderData[0],
     });
 
-    if (reminderLog.length === 0) {
-      console.error("❌ REMINDER NOT FOUND:", { logId, patientId: id });
+    if (reminderData.length === 0) {
+      console.error("❌ REMINDER NOT FOUND:", { reminderId: logId, patientId: id });
       return NextResponse.json(
         { error: "Reminder not found" },
         { status: 404 }
       );
     }
 
-    const logData = reminderLog[0];
-    console.log("✅ Reminder log found:", logData);
+    const reminderInfo = reminderData[0];
+    console.log("✅ Reminder found:", reminderInfo);
 
     // Get reminder schedule details (if reminderScheduleId exists)
     // Reminder schedule details not needed for confirmation
 
-    // Check if this ReminderLog is already manually confirmed
-    console.log("🔍 Checking for existing manual confirmation:", { logId });
+    // Check if this Reminder is already manually confirmed
+    console.log("🔍 Checking for existing manual confirmation:", { reminderId: logId });
     const existingManualConfirmation = await db
       .select({
         id: manualConfirmations.id,
       })
       .from(manualConfirmations)
-      .where(eq(manualConfirmations.reminderLogId, logId))
+      .where(eq(manualConfirmations.reminderId, logId))
       .limit(1);
 
     console.log("📊 Existing manual confirmation check:", {
@@ -130,18 +129,18 @@ export async function PUT(
     }
 
     // Check for automated confirmation conflict
-    console.log("🔍 Checking for automated confirmation conflict:", { logId });
-    const reminderLogData = await db
+    console.log("🔍 Checking for automated confirmation conflict:", { reminderId: logId });
+    const confirmationData = await db
       .select({
-        confirmationStatus: reminderLogs.confirmationStatus,
-        confirmationResponse: reminderLogs.confirmationResponse,
-        confirmationResponseAt: reminderLogs.confirmationResponseAt,
+        confirmationStatus: reminders.confirmationStatus,
+        confirmationResponse: reminders.confirmationResponse,
+        confirmationResponseAt: reminders.confirmationResponseAt,
       })
-      .from(reminderLogs)
-      .where(eq(reminderLogs.id, logId))
+      .from(reminders)
+      .where(eq(reminders.id, logId))
       .limit(1);
 
-    const automatedConfirmation = reminderLogData[0];
+    const automatedConfirmation = confirmationData[0];
     console.log("📊 Automated confirmation check:", {
       status: automatedConfirmation?.confirmationStatus,
       hasResponse: !!automatedConfirmation?.confirmationResponse,
@@ -186,8 +185,7 @@ export async function PUT(
         .values({
           patientId: id,
           volunteerId: user.id,
-          reminderScheduleId: logData.reminderScheduleId,
-          reminderLogId: logId, // Link to specific ReminderLog
+          reminderId: logId, // Link to specific Reminder
           visitDate: new Date(),
           visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
           patientCondition: "FAIR", // Default, could be made dynamic
@@ -201,8 +199,7 @@ export async function PUT(
           id: manualConfirmations.id,
           patientId: manualConfirmations.patientId,
           volunteerId: manualConfirmations.volunteerId,
-          reminderScheduleId: manualConfirmations.reminderScheduleId,
-          reminderLogId: manualConfirmations.reminderLogId,
+          reminderId: manualConfirmations.reminderId,
           visitDate: manualConfirmations.visitDate,
           visitTime: manualConfirmations.visitTime,
           patientCondition: manualConfirmations.patientCondition,

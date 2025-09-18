@@ -10,7 +10,7 @@ import {
 } from "./medication-parser";
 import { MedicationContext } from "@/services/llm/response-templates";
 import { db } from "@/db";
-import { medicationAdministrationLogs, reminderLogs } from "@/db/schema";
+import { reminders, manualConfirmations } from "@/db/schema";
 import { eq, and, desc, gte, sql, SQL } from "drizzle-orm";
 import { logger } from "./logger";
 
@@ -262,16 +262,15 @@ export class MedicationContextBuilderImpl
     additionalConditions: SQL[] = []
   ): SQL {
     const conditions = [
-      eq(medicationAdministrationLogs.patientId, patientId),
+      eq(reminders.patientId, patientId),
       ...additionalConditions,
     ];
 
-    if (schedule.reminderScheduleId) {
+    // Note: The new schema doesn't have reminderScheduleId in reminders table
+    // We'll need to match by medication details instead
+    if (schedule.medicationName) {
       conditions.push(
-        eq(
-          medicationAdministrationLogs.reminderScheduleId,
-          schedule.reminderScheduleId
-        )
+        sql`${reminders.medicationDetails}::jsonb ->> 'name' = ${schedule.medicationName}`
       );
     }
 
@@ -279,19 +278,21 @@ export class MedicationContextBuilderImpl
     return result || sql`true`;
   }
 
-  private buildReminderLogsWhereConditions(
+  private buildManualConfirmationsWhereConditions(
     patientId: string,
     schedule: MedicationSchedule,
     additionalConditions: SQL[] = []
   ): SQL {
     const conditions = [
-      eq(reminderLogs.patientId, patientId),
+      eq(manualConfirmations.patientId, patientId),
       ...additionalConditions,
     ];
 
-    if (schedule.reminderScheduleId) {
+    // Note: The new schema doesn't have reminderScheduleId in manualConfirmations table
+    // We'll need to match by medication names in the medicationsTaken array
+    if (schedule.medicationName) {
       conditions.push(
-        eq(reminderLogs.reminderScheduleId, schedule.reminderScheduleId)
+        sql`${schedule.medicationName} = ANY(${manualConfirmations.medicationsTaken})`
       );
     }
 
@@ -365,26 +366,43 @@ export class MedicationContextBuilderImpl
       const schedule = this.getCurrentScheduleForMedication(medicationName);
       if (!schedule) return undefined;
 
-      // Query medication administration logs for the last taken date
-      const logs = await db
+      // First, check manual confirmations for medications taken
+      const manualConfirmationsResult = await db
         .select({
-          actualDateTime: medicationAdministrationLogs.actualDateTime,
-          status: medicationAdministrationLogs.status,
+          confirmedAt: manualConfirmations.confirmedAt,
         })
-        .from(medicationAdministrationLogs)
+        .from(manualConfirmations)
         .where(
-          this.buildWhereConditions(this.builder.patientId, schedule, [
-            eq(
-              medicationAdministrationLogs.medicationName,
-              schedule.medicationName
-            ),
-            eq(medicationAdministrationLogs.status, "TAKEN"),
-          ])
+          this.buildManualConfirmationsWhereConditions(this.builder.patientId, schedule)
         )
-        .orderBy(desc(medicationAdministrationLogs.actualDateTime))
+        .orderBy(desc(manualConfirmations.confirmedAt))
         .limit(1);
 
-      return logs[0]?.actualDateTime || undefined;
+      // Also check reminders table for confirmed responses
+      const remindersResult = await db
+        .select({
+          confirmationResponseAt: reminders.confirmationResponseAt,
+        })
+        .from(reminders)
+        .where(
+          and(
+            eq(reminders.patientId, this.builder.patientId),
+            eq(reminders.confirmationStatus, "CONFIRMED"),
+            sql`${reminders.medicationDetails}::jsonb ->> 'name' = ${medicationName}`
+          )
+        )
+        .orderBy(desc(reminders.confirmationResponseAt))
+        .limit(1);
+
+      // Return the most recent date from either source
+      const manualDate = manualConfirmationsResult[0]?.confirmedAt;
+      const reminderDate = remindersResult[0]?.confirmationResponseAt;
+
+      if (manualDate && reminderDate) {
+        return manualDate > reminderDate ? manualDate : reminderDate;
+      }
+
+      return manualDate || reminderDate || undefined;
     } catch (error) {
       logger.error(
         "Failed to get last taken date",
@@ -468,85 +486,77 @@ export class MedicationContextBuilderImpl
       );
       if (!schedule) return { rate: 0, missed: 0, total: 0 };
 
-      // Get medication administration logs for the last 30 days
+      // Get reminders for the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const logs = await db
+      const remindersData = await db
         .select({
-          id: medicationAdministrationLogs.id,
-          status: medicationAdministrationLogs.status,
-          scheduledDateTime: medicationAdministrationLogs.scheduledDateTime,
-          actualDateTime: medicationAdministrationLogs.actualDateTime,
-          medicationName: medicationAdministrationLogs.medicationName,
+          id: reminders.id,
+          status: reminders.status,
+          confirmationStatus: reminders.confirmationStatus,
+          sentAt: reminders.sentAt,
+          startDate: reminders.startDate,
+          medicationDetails: reminders.medicationDetails,
         })
-        .from(medicationAdministrationLogs)
+        .from(reminders)
         .where(
-          this.buildWhereConditions(this.builder.patientId, schedule, [
-            eq(
-              medicationAdministrationLogs.medicationName,
-              schedule.medicationName
-            ),
-            gte(medicationAdministrationLogs.scheduledDateTime, thirtyDaysAgo),
-          ])
-        );
-
-      // Also check reminder logs for additional adherence data
-      const reminderLogsData = await db
-        .select({
-          id: reminderLogs.id,
-          status: reminderLogs.status,
-          confirmationStatus: reminderLogs.confirmationStatus,
-          sentAt: reminderLogs.sentAt,
-        })
-        .from(reminderLogs)
-        .where(
-          this.buildReminderLogsWhereConditions(
-            this.builder.patientId,
-            schedule,
-            [gte(reminderLogs.sentAt, thirtyDaysAgo)]
+          and(
+            eq(reminders.patientId, this.builder.patientId),
+            gte(reminders.startDate, thirtyDaysAgo),
+            sql`${reminders.medicationDetails}::jsonb ->> 'name' = ${medicationDetails.name}`
           )
         );
 
-      // Build a Set of unique keys from medication administration logs to avoid double-counting
-      const adminLogKeys = new Set<string>();
-      logs.forEach((log) => {
-        const timestamp = log.actualDateTime || log.scheduledDateTime;
-        const key = `${this.builder.patientId}|${timestamp.toISOString()}|${
-          log.medicationName
-        }|${log.id}`;
-        adminLogKeys.add(key);
+      // Also check manual confirmations for additional adherence data
+      const manualConfirmationsData = await db
+        .select({
+          id: manualConfirmations.id,
+          confirmedAt: manualConfirmations.confirmedAt,
+          medicationsTaken: manualConfirmations.medicationsTaken,
+        })
+        .from(manualConfirmations)
+        .where(
+          and(
+            eq(manualConfirmations.patientId, this.builder.patientId),
+            gte(manualConfirmations.confirmedAt, thirtyDaysAgo),
+            sql`${medicationDetails.name} = ANY(${manualConfirmations.medicationsTaken})`
+          )
+        );
+
+      // Build a Set of unique keys from reminders to avoid double-counting
+      const reminderKeys = new Set<string>();
+      remindersData.forEach((reminder) => {
+        const timestamp = reminder.sentAt || reminder.startDate;
+        const key = `${this.builder.patientId}|${timestamp.toISOString()}|${medicationDetails.name}|${reminder.id}`;
+        reminderKeys.add(key);
       });
 
       // Calculate adherence from both sources
       let takenCount = 0;
       let totalCount = 0;
 
-      // Count from medication administration logs
-      logs.forEach((log) => {
+      // Count from reminders
+      remindersData.forEach((reminder) => {
         totalCount++;
-        if (log.status === "TAKEN") {
+        if (reminder.confirmationStatus === "CONFIRMED") {
           takenCount++;
         }
       });
 
-      // Count from reminder logs, but skip those that match medication administration logs
-      reminderLogsData.forEach((log) => {
-        // Check if this reminder log matches any medication administration log
-        const isDuplicate = this.isDuplicateLog(
-          log,
-          logs,
-          adminLogKeys,
-          schedule.medicationName
+      // Count from manual confirmations, but skip those that match reminders
+      manualConfirmationsData.forEach((confirmation) => {
+        // Check if this manual confirmation matches any reminder
+        const isDuplicate = this.isDuplicateConfirmation(
+          confirmation,
+          remindersData,
+          reminderKeys,
+          medicationDetails.name
         );
 
         if (!isDuplicate) {
-          if (log.confirmationStatus === "CONFIRMED") {
-            takenCount++;
-            totalCount++;
-          } else if (log.status === "DELIVERED") {
-            totalCount++;
-          }
+          takenCount++;
+          totalCount++;
         }
       });
 
@@ -573,43 +583,38 @@ export class MedicationContextBuilderImpl
   }
 
   /**
-   * Check if a reminder log is a duplicate of a medication administration log
-   */
-  private isDuplicateLog(
-    reminderLog: { sentAt: Date; id: string },
-    adminLogs: Array<{
-      actualDateTime: Date | null;
-      scheduledDateTime: Date;
-      medicationName: string;
+    * Check if a manual confirmation is a duplicate of a reminder
+    */
+  private isDuplicateConfirmation(
+    confirmation: { confirmedAt: Date; id: string },
+    reminders: Array<{
+      sentAt: Date | null;
+      startDate: Date;
       id: string;
     }>,
-    adminLogKeys: Set<string>,
+    reminderKeys: Set<string>,
     medicationName: string
   ): boolean {
     // First check by exact key match
-    const reminderKey = `${
+    const confirmationKey = `${
       this.builder.patientId
-    }|${reminderLog.sentAt.toISOString()}|${medicationName}|${reminderLog.id}`;
-    if (adminLogKeys.has(reminderKey)) {
+    }|${confirmation.confirmedAt.toISOString()}|${medicationName}|${confirmation.id}`;
+    if (reminderKeys.has(confirmationKey)) {
       return true;
     }
 
     // Check for timestamp-based matching with tolerance (±2 minutes)
     const toleranceMs = 2 * 60 * 1000; // 2 minutes in milliseconds
 
-    for (const adminLog of adminLogs) {
-      const adminTimestamp =
-        adminLog.actualDateTime || adminLog.scheduledDateTime;
+    for (const reminder of reminders) {
+      const reminderTimestamp = reminder.sentAt || reminder.startDate;
 
       // Check if timestamps are within tolerance
       const timeDiff = Math.abs(
-        reminderLog.sentAt.getTime() - adminTimestamp.getTime()
+        confirmation.confirmedAt.getTime() - reminderTimestamp.getTime()
       );
       if (timeDiff <= toleranceMs) {
-        // Check if medication names match
-        if (medicationName === adminLog.medicationName) {
-          return true;
-        }
+        return true;
       }
     }
 

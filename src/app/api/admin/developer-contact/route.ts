@@ -13,7 +13,7 @@ export async function GET() {
         hospitalName: users.hospitalName,
       })
       .from(users)
-      .where(eq(users.role, "DEVELOPER"))
+      .where(eq(users.role, "ADMIN"))
       .orderBy(users.createdAt)
       .limit(1);
 

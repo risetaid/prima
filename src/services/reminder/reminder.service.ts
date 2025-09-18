@@ -13,7 +13,7 @@ import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 
-import { db, patients, reminderLogs } from "@/db";
+import { db, patients } from "@/db";
 import { ReminderError } from "./reminder.types";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { eq } from "drizzle-orm";
@@ -34,7 +34,7 @@ export class ReminderService {
     if (!patient) throw new NotFoundError("Patient not found");
 
     if (
-      patient.verificationStatus !== "verified" ||
+      patient.verificationStatus !== "VERIFIED" ||
       patient.isActive !== true
     ) {
       throw new ReminderError(
@@ -79,11 +79,9 @@ export class ReminderService {
       const schedule = await this.repository.insert({
         patientId: dto.patientId,
         scheduledTime: dto.time,
-        frequency: dto.customRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
         startDate: reminderDate,
         endDate: reminderDate,
-        isActive: true,
-        customMessage: dto.message,
+        message: dto.message,
         createdById: dto.createdById,
       });
 
@@ -145,7 +143,7 @@ export class ReminderService {
     // Update reminder
     const updated = await this.repository.update(id, {
       scheduledTime: dto.reminderTime,
-      customMessage: dto.customMessage,
+      message: dto.customMessage,
       updatedAt: getWIBTime(),
     });
 
@@ -216,8 +214,8 @@ export class ReminderService {
       "view this patient's reminders"
     );
 
-    const reminders = await this.repository.listByPatient(patientId);
-    return reminders.map((r) => ({
+    const patientReminders = await this.repository.listByPatient(patientId);
+    return patientReminders.map((r) => ({
       ...r,
       patient: {
         name: r.patientName,
@@ -258,7 +256,9 @@ export class ReminderService {
         enhancedMessage
       );
 
-      await db.insert(reminderLogs).values({
+      // ReminderLogs table was removed from schema
+      // Log reminder send using logger instead
+      logger.info('Reminder sent', {
         reminderScheduleId: scheduleId,
         patientId: patient.id,
         sentAt: getWIBTime(),

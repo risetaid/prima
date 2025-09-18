@@ -13,18 +13,17 @@ const createVideoSchema = z.object({
   thumbnailUrl: z.string().url().optional().or(z.literal("")),
   durationMinutes: z.string().optional(),
   category: z.enum([
-    "general",
-    "nutrisi",
-    "olahraga",
-    "motivational",
-    "medical",
-    "faq",
-    "testimoni",
+    "GENERAL",
+    "NUTRITION",
+    "EXERCISE",
+    "MOTIVATIONAL",
+    "MEDICAL",
+    "FAQ",
   ]),
   tags: z.array(z.string()).default([]),
   seoTitle: z.string().max(255).optional(),
   seoDescription: z.string().optional(),
-  status: z.enum(["draft", "published", "archived"]).default("draft"),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
 });
 
 // Utility function to generate slug from title
@@ -75,7 +74,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -108,20 +107,19 @@ export async function GET(request: NextRequest) {
         eq(
           cmsVideos.category,
           category as
-            | "general"
-            | "nutrisi"
-            | "olahraga"
-            | "motivational"
-            | "medical"
-            | "faq"
-            | "testimoni"
+            | "GENERAL"
+            | "NUTRITION"
+            | "EXERCISE"
+            | "MOTIVATIONAL"
+            | "MEDICAL"
+            | "FAQ"
         )
       );
     }
 
     if (status) {
       whereConditions.push(
-        eq(cmsVideos.status, status as "draft" | "published" | "archived")
+        eq(cmsVideos.status, status as "DRAFT" | "PUBLISHED" | "ARCHIVED")
       );
     }
 
@@ -171,7 +169,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -212,7 +210,7 @@ export async function POST(request: NextRequest) {
       videoUrl: embedUrl,
       thumbnailUrl: validatedData.thumbnailUrl || autoThumbnail || null,
       createdBy: user.clerkId,
-      publishedAt: validatedData.status === "published" ? new Date() : null,
+      publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
     };
 
     const createdVideo = await db

@@ -1,66 +1,81 @@
 // Reminder Repository - Database access layer for reminders
-import { db, reminderSchedules, patients, reminderContentAttachments } from '@/db'
-import { eq, inArray, desc } from 'drizzle-orm'
-import { ReminderSchedule, ReminderScheduleInsert, ValidatedContent } from './reminder.types'
+import { db, reminders, patients } from '@/db'
+import { eq, desc } from 'drizzle-orm'
 import { validateContentAttachments } from '@/lib/content-validation'
+
+// Basic types for backwards compatibility
+type ReminderInsert = {
+  patientId: string
+  scheduledTime: string
+  message: string
+  startDate: Date
+  endDate?: Date
+  createdById: string
+}
+
+type ValidatedContent = {
+  id: string
+  type: string
+  title: string
+  url: string
+}
 
 export class ReminderRepository {
   async getById(id: string) {
     const result = await db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
-        startDate: reminderSchedules.startDate,
-        endDate: reminderSchedules.endDate,
-        customMessage: reminderSchedules.customMessage,
-        isActive: reminderSchedules.isActive,
-        createdById: reminderSchedules.createdById,
-        createdAt: reminderSchedules.createdAt,
-        updatedAt: reminderSchedules.updatedAt,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        endDate: reminders.endDate,
+        message: reminders.message,
+        isActive: reminders.isActive,
+        createdById: reminders.createdById,
+        createdAt: reminders.createdAt,
+        updatedAt: reminders.updatedAt,
       })
-      .from(reminderSchedules)
-      .where(eq(reminderSchedules.id, id))
+      .from(reminders)
+      .where(eq(reminders.id, id))
       .limit(1)
 
     return result[0] || null
   }
 
   async listByPatient(patientId: string) {
-    const reminders = await db
+    const reminderList = await db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
-        frequency: reminderSchedules.frequency,
-        startDate: reminderSchedules.startDate,
-        endDate: reminderSchedules.endDate,
-        customMessage: reminderSchedules.customMessage,
-        isActive: reminderSchedules.isActive,
-        createdById: reminderSchedules.createdById,
-        createdAt: reminderSchedules.createdAt,
-        updatedAt: reminderSchedules.updatedAt,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        endDate: reminders.endDate,
+        message: reminders.message,
+        isActive: reminders.isActive,
+        createdById: reminders.createdById,
+        createdAt: reminders.createdAt,
+        updatedAt: reminders.updatedAt,
         patientName: patients.name,
         patientPhoneNumber: patients.phoneNumber,
       })
-      .from(reminderSchedules)
-      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
-      .where(eq(reminderSchedules.patientId, patientId))
-      .orderBy(desc(reminderSchedules.createdAt))
+      .from(reminders)
+      .leftJoin(patients, eq(reminders.patientId, patients.id))
+      .where(eq(reminders.patientId, patientId))
+      .orderBy(desc(reminders.createdAt))
 
-    return reminders
+    return reminderList
   }
 
-  async insert(values: ReminderScheduleInsert) {
-    const result = await db.insert(reminderSchedules).values(values).returning()
+  async insert(values: ReminderInsert) {
+    const result = await db.insert(reminders).values(values).returning()
     return result[0]
   }
 
-  async update(id: string, values: Partial<ReminderSchedule>) {
+  async update(id: string, values: Partial<Record<string, unknown>>) {
     const result = await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set(values)
-      .where(eq(reminderSchedules.id, id))
+      .where(eq(reminders.id, id))
       .returning()
 
     return result[0]
@@ -68,47 +83,25 @@ export class ReminderRepository {
 
   async softDelete(id: string, now: Date) {
     await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set({ deletedAt: now, isActive: false, updatedAt: now })
-      .where(eq(reminderSchedules.id, id))
+      .where(eq(reminders.id, id))
   }
 
   async addAttachments(reminderId: string, contents: ValidatedContent[], createdBy: string) {
-    if (!contents?.length) return
-
-    const values = contents.map((content, index) => ({
-      reminderScheduleId: reminderId,
-      contentType: content.type,
-      contentId: content.id,
-      contentTitle: content.title,
-      contentUrl: content.url,
-      attachmentOrder: index + 1,
-      createdBy,
-    }))
-
-    await db.insert(reminderContentAttachments).values(values)
+    // Attachments table was removed - no-op
+    console.log(`Would add ${contents.length} attachments to reminder ${reminderId} by user ${createdBy}`);
   }
 
   async removeAttachments(reminderId: string) {
-    await db
-      .delete(reminderContentAttachments)
-      .where(eq(reminderContentAttachments.reminderScheduleId, reminderId))
+    // Attachments table was removed - no-op
+    console.log(`Would remove attachments from reminder ${reminderId}`);
   }
 
   async getAttachments(reminderIds: string[]) {
-    if (!reminderIds?.length) return [] as Array<{ reminderScheduleId: string; contentType: string; contentTitle: string; contentUrl: string }>
-
-    const rows = await db
-      .select({
-        reminderScheduleId: reminderContentAttachments.reminderScheduleId,
-        contentType: reminderContentAttachments.contentType,
-        contentTitle: reminderContentAttachments.contentTitle,
-        contentUrl: reminderContentAttachments.contentUrl,
-      })
-      .from(reminderContentAttachments)
-      .where(inArray(reminderContentAttachments.reminderScheduleId, reminderIds))
-
-    return rows
+    // Attachments table was removed - return empty array
+    console.log(`Would get attachments for ${reminderIds.length} reminders`);
+    return [] as Array<{ reminderScheduleId: string; contentType: string; contentTitle: string; contentUrl: string }>
   }
 
   async validateAttachments(attachedContent: Array<{ id: string; type: 'article' | 'video' | 'ARTICLE' | 'VIDEO'; title: string }>) {

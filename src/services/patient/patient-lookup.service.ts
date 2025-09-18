@@ -113,13 +113,25 @@ export class PatientLookupService {
   async createPatientForOnboarding(
     phoneNumber: string,
     name?: string,
-    additionalData?: Record<string, string | Date | boolean | null>
+    additionalData?: Partial<{
+      address: string
+      birthDate: Date
+      diagnosisDate: Date
+      cancerStage: "I" | "II" | "III" | "IV"
+      assignedVolunteerId: string
+      doctorName: string
+      hospitalName: string
+      emergencyContactName: string
+      emergencyContactPhone: string
+      notes: string
+      photoUrl: string
+    }>
   ): Promise<PatientLookupResult> {
     try {
       const patientData = {
         name: name || `Patient ${phoneNumber.slice(-4)}`,
         phoneNumber,
-        verificationStatus: 'pending_verification' as const,
+        verificationStatus: 'PENDING' as const,
         isActive: true,
         ...additionalData
       }
@@ -201,16 +213,20 @@ export class PatientLookupService {
     }>
   ): Promise<boolean> {
     try {
-      const success = true // Drizzle update returns successfully if no error
-
-      if (success) {
-        logger.info('Updated patient information', {
-          patientId,
-          updates: Object.keys(updates)
+      await db
+        .update(patients)
+        .set({
+          ...updates,
+          updatedAt: new Date()
         })
-      }
+        .where(eq(patients.id, patientId))
 
-      return success
+      logger.info('Updated patient information', {
+        patientId,
+        updates: Object.keys(updates)
+      })
+
+      return true
     } catch (error) {
       logger.error('Failed to update patient information', error as Error, {
         patientId,

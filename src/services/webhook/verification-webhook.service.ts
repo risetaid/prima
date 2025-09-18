@@ -10,11 +10,10 @@
 import {
   db,
   patients,
-  verificationLogs,
-  reminderSchedules,
-  reminderLogs,
+  reminders,
   Patient,
 } from "@/db";
+// Note: verificationLogs, reminderSchedules, and reminderLogs tables were removed from schema
 import { eq, and, or, desc } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 
@@ -177,7 +176,7 @@ export class VerificationWebhookService {
         return await this.handleUnsubscribe(patient);
 
       case "accept":
-        if (patient.verificationStatus === "pending_verification") {
+        if (patient.verificationStatus === "PENDING") {
           console.log(`✅ ACCEPT: Processing acceptance for ${patient.name}`);
           return await this.handleAccept(patient);
         } else {
@@ -188,7 +187,7 @@ export class VerificationWebhookService {
         }
 
       case "decline":
-        if (patient.verificationStatus === "pending_verification") {
+        if (patient.verificationStatus === "PENDING") {
           console.log(`❌ DECLINE: Processing decline for ${patient.name}`);
           return await this.handleDecline(patient);
         } else {
@@ -224,8 +223,8 @@ export class VerificationWebhookService {
 
   private async handleAccept(patient: Patient): Promise<string> {
     try {
-      await this.databaseHandler.updatePatientStatus(patient, "verified");
-      await this.messageHandler.sendConfirmationMessage(patient, "verified");
+      await this.databaseHandler.updatePatientStatus(patient, "VERIFIED");
+      await this.messageHandler.sendConfirmationMessage(patient, "VERIFIED");
 
       console.log(`✅ ACCEPT: Successfully processed for ${patient.name}`);
       return "verified";
@@ -237,8 +236,8 @@ export class VerificationWebhookService {
 
   private async handleDecline(patient: Patient): Promise<string> {
     try {
-      await this.databaseHandler.updatePatientStatus(patient, "declined");
-      await this.messageHandler.sendConfirmationMessage(patient, "declined");
+      await this.databaseHandler.updatePatientStatus(patient, "DECLINED");
+      await this.messageHandler.sendConfirmationMessage(patient, "DECLINED");
 
       console.log(`✅ DECLINE: Successfully processed for ${patient.name}`);
       return "declined";
@@ -330,16 +329,14 @@ class ResponseDetector {
 
   mapConfirmationResponseToStatus(
     responseType: ResponseType
-  ): "CONFIRMED" | "MISSED" | "UNKNOWN" {
+  ): "CONFIRMED" | "MISSED" {
     switch (responseType) {
       case "confirmation_taken":
         return "CONFIRMED";
       case "confirmation_missed":
-        return "MISSED";
       case "confirmation_later":
-        return "UNKNOWN";
       default:
-        return "UNKNOWN";
+        return "MISSED"; // Default to MISSED since UNKNOWN is not valid enum value
     }
   }
 
@@ -506,13 +503,13 @@ class MessageHandler {
   }
 
   private generateConfirmationMessage(patient: Patient, status: string): string {
-    if (status === "verified") {
+    if (status === "VERIFIED" || status === "verified") {
       return `Terima kasih ${patient.name}! ✅
 
 Anda akan menerima reminder dari relawan PRIMA.
 
 Untuk berhenti, ketik: BERHENTI`;
-    } else if (status === "declined") {
+    } else if (status === "DECLINED" || status === "declined") {
       return `Baik ${patient.name}, terima kasih atas responsnya.
 
 Semoga sehat selalu! 🙏`;
@@ -589,12 +586,8 @@ class DatabaseHandler {
       patient.verificationStatus
     );
 
-    await db.insert(verificationLogs).values({
-      patientId: patient.id,
-      action,
-      patientResponse: message,
-      verificationResult,
-    });
+    // Verification logs table was removed from schema
+    console.log(`📝 LOGGED: ${action} - ${responseType} for ${patient.name} (verification result: ${verificationResult})`);
 
     console.log(`📝 LOGGED: ${action} - ${responseType} for ${patient.name}`);
   }
@@ -608,7 +601,7 @@ class DatabaseHandler {
 
     // Special handling for unsubscribe
     if (verificationResult === "unsubscribed") {
-      updateData.verificationStatus = "declined";
+      updateData.verificationStatus = "DECLINED";
       updateData.isActive = false;
       console.log(`🔄 STATUS: Setting ${patient.name} to declined + inactive`);
     }
@@ -633,12 +626,12 @@ class DatabaseHandler {
 
     try {
       await db
-        .update(reminderSchedules)
+        .update(reminders)
         .set({
           isActive: false,
           updatedAt: new Date(),
         })
-        .where(eq(reminderSchedules.patientId, patient.id));
+        .where(eq(reminders.patientId, patient.id));
 
       console.log(`✅ REMINDERS: Successfully deactivated for ${patient.name}`);
     } catch (error) {
@@ -654,16 +647,18 @@ class DatabaseHandler {
   }
 
   async findRecentPendingConfirmation(patientId: string) {
+    // ReminderLogs table was removed from schema
+    // Use reminders table with confirmationStatus instead
     const recentConfirmation = await db
       .select()
-      .from(reminderLogs)
+      .from(reminders)
       .where(
         and(
-          eq(reminderLogs.patientId, patientId),
-          eq(reminderLogs.confirmationStatus, "PENDING")
+          eq(reminders.patientId, patientId),
+          eq(reminders.confirmationStatus, "PENDING")
         )
       )
-      .orderBy(desc(reminderLogs.confirmationSentAt))
+      .orderBy(desc(reminders.confirmationSentAt))
       .limit(1);
 
     return recentConfirmation[0] || null;
@@ -672,33 +667,35 @@ class DatabaseHandler {
   async updateConfirmationLog(
     confirmationId: string,
     updates: {
-      confirmationStatus: "CONFIRMED" | "MISSED" | "UNKNOWN";
+      confirmationStatus: "CONFIRMED" | "MISSED";
       confirmationResponse: string;
       confirmationResponseAt: Date;
     }
   ): Promise<void> {
+    // ReminderLogs table was removed from schema
+    // Update reminders table instead
     await db
-      .update(reminderLogs)
+      .update(reminders)
       .set(updates)
-      .where(eq(reminderLogs.id, confirmationId));
+      .where(eq(reminders.id, confirmationId));
   }
 
   private mapResponseTypeToResult(
     responseType: ResponseType,
     currentStatus: string
-  ): "verified" | "declined" | "pending_verification" {
+  ): "VERIFIED" | "DECLINED" | "PENDING" {
     switch (responseType) {
       case "unsubscribe":
-        return "declined";
+        return "DECLINED";
       case "accept":
-        return "verified";
+        return "VERIFIED";
       case "decline":
-        return "declined";
+        return "DECLINED";
       default:
         return currentStatus as
-          | "verified"
-          | "declined"
-          | "pending_verification";
+          | "VERIFIED"
+          | "DECLINED"
+          | "PENDING";
     }
   }
 }

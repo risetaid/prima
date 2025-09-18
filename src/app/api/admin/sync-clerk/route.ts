@@ -12,10 +12,10 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only developers can sync users
-    if (currentUser.role !== "DEVELOPER") {
+    // Only admins and developers can sync users
+    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
       return NextResponse.json(
-        { error: "Developer access required" },
+        { error: "Admin access required" },
         { status: 403 }
       );
     }

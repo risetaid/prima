@@ -20,7 +20,7 @@ export async function generateStaticParams() {
       .select({ slug: cmsArticles.slug })
       .from(cmsArticles)
       .where(and(
-        eq(cmsArticles.status, 'published'),
+        eq(cmsArticles.status, 'PUBLISHED'),
         isNull(cmsArticles.deletedAt)
       ))
       .limit(100) // Limit for build performance
@@ -55,7 +55,7 @@ async function getArticle(slug: string) {
     .from(cmsArticles)
     .where(and(
       eq(cmsArticles.slug, slug),
-      eq(cmsArticles.status, 'published'),
+      eq(cmsArticles.status, 'PUBLISHED'),
       isNull(cmsArticles.deletedAt)
     ))
     .limit(1)

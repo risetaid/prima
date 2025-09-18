@@ -1,5 +1,5 @@
 import { db } from '@/db'
-import { verificationLogs } from '@/db/schema'
+import { patients } from '@/db/schema'
 import { and, gte, lte, count, sql } from 'drizzle-orm'
 import { logger } from './logger'
 
@@ -35,19 +35,19 @@ export class VerificationAnalytics {
 
       const result = await db
         .select({
-          totalSent: count(sql`CASE WHEN ${verificationLogs.action} = 'sent' THEN 1 END`),
+          totalSent: count(sql`CASE WHEN ${patients.verificationSentAt} IS NOT NULL THEN 1 END`),
           totalResponses: count(
-            sql`CASE WHEN ${verificationLogs.action} = 'responded' THEN 1 END`
+            sql`CASE WHEN ${patients.verificationResponseAt} IS NOT NULL THEN 1 END`
           ),
           totalSuccess: count(
-            sql`CASE WHEN ${verificationLogs.verificationResult} = 'verified' THEN 1 END`
+            sql`CASE WHEN ${patients.verificationStatus} = 'VERIFIED' THEN 1 END`
           ),
         })
-        .from(verificationLogs)
+        .from(patients)
         .where(
           and(
-            gte(verificationLogs.createdAt, startDate),
-            lte(verificationLogs.createdAt, endDate)
+            gte(patients.createdAt, startDate),
+            lte(patients.createdAt, endDate)
           )
         )
 
@@ -88,24 +88,24 @@ export class VerificationAnalytics {
 
       const result = await db
         .select({
-          date: sql<string>`DATE(${verificationLogs.createdAt})`,
-          sent: count(sql`CASE WHEN ${verificationLogs.action} = 'sent' THEN 1 END`),
+          date: sql<string>`DATE(${patients.createdAt})`,
+          sent: count(sql`CASE WHEN ${patients.verificationSentAt} IS NOT NULL THEN 1 END`),
           responses: count(
-            sql`CASE WHEN ${verificationLogs.action} = 'responded' THEN 1 END`
+            sql`CASE WHEN ${patients.verificationResponseAt} IS NOT NULL THEN 1 END`
           ),
           success: count(
-            sql`CASE WHEN ${verificationLogs.verificationResult} = 'verified' THEN 1 END`
+            sql`CASE WHEN ${patients.verificationStatus} = 'VERIFIED' THEN 1 END`
           ),
         })
-        .from(verificationLogs)
+        .from(patients)
         .where(
           and(
-            gte(verificationLogs.createdAt, startDate),
-            lte(verificationLogs.createdAt, endDate)
+            gte(patients.createdAt, startDate),
+            lte(patients.createdAt, endDate)
           )
         )
-        .groupBy(sql`DATE(${verificationLogs.createdAt})`)
-        .orderBy(sql`DATE(${verificationLogs.createdAt})`)
+        .groupBy(sql`DATE(${patients.createdAt})`)
+        .orderBy(sql`DATE(${patients.createdAt})`)
 
       return result.map(row => ({
         date: row.date,

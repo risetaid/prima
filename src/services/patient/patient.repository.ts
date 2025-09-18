@@ -3,21 +3,14 @@
 import {
   db,
   patients,
-  patientVariables,
   healthNotes,
   users,
-  reminderLogs,
+  reminders,
   manualConfirmations,
-
-  verificationLogs,
-  reminderSchedules,
 } from "@/db";
-import type { NewVerificationLog } from "@/db";
 import { and, eq, isNull, inArray, desc, count, sql, SQL } from "drizzle-orm";
 import type { InferInsertModel } from "drizzle-orm";
 import type {
-  PatientVariableRow,
-  NewPatientVariableRow,
   PatientFilters,
 } from "./patient.types";
 import { PatientQueryBuilder } from "./patient-query-builder";
@@ -32,89 +25,11 @@ export class PatientRepository {
     return rows.length > 0;
   }
 
-  async getActiveVariables(patientId: string): Promise<PatientVariableRow[]> {
-    return await db
-      .select()
-      .from(patientVariables)
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.isActive, true),
-          isNull(patientVariables.deletedAt)
-        )
-      )
-      .orderBy(patientVariables.variableName);
-  }
 
-  async upsertVariables(
-    patientId: string,
-    variables: Record<string, string>,
-    createdById: string
-  ): Promise<void> {
-    // Read existing to decide update vs insert
-    const existing = await db
-      .select({ variableName: patientVariables.variableName })
-      .from(patientVariables)
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.isActive, true)
-        )
-      );
 
-    const existingSet = new Set(existing.map((v) => v.variableName));
-    const ops: Promise<unknown>[] = [];
 
-    for (const [name, value] of Object.entries(variables)) {
-      const val = String(value || "").trim();
-      if (!val) continue;
 
-      if (existingSet.has(name)) {
-        ops.push(
-          db
-            .update(patientVariables)
-            .set({ variableValue: val, updatedAt: new Date() })
-            .where(
-              and(
-                eq(patientVariables.patientId, patientId),
-                eq(patientVariables.variableName, name),
-                eq(patientVariables.isActive, true)
-              )
-            )
-        );
-      } else {
-        ops.push(
-          db.insert(patientVariables).values({
-            patientId,
-            variableName: name,
-            variableValue: val,
-            createdById,
-            isActive: true,
-          } as NewPatientVariableRow)
-        );
-      }
-    }
 
-    if (ops.length) await Promise.all(ops);
-  }
-
-  async softDeleteVariable(
-    patientId: string,
-    variableName: string
-  ): Promise<number> {
-    const result = await db
-      .update(patientVariables)
-      .set({ deletedAt: new Date(), updatedAt: new Date(), isActive: false })
-      .where(
-        and(
-          eq(patientVariables.patientId, patientId),
-          eq(patientVariables.variableName, variableName),
-          eq(patientVariables.isActive, true)
-        )
-      )
-      .returning({ id: patientVariables.id });
-    return result.length;
-  }
 
   // ===== Health Notes =====
   async listHealthNotes(patientId: string) {
@@ -325,12 +240,12 @@ export class PatientRepository {
     const countAutomatedTaken = async (patientId: string): Promise<number> => {
       const result = await db
         .select({ count: count() })
-        .from(reminderLogs)
+        .from(reminders)
         .where(
           and(
-            eq(reminderLogs.patientId, patientId),
-            eq(reminderLogs.confirmationStatus, "CONFIRMED"),
-            eq(reminderLogs.confirmationResponse, "SUDAH")
+            eq(reminders.patientId, patientId),
+            eq(reminders.confirmationStatus, "CONFIRMED"),
+            eq(reminders.confirmationResponse, "SUDAH")
           )
         );
       return Number(result[0]?.count || 0);
@@ -347,11 +262,11 @@ export class PatientRepository {
     const countTotalAutomated = async (patientId: string): Promise<number> => {
       const result = await db
         .select({ count: count() })
-        .from(reminderLogs)
+        .from(reminders)
         .where(
           and(
-            eq(reminderLogs.patientId, patientId),
-            eq(reminderLogs.confirmationStatus, "CONFIRMED")
+            eq(reminders.patientId, patientId),
+            eq(reminders.confirmationStatus, "CONFIRMED")
           )
         );
       return Number(result[0]?.count || 0);
@@ -416,19 +331,14 @@ export class PatientRepository {
   async getPatientReminderLogs(patientId: string) {
     return await db
       .select({
-        id: reminderLogs.id,
-        message: reminderLogs.message,
-        sentAt: reminderLogs.sentAt,
-        status: reminderLogs.status,
-
+        id: reminders.id,
+        message: reminders.message,
+        sentAt: reminders.sentAt,
+        status: reminders.status,
       })
-      .from(reminderLogs)
-      .leftJoin(
-        reminderSchedules,
-        eq(reminderLogs.reminderScheduleId, reminderSchedules.id)
-      )
-      .where(eq(reminderLogs.patientId, patientId))
-      .orderBy(desc(reminderLogs.sentAt))
+      .from(reminders)
+      .where(eq(reminders.patientId, patientId))
+      .orderBy(desc(reminders.sentAt))
       .limit(10);
   }
 
@@ -456,32 +366,10 @@ export class PatientRepository {
 
   async setAllRemindersActive(patientId: string, isActive: boolean, at: Date) {
     await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set({ isActive, updatedAt: at })
-      .where(eq(reminderSchedules.patientId, patientId));
+      .where(eq(reminders.patientId, patientId));
   }
 
-  async insertVerificationLog(values: NewVerificationLog) {
-    await db.insert(verificationLogs).values(values);
-  }
 
-  async getVerificationHistoryRows(patientId: string) {
-    return await db
-      .select({
-        id: verificationLogs.id,
-        action: verificationLogs.action,
-        messageSent: verificationLogs.messageSent,
-        patientResponse: verificationLogs.patientResponse,
-        verificationResult: verificationLogs.verificationResult,
-        createdAt: verificationLogs.createdAt,
-        processedBy: verificationLogs.processedBy,
-        volunteerFirstName: users.firstName,
-        volunteerLastName: users.lastName,
-        volunteerEmail: users.email,
-      })
-      .from(verificationLogs)
-      .leftJoin(users, eq(verificationLogs.processedBy, users.id))
-      .where(eq(verificationLogs.patientId, patientId))
-      .orderBy(desc(verificationLogs.createdAt));
-  }
 }

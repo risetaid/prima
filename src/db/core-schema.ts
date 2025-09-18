@@ -8,34 +8,14 @@ import {
   foreignKey,
 } from "drizzle-orm/pg-core";
 
-// Import enums
+// Import clean enums
 import {
   userRoleEnum,
-  cancerStageEnum,
-  medicalRecordTypeEnum,
-  frequencyEnum,
-  reminderStatusEnum,
-  confirmationStatusEnum,
-  patientConditionEnum,
-  templateCategoryEnum,
-  verificationStatusEnum,
-  contentCategoryEnum,
-  contentStatusEnum,
 } from "./enums";
 
 // Re-export enums for convenience
 export {
   userRoleEnum,
-  cancerStageEnum,
-  medicalRecordTypeEnum,
-  frequencyEnum,
-  reminderStatusEnum,
-  confirmationStatusEnum,
-  patientConditionEnum,
-  templateCategoryEnum,
-  verificationStatusEnum,
-  contentCategoryEnum,
-  contentStatusEnum,
 };
 
 // ===== CORE TABLES =====
@@ -67,17 +47,7 @@ export const users = pgTable(
     roleIdx: index("users_role_idx").on(table.role),
     isActiveIdx: index("users_is_active_idx").on(table.isActive),
     isApprovedIdx: index("users_is_approved_idx").on(table.isApproved),
-    roleActiveApprovedIdx: index("users_role_active_approved_idx").on(
-      table.role,
-      table.isActive,
-      table.isApproved
-    ),
-    clerkIdApprovedActiveIdx: index("users_clerk_approved_active_idx").on(
-      table.clerkId,
-      table.isApproved,
-      table.isActive
-    ),
-    lastLoginIdx: index("users_last_login_idx").on(table.lastLoginAt),
+    clerkIdIdx: index("users_clerk_id_idx").on(table.clerkId),
     deletedAtIdx: index("users_deleted_at_idx").on(table.deletedAt),
     // Self-reference foreign key for approvedBy
     approvedByFk: foreignKey({
@@ -87,4 +57,3 @@ export const users = pgTable(
     }),
   })
 );
-

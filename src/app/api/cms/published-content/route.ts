@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     let articles: UnifiedContent[] = []
     if (type === 'all' || type === 'article') {
       const articleConditions = [
-        eq(cmsArticles.status, 'published'),
+        eq(cmsArticles.status, 'PUBLISHED'),
         isNull(cmsArticles.deletedAt)
       ]
       
@@ -67,8 +67,8 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      if (category && ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'].includes(category)) {
-        articleConditions.push(eq(cmsArticles.category, category as 'general' | 'nutrisi' | 'olahraga' | 'motivational' | 'medical' | 'faq' | 'testimoni'))
+      if (category && ['GENERAL', 'NUTRITION', 'EXERCISE', 'MOTIVATIONAL', 'MEDICAL', 'FAQ'].includes(category)) {
+        articleConditions.push(eq(cmsArticles.category, category as 'GENERAL' | 'NUTRITION' | 'EXERCISE' | 'MOTIVATIONAL' | 'MEDICAL' | 'FAQ'))
       }
 
       const articleResults = await db
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     let videos: UnifiedContent[] = []
     if (type === 'all' || type === 'video') {
       const videoConditions = [
-        eq(cmsVideos.status, 'published'),
+        eq(cmsVideos.status, 'PUBLISHED'),
         isNull(cmsVideos.deletedAt)
       ]
       
@@ -123,8 +123,8 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      if (category && ['general', 'nutrisi', 'olahraga', 'motivational', 'medical', 'faq', 'testimoni'].includes(category)) {
-        videoConditions.push(eq(cmsVideos.category, category as 'general' | 'nutrisi' | 'olahraga' | 'motivational' | 'medical' | 'faq' | 'testimoni'))
+      if (category && ['GENERAL', 'NUTRITION', 'EXERCISE', 'MOTIVATIONAL', 'MEDICAL', 'FAQ'].includes(category)) {
+        videoConditions.push(eq(cmsVideos.category, category as 'GENERAL' | 'NUTRITION' | 'EXERCISE' | 'MOTIVATIONAL' | 'MEDICAL' | 'FAQ'))
       }
 
       const videoResults = await db
@@ -174,13 +174,13 @@ export async function GET(request: NextRequest) {
       .slice(0, limit)
 
     // Get total counts for pagination
-    const totalArticles = type === 'all' || type === 'article' ? 
+    const totalArticles = type === 'all' || type === 'article' ?
       await db.select().from(cmsArticles)
-        .where(and(eq(cmsArticles.status, 'published'), isNull(cmsArticles.deletedAt))) : []
-    
+        .where(and(eq(cmsArticles.status, 'PUBLISHED'), isNull(cmsArticles.deletedAt))) : []
+
     const totalVideos = type === 'all' || type === 'video' ?
       await db.select().from(cmsVideos)
-        .where(and(eq(cmsVideos.status, 'published'), isNull(cmsVideos.deletedAt))) : []
+        .where(and(eq(cmsVideos.status, 'PUBLISHED'), isNull(cmsVideos.deletedAt))) : []
 
     const totalCount = totalArticles.length + totalVideos.length
     const hasMore = offset + limit < totalCount

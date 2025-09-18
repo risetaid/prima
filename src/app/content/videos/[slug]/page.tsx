@@ -19,7 +19,7 @@ export async function generateStaticParams() {
       .select({ slug: cmsVideos.slug })
       .from(cmsVideos)
       .where(and(
-        eq(cmsVideos.status, 'published'),
+        eq(cmsVideos.status, 'PUBLISHED'),
         isNull(cmsVideos.deletedAt)
       ))
       .limit(100) // Limit for build performance
@@ -39,7 +39,7 @@ async function getVideo(slug: string) {
     .from(cmsVideos)
     .where(and(
       eq(cmsVideos.slug, slug),
-      eq(cmsVideos.status, 'published'),
+      eq(cmsVideos.status, 'PUBLISHED'),
       isNull(cmsVideos.deletedAt)
     ))
     .limit(1)

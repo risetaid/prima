@@ -6,9 +6,7 @@ import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 import {
   db,
   patients,
-  reminderSchedules,
-  reminderLogs,
-  reminderContentAttachments,
+  reminders,
   cmsArticles,
   cmsVideos,
 } from "@/db";
@@ -49,19 +47,6 @@ type ValidatedContent = {
   url: string;
 };
 
-type ReminderSchedule = {
-  id: string;
-  patientId: string;
-  scheduledTime: string;
-  frequency: string;
-  startDate: Date;
-  endDate: Date | null;
-  customMessage: string | null;
-  isActive: boolean;
-  createdById: string;
-  createdAt: Date;
-  updatedAt: Date;
-};
 
 export async function GET(
   request: NextRequest,
@@ -84,35 +69,34 @@ export async function GET(
     );
 
     // Get reminders for patient with patient info
-    const reminders = await db
+    const patientReminders = await db
       .select({
         // Reminder fields
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
-        frequency: reminderSchedules.frequency,
-        startDate: reminderSchedules.startDate,
-        endDate: reminderSchedules.endDate,
-        customMessage: reminderSchedules.customMessage,
-        isActive: reminderSchedules.isActive,
-        createdById: reminderSchedules.createdById,
-        createdAt: reminderSchedules.createdAt,
-        updatedAt: reminderSchedules.updatedAt,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        endDate: reminders.endDate,
+        customMessage: reminders.message,
+        isActive: reminders.isActive,
+        createdById: reminders.createdById,
+        createdAt: reminders.createdAt,
+        updatedAt: reminders.updatedAt,
         // Patient fields
         patientName: patients.name,
         patientPhoneNumber: patients.phoneNumber,
       })
-      .from(reminderSchedules)
-      .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
-      .where(eq(reminderSchedules.patientId, id))
-      .orderBy(desc(reminderSchedules.createdAt));
+      .from(reminders)
+      .leftJoin(patients, eq(reminders.patientId, patients.id))
+      .where(eq(reminders.patientId, id))
+      .orderBy(desc(reminders.createdAt));
 
     // Format response to match Prisma structure
-    const formattedReminders = reminders.map((reminder) => ({
+    const formattedReminders = patientReminders.map((reminder) => ({
       id: reminder.id,
       patientId: reminder.patientId,
       scheduledTime: reminder.scheduledTime,
-      frequency: reminder.frequency,
+      frequency: "DAILY", // Default frequency for new schema
       startDate: reminder.startDate,
       endDate: reminder.endDate,
       customMessage: reminder.customMessage,
@@ -184,7 +168,7 @@ export async function POST(
     const patient = patientResult[0];
 
     // Validate input and generate schedules data
-    const { message, time, datesToSchedule, validatedContent, isCustomRecurrence } =
+    const { message, time, datesToSchedule, validatedContent } =
       await validateReminderInput(requestBody, patient);
 
     // Create reminder schedules
@@ -194,8 +178,7 @@ export async function POST(
       time,
       datesToSchedule,
       validatedContent,
-      user.id,
-      isCustomRecurrence
+      user.id
     );
 
     // Handle immediate reminders if any should be sent now
@@ -209,7 +192,7 @@ export async function POST(
         startDate: s.startDate,
         scheduledTime: s.scheduledTime,
       })),
-      recurrenceType: isCustomRecurrence ? "custom" : "manual",
+      recurrenceType: "manual", // Simplified for now
     });
   } catch (error) {
     if (error instanceof ValidationError) {
@@ -257,12 +240,10 @@ async function validateReminderInput(requestBody: { message: string; time: strin
     throw new ValidationError("Missing required fields: message and time");
   }
 
-  let isCustomRecurrence = false;
   let datesToSchedule: string[] = [];
 
   // Validate input based on recurrence type
   if (customRecurrence) {
-    isCustomRecurrence = true;
     if (!customRecurrence.frequency || !customRecurrence.interval) {
       throw new ValidationError("Invalid custom recurrence configuration");
     }
@@ -310,7 +291,7 @@ async function validateReminderInput(requestBody: { message: string; time: strin
     }
   }
 
-  return { message, time, datesToSchedule, validatedContent, isCustomRecurrence };
+  return { message, time, datesToSchedule, validatedContent };
 }
 
 async function createReminderSchedules(
@@ -319,8 +300,7 @@ async function createReminderSchedules(
   time: string,
   datesToSchedule: string[],
   validatedContent: ValidatedContent[],
-  userId: string,
-  isCustomRecurrence: boolean
+  userId: string
 ) {
   const createdSchedules = [];
 
@@ -332,38 +312,38 @@ async function createReminderSchedules(
       continue; // Skip invalid dates
     }
 
-    const reminderScheduleResult = await db
-      .insert(reminderSchedules)
+    const reminderResult = await db
+      .insert(reminders)
       .values({
         patientId,
         scheduledTime: time,
-        frequency: isCustomRecurrence ? "CUSTOM_RECURRENCE" : "CUSTOM",
+        reminderType: "MEDICATION", // Default type
+        message: message,
         startDate: reminderDate,
-        endDate: reminderDate, // Each schedule has its own single date
+        endDate: reminderDate, // Each reminder has its own single date
         isActive: true,
-        customMessage: message,
         createdById: userId,
       })
       .returning();
 
-    const reminderSchedule = reminderScheduleResult[0];
+    const reminder = reminderResult[0];
 
-    createdSchedules.push(reminderSchedule);
+    createdSchedules.push(reminder);
 
-    // Create content attachments if provided
+    // Note: Content attachments are not supported in the new schema
+    // The medication details can be stored in the medicationDetails JSON field
     if (validatedContent.length > 0) {
-      for (let i = 0; i < validatedContent.length; i++) {
-        const content = validatedContent[i];
-        await db.insert(reminderContentAttachments).values({
-          reminderScheduleId: reminderSchedule.id,
-          contentType: content.type,
-          contentId: content.id,
-          contentTitle: content.title,
-          contentUrl: content.url,
-          attachmentOrder: i + 1,
-          createdBy: userId,
-        });
-      }
+      // Update reminder with medication details
+      await db.update(reminders).set({
+        medicationDetails: {
+          content: validatedContent,
+          attachments: validatedContent.map(content => ({
+            id: content.id,
+            type: content.type,
+            title: content.title || 'Untitled',
+          }))
+        }
+      }).where(eq(reminders.id, reminder.id));
     }
   }
 
@@ -371,7 +351,11 @@ async function createReminderSchedules(
 }
 
 async function sendImmediateReminders(
-  createdSchedules: ReminderSchedule[],
+  createdSchedules: Array<{
+    id: string;
+    startDate: Date;
+    [key: string]: unknown;
+  }>,
   patient: Patient,
   message: string,
   validatedContent: ValidatedContent[],
@@ -391,19 +375,15 @@ async function sendImmediateReminders(
         body: enhancedMessage,
       });
 
-      // Log the reminder
-      const status: "DELIVERED" | "FAILED" = result.success ? "DELIVERED" : "FAILED";
-      const logData = {
-        reminderScheduleId: schedule.id,
-        patientId: patient.id,
-        sentAt: getWIBTime(),
-        status,
-        message,
-        phoneNumber: patient.phoneNumber,
-        fonnteMessageId: result.messageId,
-      };
+      // Update reminder with sent status
+      const status: "SENT" | "FAILED" = result.success ? "SENT" : "FAILED";
 
-      await db.insert(reminderLogs).values(logData);
+      await db.update(reminders).set({
+        sentAt: getWIBTime(),
+        status: status,
+        fonnteMessageId: result.messageId,
+        updatedAt: getWIBTime(),
+      }).where(eq(reminders.id, schedule.id));
 
       // Invalidate cache after creating reminder log
       await invalidateCache(CACHE_KEYS.reminderStats(patient.id));
@@ -550,7 +530,7 @@ async function validateContentAttachments(
           .where(
             and(
               eq(cmsArticles.id, content.id),
-              eq(cmsArticles.status, "published"),
+              eq(cmsArticles.status, "PUBLISHED"),
               isNull(cmsArticles.deletedAt)
             )
           )
@@ -587,7 +567,7 @@ async function validateContentAttachments(
           .where(
             and(
               eq(cmsVideos.id, content.id),
-              eq(cmsVideos.status, "published"),
+              eq(cmsVideos.status, "PUBLISHED"),
               isNull(cmsVideos.deletedAt)
             )
           )

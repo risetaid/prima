@@ -1,5 +1,5 @@
 // Patient Query Builder - Consolidates common patient query patterns
-import { db, patients, users, reminderSchedules, medicalRecords, manualConfirmations, verificationLogs } from "@/db";
+import { db, patients, users, reminders, medicalRecords, manualConfirmations } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
 
 export class PatientQueryBuilder {
@@ -51,29 +51,28 @@ export class PatientQueryBuilder {
 
 
 
-  // ===== PATIENT REMINDER SCHEDULES WITH CREATOR =====
+  // ===== PATIENT REMINDERS WITH CREATOR =====
   static async getPatientRemindersWithCreator(patientId: string, limit?: number) {
     const query = db
       .select({
-        id: reminderSchedules.id,
-
-        scheduledTime: reminderSchedules.scheduledTime,
-        isActive: reminderSchedules.isActive,
-        createdAt: reminderSchedules.createdAt,
+        id: reminders.id,
+        scheduledTime: reminders.scheduledTime,
+        isActive: reminders.isActive,
+        createdAt: reminders.createdAt,
         creatorId: users.id,
         creatorFirstName: users.firstName,
         creatorLastName: users.lastName,
         creatorHospitalName: users.hospitalName,
       })
-      .from(reminderSchedules)
-      .leftJoin(users, eq(reminderSchedules.createdById, users.id))
+      .from(reminders)
+      .leftJoin(users, eq(reminders.createdById, users.id))
       .where(
         and(
-          eq(reminderSchedules.patientId, patientId),
-          eq(reminderSchedules.isActive, true)
+          eq(reminders.patientId, patientId),
+          eq(reminders.isActive, true)
         )
       )
-      .orderBy(desc(reminderSchedules.createdAt));
+      .orderBy(desc(reminders.createdAt));
 
     if (limit) {
       query.limit(limit);
@@ -136,26 +135,7 @@ export class PatientQueryBuilder {
     return await query;
   }
 
-  // ===== PATIENT VERIFICATION HISTORY WITH PROCESSOR =====
-  static async getPatientVerificationHistoryWithProcessor(patientId: string) {
-    return await db
-      .select({
-        id: verificationLogs.id,
-        action: verificationLogs.action,
-        messageSent: verificationLogs.messageSent,
-        patientResponse: verificationLogs.patientResponse,
-        verificationResult: verificationLogs.verificationResult,
-        createdAt: verificationLogs.createdAt,
-        processedBy: verificationLogs.processedBy,
-        processorFirstName: users.firstName,
-        processorLastName: users.lastName,
-        processorEmail: users.email,
-      })
-      .from(verificationLogs)
-      .leftJoin(users, eq(verificationLogs.processedBy, users.id))
-      .where(eq(verificationLogs.patientId, patientId))
-      .orderBy(desc(verificationLogs.createdAt));
-  }
+
 
   // ===== COMPREHENSIVE PATIENT AUTOFILL DATA =====
   static async getPatientAutofillData(patientId: string) {

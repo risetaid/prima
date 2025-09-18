@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
           return; // User already exists, skip creation
         }
 
-        // Check if this is the first user (should be developer) - within transaction
+        // Check if this is the first user (should be admin) - within transaction
         const userCountResult = await tx
           .select({ count: count(users.id) })
           .from(users);
@@ -86,13 +86,13 @@ export async function POST(request: NextRequest) {
           email: email_addresses[0]?.email_address || "",
           firstName: first_name || "",
           lastName: last_name || "",
-          role: isFirstUser ? "DEVELOPER" : "RELAWAN",
+          role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser, // First user auto-approved
           approvedAt: isFirstUser ? new Date() : null,
         });
 
         console.log(`User ${id} created successfully via webhook`, {
-          role: isFirstUser ? "DEVELOPER" : "RELAWAN",
+          role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser,
           webhook: true,
         });

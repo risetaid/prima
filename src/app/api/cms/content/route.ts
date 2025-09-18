@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
       if (status !== "all") {
         articleConditions.push(
-          eq(cmsArticles.status, status as "draft" | "published" | "archived")
+          eq(cmsArticles.status, status as "DRAFT" | "PUBLISHED" | "ARCHIVED")
         );
       }
 
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
       if (status !== "all") {
         videoConditions.push(
-          eq(cmsVideos.status, status as "draft" | "published" | "archived")
+          eq(cmsVideos.status, status as "DRAFT" | "PUBLISHED" | "ARCHIVED")
         );
       }
 
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
           .from(cmsArticles)
           .where(
             and(
-              eq(cmsArticles.status, "published"),
+              eq(cmsArticles.status, "PUBLISHED"),
               isNull(cmsArticles.deletedAt)
             )
           ),
@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
           .select({ count: count() })
           .from(cmsArticles)
           .where(
-            and(eq(cmsArticles.status, "draft"), isNull(cmsArticles.deletedAt))
+            and(eq(cmsArticles.status, "DRAFT"), isNull(cmsArticles.deletedAt))
           ),
 
         // Video stats (exclude deleted)
@@ -181,13 +181,13 @@ export async function GET(request: NextRequest) {
           .select({ count: count() })
           .from(cmsVideos)
           .where(
-            and(eq(cmsVideos.status, "published"), isNull(cmsVideos.deletedAt))
+            and(eq(cmsVideos.status, "PUBLISHED"), isNull(cmsVideos.deletedAt))
           ),
         db
           .select({ count: count() })
           .from(cmsVideos)
           .where(
-            and(eq(cmsVideos.status, "draft"), isNull(cmsVideos.deletedAt))
+            and(eq(cmsVideos.status, "DRAFT"), isNull(cmsVideos.deletedAt))
           ),
       ]);
       logger.info("CMS statistics queries completed successfully", {

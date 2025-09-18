@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients, reminderSchedules, verificationLogs } from '@/db'
+import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 import { invalidateAfterPatientOperation } from '@/lib/cache-invalidation'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
@@ -33,23 +33,14 @@ export async function POST(
 
     // Update patient status to declined + inactive
     await db.update(patients).set({
-      verificationStatus: 'declined',
+      verificationStatus: 'DECLINED',
       isActive: false,
       verificationResponseAt: new Date(),
       updatedAt: new Date()
     }).where(eq(patients.id, patientId))
 
-    // Deactivate all reminders
-    await db.update(reminderSchedules).set({ isActive: false, updatedAt: new Date() }).where(eq(reminderSchedules.patientId, patientId))
-
-    // Log action
-    await db.insert(verificationLogs).values({
-      patientId: patientId,
-      action: 'manual_unsubscribe',
-      patientResponse: 'BERHENTI (by volunteer)',
-      verificationResult: 'declined',
-      processedBy: user.id
-    })
+    // DISABLED: Reminder deactivation - reminderSchedules table removed in schema cleanup
+    // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
 
     // Send WhatsApp ACK
     try {

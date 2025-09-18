@@ -5,7 +5,7 @@
  */
 
 import { logger } from "@/lib/logger";
-import { db, cmsArticles, patients, medicationSchedules } from "@/db";
+import { db, cmsArticles, patients, medicalRecords } from "@/db";
 import { eq, and, isNull, ilike, desc, or } from "drizzle-orm";
 import { ConversationContext } from "@/services/llm/llm.types";
 import { contentCategoryEnum } from "@/db/enums";
@@ -269,30 +269,65 @@ export class HealthEducationService {
     engagementLevel: "high" | "medium" | "low";
   }> {
     try {
-      // Get patient medications to infer conditions
-      const medications = await db
+      // Get patient medical records to infer conditions and medications
+      const patientMedicalRecords = await db
         .select({
-          medicationName: medicationSchedules.medicationName,
-          frequency: medicationSchedules.frequency,
-          isActive: medicationSchedules.isActive
+          title: medicalRecords.title,
+          description: medicalRecords.description,
+          recordType: medicalRecords.recordType
         })
-        .from(medicationSchedules)
+        .from(medicalRecords)
         .where(
           and(
-            eq(medicationSchedules.patientId, patientId),
-            eq(medicationSchedules.isActive, true),
-            isNull(medicationSchedules.deletedAt)
+            eq(medicalRecords.patientId, patientId),
+            or(
+              eq(medicalRecords.recordType, "TREATMENT" as const),
+              eq(medicalRecords.recordType, "DIAGNOSIS" as const)
+            )
           )
-        );
+        )
+        .orderBy(desc(medicalRecords.recordedDate))
+        .limit(10);
 
-      // Extract conditions from medications (simplified)
-      const activeConditions = this.inferConditionsFromMedications(
-        medications.map(m => m.medicationName)
-      );
+      // Extract medications and conditions from medical records
+      const medications: string[] = [];
+      const conditions: string[] = [];
+
+      for (const record of patientMedicalRecords) {
+        const content = `${record.title} ${record.description}`.toLowerCase();
+
+        // Extract medication names (simplified pattern matching)
+        const medicationPatterns = [
+          /\b(metformin|insulin|amlodipine|lisinopril|salbutamol|paracetamol)\b/gi
+        ];
+
+        for (const pattern of medicationPatterns) {
+          const matches = content.match(pattern);
+          if (matches) {
+            medications.push(...matches);
+          }
+        }
+
+        // Extract conditions
+        const conditionPatterns = [
+          /\b(diabetes|hypertension|asthma|cancer|chronic pain)\b/gi
+        ];
+
+        for (const pattern of conditionPatterns) {
+          const matches = content.match(pattern);
+          if (matches) {
+            conditions.push(...matches);
+          }
+        }
+      }
+
+      // Remove duplicates
+      const uniqueMedications = [...new Set(medications)];
+      const uniqueConditions = [...new Set(conditions)];
 
       return {
-        activeConditions,
-        medications: medications.map(m => m.medicationName),
+        activeConditions: uniqueConditions,
+        medications: uniqueMedications,
         recentTopics: [],
         engagementLevel: "medium" // Default, would be calculated from historical data
       };
@@ -430,9 +465,9 @@ export class HealthEducationService {
         .where(
           and(
             isNull(cmsArticles.deletedAt),
-            eq(cmsArticles.status, "published"),
+            eq(cmsArticles.status, "PUBLISHED"),
             // Prefer patient's preferred categories
-            ...relevantCategories.map(cat => eq(cmsArticles.category, cat as ContentCategory))
+            or(...relevantCategories.map(cat => eq(cmsArticles.category, cat as ContentCategory)))
           )
         )
         .orderBy(desc(cmsArticles.publishedAt))
@@ -519,7 +554,7 @@ export class HealthEducationService {
         .where(
           and(
             isNull(cmsArticles.deletedAt),
-            eq(cmsArticles.status, "published"),
+            eq(cmsArticles.status, "PUBLISHED"),
             or(
               eq(cmsArticles.category, trigger as ContentCategory),
               ilike(cmsArticles.tags, `%${trigger}%`)
@@ -566,7 +601,7 @@ export class HealthEducationService {
         .where(
           and(
             isNull(cmsArticles.deletedAt),
-            eq(cmsArticles.status, "published"),
+            eq(cmsArticles.status, "PUBLISHED"),
             or(
               eq(cmsArticles.category, topic as ContentCategory),
               ilike(cmsArticles.tags, `%${topic}%`)
@@ -613,7 +648,7 @@ export class HealthEducationService {
         .where(
           and(
             isNull(cmsArticles.deletedAt),
-            eq(cmsArticles.status, "published"),
+            eq(cmsArticles.status, "PUBLISHED"),
             eq(cmsArticles.category, category as ContentCategory)
           )
         )

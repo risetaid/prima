@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminderLogs, reminderSchedules, manualConfirmations } from "@/db";
+import { db, reminders, manualConfirmations } from "@/db";
 import {
   eq,
   and,
@@ -8,8 +8,6 @@ import {
   gte,
   lte,
   notExists,
-  isNull,
-  inArray,
 } from "drizzle-orm";
 
 export async function GET(
@@ -33,15 +31,15 @@ export async function GET(
 
     // Build where conditions with proper logic
     const whereConditions = [
-      eq(reminderLogs.patientId, id),
-      // Show SENT or DELIVERED reminders that haven't been confirmed yet
-      inArray(reminderLogs.status, ["SENT", "DELIVERED"]),
+      eq(reminders.patientId, id),
+      // Show SENT reminders that haven't been confirmed yet
+      eq(reminders.status, "SENT"),
       // Must not have manual confirmation
       notExists(
         db
           .select()
           .from(manualConfirmations)
-          .where(eq(manualConfirmations.reminderLogId, reminderLogs.id))
+          .where(eq(manualConfirmations.reminderId, reminders.id))
       ),
     ];
 
@@ -61,38 +59,28 @@ export async function GET(
       }
 
       const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
-      whereConditions.push(gte(reminderLogs.sentAt, startOfDay));
-      whereConditions.push(lte(reminderLogs.sentAt, endOfDay));
+      whereConditions.push(gte(reminders.sentAt, startOfDay));
+      whereConditions.push(lte(reminders.sentAt, endOfDay));
     }
 
-    // Get reminder logs that are SENT or DELIVERED but don't have manual confirmation yet
-    // Only for active (non-deleted) schedules
+    // Get reminders that are SENT but don't have manual confirmation yet
     const pendingReminders = await db
       .select({
-        id: reminderLogs.id,
-        reminderScheduleId: reminderLogs.reminderScheduleId,
-        sentAt: reminderLogs.sentAt,
-        message: reminderLogs.message,
+        id: reminders.id,
+        sentAt: reminders.sentAt,
+        message: reminders.message,
         // Automated confirmation fields
-        confirmationStatus: reminderLogs.confirmationStatus,
-        confirmationResponse: reminderLogs.confirmationResponse,
-        confirmationResponseAt: reminderLogs.confirmationResponseAt,
-        confirmationSentAt: reminderLogs.confirmationSentAt,
-        // Schedule fields
-        scheduledTime: reminderSchedules.scheduledTime,
-        customMessage: reminderSchedules.customMessage,
+        confirmationStatus: reminders.confirmationStatus,
+        confirmationResponse: reminders.confirmationResponse,
+        confirmationResponseAt: reminders.confirmationResponseAt,
+        confirmationSentAt: reminders.confirmationSentAt,
+        // Schedule fields from reminders table
+        scheduledTime: reminders.scheduledTime,
+        customMessage: reminders.message,
       })
-      .from(reminderLogs)
-      .innerJoin(
-        reminderSchedules,
-        and(
-          eq(reminderLogs.reminderScheduleId, reminderSchedules.id),
-          isNull(reminderSchedules.deletedAt), // Only active schedules
-          eq(reminderSchedules.isActive, true) // Extra safety
-        )
-      )
+      .from(reminders)
       .where(and(...whereConditions))
-      .orderBy(desc(reminderLogs.sentAt))
+      .orderBy(desc(reminders.sentAt))
       .offset(offset)
       .limit(limit);
 
@@ -100,7 +88,7 @@ export async function GET(
     const formattedReminders = pendingReminders.map((reminder) => ({
       id: reminder.id,
       scheduledTime: reminder.scheduledTime || "12:00",
-      sentDate: reminder.sentAt.toISOString().split("T")[0],
+      sentDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       customMessage: reminder.customMessage || reminder.message,
       status: "PENDING_UPDATE",
       // Include automated confirmation fields for UI to handle properly

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminderSchedules, reminderLogs, manualConfirmations } from "@/db";
+import { db, reminders, manualConfirmations } from "@/db";
 import { eq, and, desc, isNull, inArray } from "drizzle-orm";
 
 import {
@@ -44,49 +44,44 @@ export async function GET(
     // Get all active reminder schedules for this patient
     const allSchedules = await db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        startDate: reminderSchedules.startDate,
-        scheduledTime: reminderSchedules.scheduledTime,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        startDate: reminders.startDate,
+        scheduledTime: reminders.scheduledTime,
       })
-      .from(reminderSchedules)
+      .from(reminders)
       .where(
         and(
-          eq(reminderSchedules.patientId, id),
-          eq(reminderSchedules.isActive, true),
-          isNull(reminderSchedules.deletedAt)
+          eq(reminders.patientId, id),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
         )
       );
 
-    // Get all reminder logs for these schedules (only for active schedules)
+    // Get all reminders with their status (replaces reminder logs)
     const allLogs = await db
       .select({
-        id: reminderLogs.id,
-        reminderScheduleId: reminderLogs.reminderScheduleId,
-        status: reminderLogs.status,
-        sentAt: reminderLogs.sentAt,
+        id: reminders.id,
+        reminderScheduleId: reminders.id, // Use same ID for compatibility
+        status: reminders.status,
+        sentAt: reminders.sentAt,
       })
-      .from(reminderLogs)
-      .innerJoin(
-        reminderSchedules,
-        eq(reminderLogs.reminderScheduleId, reminderSchedules.id)
-      )
+      .from(reminders)
       .where(
         and(
-          eq(reminderLogs.patientId, id),
-          inArray(reminderLogs.status, ["SENT", "DELIVERED", "FAILED"]),
-          eq(reminderSchedules.isActive, true),
-          isNull(reminderSchedules.deletedAt)
+          eq(reminders.patientId, id),
+          inArray(reminders.status, ["SENT", "DELIVERED", "FAILED"]),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
         )
       )
-      .orderBy(desc(reminderLogs.sentAt));
+      .orderBy(desc(reminders.sentAt));
 
     // Get all manual confirmations for this patient
     const allConfirmations = await db
       .select({
         id: manualConfirmations.id,
-        reminderLogId: manualConfirmations.reminderLogId,
-        reminderScheduleId: manualConfirmations.reminderScheduleId,
+        reminderId: manualConfirmations.reminderId,
         visitDate: manualConfirmations.visitDate,
       })
       .from(manualConfirmations)
@@ -101,7 +96,7 @@ export async function GET(
     for (const log of allLogs) {
       // Check if this specific log has been confirmed
       const logConfirmation = allConfirmations.find(
-        (conf) => conf.reminderLogId === log.id
+        (conf) => conf.reminderId === log.id
       );
 
       if (logConfirmation) {

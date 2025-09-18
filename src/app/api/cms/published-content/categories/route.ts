@@ -17,12 +17,12 @@ export async function GET() {
       db
         .selectDistinct({ category: cmsArticles.category })
         .from(cmsArticles)
-        .where(and(eq(cmsArticles.status, 'published'), isNull(cmsArticles.deletedAt))),
+        .where(and(eq(cmsArticles.status, 'PUBLISHED'), isNull(cmsArticles.deletedAt))),
       
       db
         .selectDistinct({ category: cmsVideos.category })
         .from(cmsVideos)
-        .where(and(eq(cmsVideos.status, 'published'), isNull(cmsVideos.deletedAt)))
+        .where(and(eq(cmsVideos.status, 'PUBLISHED'), isNull(cmsVideos.deletedAt)))
     ])
 
     const allCategories = [

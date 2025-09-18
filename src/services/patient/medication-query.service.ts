@@ -3,8 +3,9 @@
  * Handles natural language queries for patient medication information with intelligent filtering
  */
 
-import { db, medicationSchedules } from "@/db";
-import { eq, and, isNull, desc, ilike, gte, sql } from "drizzle-orm";
+import { db, reminders } from "@/db";
+import { eq, and, isNull, desc, gte, sql } from "drizzle-orm";
+import { MedicationDetails } from "@/lib/medication-parser";
 import { logger } from "@/lib/logger";
 
 export interface MedicationQuery {
@@ -57,21 +58,22 @@ export class MedicationQueryService {
 
       // Build database query with all filters
       const whereConditions = [
-        eq(medicationSchedules.patientId, patientId),
-        isNull(medicationSchedules.deletedAt)
+        eq(reminders.patientId, patientId),
+        isNull(reminders.deletedAt),
+        eq(reminders.reminderType, "MEDICATION")
       ];
 
       // Apply status filter
       if (query.timeRange === "aktif") {
-        whereConditions.push(eq(medicationSchedules.isActive, true));
+        whereConditions.push(eq(reminders.isActive, true));
       } else if (query.timeRange === "selesai" || !query.includeCompleted) {
-        whereConditions.push(eq(medicationSchedules.isActive, true));
+        whereConditions.push(eq(reminders.isActive, true));
       }
 
       // Apply medication name filter
       if (query.medicationName) {
         whereConditions.push(
-          ilike(medicationSchedules.medicationName, `%${query.medicationName}%`)
+          sql`${reminders.medicationDetails}::jsonb ->> 'name' ILIKE ${`%${query.medicationName}%`}`
         );
       }
 
@@ -79,49 +81,49 @@ export class MedicationQueryService {
       const now = new Date();
       if (query.timeRange === "hari_ini") {
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        whereConditions.push(gte(medicationSchedules.startDate, today));
+        whereConditions.push(gte(reminders.startDate, today));
       } else if (query.timeRange === "minggu_ini") {
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        whereConditions.push(gte(medicationSchedules.startDate, weekAgo));
+        whereConditions.push(gte(reminders.startDate, weekAgo));
       } else if (query.timeRange === "bulan_ini") {
         const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-        whereConditions.push(gte(medicationSchedules.startDate, monthAgo));
+        whereConditions.push(gte(reminders.startDate, monthAgo));
       }
 
       // Build and execute query
       const medicationRecords = await db
         .select({
-          id: medicationSchedules.id,
-          patientId: medicationSchedules.patientId,
-          medicationName: medicationSchedules.medicationName,
-          dosage: medicationSchedules.dosage,
-          frequency: medicationSchedules.frequency,
-          instructions: medicationSchedules.instructions,
-          startDate: medicationSchedules.startDate,
-          endDate: medicationSchedules.endDate,
-          isActive: medicationSchedules.isActive,
-                    createdAt: medicationSchedules.createdAt,
-          updatedAt: medicationSchedules.updatedAt
+          id: reminders.id,
+          patientId: reminders.patientId,
+          medicationDetails: reminders.medicationDetails,
+          startDate: reminders.startDate,
+          endDate: reminders.endDate,
+          isActive: reminders.isActive,
+          createdAt: reminders.createdAt,
+          updatedAt: reminders.updatedAt
         })
-        .from(medicationSchedules)
+        .from(reminders)
         .where(and(...whereConditions))
-        .orderBy(desc(medicationSchedules.isActive), desc(medicationSchedules.startDate))
+        .orderBy(desc(reminders.isActive), desc(reminders.startDate))
         .limit(query.limit || 10);
 
       // Get total count
       const totalCount = await this.getQueryCount(patientId, query);
 
       // Transform to MedicationInfo
-      const medicationsInfo: MedicationInfo[] = medicationRecords.map(record => ({
-        id: record.id,
-        medicationName: record.medicationName,
-        dosage: record.dosage,
-        frequency: record.frequency,
-        instructions: record.instructions || undefined,
-        startDate: record.startDate,
-        endDate: record.endDate || undefined,
-        isActive: record.isActive
-      }));
+      const medicationsInfo: MedicationInfo[] = medicationRecords.map(record => {
+        const medicationDetails = record.medicationDetails as MedicationDetails | null;
+        return {
+          id: record.id,
+          medicationName: medicationDetails?.name || "Unknown",
+          dosage: medicationDetails?.dosage || "Unknown",
+          frequency: medicationDetails?.frequency || "Unknown",
+          instructions: medicationDetails?.instructions || undefined,
+          startDate: record.startDate,
+          endDate: record.endDate || undefined,
+          isActive: record.isActive
+        };
+      });
 
       // Generate query summary
       const querySummary = this.generateQuerySummary(query, medicationsInfo.length, totalCount);
@@ -216,12 +218,13 @@ export class MedicationQueryService {
     try {
       const medication = await db
         .select()
-        .from(medicationSchedules)
+        .from(reminders)
         .where(
           and(
-            eq(medicationSchedules.id, medicationId),
-            eq(medicationSchedules.patientId, patientId),
-            isNull(medicationSchedules.deletedAt)
+            eq(reminders.id, medicationId),
+            eq(reminders.patientId, patientId),
+            eq(reminders.reminderType, "MEDICATION"),
+            isNull(reminders.deletedAt)
           )
         )
         .limit(1);
@@ -231,12 +234,13 @@ export class MedicationQueryService {
       }
 
       const record = medication[0];
+      const medicationDetails = record.medicationDetails as MedicationDetails | null;
       return {
         id: record.id,
-        medicationName: record.medicationName,
-        dosage: record.dosage,
-        frequency: record.frequency,
-        instructions: record.instructions || undefined,
+        medicationName: medicationDetails?.name || "Unknown",
+        dosage: medicationDetails?.dosage || "Unknown",
+        frequency: medicationDetails?.frequency || "Unknown",
+        instructions: medicationDetails?.instructions || undefined,
         startDate: record.startDate,
         endDate: record.endDate || undefined,
         isActive: record.isActive
@@ -256,26 +260,27 @@ export class MedicationQueryService {
   private async getQueryCount(patientId: string, query: MedicationQuery): Promise<number> {
     try {
       const whereConditions = [
-        eq(medicationSchedules.patientId, patientId),
-        isNull(medicationSchedules.deletedAt)
+        eq(reminders.patientId, patientId),
+        isNull(reminders.deletedAt),
+        eq(reminders.reminderType, "MEDICATION")
       ];
 
       // Apply same filters as main query
       if (query.timeRange === "aktif") {
-        whereConditions.push(eq(medicationSchedules.isActive, true));
+        whereConditions.push(eq(reminders.isActive, true));
       } else if (query.timeRange === "selesai" || !query.includeCompleted) {
-        whereConditions.push(eq(medicationSchedules.isActive, true));
+        whereConditions.push(eq(reminders.isActive, true));
       }
 
       if (query.medicationName) {
         whereConditions.push(
-          ilike(medicationSchedules.medicationName, `%${query.medicationName}%`)
+          sql`${reminders.medicationDetails}::jsonb ->> 'name' ILIKE ${`%${query.medicationName}%`}`
         );
       }
 
       const result = await db
         .select({ count: sql<number>`count(*)` })
-        .from(medicationSchedules)
+        .from(reminders)
         .where(and(...whereConditions));
 
       return result[0]?.count || 0;

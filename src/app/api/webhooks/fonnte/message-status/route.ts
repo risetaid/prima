@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireWebhookToken } from '@/lib/webhook-auth'
 import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
-import { db, reminderLogs } from '@/db'
+import { db, reminders } from '@/db'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
@@ -84,9 +84,9 @@ export async function POST(request: NextRequest) {
   try {
     // First get the patientId for cache invalidation
     const logData = await db
-      .select({ patientId: reminderLogs.patientId })
-      .from(reminderLogs)
-      .where(eq(reminderLogs.fonnteMessageId, id))
+      .select({ patientId: reminders.patientId })
+      .from(reminders)
+      .where(eq(reminders.fonnteMessageId, id))
       .limit(1)
 
     const updates = { status: mapped! }
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
       logger.warn('Fonnte message failed', { id, reason })
     }
 
-    await db.update(reminderLogs).set(updates).where(eq(reminderLogs.fonnteMessageId, id))
+    await db.update(reminders).set(updates).where(eq(reminders.fonnteMessageId, id))
     logger.info('Updated reminder log status from webhook', { id, mapped })
 
     // Invalidate cache if we have patientId

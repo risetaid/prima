@@ -1,9 +1,8 @@
 import { createApiHandler } from "@/lib/api-handler";
-import { db, reminderSchedules, reminderContentAttachments } from "@/db";
+import { db, reminders } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 
-import { validateContentAttachments } from "@/lib/content-validation";
 import { invalidateAfterReminderOperation } from "@/lib/cache-invalidation";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { z } from "zod";
@@ -11,15 +10,6 @@ import { z } from "zod";
 const updateReminderBodySchema = z.object({
   reminderTime: z.string().min(1, "Reminder time is required"),
   customMessage: z.string().min(1, "Custom message is required"),
-  attachedContent: z
-    .array(
-      z.object({
-        id: z.string(),
-        type: z.enum(["article", "video"]),
-        title: z.string(),
-      })
-    )
-    .optional(),
 });
 
 const updateReminderParamsSchema = z.object({
@@ -35,7 +25,7 @@ export const PUT = createApiHandler(
     params: updateReminderParamsSchema,
   },
   async (body: UpdateReminderBody, context) => {
-    const { reminderTime, customMessage, attachedContent } = body;
+    const { reminderTime, customMessage } = body;
     const { id } = context.params!;
 
     if (!reminderTime || !customMessage) {
@@ -44,38 +34,25 @@ export const PUT = createApiHandler(
       );
     }
 
-    // Validate attached content if provided
-    let validatedContent: Array<{
-      id: string;
-      type: "article" | "video";
-      title: string;
-      url: string;
-    }> = [];
-    if (
-      attachedContent &&
-      Array.isArray(attachedContent) &&
-      attachedContent.length > 0
-    ) {
-      validatedContent = await validateContentAttachments(attachedContent);
-    }
 
-    // Find the reminder schedule
-    const reminderScheduleResult = await db
+
+    // Find the reminder
+    const reminderResult = await db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
-        customMessage: reminderSchedules.customMessage,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
+        message: reminders.message,
       })
-      .from(reminderSchedules)
-      .where(eq(reminderSchedules.id, id))
+      .from(reminders)
+      .where(eq(reminders.id, id))
       .limit(1);
 
-    if (reminderScheduleResult.length === 0) {
+    if (reminderResult.length === 0) {
       throw new Error("Reminder not found");
     }
 
-    const patientId = reminderScheduleResult[0].patientId;
+    const patientId = reminderResult[0].patientId;
 
     // Check role-based access to this patient's reminder
     await requirePatientAccess(
@@ -85,45 +62,22 @@ export const PUT = createApiHandler(
       "update this patient's reminder"
     );
 
-    // Update the reminder schedule
+    // Update the reminder
     const updatedReminderResult = await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set({
         scheduledTime: reminderTime,
-        customMessage: customMessage,
+        message: customMessage,
         updatedAt: getWIBTime(),
       })
-      .where(eq(reminderSchedules.id, id))
+      .where(eq(reminders.id, id))
       .returning({
-        id: reminderSchedules.id,
-        scheduledTime: reminderSchedules.scheduledTime,
-        customMessage: reminderSchedules.customMessage,
+        id: reminders.id,
+        scheduledTime: reminders.scheduledTime,
+        message: reminders.message,
       });
 
     const updatedReminder = updatedReminderResult[0];
-
-    // Handle content attachment updates
-    if (attachedContent !== undefined) {
-      // First, remove existing attachments
-      await db
-        .delete(reminderContentAttachments)
-        .where(eq(reminderContentAttachments.reminderScheduleId, id));
-
-      // Add new attachments if any
-      if (validatedContent.length > 0) {
-        const attachmentRecords = validatedContent.map((content, index) => ({
-          reminderScheduleId: id,
-          contentType: content.type,
-          contentId: content.id,
-          contentTitle: content.title,
-          contentUrl: content.url,
-          attachmentOrder: index + 1,
-          createdBy: context.user.id,
-        }));
-
-        await db.insert(reminderContentAttachments).values(attachmentRecords);
-      }
-    }
 
     // Invalidate cache after update using systematic approach
     await invalidateAfterReminderOperation(patientId, "update");
@@ -133,8 +87,7 @@ export const PUT = createApiHandler(
       reminder: {
         id: updatedReminder.id,
         scheduledTime: updatedReminder.scheduledTime,
-        customMessage: updatedReminder.customMessage,
-        attachedContent: validatedContent,
+        customMessage: updatedReminder.message,
       },
     };
   }
@@ -149,21 +102,21 @@ export const DELETE = createApiHandler(
     const { id } = context.params!;
 
     // Check if reminder exists
-    const reminderScheduleResult = await db
+    const reminderResult = await db
       .select({
-        id: reminderSchedules.id,
-        patientId: reminderSchedules.patientId,
-        scheduledTime: reminderSchedules.scheduledTime,
+        id: reminders.id,
+        patientId: reminders.patientId,
+        scheduledTime: reminders.scheduledTime,
       })
-      .from(reminderSchedules)
-      .where(eq(reminderSchedules.id, id))
+      .from(reminders)
+      .where(eq(reminders.id, id))
       .limit(1);
 
-    if (reminderScheduleResult.length === 0) {
+    if (reminderResult.length === 0) {
       throw new Error("Reminder not found");
     }
 
-    const reminder = reminderScheduleResult[0];
+    const reminder = reminderResult[0];
 
     // Check role-based access to this patient's reminder
     await requirePatientAccess(
@@ -175,13 +128,13 @@ export const DELETE = createApiHandler(
 
     // Soft delete by setting deletedAt timestamp
     await db
-      .update(reminderSchedules)
+      .update(reminders)
       .set({
         deletedAt: getWIBTime(),
         isActive: false,
         updatedAt: getWIBTime(),
       })
-      .where(eq(reminderSchedules.id, id));
+      .where(eq(reminders.id, id));
 
     // Invalidate cache after deletion using systematic approach
     await invalidateAfterReminderOperation(reminder.patientId, "delete");

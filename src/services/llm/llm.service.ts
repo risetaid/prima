@@ -239,15 +239,18 @@ export class LLMService {
           cacheAge: Date.now() - cachedResponse.createdAt.getTime(),
         });
 
-        // Parse the cached response from JSON string
-        const parsedResponse = JSON.parse(
-          cachedResponse.response
-        ) as ProcessedLLMResponse;
+        // Parse the cached response from JSON string or object
+        const parsedResponse = typeof cachedResponse.response === 'string'
+          ? JSON.parse(cachedResponse.response)
+          : cachedResponse.response;
+
+        // Type assertion to ProcessedLLMResponse
+        const typedResponse = parsedResponse as ProcessedLLMResponse;
 
         const cachedResponseObj = {
-          content: parsedResponse.content,
-          tokensUsed: parsedResponse.tokensUsed || 0,
-          model: parsedResponse.model || this.config.model,
+          content: typedResponse.content,
+          tokensUsed: typedResponse.tokensUsed || 0,
+          model: typedResponse.model || this.config.model,
           responseTime: 0, // Cached response
           finishReason: "cached",
         };

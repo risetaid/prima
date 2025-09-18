@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -93,7 +93,7 @@ export async function GET() {
           excerpt: cmsArticles.excerpt,
         })
         .from(cmsArticles)
-        .where(eq(cmsArticles.status, "published"))
+        .where(eq(cmsArticles.status, "PUBLISHED"))
         .limit(10),
 
       db
@@ -105,7 +105,7 @@ export async function GET() {
           description: cmsVideos.description,
         })
         .from(cmsVideos)
-        .where(eq(cmsVideos.status, "published"))
+        .where(eq(cmsVideos.status, "PUBLISHED"))
         .limit(10),
     ]);
 
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

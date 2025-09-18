@@ -21,19 +21,18 @@ const updateArticleSchema = z.object({
   featuredImageUrl: z.string().url().optional().or(z.literal("")),
   category: z
     .enum([
-      "general",
-      "nutrisi",
-      "olahraga",
-      "motivational",
-      "medical",
-      "faq",
-      "testimoni",
+      "GENERAL",
+      "NUTRITION",
+      "EXERCISE",
+      "MOTIVATIONAL",
+      "MEDICAL",
+      "FAQ",
     ])
     .optional(),
   tags: z.array(z.string()).optional(),
   seoTitle: z.string().max(255).optional(),
   seoDescription: z.string().optional(),
-  status: z.enum(["draft", "published", "archived"]).optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
 });
 
 // GET - Get single article by ID
@@ -44,7 +43,7 @@ export async function GET(
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -81,7 +80,7 @@ export async function PUT(
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -128,13 +127,13 @@ export async function PUT(
       ...validatedData,
       updatedAt: new Date(),
       // Set publishedAt when status changes to published
-      ...(validatedData.status === "published" &&
-      existingArticle[0].status !== "published"
+      ...(validatedData.status === "PUBLISHED" &&
+      existingArticle[0].status !== "PUBLISHED"
         ? { publishedAt: new Date() }
         : {}),
       // Clear publishedAt when status changes from published
-      ...(validatedData.status !== "published" &&
-      existingArticle[0].status === "published"
+      ...(validatedData.status !== "PUBLISHED" &&
+      existingArticle[0].status === "PUBLISHED"
         ? { publishedAt: null }
         : {}),
     };
@@ -175,7 +174,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser();
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
+    if (!user || user.role !== "ADMIN") {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

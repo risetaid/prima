@@ -4,16 +4,13 @@
  */
 
 import { db } from "@/db";
-import { 
-  analyticsEvents, 
-  performanceMetrics, 
-  systemHealthMetrics,
+import {
   patients,
   conversationMessages,
   conversationStates,
-  reminderLogs
+  reminders,
 } from "@/db/schema";
-import { and, gte, lte, sql, count, avg, desc, eq, ilike } from "drizzle-orm";
+import { and, gte, lte, sql, count, avg, eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 
 export interface TimeSeriesData {
@@ -158,7 +155,7 @@ export class AnalyticsService {
    * Get time series data
    */
   private async getTimeSeriesData(start: Date, end: Date) {
-    const [patientGrowth, messageVolume, responseTimes, systemHealth] = await Promise.all([
+    const [patientGrowth, messageVolume, responseTimes] = await Promise.all([
       // Patient growth over time
       db.select({
         date: sql<string>`DATE(${patients.createdAt})`,
@@ -170,7 +167,7 @@ export class AnalyticsService {
           sql`${patients.deletedAt} IS NULL`
         )
       ).groupBy(sql`DATE(${patients.createdAt})`).orderBy(sql`DATE(${patients.createdAt})`),
-      
+
       // Message volume over time
       db.select({
         date: sql<string>`DATE(${conversationMessages.createdAt})`,
@@ -181,7 +178,7 @@ export class AnalyticsService {
           lte(conversationMessages.createdAt, end)
         )
       ).groupBy(sql`DATE(${conversationMessages.createdAt})`).orderBy(sql`DATE(${conversationMessages.createdAt})`),
-      
+
       // Response times over time
       db.select({
         date: sql<string>`DATE(${conversationMessages.createdAt})`,
@@ -192,38 +189,23 @@ export class AnalyticsService {
           lte(conversationMessages.createdAt, end),
           sql`${conversationMessages.llmResponseTimeMs} IS NOT NULL`
         )
-      ).groupBy(sql`DATE(${conversationMessages.createdAt})`).orderBy(sql`DATE(${conversationMessages.createdAt})`),
-      
-      // System health metrics
-      db.select({
-        date: sql<string>`DATE(${systemHealthMetrics.timestamp})`,
-        avgHealth: avg(sql`CAST(${systemHealthMetrics.value} AS FLOAT)`)
-      }).from(systemHealthMetrics).where(
-        and(
-          gte(systemHealthMetrics.timestamp, start),
-          lte(systemHealthMetrics.timestamp, end),
-          eq(systemHealthMetrics.metricName, 'cpu_usage')
-        )
-      ).groupBy(sql`DATE(${systemHealthMetrics.timestamp})`).orderBy(sql`DATE(${systemHealthMetrics.timestamp})`)
+      ).groupBy(sql`DATE(${conversationMessages.createdAt})`).orderBy(sql`DATE(${conversationMessages.createdAt})`)
     ]);
 
     return {
-      patientGrowth: patientGrowth.map(p => ({ 
-        timestamp: p.date, 
-        value: Number(p.count) 
+      patientGrowth: patientGrowth.map(p => ({
+        timestamp: p.date,
+        value: Number(p.count)
       })),
-      messageVolume: messageVolume.map(m => ({ 
-        timestamp: m.date, 
-        value: Number(m.count) 
+      messageVolume: messageVolume.map(m => ({
+        timestamp: m.date,
+        value: Number(m.count)
       })),
-      responseTimes: responseTimes.map(r => ({ 
-        timestamp: r.date, 
-        value: Number(r.avgTime) || 0 
+      responseTimes: responseTimes.map(r => ({
+        timestamp: r.date,
+        value: Number(r.avgTime) || 0
       })),
-      systemHealth: systemHealth.map(s => ({ 
-        timestamp: s.date, 
-        value: Number(s.avgHealth) || 0 
-      }))
+      systemHealth: [] // System health metrics table removed
     };
   }
 
@@ -256,25 +238,26 @@ export class AnalyticsService {
       
       switch (cohortType) {
         case 'verification':
-          cohortPatients = await db.select({ id: patients.id }).from(patients).where(
-            and(
-              gte(patients.verificationSentAt, start),
-              lte(patients.verificationSentAt, end),
-              eq(patients.verificationStatus, 'verified')
-            )
-          );
+           cohortPatients = await db.select({ id: patients.id }).from(patients).where(
+             and(
+               gte(patients.verificationSentAt, start),
+               lte(patients.verificationSentAt, end),
+               eq(patients.verificationStatus, 'VERIFIED')
+             )
+           );
           break;
         case 'reminder':
-          cohortPatients = await db
-            .selectDistinct({ id: reminderLogs.patientId })
-            .from(reminderLogs)
-            .where(
-              and(
-                gte(reminderLogs.createdAt, start),
-                lte(reminderLogs.createdAt, end)
-              )
-            );
-          break;
+           cohortPatients = await db
+             .selectDistinct({ id: reminders.patientId })
+             .from(reminders)
+             .where(
+               and(
+                 gte(reminders.createdAt, start),
+                 lte(reminders.createdAt, end),
+                 sql`${reminders.deletedAt} IS NULL`
+               )
+             );
+           break;
         case 'engagement':
           cohortPatients = await db
             .selectDistinct({ id: conversationStates.patientId })
@@ -398,17 +381,17 @@ export class AnalyticsService {
       const periodStart = new Date(start.getTime() + i * 24 * 60 * 60 * 1000);
       const periodEnd = new Date(periodStart.getTime() + 7 * 24 * 60 * 60 * 1000);
       
-      const verificationCount = await db
-        .select({ count: count() })
-        .from(patients)
-        .where(
-          and(
-            sql`${patients.id} = ANY(${patientIds})`,
-            eq(patients.verificationStatus, 'verified'),
-            gte(patients.verificationResponseAt, periodStart),
-            lte(patients.verificationResponseAt, periodEnd)
-          )
-        );
+       const verificationCount = await db
+         .select({ count: count() })
+         .from(patients)
+         .where(
+           and(
+             sql`${patients.id} = ANY(${patientIds})`,
+             eq(patients.verificationStatus, 'VERIFIED'),
+             gte(patients.verificationResponseAt, periodStart),
+             lte(patients.verificationResponseAt, periodEnd)
+           )
+         );
       
       const conversionRate = patientIds.length > 0 
         ? (Number(verificationCount[0].count) / patientIds.length) * 100 
@@ -445,107 +428,37 @@ export class AnalyticsService {
    * Get performance data
    */
   private async getPerformanceData(start: Date, end: Date) {
-    const [apiResponseTimes, databaseQueryTimes, llmResponseTimes, errorRates] = await Promise.all([
-      // API response times
-      db.select({
-        timestamp: sql<string>`DATE(${performanceMetrics.timestamp})`,
-        avgValue: avg(performanceMetrics.value)
-      }).from(performanceMetrics).where(
-        and(
-          gte(performanceMetrics.timestamp, start),
-          lte(performanceMetrics.timestamp, end),
-          eq(performanceMetrics.metricType, 'api_response_time')
-        )
-      ).groupBy(sql`DATE(${performanceMetrics.timestamp})`).orderBy(sql`DATE(${performanceMetrics.timestamp})`),
-      
-      // Database query times
-      db.select({
-        timestamp: sql<string>`DATE(${performanceMetrics.timestamp})`,
-        avgValue: avg(performanceMetrics.value)
-      }).from(performanceMetrics).where(
-        and(
-          gte(performanceMetrics.timestamp, start),
-          lte(performanceMetrics.timestamp, end),
-          eq(performanceMetrics.metricType, 'db_query_time')
-        )
-      ).groupBy(sql`DATE(${performanceMetrics.timestamp})`).orderBy(sql`DATE(${performanceMetrics.timestamp})`),
-      
-      // LLM response times
-      db.select({
-        timestamp: sql<string>`DATE(${conversationMessages.createdAt})`,
-        avgValue: avg(conversationMessages.llmResponseTimeMs)
-      }).from(conversationMessages).where(
-        and(
-          gte(conversationMessages.createdAt, start),
-          lte(conversationMessages.createdAt, end),
-          sql`${conversationMessages.llmResponseTimeMs} IS NOT NULL`
-        )
-      ).groupBy(sql`DATE(${conversationMessages.createdAt})`).orderBy(sql`DATE(${conversationMessages.createdAt})`),
-      
-      // Error rates
-      db.select({
-        timestamp: sql<string>`DATE(${analyticsEvents.timestamp})`,
-        errorCount: count()
-      }).from(analyticsEvents).where(
-        and(
-          gte(analyticsEvents.timestamp, start),
-          lte(analyticsEvents.timestamp, end),
-          ilike(analyticsEvents.eventName, '%error%')
-        )
-      ).groupBy(sql`DATE(${analyticsEvents.timestamp})`).orderBy(sql`DATE(${analyticsEvents.timestamp})`)
-    ]);
+    // LLM response times from conversation messages
+    const llmResponseTimes = await db.select({
+      timestamp: sql<string>`DATE(${conversationMessages.createdAt})`,
+      avgValue: avg(conversationMessages.llmResponseTimeMs)
+    }).from(conversationMessages).where(
+      and(
+        gte(conversationMessages.createdAt, start),
+        lte(conversationMessages.createdAt, end),
+        sql`${conversationMessages.llmResponseTimeMs} IS NOT NULL`
+      )
+    ).groupBy(sql`DATE(${conversationMessages.createdAt})`).orderBy(sql`DATE(${conversationMessages.createdAt})`);
 
+    // For other performance metrics, return empty arrays since performanceMetrics table was removed
     return {
-      apiResponseTimes: apiResponseTimes.map(a => ({ 
-        timestamp: a.timestamp, 
-        value: Number(a.avgValue) || 0 
+      apiResponseTimes: [],
+      databaseQueryTimes: [],
+      llmResponseTimes: llmResponseTimes.map(l => ({
+        timestamp: l.timestamp,
+        value: Number(l.avgValue) || 0
       })),
-      databaseQueryTimes: databaseQueryTimes.map(d => ({ 
-        timestamp: d.timestamp, 
-        value: Number(d.avgValue) || 0 
-      })),
-      llmResponseTimes: llmResponseTimes.map(l => ({ 
-        timestamp: l.timestamp, 
-        value: Number(l.avgValue) || 0 
-      })),
-      errorRates: errorRates.map(e => ({ 
-        timestamp: e.timestamp, 
-        value: Number(e.errorCount) 
-      }))
+      errorRates: []
     };
   }
 
   /**
    * Get system alerts
    */
-  private async getSystemAlerts(start: Date, end: Date) {
-    const alerts = await db
-      .select({
-        type: performanceMetrics.metricType,
-        severity: sql<string>`CASE 
-          WHEN ${performanceMetrics.value} > ${performanceMetrics.threshold} THEN 'high'
-          ELSE 'medium'
-        END`,
-        message: performanceMetrics.metricName,
-        timestamp: performanceMetrics.timestamp
-      })
-      .from(performanceMetrics)
-      .where(
-        and(
-          gte(performanceMetrics.timestamp, start),
-          lte(performanceMetrics.timestamp, end),
-          sql`(${performanceMetrics.value} > ${performanceMetrics.threshold})`
-        )
-      )
-      .orderBy(desc(performanceMetrics.timestamp))
-      .limit(10);
-
-    return alerts.map(alert => ({
-      type: alert.type,
-      severity: alert.severity as 'low' | 'medium' | 'high' | 'critical',
-      message: alert.message,
-      timestamp: alert.timestamp.toISOString()
-    }));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private async getSystemAlerts(_start: Date, _end: Date) {
+    // Performance metrics table removed, return empty alerts
+    return [];
   }
 
   /**
@@ -634,27 +547,12 @@ export class AnalyticsService {
     eventData?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    try {
-      await db.insert(analyticsEvents).values({
-        eventType: event.eventType,
-        eventName: event.eventName,
-        userId: event.userId,
-        patientId: event.patientId,
-        sessionId: event.sessionId,
-        eventData: event.eventData || {},
-        metadata: event.metadata || {},
-        processedAt: new Date()
-      });
-      
-      logger.debug(`Analytics event tracked: ${event.eventName}`, {
-        eventType: event.eventType,
-        userId: event.userId,
-        patientId: event.patientId
-      });
-    } catch (error) {
-      logger.error("Failed to track analytics event", error as Error);
-      // Don't throw error for analytics tracking to avoid disrupting main functionality
-    }
+    // Analytics events table removed - just log the event
+    logger.debug(`Analytics event tracked: ${event.eventName}`, {
+      eventType: event.eventType,
+      userId: event.userId,
+      patientId: event.patientId
+    });
   }
 
   /**
@@ -668,28 +566,14 @@ export class AnalyticsService {
     tags?: Record<string, unknown>;
     threshold?: number;
   }): Promise<void> {
-    try {
-      const isAlert = metric.threshold ? metric.value > metric.threshold : false;
-      
-      await db.insert(performanceMetrics).values({
+    // Performance metrics table removed - just log alerts if threshold exceeded
+    const isAlert = metric.threshold ? metric.value > metric.threshold : false;
+
+    if (isAlert) {
+      logger.warn(`Performance alert: ${metric.metricName} = ${metric.value} ${metric.unit}`, {
         metricType: metric.metricType,
-        metricName: metric.metricName,
-        value: metric.value.toString(),
-        unit: metric.unit,
-        tags: metric.tags || {},
-        threshold: metric.threshold?.toString(),
-        isAlert
+        threshold: metric.threshold
       });
-      
-      if (isAlert) {
-        logger.warn(`Performance alert: ${metric.metricName} = ${metric.value} ${metric.unit}`, {
-          metricType: metric.metricType,
-          threshold: metric.threshold
-        });
-      }
-    } catch (error) {
-      logger.error("Failed to record performance metric", error as Error);
-      // Don't throw error for metrics recording to avoid disrupting main functionality
     }
   }
 }

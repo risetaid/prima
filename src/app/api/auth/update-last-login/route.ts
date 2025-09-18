@@ -36,7 +36,7 @@ export async function POST() {
           email: user.primaryEmailAddress?.emailAddress || "",
           firstName: user.firstName || "",
           lastName: user.lastName || "",
-          role: isFirstUser ? "DEVELOPER" : "RELAWAN",
+          role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser, // First user auto-approved
           approvedAt: isFirstUser ? new Date() : null,
         });

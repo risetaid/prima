@@ -203,7 +203,7 @@ export default function PatientDetailPage() {
     const pollInterval = setInterval(() => {
       if (
         document.visibilityState === "visible" &&
-        patient?.verificationStatus === "pending_verification"
+        patient?.verificationStatus === "PENDING"
       ) {
         fetchPatient(params.id as string, true);
       }
@@ -308,7 +308,7 @@ export default function PatientDetailPage() {
   const handleAddReminder = () => {
     if (!patient) return;
     const allowed =
-      patient.verificationStatus === "verified" && patient.isActive;
+      patient.verificationStatus === "VERIFIED" && patient.isActive;
     if (!allowed) {
       toast.error("Pasien belum terverifikasi", {
         description:

@@ -38,13 +38,11 @@ export interface AuthUser extends User {
   needsApproval: boolean;
 }
 
-export interface AdminUser extends AuthUser {
-  id: string;
+export interface AdminUser extends Omit<AuthUser, 'role'> {
   role: "ADMIN" | "DEVELOPER";
 }
 
-export interface DeveloperUser extends AuthUser {
-  id: string;
+export interface DeveloperUser extends Omit<AuthUser, 'role'> {
   role: "DEVELOPER";
 }
 

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patientVariables } from '@/db'
-import { eq, and } from 'drizzle-orm'
 import { PatientQueryBuilder } from '@/services/patient/patient-query-builder'
 import { logger } from '@/lib/logger'
 
@@ -25,16 +23,8 @@ export async function GET(
     }
 
     // Get custom patient variables (highest priority)
-    const customVariables = await db
-      .select({
-        variableName: patientVariables.variableName,
-        variableValue: patientVariables.variableValue,
-      })
-      .from(patientVariables)
-      .where(and(
-        eq(patientVariables.patientId, patientId),
-        eq(patientVariables.isActive, true)
-      ))
+    // DISABLED: patientVariables table removed in schema cleanup
+    const customVariables: Array<{ variableName: string; variableValue: string }> = []
 
     const customVariablesMap = customVariables.reduce((acc, variable) => {
       acc[variable.variableName] = variable.variableValue

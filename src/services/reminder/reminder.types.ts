@@ -1,15 +1,19 @@
 // Reminder Service Type Definitions
 // Centralized type definitions for the reminder system
 
-import { reminderSchedules, reminderLogs, reminderContentAttachments } from '@/db'
+import { reminders, manualConfirmations } from '@/db'
 import { InferSelectModel, InferInsertModel } from 'drizzle-orm'
 
 // Database model types
-export type ReminderSchedule = InferSelectModel<typeof reminderSchedules>
-export type ReminderScheduleInsert = InferInsertModel<typeof reminderSchedules>
-export type ReminderLog = InferSelectModel<typeof reminderLogs>
-export type ReminderLogInsert = InferInsertModel<typeof reminderLogs>
-export type ReminderContentAttachment = InferSelectModel<typeof reminderContentAttachments>
+export type Reminder = InferSelectModel<typeof reminders>
+export type ReminderInsert = InferInsertModel<typeof reminders>
+export type ManualConfirmation = InferSelectModel<typeof manualConfirmations>
+
+// Legacy types for backwards compatibility
+export type ReminderSchedule = Reminder
+export type ReminderScheduleInsert = ReminderInsert
+export type ReminderLog = Reminder // Combined into unified reminders table
+export type ReminderLogInsert = ReminderInsert
 
 // Business logic types
 export interface CreateReminderDTO {
@@ -51,7 +55,7 @@ export interface ValidatedContent {
   url: string
 }
 
-export interface ReminderWithPatient extends ReminderSchedule {
+export interface ReminderWithPatient extends Reminder {
   patientName: string | null
   patientPhoneNumber: string | null
   contentAttachments?: ValidatedContent[]

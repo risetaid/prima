@@ -37,22 +37,10 @@ export async function GET(
 
     // Get patient response history with user details via service
     const service = new PatientService()
-    const historyResult = await service.getVerificationHistory(patientId)
+    await service.getVerificationHistory(patientId) // Call but don't store result since table was removed
 
-    // Format history for UI consumption
-    const history = historyResult.map(entry => ({
-      id: entry.id,
-      timestamp: entry.createdAt.toISOString(),
-      action: formatAction(entry.action, entry.verificationResult || undefined),
-      message: entry.messageSent,
-      response: entry.patientResponse,
-      result: entry.verificationResult,
-      processedBy: entry.processedBy ? {
-        id: entry.processedBy,
-        name: `${entry.volunteerFirstName || ''} ${entry.volunteerLastName || ''}`.trim() || entry.volunteerEmail || 'Unknown',
-        email: entry.volunteerEmail
-      } : null
-    }))
+    // Since verification logs table was removed, service returns empty array
+    const history: Array<Record<string, unknown>> = []
 
     return NextResponse.json({
       success: true,
@@ -69,28 +57,4 @@ export async function GET(
   }
 }
 
-// Helper function to format action descriptions
-function formatAction(action: string, result?: string): string {
-  switch (action) {
-    case 'sent':
-      return '📱 Pesan verifikasi dikirim'
-    case 'responded':
-      return result === 'verified' 
-        ? '✅ Pasien menyetujui' 
-        : result === 'declined'
-        ? '❌ Pasien menolak'
-        : '💬 Pasien merespon'
-    case 'manual_verified':
-      return result === 'verified'
-        ? '👤 Diverifikasi manual (setuju)'
-        : result === 'declined' 
-        ? '👤 Diverifikasi manual (tolak)'
-        : '👤 Diverifikasi manual'
-    case 'expired':
-      return '⏰ Verifikasi kedaluwarsa'
-    case 'message_received':
-      return '💬 Pesan diterima'
-    default:
-      return `📝 ${action}`
-  }
-}
+// Helper function removed - was unused since verification logs table was removed

@@ -2,12 +2,10 @@ import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
 import {
   db,
-  reminderSchedules,
+  reminders,
   patients,
-  reminderLogs,
-  reminderContentAttachments,
 } from "@/db";
-import { eq, and, isNull, inArray, sql } from "drizzle-orm";
+import { eq, and, isNull, sql, or, ne } from "drizzle-orm";
 import { getWIBTime, getWIBDateString, getWIBTimeString } from "@/lib/timezone";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ValidatedContent } from "@/services/reminder/reminder.types";
@@ -56,7 +54,7 @@ export async function POST() {
     const patientConditions = [
       isNull(patients.deletedAt),
       eq(patients.isActive, true),
-      eq(patients.verificationStatus, "verified"),
+      eq(patients.verificationStatus, "VERIFIED"),
     ];
     if (user.role === "ADMIN" || user.role === "RELAWAN") {
       // Both ADMIN and MEMBER can only send to patients they manage
@@ -92,33 +90,34 @@ export async function POST() {
 
       activeReminders = await db
         .select({
-          // Schedule fields
-          id: reminderSchedules.id,
-          patientId: reminderSchedules.patientId,
-          scheduledTime: reminderSchedules.scheduledTime,
-          startDate: reminderSchedules.startDate,
-          customMessage: reminderSchedules.customMessage,
+          // Reminder fields
+          id: reminders.id,
+          patientId: reminders.patientId,
+          scheduledTime: reminders.scheduledTime,
+          startDate: reminders.startDate,
+          customMessage: reminders.message,
+          status: reminders.status,
+          sentAt: reminders.sentAt,
           // Patient fields
           patientName: patients.name,
           patientPhoneNumber: patients.phoneNumber,
         })
-        .from(reminderSchedules)
-        .leftJoin(patients, eq(reminderSchedules.patientId, patients.id))
+        .from(reminders)
+        .leftJoin(patients, eq(reminders.patientId, patients.id))
         .where(
           and(
-            eq(reminderSchedules.isActive, true),
+            eq(reminders.isActive, true),
             // Use date string comparison instead of timestamp comparison
-            eq(sql`DATE(${reminderSchedules.startDate})`, todayWIB), // Only today's reminders
+            eq(sql`DATE(${reminders.startDate})`, todayWIB), // Only today's reminders
             patientFilter,
-            isNull(reminderSchedules.deletedAt),
+            isNull(reminders.deletedAt),
             // SMART DUPLICATE PREVENTION: Only send reminders that haven't been delivered today
             // This prevents re-sending already delivered reminders while allowing instant send override
-            sql`NOT EXISTS (
-               SELECT 1 FROM ${reminderLogs}
-               WHERE ${reminderLogs.reminderScheduleId} = ${reminderSchedules.id}
-               AND ${reminderLogs.status} = 'DELIVERED'
-               AND DATE(${reminderLogs.sentAt}) = ${todayWIB}
-             )`
+            or(
+              isNull(reminders.sentAt),
+              ne(reminders.status, "DELIVERED"),
+              sql`DATE(${reminders.sentAt}) != ${todayWIB}`
+            )
           )
         );
 
@@ -163,36 +162,8 @@ export async function POST() {
       });
     }
 
-    // Get content attachments for all today's reminders
-    const reminderIds = activeReminders.map((r) => r.id);
+    // Content attachments functionality has been removed in the new schema
     const contentAttachmentsMap = new Map();
-
-    if (reminderIds.length > 0) {
-      const contentAttachments = await db
-        .select({
-          reminderScheduleId: reminderContentAttachments.reminderScheduleId,
-          contentType: reminderContentAttachments.contentType,
-          contentTitle: reminderContentAttachments.contentTitle,
-          contentUrl: reminderContentAttachments.contentUrl,
-        })
-        .from(reminderContentAttachments)
-        .where(
-          inArray(reminderContentAttachments.reminderScheduleId, reminderIds)
-        );
-
-      // Create content attachments map
-      contentAttachments.forEach((attachment) => {
-        if (!contentAttachmentsMap.has(attachment.reminderScheduleId)) {
-          contentAttachmentsMap.set(attachment.reminderScheduleId, []);
-        }
-        contentAttachmentsMap.get(attachment.reminderScheduleId).push({
-          id: attachment.reminderScheduleId,
-          type: attachment.contentType,
-          title: attachment.contentTitle,
-          url: attachment.contentUrl,
-        });
-      });
-    }
 
     const logMessage = `🚀 Starting instant send for ${
       activeReminders.length
@@ -262,33 +233,30 @@ export async function POST() {
             `📱 WhatsApp result for ${reminder.patientName}: success=${result.success}, messageId=${result.messageId}`
           );
 
-          // Create reminder log
+          // Update reminder with sent status
           const status: "DELIVERED" | "FAILED" = result.success
             ? "DELIVERED"
             : "FAILED";
-          const logData = {
-            reminderScheduleId: reminder.id,
-            patientId: reminder.patientId,
-            sentAt: getWIBTime(),
-            status: status,
-            message: messageBody,
-            phoneNumber: reminder.patientPhoneNumber,
-            fonnteMessageId: result.messageId,
-            notes: `Instant send by ${
-              user.role
-            } - ${getWIBDateString()} ${getWIBTimeString()}`,
-          };
 
           try {
-            await db.insert(reminderLogs).values(logData);
+            await db
+              .update(reminders)
+              .set({
+                sentAt: getWIBTime(),
+                status: status,
+                fonnteMessageId: result.messageId,
+                updatedAt: getWIBTime(),
+              })
+              .where(eq(reminders.id, reminder.id));
+
             debugLogs.push(
-              `✅ Reminder log created for ${reminder.patientName}`
+              `✅ Reminder updated with sent status for ${reminder.patientName}`
             );
           } catch (dbError) {
             debugLogs.push(
-              `⚠️ Warning: Failed to create reminder log for ${reminder.patientName}: ${dbError}`
+              `⚠️ Warning: Failed to update reminder status for ${reminder.patientName}: ${dbError}`
             );
-            // Don't increment errorCount for log failures, as the message was sent successfully
+            // Don't increment errorCount for update failures, as the message was sent successfully
           }
 
           if (result.success) {

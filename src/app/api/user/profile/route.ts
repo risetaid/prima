@@ -48,7 +48,7 @@ export async function GET() {
           email: clerkUser.primaryEmailAddress?.emailAddress || "",
           firstName: clerkUser.firstName || "",
           lastName: clerkUser.lastName || "",
-          role: isFirstUser ? "DEVELOPER" : "RELAWAN",
+          role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser,
           approvedAt: isFirstUser ? new Date() : null,
         });

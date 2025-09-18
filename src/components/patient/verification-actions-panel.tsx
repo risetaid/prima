@@ -108,8 +108,8 @@ export default function VerificationActionsPanel({
       
       <div className="space-y-3">
         {/* Primary Actions based on status */}
-        {(patient.verificationStatus === 'pending_verification' || 
-          patient.verificationStatus === 'expired' ||
+        {(patient.verificationStatus === 'PENDING' ||
+          patient.verificationStatus === 'EXPIRED' ||
           !patient.verificationStatus) && (
           <div className="flex flex-col sm:flex-row gap-3">
             <button
@@ -127,7 +127,7 @@ export default function VerificationActionsPanel({
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
-                  Kirim {patient.verificationStatus === 'expired' ? 'Ulang' : ''} Verifikasi
+                  Kirim {patient.verificationStatus === 'EXPIRED' ? 'Ulang' : ''} Verifikasi
                 </>
               )}
             </button>
@@ -145,7 +145,7 @@ export default function VerificationActionsPanel({
           </div>
         )}
 
-        {patient.verificationStatus === 'declined' && (
+        {patient.verificationStatus === 'DECLINED' && (
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               onClick={handleSendVerification}
@@ -176,7 +176,7 @@ export default function VerificationActionsPanel({
           </div>
         )}
 
-        {patient.verificationStatus === 'verified' && (
+        {patient.verificationStatus === 'VERIFIED' && (
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg">
             <div className="flex items-start gap-3">
               <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -192,7 +192,7 @@ export default function VerificationActionsPanel({
                   Reminder otomatis sudah aktif untuk pasien ini.
                 </p>
                 <button
-                  onClick={() => handleManualVerification('pending_verification')}
+                  onClick={() => handleManualVerification('PENDING')}
                   className="text-sm text-green-600 hover:text-green-800 underline font-medium"
                 >
                   Reset verifikasi jika diperlukan
@@ -203,7 +203,7 @@ export default function VerificationActionsPanel({
         )}
 
         {/* Inactive Patient (BERHENTI) Section */}
-        {!patient.isActive && patient.verificationStatus === 'declined' && (
+        {!patient.isActive && patient.verificationStatus === 'DECLINED' && (
           <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
             <div className="flex items-start gap-3">
               <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -263,7 +263,7 @@ export default function VerificationActionsPanel({
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
             <button
-              onClick={() => handleManualVerification('verified')}
+              onClick={() => handleManualVerification('VERIFIED')}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 cursor-pointer transition-all duration-200 font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,7 +272,7 @@ export default function VerificationActionsPanel({
               Tandai Setuju
             </button>
             <button
-              onClick={() => handleManualVerification('declined')}
+              onClick={() => handleManualVerification('DECLINED')}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 cursor-pointer transition-all duration-200 font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

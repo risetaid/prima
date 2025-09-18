@@ -10,7 +10,7 @@ import {
   createErrorResponse,
   createEmergencyResponse,
 } from "../response-handler";
-import { db, patients, verificationLogs } from "@/db";
+import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
@@ -313,26 +313,22 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
       .update(patients)
       .set({
         isActive: false,
-        verificationStatus: "declined",
+        verificationStatus: "DECLINED",
         unsubscribedAt: getWIBTime(),
         unsubscribeReason: analysis.reason,
         updatedAt: getWIBTime(),
       })
       .where(eq(patients.id, context.patientId));
 
-    // Log unsubscribe event
-    await db.insert(verificationLogs).values({
+    // Verification logs table was removed from schema
+    // Log unsubscribe event using logger instead
+    logger.info("Unsubscribe event logged", {
       patientId: context.patientId,
       action: "UNSUBSCRIBE",
-      messageSent: context.message,
-      patientResponse: context.message,
       verificationResult: "declined",
       processedBy: "llm_analysis",
-      additionalInfo: {
-        analysis: analysis,
-        method: "llm_powered",
-      },
-      createdAt: getWIBTime(),
+      analysis: analysis,
+      method: "llm_powered"
     });
 
     logger.info("Patient unsubscribed successfully via LLM analysis", {

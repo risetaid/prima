@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, patients, verificationLogs } from "@/db";
+import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
@@ -54,7 +54,7 @@ export async function POST(
     await db
       .update(patients)
       .set({
-        verificationStatus: "pending_verification",
+        verificationStatus: "PENDING",
         verificationSentAt: new Date(),
         verificationMessage: `Text message: Verification request sent to ${patient.name}`,
         verificationAttempts: (currentAttempts + 1).toString(),
@@ -63,14 +63,7 @@ export async function POST(
       })
       .where(eq(patients.id, patientId));
 
-    // Log verification attempt
-    await db.insert(verificationLogs).values({
-      patientId: patientId,
-      action: "sent",
-      messageSent: `Text verification sent with clear response options`,
-      verificationResult: "pending_verification",
-      processedBy: user.id,
-    });
+    // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
 
     // Set conversation state to verification context
     try {

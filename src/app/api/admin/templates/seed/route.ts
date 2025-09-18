@@ -182,9 +182,9 @@ export async function POST() {
   try {
     const user = await getCurrentUser();
 
-    if (!user || user.role !== "DEVELOPER") {
+    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
       return NextResponse.json(
-        { error: "Unauthorized. Developer access required." },
+        { error: "Unauthorized. Admin access required." },
         { status: 401 }
       );
     }

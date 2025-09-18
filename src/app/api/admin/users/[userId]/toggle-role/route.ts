@@ -14,10 +14,10 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only developers can change user roles
-    if (currentUser.role !== "DEVELOPER") {
+    // Only admins and developers can change user roles
+    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
       return NextResponse.json(
-        { error: "Developer access required" },
+        { error: "Admin access required" },
         { status: 403 }
       );
     }
@@ -25,7 +25,7 @@ export async function POST(
     const { userId } = await params;
     const { role } = await request.json();
 
-    if (!role || !["DEVELOPER", "ADMIN", "RELAWAN"].includes(role)) {
+    if (!role || !["ADMIN", "RELAWAN", "DEVELOPER"].includes(role)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 });
     }
 
@@ -44,17 +44,23 @@ export async function POST(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Prevent demoting the last developer
-    if (targetUser[0].role === "DEVELOPER" && role !== "DEVELOPER") {
-      const developerCount = await db
+    // Prevent demoting the last admin/developer
+    if ((targetUser[0].role === "ADMIN" || targetUser[0].role === "DEVELOPER") && 
+        role !== "ADMIN" && role !== "DEVELOPER") {
+      const adminDevCount = await db
         .select({ count: users.id })
         .from(users)
-        .where(eq(users.role, "DEVELOPER"));
+        .where(eq(users.role, "ADMIN"))
+        .unionAll(
+          db.select({ count: users.id })
+            .from(users)
+            .where(eq(users.role, "DEVELOPER"))
+        );
 
-      if (developerCount.length <= 1) {
+      if (adminDevCount.length <= 1) {
         return NextResponse.json(
           {
-            error: "Cannot demote the last developer",
+            error: "Cannot demote the last admin/developer",
           },
           { status: 400 }
         );
@@ -65,7 +71,7 @@ export async function POST(
     await db
       .update(users)
       .set({
-        role: role as "DEVELOPER" | "ADMIN" | "RELAWAN",
+        role: role as "ADMIN" | "RELAWAN" | "DEVELOPER",
         updatedAt: getWIBTime(),
       })
       .where(eq(users.clerkId, userId));

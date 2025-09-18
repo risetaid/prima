@@ -3,11 +3,10 @@
 
 import { db } from "@/db";
 import {
-  reminderSchedules,
-  conversationMessages,
   patients,
   healthNotes,
-  patientVariables,
+  reminders,
+  conversationMessages,
 } from "@/db";
 import { eq, and, gte, desc, isNull, or, inArray, lte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
@@ -21,7 +20,7 @@ import {
   invalidateCache,
 } from "@/lib/cache";
 import { generatePhoneAlternatives } from "@/lib/phone-utils";
-import { MedicationParser } from "@/lib/medication-parser";
+// MedicationParser import removed
 
 export interface PatientContext {
   patient: {
@@ -280,43 +279,42 @@ export class PatientContextService {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      const reminders = await db
+      const todaysReminders = await db
         .select({
-          id: reminderSchedules.id,
-          scheduledTime: reminderSchedules.scheduledTime,
-          frequency: reminderSchedules.frequency,
-          customMessage: reminderSchedules.customMessage,
-          createdAt: reminderSchedules.createdAt,
+          id: reminders.id,
+          scheduledTime: reminders.scheduledTime,
+          reminderType: reminders.reminderType,
+          message: reminders.message,
+          medicationDetails: reminders.medicationDetails,
+          createdAt: reminders.createdAt,
+          status: reminders.status,
+          sentAt: reminders.sentAt,
         })
-        .from(reminderSchedules)
+        .from(reminders)
         .where(
           and(
-            eq(reminderSchedules.patientId, patientId),
-            eq(reminderSchedules.isActive, true),
-            isNull(reminderSchedules.deletedAt),
-            gte(reminderSchedules.startDate, today),
-            lte(reminderSchedules.startDate, tomorrow)
+            eq(reminders.patientId, patientId),
+            eq(reminders.isActive, true),
+            isNull(reminders.deletedAt),
+            gte(reminders.startDate, today),
+            lte(reminders.startDate, tomorrow)
           )
         )
-        .orderBy(reminderSchedules.scheduledTime)
+        .orderBy(reminders.scheduledTime)
         .limit(10);
 
-      return reminders.map((reminder) => {
+      return todaysReminders.map((reminder) => {
         // Parse structured medication data
-        const medicationDetails = MedicationParser.parseFromReminder(
-          'Unknown Medication',
-          reminder.customMessage || undefined
-        );
+        const medicationDetails = reminder.medicationDetails as Record<string, unknown> || {};
 
         return {
           id: reminder.id,
           scheduledTime: reminder.scheduledTime,
-          frequency: reminder.frequency,
-          medicationName: medicationDetails.name,
-          customMessage: reminder.customMessage || undefined,
-          medicationDetails,
-          isCompleted: false, // TODO: Check from reminder_logs
-          lastCompletedAt: undefined, // TODO: Get from reminder_logs
+          frequency: reminder.reminderType, // Use reminderType as frequency
+          medicationName: String(medicationDetails.name || 'Unknown Medication'),
+          customMessage: reminder.message || undefined,
+          isCompleted: reminder.status === 'DELIVERED',
+          lastCompletedAt: reminder.sentAt || undefined,
         };
       });
     } catch (error) {
@@ -388,33 +386,33 @@ export class PatientContextService {
         }
       }
 
-      // Get medications from patient variables using structured parsing
-      const medicationVars = await db
+      // Get medications from reminders using structured parsing
+      const medicationReminders = await db
         .select({
-          variableName: patientVariables.variableName,
-          variableValue: patientVariables.variableValue,
+          medicationDetails: reminders.medicationDetails,
+          message: reminders.message,
         })
-        .from(patientVariables)
+        .from(reminders)
         .where(
           and(
-            eq(patientVariables.patientId, patientId),
-            eq(patientVariables.isActive, true),
-            isNull(patientVariables.deletedAt)
+            eq(reminders.patientId, patientId),
+            eq(reminders.isActive, true),
+            eq(reminders.reminderType, 'MEDICATION'),
+            isNull(reminders.deletedAt)
           )
         );
 
-      // Parse medications using the new medication parser
-      const medications = MedicationParser.parseMultipleFromVariables(
-        medicationVars.map(v => ({ name: v.variableName, value: v.variableValue }))
-      );
-
-      const medicationsList = medications.map(med => ({
-        name: med.name,
-        dosage: med.dosage,
-        frequency: med.frequency,
-        startDate: undefined, // Could be parsed from value
-        notes: med.instructions,
-      }));
+      // Parse medications from reminder details
+      const medicationsList = medicationReminders.map(reminder => {
+        const details = reminder.medicationDetails as Record<string, unknown> || {};
+        return {
+          name: String(details.name || 'Unknown Medication'),
+          dosage: details.dosage ? String(details.dosage) : undefined,
+          frequency: details.frequency ? String(details.frequency) : undefined,
+          startDate: undefined,
+          notes: reminder.message || undefined,
+        };
+      });
 
       const patient = patientData[0] || {};
 
@@ -481,37 +479,11 @@ export class PatientContextService {
 
   /**
    * Get patient variables for a patient
+   * DISABLED: patientVariables table removed in schema cleanup
    */
   private async getPatientVariables(patientId: string) {
-    try {
-      const variables = await db
-        .select({
-          variableName: patientVariables.variableName,
-          variableValue: patientVariables.variableValue,
-          isActive: patientVariables.isActive,
-        })
-        .from(patientVariables)
-        .where(
-          and(
-            eq(patientVariables.patientId, patientId),
-            eq(patientVariables.isActive, true),
-            isNull(patientVariables.deletedAt)
-          )
-        )
-        .orderBy(desc(patientVariables.createdAt))
-        .limit(10);
-
-      return variables.map((v) => ({
-        name: v.variableName,
-        value: v.variableValue,
-        isActive: v.isActive,
-      }));
-    } catch (error) {
-      logger.error("Failed to get patient variables", error as Error, {
-        patientId,
-      });
-      return [];
-    }
+    logger.info("Patient variables disabled - table removed in schema cleanup", { patientId });
+    return [];
   }
 
   /**
@@ -521,41 +493,41 @@ export class PatientContextService {
     try {
       const now = new Date();
 
-      const reminders = await db
+      const activeReminders = await db
         .select({
-          id: reminderSchedules.id,
-          scheduledTime: reminderSchedules.scheduledTime,
-          frequency: reminderSchedules.frequency,
-          startDate: reminderSchedules.startDate,
-          endDate: reminderSchedules.endDate,
-          customMessage: reminderSchedules.customMessage,
-          createdAt: reminderSchedules.createdAt,
+          id: reminders.id,
+          scheduledTime: reminders.scheduledTime,
+          reminderType: reminders.reminderType,
+          startDate: reminders.startDate,
+          endDate: reminders.endDate,
+          message: reminders.message,
+          createdAt: reminders.createdAt,
         })
-        .from(reminderSchedules)
+        .from(reminders)
         .where(
           and(
-            eq(reminderSchedules.patientId, patientId),
-            eq(reminderSchedules.isActive, true),
-            isNull(reminderSchedules.deletedAt),
-            gte(reminderSchedules.startDate, now), // Only future or current reminders
+            eq(reminders.patientId, patientId),
+            eq(reminders.isActive, true),
+            isNull(reminders.deletedAt),
+            gte(reminders.startDate, now), // Only future or current reminders
             // endDate is null OR endDate >= now
             or(
-              isNull(reminderSchedules.endDate),
-              gte(reminderSchedules.endDate, now)
+              isNull(reminders.endDate),
+              gte(reminders.endDate, now)
             )
           )
         )
-        .orderBy(desc(reminderSchedules.createdAt))
+        .orderBy(desc(reminders.createdAt))
         .limit(10); // Limit to prevent excessive data
 
       // Map to handle null values properly
-      return reminders.map((reminder) => ({
+      return activeReminders.map((reminder) => ({
         id: reminder.id,
         scheduledTime: reminder.scheduledTime,
-        frequency: reminder.frequency,
+        frequency: reminder.reminderType, // Use reminderType as frequency
         startDate: reminder.startDate,
         endDate: reminder.endDate || undefined,
-        customMessage: reminder.customMessage || undefined,
+        customMessage: reminder.message || undefined,
         createdAt: reminder.createdAt,
       }));
     } catch (error) {

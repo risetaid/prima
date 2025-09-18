@@ -42,11 +42,11 @@ async function setupFirstUser() {
     console.log(`🎭 Current role: ${user.role}`);
     console.log(`✅ Currently approved: ${user.isApproved}`);
 
-    // Update user to Developer role and approve them
+    // Update user to Admin role and approve them
     await db
       .update(schema.users)
       .set({
-        role: "DEVELOPER",
+        role: "ADMIN",
         isApproved: true,
         approvedAt: new Date(),
         approvedBy: user.id, // Self-approval for first user
@@ -55,7 +55,7 @@ async function setupFirstUser() {
       .where(eq(schema.users.email, "davidyusaku13@gmail.com"));
 
     console.log("✅ User updated successfully!");
-    console.log("🎭 New role: DEVELOPER");
+    console.log("🎭 New role: ADMIN");
     console.log("✅ Approved: true");
     console.log("🎉 First user setup complete!");
 

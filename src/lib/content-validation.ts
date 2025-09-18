@@ -51,7 +51,7 @@ export async function validateContentAttachments(
           .where(
             and(
               eq(cmsArticles.id, content.id),
-              eq(cmsArticles.status, "published"),
+              eq(cmsArticles.status, "PUBLISHED"),
               isNull(cmsArticles.deletedAt)
             )
           )
@@ -72,7 +72,7 @@ export async function validateContentAttachments(
           .where(
             and(
               eq(cmsVideos.id, content.id),
-              eq(cmsVideos.status, "published"),
+              eq(cmsVideos.status, "PUBLISHED"),
               isNull(cmsVideos.deletedAt)
             )
           )
@@ -130,7 +130,7 @@ export async function isValidContentAttachments(
           .where(
             and(
               eq(cmsArticles.id, content.id),
-              eq(cmsArticles.status, "published"),
+              eq(cmsArticles.status, "PUBLISHED"),
               isNull(cmsArticles.deletedAt)
             )
           )
@@ -146,7 +146,7 @@ export async function isValidContentAttachments(
           .where(
             and(
               eq(cmsVideos.id, content.id),
-              eq(cmsVideos.status, "published"),
+              eq(cmsVideos.status, "PUBLISHED"),
               isNull(cmsVideos.deletedAt)
             )
           )
@@ -184,7 +184,7 @@ export async function getContentUrl(
         .where(
           and(
             eq(cmsArticles.id, contentId),
-            eq(cmsArticles.status, "published"),
+            eq(cmsArticles.status, "PUBLISHED"),
             isNull(cmsArticles.deletedAt)
           )
         )
@@ -200,7 +200,7 @@ export async function getContentUrl(
         .where(
           and(
             eq(cmsVideos.id, contentId),
-            eq(cmsVideos.status, "published"),
+            eq(cmsVideos.status, "PUBLISHED"),
             isNull(cmsVideos.deletedAt)
           )
         )

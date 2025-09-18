@@ -1,4 +1,4 @@
-import { db, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
+import { db, reminders, manualConfirmations } from '@/db'
 import { eq, and, isNull, desc } from 'drizzle-orm'
 
 async function debugPatientReminders() {
@@ -8,78 +8,64 @@ async function debugPatientReminders() {
     console.log('🔍 Debugging patient reminders for:', patientId)
     console.log('=' .repeat(60))
 
-    // 1. Get all reminder schedules (active and inactive)
-    console.log('\n📅 REMINDER SCHEDULES:')
-    const allSchedules = await db
+    // 1. Get all reminders (active and inactive)
+    console.log('\n📅 REMINDERS:')
+    const allReminders = await db
       .select()
-      .from(reminderSchedules)
-      .where(eq(reminderSchedules.patientId, patientId))
-      .orderBy(desc(reminderSchedules.createdAt))
+      .from(reminders)
+      .where(eq(reminders.patientId, patientId))
+      .orderBy(desc(reminders.createdAt))
 
-    console.log(`Total schedules found: ${allSchedules.length}`)
-    allSchedules.forEach((schedule, index) => {
-      console.log(`${index + 1}. ID: ${schedule.id}`)
-      console.log(`   Active: ${schedule.isActive}`)
-      console.log(`   Deleted: ${schedule.deletedAt ? 'Yes' : 'No'}`)
-      console.log(`   Start Date: ${schedule.startDate}`)
-      console.log(`   Created: ${schedule.createdAt}`)
+    console.log(`Total reminders found: ${allReminders.length}`)
+    allReminders.forEach((reminder, index) => {
+      console.log(`${index + 1}. ID: ${reminder.id}`)
+      console.log(`   Active: ${reminder.isActive}`)
+      console.log(`   Status: ${reminder.status}`)
+      console.log(`   Deleted: ${reminder.deletedAt ? 'Yes' : 'No'}`)
+      console.log(`   Start Date: ${reminder.startDate}`)
+      console.log(`   Sent At: ${reminder.sentAt || 'Not sent'}`)
+      console.log(`   Created: ${reminder.createdAt}`)
       console.log('')
     })
 
-    // 2. Get all reminder logs
-    console.log('\n📨 REMINDER LOGS:')
-    const allLogs = await db
+    // 2. Get active reminders only (what the API uses)
+    console.log('\n✅ ACTIVE REMINDERS ONLY (what API uses):')
+    const activeReminders = await db
       .select()
-      .from(reminderLogs)
-      .where(eq(reminderLogs.patientId, patientId))
-      .orderBy(desc(reminderLogs.sentAt))
-
-    console.log(`Total logs found: ${allLogs.length}`)
-    allLogs.forEach((log, index) => {
-      console.log(`${index + 1}. Schedule ID: ${log.reminderScheduleId}`)
-      console.log(`   Status: ${log.status}`)
-      console.log(`   Sent At: ${log.sentAt}`)
-      console.log('')
-    })
-
-    // 3. Get active schedules only (what the API uses)
-    console.log('\n✅ ACTIVE SCHEDULES ONLY (what API uses):')
-    const activeSchedules = await db
-      .select()
-      .from(reminderSchedules)
+      .from(reminders)
       .where(
         and(
-          eq(reminderSchedules.patientId, patientId),
-          eq(reminderSchedules.isActive, true),
-          isNull(reminderSchedules.deletedAt)
+          eq(reminders.patientId, patientId),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
         )
       )
 
-    console.log(`Active schedules: ${activeSchedules.length}`)
-    activeSchedules.forEach((schedule, index) => {
-      console.log(`${index + 1}. ID: ${schedule.id}`)
+    console.log(`Active reminders: ${activeReminders.length}`)
+    activeReminders.forEach((reminder, index) => {
+      console.log(`${index + 1}. ID: ${reminder.id} - ${reminder.status}`)
     })
 
-    // 4. Get delivered logs only
-    console.log('\n📨 DELIVERED LOGS ONLY:')
-    const deliveredLogs = await db
+    // 3. Get delivered reminders only
+    console.log('\n📨 DELIVERED REMINDERS ONLY:')
+    const deliveredReminders = await db
       .select()
-      .from(reminderLogs)
+      .from(reminders)
       .where(
         and(
-          eq(reminderLogs.patientId, patientId),
-          eq(reminderLogs.status, 'DELIVERED')
+          eq(reminders.patientId, patientId),
+          eq(reminders.status, 'DELIVERED')
         )
       )
-      .orderBy(desc(reminderLogs.sentAt))
+      .orderBy(desc(reminders.sentAt))
 
-    console.log(`Delivered logs: ${deliveredLogs.length}`)
-    deliveredLogs.forEach((log, index) => {
-      console.log(`${index + 1}. Schedule ID: ${log.reminderScheduleId}`)
-      console.log(`   Sent At: ${log.sentAt}`)
+    console.log(`Delivered reminders: ${deliveredReminders.length}`)
+    deliveredReminders.forEach((reminder, index) => {
+      console.log(`${index + 1}. ID: ${reminder.id}`)
+      console.log(`   Sent At: ${reminder.sentAt}`)
     })
 
-    // 5. Get confirmations
+    // 4. Get confirmations
     console.log('\n✅ MANUAL CONFIRMATIONS:')
     const confirmations = await db
       .select()
@@ -89,22 +75,21 @@ async function debugPatientReminders() {
 
     console.log(`Total confirmations: ${confirmations.length}`)
     confirmations.forEach((conf, index) => {
-      console.log(`${index + 1}. Reminder Log ID: ${conf.reminderLogId}`)
+      console.log(`${index + 1}. Reminder ID: ${conf.reminderId}`)
       console.log(`   Confirmed At: ${conf.confirmedAt}`)
     })
 
     console.log('\n🔍 ANALYSIS:')
-    console.log(`- Total schedules: ${allSchedules.length}`)
-    console.log(`- Active schedules: ${activeSchedules.length}`)
-    console.log(`- Total logs: ${allLogs.length}`)
-    console.log(`- Delivered logs: ${deliveredLogs.length}`)
+    console.log(`- Total reminders: ${allReminders.length}`)
+    console.log(`- Active reminders: ${activeReminders.length}`)
+    console.log(`- Delivered reminders: ${deliveredReminders.length}`)
     console.log(`- Confirmations: ${confirmations.length}`)
 
-    const inactiveSchedules = allSchedules.length - activeSchedules.length
-    const failedLogs = allLogs.length - deliveredLogs.length
+    const inactiveReminders = allReminders.length - activeReminders.length
+    const pendingReminders = allReminders.length - deliveredReminders.length
 
-    console.log(`- Inactive/deleted schedules: ${inactiveSchedules}`)
-    console.log(`- Failed/pending logs: ${failedLogs}`)
+    console.log(`- Inactive/deleted reminders: ${inactiveReminders}`)
+    console.log(`- Pending/failed reminders: ${pendingReminders}`)
 
   } catch (error) {
     console.error('❌ Error debugging patient reminders:', error)

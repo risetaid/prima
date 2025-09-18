@@ -1,29 +1,12 @@
 // Patient domain shared type definitions and error classes
 
-import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
-import { patients, patientVariables } from '@/db'
+import { InferSelectModel } from 'drizzle-orm'
+import { patients } from '@/db'
 
 // DB types
 export type PatientRow = InferSelectModel<typeof patients>
-export type PatientVariableRow = InferSelectModel<typeof patientVariables>
-export type NewPatientVariableRow = InferInsertModel<typeof patientVariables>
 
-// Variables DTOs
-export interface PatientVariablesListItem {
-  id: string
-  variableName: string
-  variableValue: string
-  createdAt: Date
-  updatedAt: Date
-}
 
-export interface PatientVariablesResponse {
-  success: boolean
-  patientId: string
-  variables: Record<string, string>
-  variablesList: PatientVariablesListItem[]
-  count: number
-}
 
 // Create / Update Patient DTOs
 export interface CreatePatientDTO {

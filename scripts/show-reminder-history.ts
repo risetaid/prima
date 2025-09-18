@@ -1,5 +1,5 @@
-import { db, patients, reminderSchedules, reminderLogs, manualConfirmations } from '@/db'
-import { eq, and, isNull, desc } from 'drizzle-orm'
+import { db, patients, reminders, manualConfirmations } from '@/db'
+import { eq, and, isNull, not, desc } from 'drizzle-orm'
 
 async function showReminderHistory() {
   console.log('📋 Reminder History Analysis')
@@ -24,67 +24,69 @@ async function showReminderHistory() {
     console.log(`📊 Status: ${patient.isActive ? 'Active' : 'Inactive'}`)
     console.log()
 
-    // Get ALL reminder schedules (including inactive ones)
-    const allSchedules = await db
+    // Get ALL reminders (including inactive ones)
+    const allReminders = await db
       .select()
-      .from(reminderSchedules)
-      .where(eq(reminderSchedules.patientId, patient.id))
-      .orderBy(desc(reminderSchedules.createdAt))
+      .from(reminders)
+      .where(eq(reminders.patientId, patient.id))
+      .orderBy(desc(reminders.createdAt))
 
-    console.log(`📋 ALL REMINDER SCHEDULES (${allSchedules.length}):`)
-    console.log('================================================')
+    console.log(`📋 ALL REMINDERS (${allReminders.length}):`)
+    console.log('=====================================')
 
-    allSchedules.forEach((schedule, index) => {
-      console.log(`${index + 1}. ${schedule.customMessage || 'No message'}`)
-      console.log(`   ⏰ Time: ${schedule.scheduledTime}`)
-      console.log(`   📅 Start: ${schedule.startDate.toISOString().split('T')[0]}`)
-      console.log(`   ✅ Active: ${schedule.isActive ? 'Yes' : 'No'}`)
-      console.log(`   🕒 Created: ${schedule.createdAt}`)
+    allReminders.forEach((reminder, index) => {
+      console.log(`${index + 1}. ${reminder.message}`)
+      console.log(`   ⏰ Time: ${reminder.scheduledTime}`)
+      console.log(`   📅 Start: ${reminder.startDate.toISOString().split('T')[0]}`)
+      console.log(`   ✅ Active: ${reminder.isActive ? 'Yes' : 'No'}`)
+      console.log(`   📊 Status: ${reminder.status}`)
+      console.log(`   🕒 Created: ${reminder.createdAt}`)
       console.log()
     })
 
-    // Get only ACTIVE reminder schedules
-    const activeSchedules = allSchedules.filter(s => s.isActive)
-    console.log(`📋 ACTIVE REMINDER SCHEDULES (${activeSchedules.length}):`)
-    console.log('=======================================================')
+    // Get only ACTIVE reminders
+    const activeReminders = allReminders.filter(r => r.isActive)
+    console.log(`📋 ACTIVE REMINDERS (${activeReminders.length}):`)
+    console.log('===============================================')
 
-    if (activeSchedules.length === 0) {
-      console.log('❌ No active reminder schedules found!')
+    if (activeReminders.length === 0) {
+      console.log('❌ No active reminders found!')
       console.log('💡 This explains why Terjadwal/Perlu Diperbarui/Semua = 0')
     } else {
-      activeSchedules.forEach((schedule, index) => {
-        console.log(`${index + 1}. ${schedule.customMessage || 'No message'} - ${schedule.scheduledTime}`)
+      activeReminders.forEach((reminder, index) => {
+        console.log(`${index + 1}. ${reminder.message} - ${reminder.scheduledTime}`)
       })
     }
     console.log()
 
-    // Get reminder logs history
-    const allLogs = await db
+    // Get sent reminders history
+    const sentReminders = await db
       .select()
-      .from(reminderLogs)
-      .where(eq(reminderLogs.patientId, patient.id))
-      .orderBy(desc(reminderLogs.sentAt))
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.patientId, patient.id),
+          not(isNull(reminders.sentAt))
+        )
+      )
+      .orderBy(desc(reminders.sentAt))
 
-    console.log(`📨 REMINDER LOGS HISTORY (${allLogs.length}):`)
-    console.log('===========================================')
+    console.log(`📨 SENT REMINDERS HISTORY (${sentReminders.length}):`)
+    console.log('===============================================')
 
-    if (allLogs.length === 0) {
-      console.log('❌ No reminder logs found')
+    if (sentReminders.length === 0) {
+      console.log('❌ No sent reminders found')
     } else {
-      allLogs.slice(0, 10).forEach((log, index) => {
-        const schedule = allSchedules.find(s => s.id === log.reminderScheduleId)
-        const scheduleName = schedule ? (schedule.customMessage || 'No message') : 'Unknown'
-        const isActive = schedule ? schedule.isActive : false
-
-        console.log(`${index + 1}. ${scheduleName} (${log.status})`)
-        console.log(`   📅 Sent: ${log.sentAt}`)
-        console.log(`   📋 Schedule Active: ${isActive ? 'Yes' : 'No'}`)
-        console.log(`   💬 Message: ${log.message.substring(0, 50)}...`)
+      sentReminders.slice(0, 10).forEach((reminder, index) => {
+        console.log(`${index + 1}. ${reminder.message} (${reminder.status})`)
+        console.log(`   📅 Sent: ${reminder.sentAt}`)
+        console.log(`   📋 Active: ${reminder.isActive ? 'Yes' : 'No'}`)
+        console.log(`   💬 Message: ${reminder.message.substring(0, 50)}...`)
         console.log()
       })
 
-      if (allLogs.length > 10) {
-        console.log(`... and ${allLogs.length - 10} more logs`)
+      if (sentReminders.length > 10) {
+        console.log(`... and ${sentReminders.length - 10} more reminders`)
       }
     }
 
@@ -102,13 +104,12 @@ async function showReminderHistory() {
       console.log('❌ No confirmations found')
     } else {
       allConfirmations.slice(0, 10).forEach((conf, index) => {
-        const schedule = allSchedules.find(s => s.id === conf.reminderScheduleId)
-        const scheduleName = schedule ? (schedule.customMessage || 'No message') : 'Unknown'
-        const isActive = schedule ? schedule.isActive : false
+        const reminder = allReminders.find(r => r.id === conf.reminderId)
+        const reminderMessage = reminder ? reminder.message : 'Unknown'
 
-        console.log(`${index + 1}. ${scheduleName}`)
+        console.log(`${index + 1}. ${reminderMessage}`)
         console.log(`   📅 Confirmed: ${conf.confirmedAt}`)
-        console.log(`   📋 Schedule Active: ${isActive ? 'Yes' : 'No'}`)
+        console.log(`   📋 Reminder Active: ${reminder?.isActive ? 'Yes' : 'No'}`)
         console.log()
       })
 
@@ -120,21 +121,21 @@ async function showReminderHistory() {
     // Analysis
     console.log('🔍 ANALYSIS:')
     console.log('============')
-    console.log(`Total Schedules: ${allSchedules.length}`)
-    console.log(`Active Schedules: ${activeSchedules.length}`)
-    console.log(`Inactive Schedules: ${allSchedules.length - activeSchedules.length}`)
-    console.log(`Total Logs: ${allLogs.length}`)
+    console.log(`Total Reminders: ${allReminders.length}`)
+    console.log(`Active Reminders: ${activeReminders.length}`)
+    console.log(`Inactive Reminders: ${allReminders.length - activeReminders.length}`)
+    console.log(`Sent Reminders: ${sentReminders.length}`)
     console.log(`Total Confirmations: ${allConfirmations.length}`)
 
     // Note: Patient reactivation tracking is handled in the database
-    // Old reminder schedules may be deactivated and not counted in stats
+    // Old reminders may be deactivated and not counted in stats
     // But compliance calculation includes historical data
 
     console.log()
     console.log('🎯 RECOMMENDATION:')
     console.log('==================')
-    if (activeSchedules.length === 0 && allSchedules.length > 0) {
-      console.log('✅ Reactivate old reminder schedules OR create new ones')
+    if (activeReminders.length === 0 && allReminders.length > 0) {
+      console.log('✅ Reactivate old reminders OR create new ones')
       console.log('✅ This will fix the "Terjadwal/Perlu Diperbarui/Semua = 0" issue')
     }
 

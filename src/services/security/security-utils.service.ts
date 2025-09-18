@@ -130,7 +130,7 @@ export class SecurityUtilsService {
       }
 
       // Check verification status
-      const isVerified = patientData.verificationStatus === "verified";
+      const isVerified = patientData.verificationStatus === "VERIFIED";
       if (!isVerified) {
         reasons.push("Patient is not verified");
         riskScore += 30;
@@ -199,7 +199,7 @@ export class SecurityUtilsService {
       }
 
       const patientData = patient[0];
-      const isVerified = patientData.verificationStatus === "verified";
+      const isVerified = patientData.verificationStatus === "VERIFIED";
 
       // Determine security level based on verification and activity status
       let securityLevel: "standard" | "enhanced" | "restricted" = "standard";

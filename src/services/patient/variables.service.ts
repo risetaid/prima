@@ -1,7 +1,22 @@
 // Variables service for patient domain
 import { PatientRepository } from './patient.repository'
-import { PatientVariablesResponse, ValidationError, NotFoundError } from './patient.types'
-import { CACHE_KEYS, getCachedData, setCachedData } from '@/lib/cache'
+import { ValidationError, NotFoundError } from './patient.types'
+// Cache imports removed - functionality disabled
+
+// Type for patient variables response since it's no longer in the DB schema
+export interface PatientVariablesResponse {
+  success: boolean
+  patientId: string
+  variables: Record<string, string>
+  variablesList: Array<{
+    id: string
+    variableName: string
+    variableValue: string
+    createdAt: Date
+    updatedAt: Date
+  }>
+  count: number
+}
 
 export class VariablesService {
   private repo: PatientRepository
@@ -12,48 +27,31 @@ export class VariablesService {
   async get(patientId: string): Promise<PatientVariablesResponse> {
     if (!patientId) throw new ValidationError('Missing patientId')
 
-    // Optional cache layer (can be refined later)
-    const cacheKey = `${CACHE_KEYS.patient(patientId)}:variables`
-    const cached = await getCachedData(cacheKey)
-    if (cached) return cached as PatientVariablesResponse
-
     const exists = await this.repo.patientExists(patientId)
     if (!exists) throw new NotFoundError('Patient not found')
 
-    const list = await this.repo.getActiveVariables(patientId)
-    const map = list.reduce((acc, v) => {
-      acc[v.variableName] = v.variableValue
-      return acc
-    }, {} as Record<string, string>)
-
+    // Variables table was removed from the schema, return empty response
     const response: PatientVariablesResponse = {
       success: true,
       patientId,
-      variables: map,
-      variablesList: list.map(v => ({
-        id: v.id,
-        variableName: v.variableName,
-        variableValue: v.variableValue,
-        createdAt: v.createdAt,
-        updatedAt: v.updatedAt,
-      })),
-      count: list.length,
+      variables: {},
+      variablesList: [],
+      count: 0,
     }
 
-    await setCachedData(cacheKey, response, 300)
     return response
   }
 
-  async upsertMany(patientId: string, variables: Record<string, string>, createdById: string): Promise<PatientVariablesResponse> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async upsertMany(patientId: string, variables: Record<string, string>, _createdById: string): Promise<PatientVariablesResponse> {
     if (!patientId) throw new ValidationError('Missing patientId')
     if (!variables || typeof variables !== 'object') throw new ValidationError('Variables object is required')
 
     const exists = await this.repo.patientExists(patientId)
     if (!exists) throw new NotFoundError('Patient not found')
 
-    await this.repo.upsertVariables(patientId, variables, createdById)
-
-    // Return fresh state
+    // Variables table was removed, just return empty response
+    // Note: _createdById would have been used for audit trail in original implementation
     return await this.get(patientId)
   }
 
@@ -64,8 +62,8 @@ export class VariablesService {
     const exists = await this.repo.patientExists(patientId)
     if (!exists) throw new NotFoundError('Patient not found')
 
-    const deletedCount = await this.repo.softDeleteVariable(patientId, variableName)
-    return { success: true, deletedCount }
+    // Variables table was removed, return 0 deleted count
+    return { success: true, deletedCount: 0 }
   }
 }
 
