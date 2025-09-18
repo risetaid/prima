@@ -252,15 +252,15 @@ export function LLMAnalyticsDashboard({
                           {requests} requests
                         </span>
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {formatCurrency(stats.costByModel[model] || 0)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {((requests / stats.totalRequests) * 100).toFixed(1)}%
-                          of total
-                        </div>
-                      </div>
+                       <div className="text-right">
+                         <div className="font-medium">
+                           {formatCurrency(stats.costByModel[model] || 0)}
+                         </div>
+                         <div className="text-xs text-muted-foreground">
+                           {stats.totalRequests > 0 ? ((requests / stats.totalRequests) * 100).toFixed(1) : '0.0'}%
+                           of total
+                         </div>
+                       </div>
                     </div>
                   )
                 )}
@@ -292,12 +292,12 @@ export function LLMAnalyticsDashboard({
                           {requests} requests
                         </span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">
-                          {((requests / stats.totalRequests) * 100).toFixed(1)}%
-                          of total
-                        </div>
-                      </div>
+                       <div className="text-right">
+                         <div className="text-xs text-muted-foreground">
+                           {stats.totalRequests > 0 ? ((requests / stats.totalRequests) * 100).toFixed(1) : '0.0'}%
+                           of total
+                         </div>
+                       </div>
                     </div>
                   ))}
               </div>

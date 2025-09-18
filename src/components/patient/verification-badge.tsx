@@ -23,7 +23,7 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
 
   if (!isActive) {
     return {
-      badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+      badgeColor: 'bg-gray-700 text-white border-gray-800',
       badgeIcon: '⏹️',
       displayStatus: 'BERHENTI',
       description: 'Pasien telah berhenti dari layanan'
@@ -34,49 +34,62 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
   // Database: VERIFIED, PENDING, DECLINED, EXPIRED (uppercase)
   // UI expects: verified, pending_verification, declined, expired, unsubscribed (lowercase)
   let mappedStatus = normalizedStatus
-  
+
   // Map database enum values to UI expected values
   switch (normalizedStatus) {
     case 'pending':
+    case 'pending_verification':
       mappedStatus = 'pending_verification'
       break
-    // Add other mappings as needed
+    case 'verified':
+      mappedStatus = 'verified'
+      break
+    case 'declined':
+      mappedStatus = 'declined'
+      break
+    case 'expired':
+      mappedStatus = 'expired'
+      break
+    case 'unsubscribed':
+      mappedStatus = 'unsubscribed'
+      break
     default:
+      // Handle any other status by trying to map it
       mappedStatus = normalizedStatus
   }
 
   switch (mappedStatus) {
     case 'verified':
       return {
-        badgeColor: 'bg-green-100 text-green-800 border-green-300',
+        badgeColor: 'bg-green-600 text-white border-green-700',
         badgeIcon: '✅',
         displayStatus: 'Terverifikasi',
         description: 'Pasien telah diverifikasi'
       }
     case 'declined':
       return {
-        badgeColor: 'bg-red-100 text-red-800 border-red-300',
+        badgeColor: 'bg-red-600 text-white border-red-700',
         badgeIcon: '❌',
         displayStatus: 'Menolak',
         description: 'Pasien menolak verifikasi'
       }
     case 'expired':
       return {
-        badgeColor: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        badgeColor: 'bg-orange-600 text-white border-orange-700',
         badgeIcon: '⏰',
         displayStatus: 'Kedaluwarsa',
         description: 'Verifikasi kedaluwarsa'
       }
     case 'pending_verification':
       return {
-        badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+        badgeColor: 'bg-blue-600 text-white border-blue-700',
         badgeIcon: '⏳',
         displayStatus: 'Menunggu Verifikasi',
         description: 'Menunggu verifikasi'
       }
     case 'unsubscribed':
       return {
-        badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+        badgeColor: 'bg-gray-600 text-white border-gray-700',
         badgeIcon: '🚫',
         displayStatus: 'Berhenti',
         description: 'Pasien telah berhenti dari layanan'
@@ -85,7 +98,7 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
       // Add debug info to help identify unmapped statuses
       console.warn('Unmapped verification status:', input.verificationStatus, '(normalized:', normalizedStatus, ')')
       return {
-        badgeColor: 'bg-gray-100 text-gray-800 border-gray-300',
+        badgeColor: 'bg-purple-600 text-white border-purple-700',
         badgeIcon: '❓',
         displayStatus: 'Status Tidak Dikenal',
         description: `Status tidak dikenal: ${input.verificationStatus}`

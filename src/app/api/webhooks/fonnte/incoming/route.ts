@@ -1476,64 +1476,15 @@ export async function POST(request: NextRequest) {
 
   await logConversation(patient, sender, message || "");
 
-  // PRIORITY 0: Skip standardized response processor for verification context to avoid LLM misuse
-  if (patient.verificationStatus !== "PENDING") {
-    try {
-      const { responseProcessorService } = await import(
-        "@/services/response-processor.service"
-      );
-      const context = responseProcessorService.createContext(
-        patient.id,
-        patient.phoneNumber,
-        message || "",
-        patient.verificationStatus,
-        "verification" // Default, will be refined by handlers
-      );
+  // SIMPLIFIED PROCESSING PIPELINE - Single LLM processor with clear fallbacks
 
-      const standardResult = await responseProcessorService.processResponse(
-        context
-      );
-
-      if (standardResult.success) {
-        // Send response message if available
-        if (
-          standardResult.data?.responseMessage &&
-          typeof standardResult.data.responseMessage === "string"
-        ) {
-          await sendAck(
-            patient.phoneNumber,
-            standardResult.data.responseMessage
-          );
-        }
-
-        return NextResponse.json({
-          ok: true,
-          processed: true,
-          action: standardResult.metadata?.action || "standard_response",
-          source: "standard_processor",
-          emergencyDetected: standardResult.metadata?.emergencyDetected,
-          escalated: standardResult.metadata?.escalated,
-        });
-      }
-    } catch (error) {
-      logger.warn(
-        "Standard response processor failed, falling back to unified processor",
-        {
-          patientId: patient.id,
-          operation: "standard_processor_fallback",
-          error: error instanceof Error ? error.message : String(error),
-        }
-      );
-    }
-  }
-
-  // PRIORITY 1: Check if patient is awaiting verification (process BEFORE unified processor)
+  // PRIORITY 1: Verification responses (keyword-based, no LLM for security)
   if (patient.verificationStatus === "PENDING") {
     const result = await processVerificationResponse(message || "", patient);
     if (result) return result;
   }
 
-  // PRIORITY 1: Try unified processor for all messages (fallback)
+  // PRIORITY 2: Try unified LLM processor for all other messages
   const unifiedResult = await processMessageWithUnifiedProcessor(
     message || "",
     patient
@@ -1547,19 +1498,19 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // PRIORITY 2: Check for medication responses (if patient is verified) (legacy fallback)
+  // PRIORITY 3: Legacy medication responses (keyword-based fallback)
   if (patient.verificationStatus === "VERIFIED") {
     const result = await processMedicationResponse(message || "", patient);
     if (result) return result;
   }
 
-  // PRIORITY 3: Check for followup responses (if patient is verified) (legacy fallback)
+  // PRIORITY 4: Legacy followup responses (keyword-based fallback)
   if (patient.verificationStatus === "VERIFIED") {
     const result = await processFollowupResponse(message || "", patient);
     if (result) return result;
   }
 
-  // FALLBACK: Handle unrecognized messages
+  // FALLBACK: Handle unrecognized messages with generic responses
   await handleUnrecognizedMessage(message || "", patient);
 
   return NextResponse.json({ ok: true, processed: true, action: "none" });
