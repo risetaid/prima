@@ -106,6 +106,19 @@ function detectIntentEnhanced(
   const msg = (rawMessage || "").toLowerCase().trim();
   const words = msg.split(/\s+/);
 
+  // Check for general inquiry patterns that should NOT be classified as verification/medication
+  const generalInquiryPatterns = [
+    'halo', 'hai', 'hello', 'hi', 'siapa', 'apa', 'bagaimana', 'gimana',
+    'kenapa', 'kapan', 'dimana', 'berapa', 'info', 'informasi', 'kabar',
+    'bantuan', 'help', 'tolong', 'tanya', 'pertanyaan', 'kamu', 'nama'
+  ];
+
+  // If message contains general inquiry patterns and is in verification context, 
+  // reduce confidence significantly to avoid false classification
+  const hasGeneralInquiry = generalInquiryPatterns.some(pattern => 
+    msg.includes(pattern)
+  );
+
   // Enhanced Indonesian language patterns with weights
   const patterns = {
     accept: [
@@ -212,6 +225,11 @@ function detectIntentEnhanced(
       ["medication_taken", "medication_pending", "need_help"].includes(intent)
     ) {
       confidence *= 1.2;
+    }
+
+    // General inquiry penalty - significantly reduce confidence for general chat
+    if (hasGeneralInquiry && (context === "verification" || context === "medication")) {
+      confidence *= 0.1; // Massive penalty to prevent misclassification
     }
 
     if (confidence > bestMatch.confidence) {
@@ -1126,6 +1144,41 @@ async function handleUnrecognizedMessage(
 }
 
 /**
+ * Smart verification response detection
+ * Only treats message as verification response if it's truly a YA/TIDAK answer
+ */
+function isActualVerificationResponse(message: string | undefined): boolean {
+  if (!message) return false;
+  
+  const normalizedMessage = message.toLowerCase().trim();
+  const words = normalizedMessage.split(/\s+/);
+  
+  // Must be short response (max 3 words) to be verification
+  if (words.length > 3) return false;
+  
+  // Explicit verification keywords
+  const verificationKeywords = [
+    'ya', 'iya', 'yes', 'y', 'ok', 'oke', 'setuju', 'terima', 'mau',
+    'tidak', 'no', 'n', 'ga', 'gak', 'engga', 'enggak', 'tolak', 'nolak'
+  ];
+  
+  // General inquiry keywords that should NOT be treated as verification
+  const generalKeywords = [
+    'halo', 'hai', 'hello', 'siapa', 'apa', 'bagaimana', 'gimana', 
+    'kenapa', 'kapan', 'dimana', 'berapa', 'info', 'informasi',
+    'bantuan', 'help', 'tolong', 'tanya', 'kabar'
+  ];
+  
+  // If contains general inquiry keywords, not verification
+  if (generalKeywords.some(keyword => normalizedMessage.includes(keyword))) {
+    return false;
+  }
+  
+  // Must contain verification keywords to be considered verification
+  return verificationKeywords.some(keyword => normalizedMessage.includes(keyword));
+}
+
+/**
  * Unified message processing using MessageProcessorService
  * This provides consistent handling across all message types with LLM integration
  */
@@ -1133,16 +1186,17 @@ async function processMessageWithUnifiedProcessor(
   message: string | undefined,
   patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
-  // Skip unified processor for verification context to avoid LLM misuse
-  if (patient.verificationStatus === "PENDING") {
-    logger.info("Skipping unified processor for verification context", {
+  // Smart verification detection: only skip unified processor for actual verification responses
+  if (patient.verificationStatus === "PENDING" && isActualVerificationResponse(message)) {
+    logger.info("Skipping unified processor for actual verification response", {
       patientId: patient.id,
       verificationStatus: patient.verificationStatus,
-      operation: "verification_context_protection",
+      message: message?.substring(0, 50),
+      operation: "verification_response_protection",
     });
     return {
       processed: false,
-      message: "Verification context - using legacy handlers",
+      message: "Actual verification response - using verification handlers",
     };
   }
 
