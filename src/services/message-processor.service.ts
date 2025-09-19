@@ -283,15 +283,36 @@ export class MessageProcessorService {
 
     // Extended unsubscribe keywords that need LLM analysis for better context
     const unsubscribeIndicators = [
-      "berhenti", "stop", "matikan", "hentikan", "cukup", "tidak mau lagi",
-      "sudah sembuh", "tidak sakit lagi", "obat habis", "tidak butuh lagi",
-      "berhenti dong", "cukup sampai sini", "saya sudah tidak sakit",
-      "boleh berhenti", "maaf mau berhenti", "terima kasih mau berhenti",
-      "keluar", "batal", "cancel", "unsubscribe", "tidak ingin",
-      "mau berhenti", "hentikan", "stop dulu", "berhenti dulu"
+      "berhenti",
+      "stop",
+      "matikan",
+      "hentikan",
+      "cukup",
+      "tidak mau lagi",
+      "sudah sembuh",
+      "tidak sakit lagi",
+      "obat habis",
+      "tidak butuh lagi",
+      "berhenti dong",
+      "cukup sampai sini",
+      "saya sudah tidak sakit",
+      "boleh berhenti",
+      "maaf mau berhenti",
+      "terima kasih mau berhenti",
+      "keluar",
+      "batal",
+      "cancel",
+      "unsubscribe",
+      "tidak ingin",
+      "mau berhenti",
+      "hentikan",
+      "stop dulu",
+      "berhenti dulu",
     ];
 
-    return unsubscribeIndicators.some((keyword) => normalizedMessage.includes(keyword));
+    return unsubscribeIndicators.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
   }
 
   // Indonesian keyword mappings for fallback (kept for emergency cases)
@@ -509,13 +530,18 @@ export class MessageProcessorService {
 
     // Check if patient is already verified but conversation is still in verification context
     // If so, switch to general_inquiry context for proper LLM processing
-    if (conversationState.currentContext === "verification" &&
-        context.verificationStatus === "VERIFIED") {
-      logger.info("Switching verified patient conversation from verification to general_inquiry context", {
-        patientId: context.patientId,
-        phoneNumber: context.phoneNumber,
-        conversationStateId: conversationState.id
-      });
+    if (
+      conversationState.currentContext === "verification" &&
+      context.verificationStatus === "VERIFIED"
+    ) {
+      logger.info(
+        "Switching verified patient conversation from verification to general_inquiry context",
+        {
+          patientId: context.patientId,
+          phoneNumber: context.phoneNumber,
+          conversationStateId: conversationState.id,
+        }
+      );
 
       conversationState = await this.conversationStateService.switchContext(
         conversationState.id,
@@ -551,7 +577,8 @@ export class MessageProcessorService {
       }
     } else {
       // Always check for unsubscribe keywords first, regardless of context
-      const shouldUseLLMForUnsubscribe = this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
+      const shouldUseLLMForUnsubscribe =
+        this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
 
       if (shouldUseLLMForUnsubscribe) {
         // Use LLM-based unsubscribe detection for better understanding
@@ -571,8 +598,8 @@ export class MessageProcessorService {
         }
       } else {
         // Fallback to original keyword-based unsubscribe detection
-        const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some((keyword) =>
-          normalizedMessage.includes(keyword)
+        const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some(
+          (keyword) => normalizedMessage.includes(keyword)
         );
 
         if (hasUnsubscribeKeywords) {
@@ -733,25 +760,26 @@ export class MessageProcessorService {
         {
           intent: intent.primary,
           confidence: intent.confidence,
-          responseTime: llmResponse.responseTime
+          responseTime: llmResponse.responseTime,
         }
       );
 
-      const outboundMessageData = await this.conversationStateService.addMessage(conversationState.id, {
-        message: llmResponse.content,
-        direction: "outbound",
-        messageType: this.mapIntentToMessageType(intent.primary),
-        intent: intent.primary,
-        confidence: intent.confidence
-          ? Math.round(intent.confidence * 100)
-          : 100,
-        llmResponseId: llmResponse.model,
-        llmModel: llmResponse.model,
-        llmTokensUsed: llmResponse.tokensUsed,
-        llmCost: costTrackingEvent.cost, // Use tracked cost instead of calculated
-        llmResponseTimeMs: llmResponse.responseTime,
-        processedAt: new Date(),
-      });
+      const outboundMessageData =
+        await this.conversationStateService.addMessage(conversationState.id, {
+          message: llmResponse.content,
+          direction: "outbound",
+          messageType: this.mapIntentToMessageType(intent.primary),
+          intent: intent.primary,
+          confidence: intent.confidence
+            ? Math.round(intent.confidence * 100)
+            : 100,
+          llmResponseId: llmResponse.model,
+          llmModel: llmResponse.model,
+          llmTokensUsed: llmResponse.tokensUsed,
+          llmCost: costTrackingEvent.cost, // Use tracked cost instead of calculated
+          llmResponseTimeMs: llmResponse.responseTime,
+          processedAt: new Date(),
+        });
 
       // Log cost tracking for monitoring
       logger.debug("LLM response cost tracked", {
@@ -759,7 +787,7 @@ export class MessageProcessorService {
         messageId: outboundMessageData.id,
         cost: costTrackingEvent.cost,
         tokens: costTrackingEvent.tokensUsed,
-        operationType: costTrackingEvent.operationType
+        operationType: costTrackingEvent.operationType,
       });
     }
 
@@ -1516,11 +1544,11 @@ export class MessageProcessorService {
           "", // No specific input text for direct response
           llmResponse.content,
           llmResponse.model,
-          'direct_response',
+          "direct_response",
           {
             intent: intent.primary,
             confidence: intent.confidence,
-            responseTime: llmResponse.responseTime
+            responseTime: llmResponse.responseTime,
           }
         );
 
@@ -1653,10 +1681,10 @@ export class MessageProcessorService {
           message, // Input message
           finalResponse.content,
           finalResponse.model,
-          'direct_response',
+          "direct_response",
           {
             safetyFiltered: !safetyResult.isSafe,
-            violations: safetyResult.violations.length
+            violations: safetyResult.violations.length,
           }
         );
       }
@@ -1709,16 +1737,18 @@ RESPONSE GUIDELINES:
    * Convert markdown formatting to WhatsApp compatible format
    */
   private convertMarkdownToWhatsApp(text: string): string {
-    return text
-      // Convert **bold** to *bold* (WhatsApp format)
-      .replace(/\*\*(.*?)\*\*/g, '*$1*')
-      // Convert _italic_ to _italic_ (already WhatsApp compatible)
-      // Convert ```code``` to ```code``` (already WhatsApp compatible)
-      // Remove any other markdown that WhatsApp doesn't support
-      .replace(/#{1,6}\s/g, '') // Remove headers
-      .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // Convert links to just text
-      .replace(/^\s*[-*+]\s/gm, '• ') // Convert list items to bullet points
-      .replace(/^\s*\d+\.\s/gm, '$1 ') // Keep numbered lists but clean them up
+    return (
+      text
+        // Convert **bold** to *bold* (WhatsApp format)
+        .replace(/\*\*(.*?)\*\*/g, "*$1*")
+        // Convert _italic_ to _italic_ (already WhatsApp compatible)
+        // Convert ```code``` to ```code``` (already WhatsApp compatible)
+        // Remove any other markdown that WhatsApp doesn't support
+        .replace(/#{1,6}\s/g, "") // Remove headers
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1") // Convert links to just text
+        .replace(/^\s*[-*+]\s/gm, "• ") // Convert list items to bullet points
+        .replace(/^\s*\d+\.\s/gm, "$1 ")
+    ); // Keep numbered lists but clean them up
   }
 
   /**
@@ -1774,11 +1804,15 @@ RESPONSE GUIDELINES:
       };
     }
 
-    // Fallback response
+    // Intelligent fallback response based on message content
+    const fallbackMessage = this.generateIntelligentFallbackResponse(
+      context.message,
+      "unknown" // Default intent for fallback
+    );
+
     return {
       type: "auto_reply",
-      message:
-        "Terima kasih atas pesannya. Jika ada yang bisa dibantu, silakan beri tahu.",
+      message: fallbackMessage,
       actions: [],
       priority: "low",
     };
@@ -1789,7 +1823,10 @@ RESPONSE GUIDELINES:
    */
   private calculateLLMCost(tokensUsed: number, model?: string): number {
     // Use tokenizer service for accurate cost calculation
-    return tokenizerService.estimateCost(tokensUsed, model || "gemini-2.0-flash-exp");
+    return tokenizerService.estimateCost(
+      tokensUsed,
+      model || "gemini-2.0-flash-exp"
+    );
   }
 
   /**
@@ -1934,5 +1971,176 @@ RESPONSE GUIDELINES:
       });
     }
     return entities;
+  }
+
+  /**
+   * Generate intelligent fallback response based on message content
+   */
+  private generateIntelligentFallbackResponse(
+    message: string,
+    intent: MessageIntent["primary"]
+  ): string {
+    const normalizedMessage = message.toLowerCase().trim();
+
+    // Check for greeting patterns
+    if (this.isGreetingMessage(normalizedMessage)) {
+      return "Halo! Saya adalah asisten PRIMA yang siap membantu Anda. Ada yang bisa saya bantu terkait kesehatan atau pengingat obat Anda? 💙";
+    }
+
+    // Check for question patterns
+    if (this.isQuestionMessage(normalizedMessage)) {
+      return "Saya melihat Anda memiliki pertanyaan. Untuk memberikan jawaban yang tepat, bisakah Anda memberikan sedikit detail lebih lanjut? Atau saya bisa membantu dengan informasi tentang pengingat obat Anda. 💊";
+    }
+
+    // Check for thank you patterns
+    if (this.isThankYouMessage(normalizedMessage)) {
+      return "Sama-sama! Saya di sini untuk membantu Anda. Jika ada hal lain yang bisa saya bantu, jangan ragu untuk bertanya. Semoga sehat selalu! 🙏💙";
+    }
+
+    // Check for medication-related keywords
+    if (this.isMedicationRelated(normalizedMessage)) {
+      return "Saya melihat pesan Anda berkaitan dengan obat. Untuk informasi yang akurat, saya bisa membantu dengan:\n\n• Jadwal pengingat obat Anda\n• Status kepatuhan minum obat\n• Informasi umum tentang pengobatan\n\nApa yang ingin Anda ketahui? 💊";
+    }
+
+    // Check for health-related keywords
+    if (this.isHealthRelated(normalizedMessage)) {
+      return "Saya melihat Anda menyebutkan tentang kesehatan. Sebagai asisten PRIMA, saya bisa membantu dengan informasi umum tentang:\n\n• Edukasi kesehatan paliatif\n• Dukungan untuk pasien kanker\n• Tips kesehatan sehari-hari\n\nApakah ada topik spesifik yang ingin Anda bahas? 🏥";
+    }
+
+    // Default intelligent response based on intent
+    switch (intent) {
+      case "inquiry":
+        return "Saya menerima pertanyaan Anda. Untuk memberikan bantuan yang lebih baik, bisakah Anda memberikan sedikit konteks atau detail lebih lanjut? Atau saya bisa membantu dengan informasi tentang layanan PRIMA. 💙";
+
+      case "reminder_inquiry":
+        return "Untuk informasi tentang pengingat obat, saya bisa membantu dengan:\n\n• Melihat jadwal obat hari ini\n• Mengecek status pengingat aktif\n• Memberikan ringkasan kepatuhan\n\nApa yang ingin Anda ketahui? ⏰";
+
+      case "emergency":
+        return "Saya mendeteksi ini mungkin berkaitan dengan keadaan darurat. Jika Anda membutuhkan bantuan medis segera, silakan hubungi:\n\n• Layanan darurat: 112\n• Rumah sakit terdekat\n• Relawan PRIMA untuk dukungan\n\nApakah ini benar keadaan darurat? 🚨";
+
+      default:
+        return "Terima kasih atas pesan Anda. Saya adalah asisten PRIMA yang siap membantu dengan:\n\n• Informasi tentang pengingat obat\n• Dukungan kesehatan paliatif\n• Edukasi kanker dan pengobatan\n• Bantuan untuk pasien dan relawan\n\nAda yang spesifik yang bisa saya bantu? 💙";
+    }
+  }
+
+  /**
+   * Check if message is a greeting
+   */
+  private isGreetingMessage(message: string): boolean {
+    const greetingPatterns = [
+      "halo",
+      "hai",
+      "hello",
+      "hi",
+      "selamat",
+      "pagi",
+      "siang",
+      "sore",
+      "malam",
+      "assalamualaikum",
+      "salam",
+      "apa kabar",
+      "bagaimana kabar",
+    ];
+    return greetingPatterns.some((pattern) => message.includes(pattern));
+  }
+
+  /**
+   * Check if message contains questions
+   */
+  private isQuestionMessage(message: string): boolean {
+    const questionPatterns = [
+      "apa",
+      "bagaimana",
+      "gimana",
+      "kenapa",
+      "kok",
+      "mengapa",
+      "kapan",
+      "dimana",
+      "siapa",
+      "berapa",
+      "tanya",
+      "pertanyaan",
+      "bisa",
+      "boleh",
+      "minta",
+    ];
+    return (
+      questionPatterns.some((pattern) => message.includes(pattern)) ||
+      message.includes("?") ||
+      message.startsWith("tolong") ||
+      message.startsWith("bantu")
+    );
+  }
+
+  /**
+   * Check if message is thank you
+   */
+  private isThankYouMessage(message: string): boolean {
+    const thankYouPatterns = [
+      "terima kasih",
+      "makasih",
+      "thanks",
+      "thank you",
+      "thx",
+      "tq",
+      "sama-sama",
+      "sama²",
+      "terimakasih",
+    ];
+    return thankYouPatterns.some((pattern) => message.includes(pattern));
+  }
+
+  /**
+   * Check if message is medication-related
+   */
+  private isMedicationRelated(message: string): boolean {
+    const medicationPatterns = [
+      "obat",
+      "pil",
+      "tablet",
+      "kapsul",
+      "sirup",
+      "salep",
+      "injeksi",
+      "minum obat",
+      "ambil obat",
+      "makan obat",
+      "telan",
+      "konsumsi",
+      "dosis",
+      "jadwal",
+      "pengingat",
+      "reminder",
+      "schedule",
+    ];
+    return medicationPatterns.some((pattern) => message.includes(pattern));
+  }
+
+  /**
+   * Check if message is health-related
+   */
+  private isHealthRelated(message: string): boolean {
+    const healthPatterns = [
+      "sakit",
+      "nyeri",
+      "demam",
+      "mual",
+      "muntah",
+      "pusing",
+      "lemah",
+      "kesehatan",
+      "penyakit",
+      "diagnosis",
+      "pengobatan",
+      "terapi",
+      "kanker",
+      "tumor",
+      "kemoterapi",
+      "radiasi",
+      "operasi",
+    ];
+    return healthPatterns.some((pattern) => message.includes(pattern));
   }
 }

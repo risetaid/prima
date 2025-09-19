@@ -196,7 +196,7 @@ export class EnhancedCostManager {
           const breakdown = await this.calculateEnhancedCost(
             message.direction === 'inbound' ? message.message : '',
             message.direction === 'outbound' ? message.message : '',
-            message.llmModel || 'gemini-2.0-flash-exp',
+            message.llmModel || process.env.ANTHROPIC_MODEL || 'claude-3-5-haiku',
             operationType
           );
 

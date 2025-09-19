@@ -7,11 +7,14 @@ import { db } from "@/db";
 import { conversationMessages, conversationStates } from "@/db/schema";
 import { and, eq, gte, lte, sql, sum } from "drizzle-orm";
 import { logger } from "@/lib/logger";
-import { enhancedCostManager, CostBreakdown } from "@/lib/enhanced-cost-manager";
+import {
+  enhancedCostManager,
+  CostBreakdown,
+} from "@/lib/enhanced-cost-manager";
 
 export interface CostThreshold {
   id: string;
-  type: 'daily' | 'weekly' | 'monthly' | 'per_user' | 'per_conversation';
+  type: "daily" | "weekly" | "monthly" | "per_user" | "per_conversation";
   threshold: number;
   userId?: string;
   conversationId?: string;
@@ -23,7 +26,7 @@ export interface CostBudget {
   id: string;
   name: string;
   amount: number;
-  period: 'daily' | 'weekly' | 'monthly';
+  period: "daily" | "weekly" | "monthly";
   userId?: string;
   alertThreshold: number; // Percentage (e.g., 80 for 80%)
   resetDate: Date;
@@ -37,7 +40,7 @@ export interface CostTrackingEvent {
   conversationId: string;
   messageId: string;
   userId: string;
-  operationType: CostBreakdown['operationType'];
+  operationType: CostBreakdown["operationType"];
   model: string;
   tokensUsed: number;
   cost: number;
@@ -61,7 +64,7 @@ export class CostMonitorService {
     inputText: string,
     outputText: string,
     model: string,
-    operationType: CostBreakdown['operationType'],
+    operationType: CostBreakdown["operationType"],
     metadata?: Record<string, unknown>
   ): Promise<CostTrackingEvent> {
     try {
@@ -84,13 +87,15 @@ export class CostMonitorService {
         tokensUsed: costBreakdown.totalTokens,
         cost: costBreakdown.totalCost,
         timestamp: new Date(),
-        metadata
+        metadata,
       };
 
       // Store in memory for quick access
       this.trackingEvents.push(event);
       if (this.trackingEvents.length > this.MAX_EVENTS_MEMORY) {
-        this.trackingEvents = this.trackingEvents.slice(-this.MAX_EVENTS_MEMORY);
+        this.trackingEvents = this.trackingEvents.slice(
+          -this.MAX_EVENTS_MEMORY
+        );
       }
 
       // Check thresholds and budgets
@@ -110,28 +115,65 @@ export class CostMonitorService {
 
       return event;
     } catch (error) {
-      logger.error("Failed to track message cost", error as Error, {
+      const err = error as Error;
+      logger.error("Failed to track message cost", err, {
         conversationId,
         messageId,
         userId,
+        errorType: err.constructor.name,
+        errorMessage: err.message,
       });
-      throw error;
+
+      // Don't throw error - return a minimal tracking event to prevent blocking LLM responses
+      logger.warn(
+        "Cost tracking failed, returning minimal event to prevent blocking",
+        {
+          conversationId,
+          messageId,
+          userId,
+        }
+      );
+
+      return {
+        id: `cost_fallback_${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`,
+        conversationId,
+        messageId,
+        userId,
+        operationType,
+        model: model || "unknown",
+        tokensUsed: 0,
+        cost: 0,
+        timestamp: new Date(),
+        metadata: {
+          ...metadata,
+          costTrackingFailed: true,
+          error: err.message,
+        },
+      };
     }
   }
 
   /**
    * Add a cost threshold
    */
-  addThreshold(threshold: Omit<CostThreshold, 'id' | 'createdAt'>): string {
-    const id = `threshold_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  addThreshold(threshold: Omit<CostThreshold, "id" | "createdAt">): string {
+    const id = `threshold_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     const newThreshold: CostThreshold = {
       ...threshold,
       id,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     this.thresholds.push(newThreshold);
-    logger.info("Cost threshold added", { id, type: threshold.type, threshold: threshold.threshold });
+    logger.info("Cost threshold added", {
+      id,
+      type: threshold.type,
+      threshold: threshold.threshold,
+    });
     return id;
   }
 
@@ -139,7 +181,7 @@ export class CostMonitorService {
    * Remove a cost threshold
    */
   removeThreshold(thresholdId: string): boolean {
-    const index = this.thresholds.findIndex(t => t.id === thresholdId);
+    const index = this.thresholds.findIndex((t) => t.id === thresholdId);
     if (index !== -1) {
       this.thresholds.splice(index, 1);
       logger.info("Cost threshold removed", { thresholdId });
@@ -151,25 +193,36 @@ export class CostMonitorService {
   /**
    * Add a cost budget
    */
-  addBudget(budget: Omit<CostBudget, 'id' | 'createdAt' | 'currentSpent'>): string {
-    const id = `budget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  addBudget(
+    budget: Omit<CostBudget, "id" | "createdAt" | "currentSpent">
+  ): string {
+    const id = `budget_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
     const newBudget: CostBudget = {
       ...budget,
       id,
       currentSpent: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
     };
 
     this.budgets.push(newBudget);
-    logger.info("Cost budget added", { id, name: budget.name, amount: budget.amount });
+    logger.info("Cost budget added", {
+      id,
+      name: budget.name,
+      amount: budget.amount,
+    });
     return id;
   }
 
   /**
    * Update budget spending
    */
-  async updateBudgetSpending(budgetId: string, additionalCost: number): Promise<void> {
-    const budget = this.budgets.find(b => b.id === budgetId);
+  async updateBudgetSpending(
+    budgetId: string,
+    additionalCost: number
+  ): Promise<void> {
+    const budget = this.budgets.find((b) => b.id === budgetId);
     if (budget) {
       budget.currentSpent += additionalCost;
 
@@ -179,7 +232,7 @@ export class CostMonitorService {
           budgetId,
           name: budget.name,
           spent: budget.currentSpent,
-          limit: budget.amount
+          limit: budget.amount,
         });
       }
     }
@@ -198,7 +251,7 @@ export class CostMonitorService {
       let thresholdExceeded = false;
 
       switch (threshold.type) {
-        case 'per_user':
+        case "per_user":
           if (threshold.userId === event.userId) {
             currentValue = await this.getUserCostInPeriod(
               event.userId,
@@ -209,14 +262,14 @@ export class CostMonitorService {
           }
           break;
 
-        case 'per_conversation':
+        case "per_conversation":
           if (threshold.conversationId === event.conversationId) {
             currentValue = await this.getConversationCost(event.conversationId);
             thresholdExceeded = currentValue >= threshold.threshold;
           }
           break;
 
-        case 'daily':
+        case "daily":
           currentValue = await this.getTotalCostInPeriod(
             new Date(Date.now() - 24 * 60 * 60 * 1000),
             new Date()
@@ -224,7 +277,7 @@ export class CostMonitorService {
           thresholdExceeded = currentValue >= threshold.threshold;
           break;
 
-        case 'weekly':
+        case "weekly":
           currentValue = await this.getTotalCostInPeriod(
             new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
             new Date()
@@ -232,7 +285,7 @@ export class CostMonitorService {
           thresholdExceeded = currentValue >= threshold.threshold;
           break;
 
-        case 'monthly':
+        case "monthly":
           currentValue = await this.getTotalCostInPeriod(
             new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
             new Date()
@@ -242,7 +295,11 @@ export class CostMonitorService {
       }
 
       if (thresholdExceeded) {
-        const alertMessage = `Cost threshold exceeded: ${threshold.type} limit of $${threshold.threshold} reached (current: $${currentValue.toFixed(2)})`;
+        const alertMessage = `Cost threshold exceeded: ${
+          threshold.type
+        } limit of $${
+          threshold.threshold
+        } reached (current: $${currentValue.toFixed(2)})`;
         alerts.push(alertMessage);
 
         logger.warn("Cost threshold exceeded", {
@@ -251,7 +308,7 @@ export class CostMonitorService {
           threshold: threshold.threshold,
           current: currentValue,
           userId: event.userId,
-          conversationId: event.conversationId
+          conversationId: event.conversationId,
         });
       }
     }
@@ -270,8 +327,7 @@ export class CostMonitorService {
       if (!budget.enabled) continue;
 
       // Check if this event applies to the budget
-      const appliesToBudget =
-        !budget.userId || budget.userId === event.userId;
+      const appliesToBudget = !budget.userId || budget.userId === event.userId;
 
       if (appliesToBudget) {
         await this.updateBudgetSpending(budget.id, event.cost);
@@ -284,7 +340,7 @@ export class CostMonitorService {
             name: budget.name,
             usagePercentage,
             spent: budget.currentSpent,
-            limit: budget.amount
+            limit: budget.amount,
           });
 
           await this.sendBudgetAlert(budget, usagePercentage, event);
@@ -296,7 +352,11 @@ export class CostMonitorService {
   /**
    * Get user cost in a specific period
    */
-  private async getUserCostInPeriod(userId: string, startDate: Date, endDate: Date): Promise<number> {
+  private async getUserCostInPeriod(
+    userId: string,
+    startDate: Date,
+    endDate: Date
+  ): Promise<number> {
     try {
       // Get conversations for this user
       const conversations = await db
@@ -312,7 +372,7 @@ export class CostMonitorService {
 
       if (conversations.length === 0) return 0;
 
-      const conversationIds = conversations.map(c => c.id);
+      const conversationIds = conversations.map((c) => c.id);
 
       // Get cost for these conversations
       const result = await db
@@ -329,7 +389,9 @@ export class CostMonitorService {
 
       return Number(result[0]?.total) || 0;
     } catch (error) {
-      logger.error("Failed to get user cost in period", error as Error, { userId });
+      logger.error("Failed to get user cost in period", error as Error, {
+        userId,
+      });
       return 0;
     }
   }
@@ -351,7 +413,9 @@ export class CostMonitorService {
 
       return Number(result[0]?.total) || 0;
     } catch (error) {
-      logger.error("Failed to get conversation cost", error as Error, { conversationId });
+      logger.error("Failed to get conversation cost", error as Error, {
+        conversationId,
+      });
       return 0;
     }
   }
@@ -359,7 +423,10 @@ export class CostMonitorService {
   /**
    * Get total cost in a specific period
    */
-  private async getTotalCostInPeriod(startDate: Date, endDate: Date): Promise<number> {
+  private async getTotalCostInPeriod(
+    startDate: Date,
+    endDate: Date
+  ): Promise<number> {
     try {
       const result = await db
         .select({ total: sum(conversationMessages.llmCost) })
@@ -382,7 +449,10 @@ export class CostMonitorService {
   /**
    * Send cost alerts
    */
-  private async sendCostAlerts(alerts: string[], event: CostTrackingEvent): Promise<void> {
+  private async sendCostAlerts(
+    alerts: string[],
+    event: CostTrackingEvent
+  ): Promise<void> {
     // In a real implementation, this would send notifications via email, Slack, etc.
     // For now, we'll just log them
     for (const alert of alerts) {
@@ -391,7 +461,7 @@ export class CostMonitorService {
         userId: event.userId,
         conversationId: event.conversationId,
         cost: event.cost,
-        operationType: event.operationType
+        operationType: event.operationType,
       });
     }
   }
@@ -399,7 +469,11 @@ export class CostMonitorService {
   /**
    * Send budget alerts
    */
-  private async sendBudgetAlert(budget: CostBudget, usagePercentage: number, event: CostTrackingEvent): Promise<void> {
+  private async sendBudgetAlert(
+    budget: CostBudget,
+    usagePercentage: number,
+    event: CostTrackingEvent
+  ): Promise<void> {
     logger.warn("Budget Alert", {
       budgetId: budget.id,
       budgetName: budget.name,
@@ -407,7 +481,7 @@ export class CostMonitorService {
       spent: budget.currentSpent,
       limit: budget.amount,
       userId: event.userId,
-      conversationId: event.conversationId
+      conversationId: event.conversationId,
     });
   }
 
@@ -433,24 +507,24 @@ export class CostMonitorService {
     const [todayCost, weekCost, monthCost] = await Promise.all([
       this.getTotalCostInPeriod(today, now),
       this.getTotalCostInPeriod(weekAgo, now),
-      this.getTotalCostInPeriod(monthAgo, now)
+      this.getTotalCostInPeriod(monthAgo, now),
     ]);
 
     return {
-      activeThresholds: this.thresholds.filter(t => t.enabled),
-      activeBudgets: this.budgets.filter(b => b.enabled),
+      activeThresholds: this.thresholds.filter((t) => t.enabled),
+      activeBudgets: this.budgets.filter((b) => b.enabled),
       recentEvents: this.trackingEvents.slice(-10), // Last 10 events
       costSummary: {
         today: todayCost,
         thisWeek: weekCost,
-        thisMonth: monthCost
+        thisMonth: monthCost,
       },
-      alertsTriggered: this.trackingEvents.filter(e =>
-        this.thresholds.some(t => {
+      alertsTriggered: this.trackingEvents.filter((e) =>
+        this.thresholds.some((t) => {
           // Simplified check - in practice you'd want more sophisticated alert tracking
           return t.enabled && e.cost > t.threshold;
         })
-      ).length
+      ).length,
     };
   }
 
@@ -466,7 +540,7 @@ export class CostMonitorService {
         logger.info("Resetting budget", {
           budgetId: budget.id,
           name: budget.name,
-          previousSpent: budget.currentSpent
+          previousSpent: budget.currentSpent,
         });
         budget.currentSpent = 0;
         budget.resetDate = this.getNextResetDate(budget);
@@ -479,11 +553,11 @@ export class CostMonitorService {
    */
   private shouldResetBudget(budget: CostBudget, now: Date): boolean {
     switch (budget.period) {
-      case 'daily':
+      case "daily":
         return now >= budget.resetDate;
-      case 'weekly':
+      case "weekly":
         return now.getDay() === 1 && now >= budget.resetDate; // Monday
-      case 'monthly':
+      case "monthly":
         return now.getDate() === 1 && now >= budget.resetDate; // First day of month
       default:
         return false;
@@ -497,12 +571,12 @@ export class CostMonitorService {
     const now = new Date();
 
     switch (budget.period) {
-      case 'daily':
+      case "daily":
         return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-      case 'weekly':
+      case "weekly":
         const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
         return new Date(now.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
-      case 'monthly':
+      case "monthly":
         return new Date(now.getFullYear(), now.getMonth() + 1, 1);
       default:
         return new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -514,7 +588,9 @@ export class CostMonitorService {
    */
   cleanupOldEvents(maxAgeHours: number = 24): void {
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
-    this.trackingEvents = this.trackingEvents.filter(event => event.timestamp >= cutoffTime);
+    this.trackingEvents = this.trackingEvents.filter(
+      (event) => event.timestamp >= cutoffTime
+    );
   }
 }
 

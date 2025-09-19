@@ -1244,10 +1244,20 @@ async function processMessageWithUnifiedProcessor(
       message: `Processed via unified processor: ${processedResult.intent.primary}`,
     };
   } catch (error) {
-    logger.error("Unified message processing failed", error as Error, {
+    const err = error as Error;
+    logger.error("Unified message processing failed", err, {
       patientId: patient.id,
       message: message?.substring(0, 100),
       operation: "unified_processing",
+      errorType: err.constructor.name,
+      errorMessage: err.message,
+      stack: err.stack?.substring(0, 500),
+    });
+
+    // Log the failure but don't fail the webhook - continue to legacy processing
+    logger.warn("Continuing with legacy processing after unified processor failure", {
+      patientId: patient.id,
+      operation: "fallback_to_legacy",
     });
 
     // Fall back to legacy processing

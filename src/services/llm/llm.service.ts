@@ -29,7 +29,7 @@ export class LLMService {
     this.config = {
       apiKey: process.env.ANTHROPIC_API_KEY || "",
       baseURL: "", // Anthropic doesn't use baseURL
-      model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
+      model: process.env.ANTHROPIC_MODEL || "claude-3-5-haiku",
       maxTokens: parseInt(process.env.LLM_MAX_TOKENS || "1000"),
       temperature: parseFloat(process.env.LLM_TEMPERATURE || "0.7"),
       timeout: parseInt(process.env.LLM_TIMEOUT_MS || "30000"),
@@ -145,15 +145,27 @@ export class LLMService {
           responseTime,
           model: this.config.model,
           circuitBreakerState: this.circuitBreaker.getStats().state,
+          messageCount: request.messages.length,
+          maxTokens: request.maxTokens || this.config.maxTokens,
+          temperature: request.temperature || this.config.temperature,
+          errorType: err.constructor.name,
+          errorMessage: err.message,
+          stack: err.stack?.substring(0, 500), // First 500 chars of stack
         }
       );
 
       // Queue message for later retry if it's a temporary failure
       if (this.isRetryableError(err)) {
+        logger.info("Queueing failed LLM request for retry", {
+          patientId: this.extractPatientInfoFromRequest(request)?.patientId,
+          errorType: err.constructor.name,
+        });
         await this.queueMessageForRetry(request, err.message);
       }
 
-      throw new Error(`Anthropic Claude LLM request failed: ${err.message}`);
+      // Don't throw generic error - provide specific error information
+      const errorMessage = `Anthropic Claude LLM request failed: ${err.message} (Model: ${this.config.model}, Response time: ${responseTime}ms)`;
+      throw new Error(errorMessage);
     }
   }
 
@@ -673,7 +685,8 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   }
 
   /**
-   * Convert OpenAI message format to Anthropic format
+   * Convert internal message format to Anthropic format following official guide
+   * https://docs.claude.com/en/docs/get-started#typescript
    */
   private convertMessagesToAnthropicFormat(
     messages: LLMRequest["messages"]
@@ -683,29 +696,45 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
       content: string;
     }> = [];
 
+    // Handle system message separately - Anthropic recommends putting system instructions in the first user message
+    let systemContent = "";
+
     for (const msg of messages) {
       if (msg.role === "system") {
-        // Anthropic handles system messages differently - prepend to first user message
-        if (
-          anthropicMessages.length === 0 ||
-          anthropicMessages[0].role !== "user"
-        ) {
-          anthropicMessages.push({
-            role: "user",
-            content: `System: ${msg.content}\n\n${
-              anthropicMessages.length > 0 ? anthropicMessages[0].content : ""
-            }`,
-          });
-        } else {
-          anthropicMessages[0].content = `System: ${msg.content}\n\n${anthropicMessages[0].content}`;
-        }
+        systemContent = msg.content;
       } else if (msg.role === "user" || msg.role === "assistant") {
+        let content = msg.content;
+
+        // Prepend system content to the first user message
+        if (
+          msg.role === "user" &&
+          systemContent &&
+          anthropicMessages.length === 0
+        ) {
+          content = `${systemContent}\n\n${content}`;
+          systemContent = ""; // Clear after using
+        }
+
         anthropicMessages.push({
           role: msg.role,
-          content: msg.content,
+          content: content,
         });
       }
     }
+
+    // If we still have system content and no user messages, create a user message with it
+    if (systemContent && anthropicMessages.length === 0) {
+      anthropicMessages.push({
+        role: "user",
+        content: systemContent,
+      });
+    }
+
+    logger.debug("Converted messages to Anthropic format", {
+      originalCount: messages.length,
+      convertedCount: anthropicMessages.length,
+      hasSystemMessage: messages.some((m) => m.role === "system"),
+    });
 
     return anthropicMessages;
   }
