@@ -33,6 +33,16 @@ export const metadata: Metadata = {
       { url: "/icon-512x512.png", sizes: "512x512" },
     ],
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-title': 'PRIMA',
+    'application-name': 'PRIMA',
+    'msapplication-TileColor': '#3b82f6',
+    'msapplication-config': '/browserconfig.xml',
+    'format-detection': 'telephone=no'
+  }
 };
 
 export function generateViewport() {
