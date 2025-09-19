@@ -14,10 +14,10 @@ import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 
-import { db, patients } from "@/db";
+import { db, patients, reminders } from "@/db";
 import { ReminderError } from "./reminder.types";
 import { requirePatientAccess } from "@/lib/patient-access-control";
-import { eq } from "drizzle-orm";
+import { eq, and, gte, lte, isNull } from "drizzle-orm";
 
 export class ReminderService {
   private repository: ReminderRepository;
@@ -309,7 +309,127 @@ export class ReminderService {
     }
   }
 
-  
+  /**
+   * Get today's reminders for a patient - real-time data access
+   */
+  async getTodaysReminders(patientId: string, userId?: string, userRole?: string) {
+    // Check patient access control if userId and userRole provided
+    if (userId && userRole) {
+      await requirePatientAccess(
+        userId,
+        userRole,
+        patientId,
+        "view this patient's reminders"
+      );
+    }
+
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const todaysReminders = await db
+        .select({
+          id: reminders.id,
+          scheduledTime: reminders.scheduledTime,
+          reminderType: reminders.reminderType,
+          message: reminders.message,
+          startDate: reminders.startDate,
+          status: reminders.status,
+          sentAt: reminders.sentAt,
+          confirmationResponse: reminders.confirmationResponse,
+          confirmationResponseAt: reminders.confirmationResponseAt,
+        })
+        .from(reminders)
+        .where(
+          and(
+            eq(reminders.patientId, patientId),
+            eq(reminders.isActive, true),
+            isNull(reminders.deletedAt),
+            gte(reminders.startDate, today),
+            lte(reminders.startDate, tomorrow)
+          )
+        )
+        .orderBy(reminders.scheduledTime)
+        .limit(20);
+
+      logger.info("Retrieved today's reminders for patient", {
+        patientId,
+        remindersCount: todaysReminders.length,
+        operation: "get_todays_reminders",
+      });
+
+      return todaysReminders.map(reminder => ({
+        ...reminder,
+        isCompleted: reminder.status === 'DELIVERED',
+        timeRemaining: this.calculateTimeRemaining(reminder.scheduledTime),
+      }));
+
+    } catch (error) {
+      logger.error("Failed to get today's reminders", error as Error, {
+        patientId,
+        operation: "get_todays_reminders",
+      });
+      throw new ReminderError(
+        "Failed to retrieve today's reminders",
+        "DATABASE_ERROR",
+        500,
+        { patientId }
+      );
+    }
+  }
+
+  /**
+   * Calculate time remaining until reminder time
+   */
+  private calculateTimeRemaining(scheduledTime: string): string {
+    try {
+      const now = new Date();
+      const [hours, minutes] = scheduledTime.split(':').map(Number);
+      const reminderTime = new Date();
+      reminderTime.setHours(hours, minutes, 0, 0);
+
+      // If reminder time has passed today, assume it's for tomorrow
+      if (reminderTime < now) {
+        reminderTime.setDate(reminderTime.getDate() + 1);
+      }
+
+      const diffMs = reminderTime.getTime() - now.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      if (diffHours > 0) {
+        return `${diffHours} jam ${diffMinutes} menit`;
+      } else {
+        return `${diffMinutes} menit`;
+      }
+    } catch {
+      return "Waktu tidak tersedia";
+    }
+  }
+
+  /**
+   * Format reminders for LLM consumption
+   */
+  formatRemindersForLLM(reminders: Array<{scheduledTime: string; message?: string; isCompleted?: boolean; timeRemaining?: string}>): string {
+    if (reminders.length === 0) {
+      return "Tidak ada pengingat yang dijadwalkan untuk hari ini.";
+    }
+
+    const formattedReminders = reminders.map((reminder, index) => {
+      const time = reminder.scheduledTime;
+      const message = reminder.message || "Pengingat";
+      const status = reminder.isCompleted ? "✅ Selesai" : "⏰ Menunggu";
+      const timeRemaining = reminder.timeRemaining ? `(${reminder.timeRemaining})` : "";
+
+      return `${index + 1}. Pukul ${time}: ${message} ${status} ${timeRemaining}`;
+    }).join('\n');
+
+    return `Pengingat Hari Ini:\n${formattedReminders}`;
+  }
+
+
   private generateRecurrenceDates(recurrence: CustomRecurrence): string[] {
     const dates: string[] = [];
     const today = new Date();

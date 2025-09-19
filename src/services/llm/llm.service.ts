@@ -152,7 +152,7 @@ export class LLMService {
     message: string,
     context: ConversationContext
   ): Promise<IntentDetectionResult> {
-    const systemPrompt = this.buildIntentDetectionPrompt(context);
+    const systemPrompt = await this.buildIntentDetectionPrompt(context);
 
     const request: LLMRequest = {
       messages: [
@@ -329,7 +329,7 @@ export class LLMService {
   /**
    * Build system prompt for intent detection
    */
-  private buildIntentDetectionPrompt(context: ConversationContext): string {
+  private async buildIntentDetectionPrompt(context: ConversationContext): Promise<string> {
     const activeReminders = context.patientInfo?.activeReminders || [];
     const reminderContext =
       activeReminders.length > 0
@@ -346,6 +346,42 @@ export class LLMService {
             .join(", ")}`
         : "";
 
+    // Get real-time today's reminders for better context
+    let todaysRemindersContext = "";
+    try {
+      if (context.patientId) {
+        const { ReminderService } = await import("@/services/reminder/reminder.service");
+        const reminderService = new ReminderService();
+        const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
+
+        if (todaysReminders.length > 0) {
+          todaysRemindersContext = `\nToday's Reminders: ${todaysReminders.map(r =>
+            `${r.scheduledTime}: ${r.message || "pengingat"} (${r.isCompleted ? 'completed' : 'pending'})`
+          ).join(", ")}`;
+        }
+      }
+    } catch {
+      // Silently fail - real-time data is optional for intent detection
+    }
+
+    // Get health notes context
+    let healthNotesContext = "";
+    try {
+      if (context.patientId) {
+        const { healthNotesQueryService } = await import("@/services/patient/health-notes-query.service");
+        const recentNotes = await healthNotesQueryService.queryHealthNotes(context.patientId, {
+          timeRange: "hari_ini",
+          limit: 3
+        });
+
+        if (recentNotes.notes.length > 0) {
+          healthNotesContext = `\nRecent Health Notes: ${recentNotes.notes.length} notes recorded today`;
+        }
+      }
+    } catch {
+      // Silently fail - real-time data is optional for intent detection
+    }
+
     return `You are an AI assistant for PRIMA healthcare system helping cancer patients via WhatsApp.
 
 Patient Information:
@@ -353,10 +389,10 @@ Patient Information:
 - Phone: ${context.phoneNumber}
 - Verification Status: ${
       context.patientInfo?.verificationStatus || "Unknown"
-    }${reminderContext}
+    }${reminderContext}${todaysRemindersContext}${healthNotesContext}
 
 Your task is to analyze the patient's message and determine their intent. Respond with a JSON object containing:
-- intent: One of [verification_response, medication_confirmation, unsubscribe, general_inquiry, emergency, unknown]
+- intent: One of [verification_response, medication_confirmation, unsubscribe, reminder_inquiry, health_notes_inquiry, general_inquiry, emergency, unknown]
 - confidence: Number between 0-1 indicating confidence level
 - entities: Any extracted information (medication names, times, etc.)
 
@@ -368,6 +404,14 @@ Guidelines:
   * "sudah makan obat", "sudah telan obat", "sudah konsumsi obat"
   * References to taking medication: "minum", "ambil obat", "makan obat", "telan", "konsumsi"
   * Numbers like "keduanya sudah" (both already), "semuanya sudah" (all already)
+- For reminder_inquiry: Look for questions about today's reminders, schedules, such as:
+  * "remindernya hari ini apa saja", "pengingat hari ini apa saja"
+  * "jadwal hari ini", "reminder untuk hari ini"
+  * "apa reminder saya", "lihat reminder", "cek reminder"
+- For health_notes_inquiry: Look for questions about health notes, medical records, such as:
+  * "catatan kesehatannya apa saja", "catatan kesehatan hari ini"
+  * "catatan kesehatan", "health notes", "riwayat kesehatan"
+  * "kondisi kesehatan", "catatan medis"
 - For unsubscribe: Look for "BERHENTI", "STOP", "CANCEL" or similar stop requests
 - For emergency: Look for urgent medical situations, pain, symptoms
 - For general_inquiry: Any other questions or statements

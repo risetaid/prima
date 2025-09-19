@@ -72,6 +72,7 @@ export interface MessageIntent {
     | "confirm_later"
     | "unsubscribe"
     | "reminder_inquiry"
+    | "health_notes_inquiry"
     | "inquiry"
     | "emergency"
     | "unknown";
@@ -250,12 +251,16 @@ export class MessageProcessorService {
     const hasReminderInquiryKeywords = this.REMINDER_INQUIRY_KEYWORDS.some(
       (keyword) => normalizedMessage.includes(keyword)
     );
+    const hasHealthNotesInquiryKeywords = this.HEALTH_NOTES_INQUIRY_KEYWORDS.some(
+      (keyword) => normalizedMessage.includes(keyword)
+    );
 
     // Use intent detection if message contains relevant keywords
     return (
       hasVerificationKeywords ||
       hasConfirmationKeywords ||
-      hasReminderInquiryKeywords
+      hasReminderInquiryKeywords ||
+      hasHealthNotesInquiryKeywords
     );
   }
 
@@ -408,6 +413,12 @@ export class MessageProcessorService {
     "ada reminder",
     "apa ada pengingat",
     "kapan pengingat",
+    "remindernya hari ini apa saja",
+    "pengingat hari ini apa saja",
+    "jadwal hari ini",
+    "jadwal reminder hari ini",
+    "pengingat untuk hari ini",
+    "reminder untuk hari ini",
   ];
 
   private readonly EMERGENCY_KEYWORDS = [
@@ -441,6 +452,20 @@ export class MessageProcessorService {
     "help",
     "tolong",
     "mau tanya",
+  ];
+
+  private readonly HEALTH_NOTES_INQUIRY_KEYWORDS = [
+    "catatan kesehatan",
+    "catatan kesehatannya",
+    "catatan kesehatan apa saja",
+    "health notes",
+    "notes",
+    "catatan medis",
+    "catatan kesehatan hari ini",
+    "catatan kesehatan terbaru",
+    "riwayat kesehatan",
+    "kondisi kesehatan",
+    "catatan kesehatan untuk hari ini",
   ];
 
   /**
@@ -1138,6 +1163,8 @@ export class MessageProcessorService {
         return this.generateUnsubscribeResponse();
       case "reminder_inquiry":
         return this.generateReminderInquiryResponse(context);
+      case "health_notes_inquiry":
+        return this.generateHealthNotesInquiryResponse(context);
       default:
         return this.generateLowConfidenceResponse(intent);
     }
@@ -1302,54 +1329,47 @@ export class MessageProcessorService {
   /**
    * Generate response for reminder inquiry intent
    */
-  private generateReminderInquiryResponse(
+  private async generateReminderInquiryResponse(
     context: MessageContext
-  ): RecommendedResponse {
+  ): Promise<RecommendedResponse> {
     const actions: ResponseAction[] = [];
 
-    // Get today's reminders from context
-    const todaysReminders = context.fullPatientContext?.todaysReminders || [];
-    const activeReminders = context.fullPatientContext?.activeReminders || [];
+    try {
+      // Import reminder service for real-time data access
+      const { ReminderService } = await import("@/services/reminder/reminder.service");
+      const reminderService = new ReminderService();
 
-    let message = `Halo ${
-      context.patientName || "pasien"
-    }, berikut informasi pengingat Anda:\n\n`;
+      // Get today's reminders in real-time
+      const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
 
-    if (todaysReminders.length > 0) {
-      message += "📅 *Pengingat Hari Ini:*\n";
-      todaysReminders.forEach((reminder, index) => {
-        const reminderMessage =
-          reminder.customMessage || "pengingat";
-        const scheduledTime =
-          reminder.scheduledTime || "waktu yang dijadwalkan";
-        message += `${index + 1}. ${reminderMessage} - pukul ${scheduledTime}\n`;
-      });
-      message += "\n";
-    } else {
-      message +=
-        "📅 *Hari Ini:* Tidak ada pengingat yang dijadwalkan.\n\n";
-    }
+      let message = `Halo ${
+        context.patientName || "pasien"
+      }, berikut informasi pengingat Anda:\n\n`;
 
-    if (activeReminders.length > 0) {
-      message += "📋 *Jadwal Pengingat Aktif:*\n";
-      activeReminders.slice(0, 5).forEach((reminder, index) => {
-        const reminderMessage = reminder.customMessage || "pengingat";
-        const scheduledTime =
-          reminder.scheduledTime || "waktu yang dijadwalkan";
-        const frequency = reminder.frequency || "sekali sehari";
-        message += `${
-          index + 1
-        }. ${reminderMessage} - ${scheduledTime} (${frequency})\n`;
-      });
+      if (todaysReminders.length > 0) {
+        message += "📅 *Pengingat Hari Ini:*\n";
+        todaysReminders.forEach((reminder, index) => {
+          const reminderMessage = reminder.message || "pengingat";
+          const scheduledTime = reminder.scheduledTime || "waktu yang dijadwalkan";
+          const status = reminder.isCompleted ? "✅ Selesai" : "⏰ Menunggu";
+          const timeRemaining = reminder.timeRemaining ? `(${reminder.timeRemaining})` : "";
 
-      if (activeReminders.length > 5) {
-        message += `... dan ${activeReminders.length - 5} pengingat lainnya.\n`;
+          message += `${index + 1}. Pukul ${scheduledTime}: ${reminderMessage} ${status} ${timeRemaining}\n`;
+        });
+        message += "\n";
+      } else {
+        message +=
+          "📅 *Hari Ini:* Tidak ada pengingat yang dijadwalkan.\n\n";
       }
-      message += "\n";
-    } else {
-      message +=
-        "📋 *Status:* Tidak ada pengingat yang aktif saat ini.\n\n";
-    }
+
+      // Add summary statistics
+      const completedCount = todaysReminders.filter(r => r.isCompleted).length;
+      const pendingCount = todaysReminders.filter(r => !r.isCompleted).length;
+
+      message += "📊 *Ringkasan Hari Ini:*\n";
+      message += `- Total pengingat: ${todaysReminders.length}\n`;
+      message += `- Selesai: ${completedCount}\n`;
+      message += `- Menunggu: ${pendingCount}\n\n`;
 
     message +=
       "💙 Jika ada pertanyaan, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
@@ -1360,6 +1380,84 @@ export class MessageProcessorService {
       actions,
       priority: "low",
     };
+    } catch (error) {
+      logger.error("Failed to generate reminder inquiry response", error as Error, {
+        patientId: context.patientId,
+      });
+
+      // Fallback response if service fails
+      return {
+        type: "auto_reply",
+        message: `Halo ${context.patientName || "pasien"}, maaf saat ini tidak dapat mengambil jadwal pengingat Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
+        actions,
+        priority: "low",
+      };
+    }
+  }
+
+  /**
+   * Generate response for health notes inquiry intent
+   */
+  private async generateHealthNotesInquiryResponse(
+    context: MessageContext
+  ): Promise<RecommendedResponse> {
+    const actions: ResponseAction[] = [];
+
+    try {
+      // Import health notes service
+      const { healthNotesQueryService } = await import("@/services/patient/health-notes-query.service");
+
+      // Get today's health notes for the patient
+      const todayNotes = await healthNotesQueryService.queryHealthNotes(context.patientId, {
+        timeRange: "hari_ini",
+        limit: 10
+      });
+
+      // Get recent health summary
+      const healthSummary = await healthNotesQueryService.getRecentHealthSummary(context.patientId, 7);
+
+      let message = `Halo ${context.patientName || "pasien"}, berikut informasi catatan kesehatan Anda:\n\n`;
+
+      if (todayNotes.notes.length > 0) {
+        message += "📋 *Catatan Kesehatan Hari Ini:*\n";
+        todayNotes.notes.forEach((note, index) => {
+          const date = new Date(note.noteDate).toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+          message += `${index + 1}. ${date}: ${note.note.substring(0, 100)}${note.note.length > 100 ? '...' : ''}\n`;
+        });
+        message += "\n";
+      } else {
+        message += "📋 *Hari Ini:* Tidak ada catatan kesehatan yang dicatat hari ini.\n\n";
+      }
+
+      // Add recent health summary
+      message += "📊 *Ringkasan Kesehatan Terkini:*\n";
+      message += `${healthSummary}\n\n`;
+
+      message += "💙 Jika ada pertanyaan tentang catatan kesehatan Anda, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
+
+      return {
+        type: "auto_reply",
+        message,
+        actions,
+        priority: "low",
+      };
+    } catch (error) {
+      logger.error("Failed to generate health notes inquiry response", error as Error, {
+        patientId: context.patientId,
+      });
+
+      // Fallback response if service fails
+      return {
+        type: "auto_reply",
+        message: `Halo ${context.patientName || "pasien"}, maaf saat ini tidak dapat mengambil catatan kesehatan Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
+        actions,
+        priority: "low",
+      };
+    }
   }
 
   /**
@@ -1789,6 +1887,10 @@ RESPONSE GUIDELINES:
       reminder_inquiry: this.calculateKeywordScore(
         message,
         this.REMINDER_INQUIRY_KEYWORDS
+      ),
+      health_notes_inquiry: this.calculateKeywordScore(
+        message,
+        this.HEALTH_NOTES_INQUIRY_KEYWORDS
       ),
       emergency: this.calculateKeywordScore(message, this.EMERGENCY_KEYWORDS),
       inquiry: this.calculateKeywordScore(message, this.INQUIRY_KEYWORDS),
