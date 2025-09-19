@@ -1,9 +1,9 @@
 /**
- * LLM Service for Google Gemini integration
- * Handles communication with Google Gemini API for natural language processing
+ * LLM Service for Anthropic Claude integration
+ * Handles communication with Anthropic Claude API for natural language processing
  */
 
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
 import { responseCache } from "@/lib/response-cache";
 import { safetyFilterService } from "./safety-filter";
@@ -21,26 +21,26 @@ import {
 } from "./llm.types";
 
 export class LLMService {
-  private client: GoogleGenAI;
+  private client: Anthropic;
   private config: LLMConfig;
   private circuitBreaker: CircuitBreaker;
   private isCircuitBreakerEnabled: boolean;
 
   constructor() {
     this.config = {
-      apiKey: process.env.GEMINI_API_KEY || "",
-      baseURL: "", // Gemini doesn't use baseURL
-      model: process.env.GEMINI_MODEL || "gemini-2.0-flash-exp",
+      apiKey: process.env.ANTHROPIC_API_KEY || "",
+      baseURL: "", // Anthropic doesn't use baseURL
+      model: process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022",
       maxTokens: parseInt(process.env.LLM_MAX_TOKENS || "1000"),
       temperature: parseFloat(process.env.LLM_TEMPERATURE || "0.7"),
       timeout: parseInt(process.env.LLM_TIMEOUT_MS || "30000"),
     };
 
     if (!this.config.apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required");
+      throw new Error("ANTHROPIC_API_KEY environment variable is required");
     }
 
-    this.client = new GoogleGenAI({
+    this.client = new Anthropic({
       apiKey: this.config.apiKey,
     });
 
@@ -51,7 +51,7 @@ export class LLMService {
 
     logger.info("LLM Service initialized", {
       model: this.config.model,
-      provider: "Google Gemini",
+      provider: "Anthropic Claude",
       circuitBreakerEnabled: this.isCircuitBreakerEnabled,
     });
   }
@@ -96,34 +96,30 @@ export class LLMService {
     try {
       // Execute with retry logic and circuit breaker protection
       const response = await this.executeWithFallbacks(async () => {
-        logger.debug("Sending Gemini LLM request", {
+        logger.debug("Sending Anthropic Claude LLM request", {
           messageCount: request.messages.length,
           maxTokens: request.maxTokens || this.config.maxTokens,
         });
 
-        // Convert OpenAI format to Gemini format
-        const prompt = this.convertMessagesToGeminiPrompt(request.messages);
+        // Convert messages to Anthropic format
+        const messages = this.convertMessagesToAnthropicFormat(request.messages);
 
-        const result = await this.client.models.generateContent({
+        const result = await this.client.messages.create({
           model: this.config.model,
-          contents: [{ parts: [{ text: prompt }] }],
-          config: {
-            thinkingConfig: {
-              thinkingBudget: 0, // Disable thinking for cost savings
-            },
-          },
+          max_tokens: request.maxTokens || this.config.maxTokens,
+          temperature: request.temperature || this.config.temperature,
+          messages: messages,
         });
 
         return result;
       });
 
         const responseTime = Date.now() - startTime;
-        const content = response.text || "";
-        const tokenCount = tokenizerService.countTokens(content, this.config.model);
-        const tokensUsed = tokenCount.tokens;
-        const finishReason = "stop"; // Gemini doesn't provide finish reason in the same way
+        const content = response.content[0]?.type === 'text' ? response.content[0].text : "";
+        const tokensUsed = response.usage?.output_tokens || 0;
+        const finishReason = response.stop_reason || "stop";
 
-      logger.info("Gemini LLM response generated successfully", {
+      logger.info("Anthropic Claude LLM response generated successfully", {
         tokensUsed,
         responseTime,
         contentLength: content.length,
@@ -140,7 +136,7 @@ export class LLMService {
       const responseTime = Date.now() - startTime;
       const err = error as Error;
 
-      logger.error("Gemini LLM request failed after all retries", err, {
+      logger.error("Anthropic Claude LLM request failed after all retries", err, {
         responseTime,
         model: this.config.model,
         circuitBreakerState: this.circuitBreaker.getStats().state,
@@ -151,7 +147,7 @@ export class LLMService {
         await this.queueMessageForRetry(request, err.message);
       }
 
-      throw new Error(`Gemini LLM request failed: ${err.message}`);
+      throw new Error(`Anthropic Claude LLM request failed: ${err.message}`);
     }
   }
 
@@ -665,23 +661,33 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   }
 
   /**
-   * Convert OpenAI message format to Gemini prompt
+   * Convert OpenAI message format to Anthropic format
    */
-  private convertMessagesToGeminiPrompt(
+  private convertMessagesToAnthropicFormat(
     messages: LLMRequest["messages"]
-  ): string {
-    return messages
-      .map((msg) => {
-        if (msg.role === "system") {
-          return `System: ${msg.content}`;
-        } else if (msg.role === "user") {
-          return `User: ${msg.content}`;
-        } else if (msg.role === "assistant") {
-          return `Assistant: ${msg.content}`;
+  ): Array<{ role: "user" | "assistant"; content: string }> {
+    const anthropicMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+    for (const msg of messages) {
+      if (msg.role === "system") {
+        // Anthropic handles system messages differently - prepend to first user message
+        if (anthropicMessages.length === 0 || anthropicMessages[0].role !== "user") {
+          anthropicMessages.push({
+            role: "user",
+            content: `System: ${msg.content}\n\n${anthropicMessages.length > 0 ? anthropicMessages[0].content : ""}`
+          });
+        } else {
+          anthropicMessages[0].content = `System: ${msg.content}\n\n${anthropicMessages[0].content}`;
         }
-        return msg.content;
-      })
-      .join("\n\n");
+      } else if (msg.role === "user" || msg.role === "assistant") {
+        anthropicMessages.push({
+          role: msg.role,
+          content: msg.content
+        });
+      }
+    }
+
+    return anthropicMessages;
   }
 
 

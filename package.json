@@ -22,8 +22,8 @@
     "start-message-worker": "bun run scripts/start-message-worker.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.63.0",
     "@clerk/nextjs": "^6.31.6",
-    "@google/genai": "^1.20.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.7",
