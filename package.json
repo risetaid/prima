@@ -15,7 +15,7 @@
     "postinstall": "drizzle-kit generate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
+    "db:push": "drizzle-kit push --force",
     "db:studio": "drizzle-kit studio",
     "nuke-recreate-db": "bun run scripts/nuke-recreate-database.ts",
     "setup-first-user": "bun run scripts/setup-first-user.ts",
@@ -48,7 +48,6 @@
     "sonner": "^2.0.7",
     "svix": "^1.71.0",
     "tailwind-merge": "^3.3.1",
-    "tiktoken": "^1.0.22",
     "tinymce": "^8.0.2",
     "zod": "^4.0.17"
   },
