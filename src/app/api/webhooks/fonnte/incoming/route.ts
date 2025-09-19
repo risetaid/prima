@@ -1184,6 +1184,7 @@ function isActualVerificationResponse(message: string | undefined): boolean {
 /**
  * Unified message processing using MessageProcessorService
  * This provides consistent handling across all message types with LLM integration
+ * ENHANCED: Now includes context-aware medication response detection
  */
 async function processMessageWithUnifiedProcessor(
   message: string | undefined,
@@ -1210,6 +1211,70 @@ async function processMessageWithUnifiedProcessor(
       messageLength: message?.length || 0,
       operation: "unified_processing",
     });
+
+    // ENHANCED: Check for simple medication responses first (context-aware)
+    if (patient.verificationStatus === "VERIFIED" && message) {
+      // Build context for simple medication detection
+      const llmContext = {
+        patientId: patient.id,
+        phoneNumber: patient.phoneNumber || "",
+        previousMessages: [],
+        patientInfo: {
+          name: patient.name,
+          verificationStatus: patient.verificationStatus,
+          activeReminders: [],
+        },
+      };
+
+      // Use LLM service to detect simple medication response
+      const simpleResponse = await llmService.detectSimpleMedicationResponse(
+        message,
+        llmContext
+      );
+
+      if (simpleResponse.isMedicationResponse && simpleResponse.responseType !== "unknown") {
+        // Handle simple medication response with automatic status update
+        const updateResult = await llmService.updateReminderStatusFromResponse(
+          patient.id,
+          simpleResponse.responseType,
+          message
+        );
+
+        if (updateResult.success) {
+          // Send appropriate response based on medication status
+          let responseMessage = "";
+          if (simpleResponse.responseType === "taken") {
+            responseMessage = `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n💙 Tim PRIMA`;
+          } else {
+            responseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+          }
+
+          await sendAck(patient.phoneNumber || "", responseMessage);
+
+          logger.info("Simple medication response processed via unified processor", {
+            patientId: patient.id,
+            responseType: simpleResponse.responseType,
+            updatedReminderId: updateResult.updatedReminderId,
+            confidence: simpleResponse.confidence,
+            operation: "simple_medication_response",
+          });
+
+          return {
+            processed: true,
+            action: simpleResponse.responseType === "taken" ? "medication_taken" : "medication_not_taken",
+            message: `Simple medication response processed: ${simpleResponse.responseType}`,
+          };
+        } else {
+          logger.warn("Failed to update reminder status from simple response", {
+            patientId: patient.id,
+            error: updateResult.error,
+            responseType: simpleResponse.responseType,
+            operation: "simple_medication_response_failed",
+          });
+          // Continue with normal unified processing
+        }
+      }
+    }
 
     // Build message context for the processor
     const messageContext = {

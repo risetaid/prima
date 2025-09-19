@@ -536,6 +536,116 @@ export class ConversationStateService {
   }
 
   /**
+   * Get recent reminders context for a patient (for medication response detection)
+   */
+  async getRecentRemindersContext(
+    patientId: string,
+    hoursBack: number = 24
+  ): Promise<{
+    hasRecentReminders: boolean;
+    recentReminderCount: number;
+    lastReminderTime?: Date;
+    lastReminderMessage?: string;
+  }> {
+    try {
+      const { reminders } = await import('@/db')
+      const { eq, and, gte, desc } = await import('drizzle-orm')
+
+      const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000)
+
+      const recentReminders = await db
+        .select({
+          id: reminders.id,
+          message: reminders.message,
+          sentAt: reminders.sentAt,
+          status: reminders.status,
+          confirmationStatus: reminders.confirmationStatus
+        })
+        .from(reminders)
+        .where(
+          and(
+            eq(reminders.patientId, patientId),
+            gte(reminders.sentAt, cutoffTime)
+          )
+        )
+        .orderBy(desc(reminders.sentAt))
+        .limit(5)
+
+      const hasRecentReminders = recentReminders.length > 0
+      const lastReminder = recentReminders[0]
+
+      return {
+        hasRecentReminders,
+        recentReminderCount: recentReminders.length,
+        lastReminderTime: lastReminder?.sentAt || undefined,
+        lastReminderMessage: lastReminder?.message
+      }
+    } catch (error) {
+      logger.error('Failed to get recent reminders context', error as Error, {
+        patientId,
+        hoursBack
+      })
+
+      // Return default context on error
+      return {
+        hasRecentReminders: false,
+        recentReminderCount: 0
+      }
+    }
+  }
+
+  /**
+   * Update conversation state with reminder context
+   * This helps the LLM understand the medication reminder context
+   */
+  async updateWithReminderContext(
+    conversationStateId: string,
+    reminderContext: {
+      reminderId?: string
+      reminderMessage?: string
+      reminderTime?: Date
+      isPendingConfirmation?: boolean
+    }
+  ): Promise<ConversationStateData> {
+    try {
+      const updates: Partial<ConversationStateData> = {
+        stateData: {
+          ...reminderContext,
+          lastReminderUpdate: new Date().toISOString()
+        },
+        updatedAt: new Date()
+      }
+
+      // Switch to reminder confirmation context if there's a pending reminder
+      if (reminderContext.isPendingConfirmation) {
+        updates.currentContext = 'reminder_confirmation'
+        updates.expectedResponseType = 'confirmation'
+        updates.relatedEntityType = 'reminder_log'
+        updates.relatedEntityId = reminderContext.reminderId
+      }
+
+      const updated = await this.updateConversationState(
+        conversationStateId,
+        updates
+      )
+
+      logger.info('Updated conversation state with reminder context', {
+        conversationStateId,
+        reminderContext,
+        newContext: updates.currentContext
+      })
+
+      return updated
+    } catch (error) {
+      logger.error('Failed to update conversation state with reminder context', error as Error, {
+        conversationStateId,
+        reminderContext
+      })
+      throw error
+    }
+  }
+
+  /**
    * Map database row to ConversationStateData
    */
   private mapConversationState(row: ConversationStateRow): ConversationStateData {

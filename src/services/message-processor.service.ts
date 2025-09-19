@@ -513,7 +513,11 @@ export class MessageProcessorService {
     const normalizedMessage = this.normalizeMessage(context.message);
 
     // Declare variables at function scope
-    let intent: MessageIntent;
+    let intent: MessageIntent = {
+      primary: "inquiry",
+      sentiment: "neutral",
+      confidence: 1.0,
+    };
     let entities: MessageEntity[] = [];
     let llmResponse: ProcessedLLMResponse | null = null;
     let needsIntentDetection = false;
@@ -580,63 +584,110 @@ export class MessageProcessorService {
         entities = [];
       }
     } else {
-      // Always check for unsubscribe keywords first, regardless of context
-      const shouldUseLLMForUnsubscribe =
-        this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
+      // NEW: Check for simple medication responses first (context-aware)
+      const simpleMedicationResponse = await this.checkSimpleMedicationResponse(
+        normalizedMessage,
+        context,
+        conversationState
+      );
 
-      if (shouldUseLLMForUnsubscribe) {
-        // Use LLM-based unsubscribe detection for better understanding
-        intent = await this.detectIntent(
-          normalizedMessage,
-          context,
-          conversationHistory
-        );
-        entities = this.extractEntities(normalizedMessage);
-        needsIntentDetection = true;
+        let updateResult: { success: boolean; updatedReminderId?: string; error?: string } | undefined;
 
-        // Override intent if LLM detection results in unsubscribe
-        if (intent.primary === "unsubscribe") {
-          // Keep the LLM-detected intent with enhanced confidence
-          intent.confidence = Math.max(intent.confidence || 0.7, 0.8);
-          intent.sentiment = "negative";
-        }
-      } else {
-        // Fallback to original keyword-based unsubscribe detection
-        const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some(
-          (keyword) => normalizedMessage.includes(keyword)
+    if (simpleMedicationResponse.isMedicationResponse && simpleMedicationResponse.responseType !== "unknown") {
+        // Handle simple medication response with automatic status update
+        updateResult = await llmService.updateReminderStatusFromResponse(
+          context.patientId,
+          simpleMedicationResponse.responseType,
+          normalizedMessage
         );
 
-        if (hasUnsubscribeKeywords) {
-          // Force unsubscribe intent detection for messages with unsubscribe keywords
+        if (updateResult.success) {
+          // Set intent based on response type
           intent = {
-            primary: "unsubscribe",
-            sentiment: "negative",
-            confidence: 0.9, // High confidence for keyword-based detection
+            primary: simpleMedicationResponse.responseType === "taken" ? "confirm_taken" : "confirm_missed",
+            sentiment: simpleMedicationResponse.responseType === "taken" ? "positive" : "negative",
+            confidence: simpleMedicationResponse.confidence,
           };
-          entities = this.extractEntities(normalizedMessage);
+          entities = [];
+          needsIntentDetection = false;
+
+          logger.info("Simple medication response processed and status updated", {
+            patientId: context.patientId,
+            responseType: simpleMedicationResponse.responseType,
+            updatedReminderId: updateResult.updatedReminderId,
+            confidence: simpleMedicationResponse.confidence
+          });
         } else {
-          // Determine if this message needs intent classification
-          needsIntentDetection = this.shouldUseIntentDetection(
+          // Fallback to general processing if status update fails
+          logger.warn("Failed to update reminder status from simple response", {
+            patientId: context.patientId,
+            error: updateResult.error,
+            responseType: simpleMedicationResponse.responseType
+          });
+          // Continue with normal processing flow
+        }
+      }
+
+      // If not a simple medication response or processing failed, continue with normal flow
+      if (!simpleMedicationResponse.isMedicationResponse || simpleMedicationResponse.responseType === "unknown" || !updateResult?.success) {
+        // Always check for unsubscribe keywords first, regardless of context
+        const shouldUseLLMForUnsubscribe =
+          this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
+
+        if (shouldUseLLMForUnsubscribe) {
+          // Use LLM-based unsubscribe detection for better understanding
+          intent = await this.detectIntent(
             normalizedMessage,
-            conversationState,
-            context
+            context,
+            conversationHistory
+          );
+          entities = this.extractEntities(normalizedMessage);
+          needsIntentDetection = true;
+
+          // Override intent if LLM detection results in unsubscribe
+          if (intent.primary === "unsubscribe") {
+            // Keep the LLM-detected intent with enhanced confidence
+            intent.confidence = Math.max(intent.confidence || 0.7, 0.8);
+            intent.sentiment = "negative";
+          }
+        } else {
+          // Fallback to original keyword-based unsubscribe detection
+          const hasUnsubscribeKeywords = this.UNSUBSCRIBE_KEYWORDS.some(
+            (keyword) => normalizedMessage.includes(keyword)
           );
 
-          if (needsIntentDetection) {
-            // Use intent detection for verification and confirmation messages
-            intent = await this.detectIntent(
-              normalizedMessage,
-              context,
-              conversationHistory
-            );
+          if (hasUnsubscribeKeywords) {
+            // Force unsubscribe intent detection for messages with unsubscribe keywords
+            intent = {
+              primary: "unsubscribe",
+              sentiment: "negative",
+              confidence: 0.9, // High confidence for keyword-based detection
+            };
             entities = this.extractEntities(normalizedMessage);
           } else {
-            // Use direct LLM response for general inquiries
-            intent = {
-              primary: "inquiry",
-              sentiment: "neutral",
-              confidence: 1.0,
-            };
+            // Determine if this message needs intent classification
+            needsIntentDetection = this.shouldUseIntentDetection(
+              normalizedMessage,
+              conversationState,
+              context
+            );
+
+            if (needsIntentDetection) {
+              // Use intent detection for verification and confirmation messages
+              intent = await this.detectIntent(
+                normalizedMessage,
+                context,
+                conversationHistory
+              );
+              entities = this.extractEntities(normalizedMessage);
+            } else {
+              // Use direct LLM response for general inquiries
+              intent = {
+                primary: "inquiry",
+                sentiment: "neutral",
+                confidence: 1.0,
+              };
+            }
           }
         }
       }
@@ -810,6 +861,90 @@ export class MessageProcessorService {
         .replace(/\bengga\b/g, "tidak")
         .replace(/\benggak\b/g, "tidak")
     );
+  }
+
+  /**
+   * Check for simple medication responses (sudah/belum patterns)
+   */
+  private async checkSimpleMedicationResponse(
+    message: string,
+    context: MessageContext,
+    conversationState: ConversationState
+  ): Promise<{
+    isMedicationResponse: boolean;
+    responseType: "taken" | "not_taken" | "unknown";
+    confidence: number;
+  }> {
+    // Build LLM context for medication response detection
+    const llmContext: ConversationContext = {
+      patientId: context.patientId,
+      phoneNumber: context.phoneNumber,
+      previousMessages: [], // Not needed for simple detection
+      patientInfo: {
+        name: context.patientName,
+        verificationStatus: context.verificationStatus,
+        activeReminders: [], // Not needed for simple detection
+      },
+    };
+
+    // Use LLM service to detect simple medication response
+    const detectionResult = await llmService.detectSimpleMedicationResponse(
+      message,
+      llmContext
+    );
+
+    // Additional context check: only treat as medication response if there are active reminders
+    if (detectionResult.isMedicationResponse && context.verificationStatus === "VERIFIED") {
+      // Check if patient has recent reminders (simplified check)
+      try {
+        const { db, reminders } = await import("@/db");
+        const { eq, and, gte } = await import("drizzle-orm");
+
+        const recentReminders = await db
+          .select({ id: reminders.id })
+          .from(reminders)
+          .where(
+            and(
+              eq(reminders.patientId, context.patientId),
+              eq(reminders.status, "SENT"),
+              gte(reminders.sentAt, new Date(Date.now() - 24 * 60 * 60 * 1000)) // Last 24 hours
+            )
+          )
+          .limit(1);
+
+        if (recentReminders.length > 0) {
+          return detectionResult;
+        } else {
+          // No recent reminders, don't treat as medication response
+          logger.debug("Ignoring medication response - no recent reminders found", {
+            patientId: context.patientId,
+            message: message.substring(0, 50),
+          });
+          return {
+            isMedicationResponse: false,
+            responseType: "unknown",
+            confidence: 0,
+          };
+        }
+      } catch (error) {
+        logger.warn("Failed to check for recent reminders", {
+          patientId: context.patientId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Default to not being a medication response if we can't verify
+        return {
+          isMedicationResponse: false,
+          responseType: "unknown",
+          confidence: 0,
+        };
+      }
+    }
+
+    return {
+      isMedicationResponse: false,
+      responseType: "unknown",
+      confidence: 0,
+    };
   }
 
   /**

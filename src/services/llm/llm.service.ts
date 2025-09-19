@@ -715,6 +715,187 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   }
 
   /**
+   * Detect simple medication confirmation response
+   * This method detects "sudah"/"belum" patterns for status updates
+   */
+  async detectSimpleMedicationResponse(
+    message: string,
+    context: ConversationContext
+  ): Promise<{
+    isMedicationResponse: boolean;
+    responseType: "taken" | "not_taken" | "unknown";
+    confidence: number;
+  }> {
+    const normalizedMessage = message.toLowerCase().trim();
+
+    // Simple pattern matching for Indonesian medication responses
+    const takenPatterns = [
+      "sudah", "udh", "udah", "sdh", "dah",
+      "sudah minum", "udah minum", "sudah makan", "sudah telan",
+      "sudah konsumsi", "sudah ambil", "done", "selesai",
+      "sudah selesai", "sudah lakukan", "oke siap", "siap"
+    ];
+
+    const notTakenPatterns = [
+      "belum", "blm", "blum", "lum", "belom",
+      "belum minum", "blm minum", "belum makan", "belum telan",
+      "belum konsumsi", "belum ambil", "lupa", "belum lakukan",
+      "nanti", "sebentar"
+    ];
+
+    // Check for taken patterns
+    const takenMatch = takenPatterns.some(pattern =>
+      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    );
+
+    // Check for not taken patterns
+    const notTakenMatch = notTakenPatterns.some(pattern =>
+      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    );
+
+    // Determine response type and confidence
+    if (takenMatch && !notTakenMatch) {
+      return {
+        isMedicationResponse: true,
+        responseType: "taken",
+        confidence: 0.9
+      };
+    } else if (notTakenMatch && !takenMatch) {
+      return {
+        isMedicationResponse: true,
+        responseType: "not_taken",
+        confidence: 0.9
+      };
+    } else if (takenMatch && notTakenMatch) {
+      // Both patterns present - need more sophisticated analysis
+      // Use LLM to determine the actual intent
+      try {
+        const llmResult = await this.detectIntent(message, context);
+        if (llmResult.intent === "medication_confirmation") {
+          // Check entities for more specific information
+          const entities = llmResult.entities as Record<string, unknown> || {};
+          if (entities.confirmation_status === "taken") {
+            return {
+              isMedicationResponse: true,
+              responseType: "taken",
+              confidence: 0.8
+            };
+          } else if (entities.confirmation_status === "not_taken") {
+            return {
+              isMedicationResponse: true,
+              responseType: "not_taken",
+              confidence: 0.8
+            };
+          }
+        }
+      } catch (error) {
+        logger.warn("LLM analysis failed for ambiguous medication response", {
+          message: normalizedMessage.substring(0, 50),
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+
+      // Default to taken if ambiguous (conservative approach)
+      return {
+        isMedicationResponse: true,
+        responseType: "taken",
+        confidence: 0.6
+      };
+    }
+
+    return {
+      isMedicationResponse: false,
+      responseType: "unknown",
+      confidence: 0
+    };
+  }
+
+  /**
+   * Update reminder status based on simple response detection
+   */
+  async updateReminderStatusFromResponse(
+    patientId: string,
+    responseType: "taken" | "not_taken",
+    message: string
+  ): Promise<{ success: boolean; updatedReminderId?: string; error?: string }> {
+    try {
+      // Import dynamically to avoid circular dependencies
+      const { db, reminders } = await import("@/db");
+      const { eq, and, desc } = await import("drizzle-orm");
+
+      // Find the most recent SENT reminder for this patient
+      const pendingReminders = await db
+        .select()
+        .from(reminders)
+        .where(
+          and(
+            eq(reminders.patientId, patientId),
+            eq(reminders.status, "SENT")
+          )
+        )
+        .orderBy(desc(reminders.sentAt))
+        .limit(1);
+
+      if (pendingReminders.length === 0) {
+        return {
+          success: false,
+          error: "No pending reminder found for this patient"
+        };
+      }
+
+      const reminder = pendingReminders[0];
+
+      // Map response types to database status
+      const statusMapping = {
+        "taken": "DELIVERED",     // DIPATUHI -> DELIVERED
+        "not_taken": "SENT"       // TIDAK_DIPATUHI -> keep as SENT (or could use a different status)
+      };
+
+      const confirmationStatusMapping = {
+        "taken": "CONFIRMED",     // DIPATUHI -> CONFIRMED
+        "not_taken": "MISSED"     // TIDAK_DIPATUHI -> MISSED
+      };
+
+      // Update the reminder status
+      await db
+        .update(reminders)
+        .set({
+          status: statusMapping[responseType] as "SENT" | "DELIVERED" | "FAILED",
+          confirmationStatus: confirmationStatusMapping[responseType] as "PENDING" | "CONFIRMED" | "MISSED",
+          confirmationResponse: message,
+          confirmationResponseAt: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(reminders.id, reminder.id));
+
+      logger.info("Reminder status updated from simple response", {
+        patientId,
+        reminderId: reminder.id,
+        responseType,
+        newStatus: statusMapping[responseType],
+        confirmationStatus: confirmationStatusMapping[responseType]
+      });
+
+      return {
+        success: true,
+        updatedReminderId: reminder.id
+      };
+
+    } catch (error) {
+      logger.error("Failed to update reminder status from response", error as Error, {
+        patientId,
+        responseType,
+        message: message.substring(0, 50)
+      });
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  }
+
+  /**
    * Get current configuration (for debugging)
    */
   getConfig(): Partial<LLMConfig> {
