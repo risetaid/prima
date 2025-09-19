@@ -15,7 +15,7 @@ export interface SafetyFilterResult {
 }
 
 export interface SafetyViolation {
-  type: "medical_advice" | "emergency" | "profanity";
+  type: "medical_advice" | "emergency" | "profanity" | "personal_info";
   severity: "medium" | "high" | "critical";
   description: string;
   matchedText?: string;
