@@ -1,6 +1,6 @@
 /**
  * Tokenizer Service for accurate token counting
- * Supports multiple models including Google Gemini and OpenAI models
+ * Supports multiple models including Anthropic and OpenAI models
  */
 
 import { get_encoding } from "tiktoken";
@@ -41,21 +41,24 @@ export class TokenizerService {
    */
   private initializeEncodings(): void {
     try {
-      // For Google Gemini models, we'll use GPT-4 encoding as a close approximation
-      // since Gemini uses similar tokenization patterns
-      this.encodings.set("gemini-2.0-flash-exp", get_encoding("cl100k_base"));
-      this.encodings.set("gemini-1.5-flash", get_encoding("cl100k_base"));
-      this.encodings.set("gemini-1.5-pro", get_encoding("cl100k_base"));
-      this.encodings.set("gemini-1.0-pro", get_encoding("cl100k_base"));
+      // For Anthropic models, we'll use GPT-4 encoding as a close approximation
+      // since Claude uses similar tokenization patterns
+      this.encodings.set("claude-3.5-haiku", get_encoding("cl100k_base"));
+      this.encodings.set("claude-3.5-sonnet", get_encoding("cl100k_base"));
+      this.encodings.set("claude-3-opus", get_encoding("cl100k_base"));
+      this.encodings.set("claude-3-haiku", get_encoding("cl100k_base"));
 
       // Fallback encoding for unknown models
       this.encodings.set("default", get_encoding("cl100k_base"));
 
       logger.info("Tokenizer encodings initialized successfully");
     } catch (error) {
-      logger.warn("Failed to initialize tokenizer encodings, will use fallback methods", {
-        message: (error as Error).message,
-      });
+      logger.warn(
+        "Failed to initialize tokenizer encodings, will use fallback methods",
+        {
+          message: (error as Error).message,
+        }
+      );
       this.initializationError = error as Error;
       // Don't throw - allow the service to continue with fallback methods
     }
@@ -67,11 +70,14 @@ export class TokenizerService {
   public countTokens(text: string, model: string = "default"): TokenCount {
     // If initialization failed, use fallback immediately
     if (this.initializationError || this.encodings.size === 0) {
-      logger.debug("Using fallback token counting due to initialization error", {
-        model,
-        textLength: text.length,
-        error: this.initializationError?.message,
-      });
+      logger.debug(
+        "Using fallback token counting due to initialization error",
+        {
+          model,
+          textLength: text.length,
+          error: this.initializationError?.message,
+        }
+      );
 
       return {
         tokens: Math.ceil(text.length / 4),
@@ -81,7 +87,8 @@ export class TokenizerService {
     }
 
     try {
-      const encoding = this.encodings.get(model) || this.encodings.get("default");
+      const encoding =
+        this.encodings.get(model) || this.encodings.get("default");
       if (!encoding) {
         throw new Error(`No encoding found for model: ${model}`);
       }
@@ -94,11 +101,14 @@ export class TokenizerService {
         model,
       };
     } catch (error) {
-      logger.warn("Token counting failed, falling back to character estimation", {
-        model,
-        textLength: text.length,
-        error: (error as Error).message,
-      });
+      logger.warn(
+        "Token counting failed, falling back to character estimation",
+        {
+          model,
+          textLength: text.length,
+          error: (error as Error).message,
+        }
+      );
 
       // Fallback to rough character-based estimation
       return {
@@ -166,35 +176,42 @@ export class TokenizerService {
   /**
    * Estimate cost based on token usage with enhanced pricing data
    */
-  public estimateCost(tokens: number, model: string, operationType?: string): number {
-    // Enhanced Gemini pricing (per 1K tokens) - updated as of 2024
-    const pricing: Record<string, { input: number; output: number; context?: number }> = {
-      "gemini-2.0-flash-exp": {
-        input: 0.0005,  // $0.0005 per 1K input tokens
-        output: 0.0005, // $0.0005 per 1K output tokens
-        context: 0.00025 // $0.00025 per 1K context tokens (for long contexts)
+  public estimateCost(
+    tokens: number,
+    model: string,
+    operationType?: string
+  ): number {
+    // Enhanced Anthropic pricing (per 1K tokens) - updated as of 2024
+    const pricing: Record<
+      string,
+      { input: number; output: number; context?: number }
+    > = {
+      "claude-3.5-haiku": {
+        input: 0.0008, // $0.0008 per 1K input tokens
+        output: 0.004, // $0.004 per 1K output tokens
+        context: 0.0008, // $0.0008 per 1K context tokens (for long contexts)
       },
-      "gemini-1.5-flash": {
-        input: 0.0005,
-        output: 0.0005,
-        context: 0.00025
+      "claude-3.5-sonnet": {
+        input: 0.003,
+        output: 0.015,
+        context: 0.003,
       },
-      "gemini-1.5-pro": {
-        input: 0.00125,
+      "claude-3-opus": {
+        input: 0.015,
+        output: 0.075,
+        context: 0.015,
+      },
+      "claude-3-haiku": {
+        input: 0.00025,
         output: 0.00125,
-        context: 0.000625
-      },
-      "gemini-1.0-pro": {
-        input: 0.001,
-        output: 0.001,
-        context: 0.0005
+        context: 0.00025,
       },
       // Fallback for unknown models
-      "default": {
-        input: 0.0005,
-        output: 0.0005,
-        context: 0.00025
-      }
+      default: {
+        input: 0.0008,
+        output: 0.004,
+        context: 0.0008,
+      },
     };
 
     const modelPricing = pricing[model] || pricing["default"];
@@ -221,8 +238,10 @@ export class TokenizerService {
     const pricing = this.getModelPricing(model);
     const operationMultiplier = this.getOperationCostMultiplier(operationType);
 
-    const inputCost = (inputTokens / 1000) * pricing.input * operationMultiplier;
-    const outputCost = (outputTokens / 1000) * pricing.output * operationMultiplier;
+    const inputCost =
+      (inputTokens / 1000) * pricing.input * operationMultiplier;
+    const outputCost =
+      (outputTokens / 1000) * pricing.output * operationMultiplier;
     const totalCost = inputCost + outputCost;
 
     return { inputCost, outputCost, totalCost };
@@ -231,13 +250,24 @@ export class TokenizerService {
   /**
    * Get pricing data for a specific model
    */
-  private getModelPricing(model: string): { input: number; output: number; context: number } {
-    const pricing: Record<string, { input: number; output: number; context: number }> = {
-      "gemini-2.0-flash-exp": { input: 0.0005, output: 0.0005, context: 0.00025 },
-      "gemini-1.5-flash": { input: 0.0005, output: 0.0005, context: 0.00025 },
-      "gemini-1.5-pro": { input: 0.00125, output: 0.00125, context: 0.000625 },
-      "gemini-1.0-pro": { input: 0.001, output: 0.001, context: 0.0005 },
-      "default": { input: 0.0005, output: 0.0005, context: 0.00025 }
+  private getModelPricing(model: string): {
+    input: number;
+    output: number;
+    context: number;
+  } {
+    const pricing: Record<
+      string,
+      { input: number; output: number; context: number }
+    > = {
+      "claude-3.5-haiku": {
+        input: 0.0008,
+        output: 0.004,
+        context: 0.0008,
+      },
+      "claude-3.5-sonnet": { input: 0.003, output: 0.015, context: 0.003 },
+      "claude-3-opus": { input: 0.015, output: 0.075, context: 0.015 },
+      "claude-3-haiku": { input: 0.00025, output: 0.00125, context: 0.00025 },
+      default: { input: 0.0008, output: 0.004, context: 0.0008 },
     };
 
     return pricing[model] || pricing["default"];
@@ -248,22 +278,22 @@ export class TokenizerService {
    */
   private getOperationCostMultiplier(operationType?: string): number {
     const multipliers: Record<string, number> = {
-      'intent_detection': 1.0,    // Standard rate
-      'response_generation': 1.0, // Standard rate
-      'direct_response': 1.0,     // Standard rate
-      'safety_filter': 0.8,       // Slightly discounted for safety operations
-      'caching': 0.1,             // Heavily discounted for cached responses
-      'optimization': 0.9,        // Slightly discounted for optimized operations
+      intent_detection: 1.0, // Standard rate
+      response_generation: 1.0, // Standard rate
+      direct_response: 1.0, // Standard rate
+      safety_filter: 0.8, // Slightly discounted for safety operations
+      caching: 0.1, // Heavily discounted for cached responses
+      optimization: 0.9, // Slightly discounted for optimized operations
     };
 
-    return multipliers[operationType || 'response_generation'] || 1.0;
+    return multipliers[operationType || "response_generation"] || 1.0;
   }
 
   /**
    * Get supported models
    */
   public getSupportedModels(): string[] {
-    return Array.from(this.encodings.keys()).filter(key => key !== "default");
+    return Array.from(this.encodings.keys()).filter((key) => key !== "default");
   }
 
   /**
@@ -279,20 +309,28 @@ export class TokenizerService {
 
     const cheapestModel = models.reduce((cheapest, model) => {
       const cost = this.estimateCost(inputTokens + outputTokens, model);
-      const cheapestCost = this.estimateCost(inputTokens + outputTokens, cheapest);
+      const cheapestCost = this.estimateCost(
+        inputTokens + outputTokens,
+        cheapest
+      );
       return cost < cheapestCost ? model : cheapest;
     });
 
-    const cheapestCost = this.estimateCost(inputTokens + outputTokens, cheapestModel);
+    const cheapestCost = this.estimateCost(
+      inputTokens + outputTokens,
+      cheapestModel
+    );
 
-    return models.map(model => {
-      const totalCost = this.estimateCost(inputTokens + outputTokens, model);
-      return {
-        model,
-        totalCost,
-        savings: cheapestCost - totalCost
-      };
-    }).sort((a, b) => a.totalCost - b.totalCost);
+    return models
+      .map((model) => {
+        const totalCost = this.estimateCost(inputTokens + outputTokens, model);
+        return {
+          model,
+          totalCost,
+          savings: cheapestCost - totalCost,
+        };
+      })
+      .sort((a, b) => a.totalCost - b.totalCost);
   }
 
   /**
@@ -303,21 +341,36 @@ export class TokenizerService {
     optimizedPrompt: string,
     model: string,
     expectedOutputTokens: number = 1000
-  ): { originalCost: number; optimizedCost: number; savings: number; savingsPercentage: number } {
+  ): {
+    originalCost: number;
+    optimizedCost: number;
+    savings: number;
+    savingsPercentage: number;
+  } {
     const originalInputTokens = this.countTokens(originalPrompt, model).tokens;
-    const optimizedInputTokens = this.countTokens(optimizedPrompt, model).tokens;
+    const optimizedInputTokens = this.countTokens(
+      optimizedPrompt,
+      model
+    ).tokens;
 
-    const originalCost = this.estimateCost(originalInputTokens + expectedOutputTokens, model);
-    const optimizedCost = this.estimateCost(optimizedInputTokens + expectedOutputTokens, model);
+    const originalCost = this.estimateCost(
+      originalInputTokens + expectedOutputTokens,
+      model
+    );
+    const optimizedCost = this.estimateCost(
+      optimizedInputTokens + expectedOutputTokens,
+      model
+    );
 
     const savings = originalCost - optimizedCost;
-    const savingsPercentage = originalCost > 0 ? (savings / originalCost) * 100 : 0;
+    const savingsPercentage =
+      originalCost > 0 ? (savings / originalCost) * 100 : 0;
 
     return {
       originalCost,
       optimizedCost,
       savings,
-      savingsPercentage
+      savingsPercentage,
     };
   }
 
@@ -330,18 +383,28 @@ export class TokenizerService {
     averageOutputTokens: number,
     monthlyUsage: number
   ): Array<{ model: string; monthlySavings: number; reason: string }> {
-    const recommendations: Array<{ model: string; monthlySavings: number; reason: string }> = [];
+    const recommendations: Array<{
+      model: string;
+      monthlySavings: number;
+      reason: string;
+    }> = [];
 
-    const currentCostPerRequest = this.estimateCost(averageInputTokens + averageOutputTokens, currentModel);
+    const currentCostPerRequest = this.estimateCost(
+      averageInputTokens + averageOutputTokens,
+      currentModel
+    );
     const currentMonthlyCost = currentCostPerRequest * monthlyUsage;
 
     // Compare with more cost-effective models
-    const alternativeModels = ['gemini-2.0-flash-exp', 'gemini-1.5-flash'];
+    const alternativeModels = ["claude-3.5-haiku", "claude-3-haiku"];
 
     for (const model of alternativeModels) {
       if (model === currentModel) continue;
 
-      const alternativeCostPerRequest = this.estimateCost(averageInputTokens + averageOutputTokens, model);
+      const alternativeCostPerRequest = this.estimateCost(
+        averageInputTokens + averageOutputTokens,
+        model
+      );
       const alternativeMonthlyCost = alternativeCostPerRequest * monthlyUsage;
       const monthlySavings = currentMonthlyCost - alternativeMonthlyCost;
 
@@ -349,7 +412,9 @@ export class TokenizerService {
         recommendations.push({
           model,
           monthlySavings,
-          reason: `Switch to ${model} for ${monthlySavings.toFixed(2)} monthly savings`
+          reason: `Switch to ${model} for ${monthlySavings.toFixed(
+            2
+          )} monthly savings`,
         });
       }
     }
@@ -369,14 +434,14 @@ export class TokenizerService {
   }> {
     const models = this.getSupportedModels();
 
-    return models.map(model => {
+    return models.map((model) => {
       const modelPricing = this.getModelPricing(model);
       return {
         model,
         inputCostPerThousand: modelPricing.input,
         outputCostPerThousand: modelPricing.output,
         contextCostPerThousand: modelPricing.context,
-        recommended: model === 'gemini-2.0-flash-exp' // Most cost-effective
+        recommended: model === "claude-3.5-haiku", // Most cost-effective
       };
     });
   }
@@ -388,8 +453,13 @@ export class TokenizerService {
     messages: Array<{ role: string; content: string }>,
     model: string,
     operationType?: string
-  ): { totalTokens: number; estimatedCost: number; breakdown: Array<{ message: string; tokens: number; cost: number }> } {
-    const breakdown: Array<{ message: string; tokens: number; cost: number }> = [];
+  ): {
+    totalTokens: number;
+    estimatedCost: number;
+    breakdown: Array<{ message: string; tokens: number; cost: number }>;
+  } {
+    const breakdown: Array<{ message: string; tokens: number; cost: number }> =
+      [];
     let totalTokens = 0;
     let totalCost = 0;
 
@@ -398,9 +468,11 @@ export class TokenizerService {
       const cost = this.estimateCost(tokens, model, operationType);
 
       breakdown.push({
-        message: message.content.substring(0, 50) + (message.content.length > 50 ? '...' : ''),
+        message:
+          message.content.substring(0, 50) +
+          (message.content.length > 50 ? "..." : ""),
         tokens,
-        cost
+        cost,
       });
 
       totalTokens += tokens;
@@ -410,7 +482,7 @@ export class TokenizerService {
     return {
       totalTokens,
       estimatedCost: totalCost,
-      breakdown
+      breakdown,
     };
   }
 

@@ -11,7 +11,6 @@ import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from "@/lib/circuit-breaker";
 import { withRetry, DEFAULT_RETRY_CONFIGS } from "@/lib/retry";
 import { messageQueueService } from "@/services/message-queue.service";
 import { usageLimits } from "@/lib/usage-limits";
-import { tokenizerService } from "@/lib/tokenizer";
 import {
   LLMConfig,
   LLMRequest,
@@ -102,7 +101,9 @@ export class LLMService {
         });
 
         // Convert messages to Anthropic format
-        const messages = this.convertMessagesToAnthropicFormat(request.messages);
+        const messages = this.convertMessagesToAnthropicFormat(
+          request.messages
+        );
 
         const result = await this.client.messages.create({
           model: this.config.model,
@@ -114,10 +115,11 @@ export class LLMService {
         return result;
       });
 
-        const responseTime = Date.now() - startTime;
-        const content = response.content[0]?.type === 'text' ? response.content[0].text : "";
-        const tokensUsed = response.usage?.output_tokens || 0;
-        const finishReason = response.stop_reason || "stop";
+      const responseTime = Date.now() - startTime;
+      const content =
+        response.content[0]?.type === "text" ? response.content[0].text : "";
+      const tokensUsed = response.usage?.output_tokens || 0;
+      const finishReason = response.stop_reason || "stop";
 
       logger.info("Anthropic Claude LLM response generated successfully", {
         tokensUsed,
@@ -136,11 +138,15 @@ export class LLMService {
       const responseTime = Date.now() - startTime;
       const err = error as Error;
 
-      logger.error("Anthropic Claude LLM request failed after all retries", err, {
-        responseTime,
-        model: this.config.model,
-        circuitBreakerState: this.circuitBreaker.getStats().state,
-      });
+      logger.error(
+        "Anthropic Claude LLM request failed after all retries",
+        err,
+        {
+          responseTime,
+          model: this.config.model,
+          circuitBreakerState: this.circuitBreaker.getStats().state,
+        }
+      );
 
       // Queue message for later retry if it's a temporary failure
       if (this.isRetryableError(err)) {
@@ -238,9 +244,10 @@ export class LLMService {
         });
 
         // Parse the cached response from JSON string or object
-        const parsedResponse = typeof cachedResponse.response === 'string'
-          ? JSON.parse(cachedResponse.response)
-          : cachedResponse.response;
+        const parsedResponse =
+          typeof cachedResponse.response === "string"
+            ? JSON.parse(cachedResponse.response)
+            : cachedResponse.response;
 
         // Type assertion to ProcessedLLMResponse
         const typedResponse = parsedResponse as ProcessedLLMResponse;
@@ -349,8 +356,13 @@ export class LLMService {
       activeReminders.length > 0
         ? `\nActive Medication Reminders: ${activeReminders
             .map((r: unknown) => {
-              const reminder = r as { medicationName?: string; customMessage?: string };
-              return reminder.medicationName || reminder.customMessage || "obat";
+              const reminder = r as {
+                medicationName?: string;
+                customMessage?: string;
+              };
+              return (
+                reminder.medicationName || reminder.customMessage || "obat"
+              );
             })
             .join(", ")}`
         : "";
@@ -666,15 +678,23 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   private convertMessagesToAnthropicFormat(
     messages: LLMRequest["messages"]
   ): Array<{ role: "user" | "assistant"; content: string }> {
-    const anthropicMessages: Array<{ role: "user" | "assistant"; content: string }> = [];
+    const anthropicMessages: Array<{
+      role: "user" | "assistant";
+      content: string;
+    }> = [];
 
     for (const msg of messages) {
       if (msg.role === "system") {
         // Anthropic handles system messages differently - prepend to first user message
-        if (anthropicMessages.length === 0 || anthropicMessages[0].role !== "user") {
+        if (
+          anthropicMessages.length === 0 ||
+          anthropicMessages[0].role !== "user"
+        ) {
           anthropicMessages.push({
             role: "user",
-            content: `System: ${msg.content}\n\n${anthropicMessages.length > 0 ? anthropicMessages[0].content : ""}`
+            content: `System: ${msg.content}\n\n${
+              anthropicMessages.length > 0 ? anthropicMessages[0].content : ""
+            }`,
           });
         } else {
           anthropicMessages[0].content = `System: ${msg.content}\n\n${anthropicMessages[0].content}`;
@@ -682,15 +702,13 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
       } else if (msg.role === "user" || msg.role === "assistant") {
         anthropicMessages.push({
           role: msg.role,
-          content: msg.content
+          content: msg.content,
         });
       }
     }
 
     return anthropicMessages;
   }
-
-
 
   /**
    * Get current configuration and circuit breaker stats (for debugging)

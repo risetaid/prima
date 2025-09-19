@@ -278,15 +278,15 @@ export class LLMAnalyticsService {
    * @deprecated Use tokenizerService.estimateCost() instead
    */
   getCostPerToken(model: string): number {
-    // Google Gemini pricing (approximate)
+    // Anthropic pricing (approximate)
     const pricing: Record<string, number> = {
-      "gemini-2.0-flash-exp": 0.0005, // $0.0005 per 1K tokens (experimental)
-      "gemini-1.5-flash": 0.0005, // $0.0005 per 1K tokens
-      "gemini-1.5-pro": 0.00125, // $0.00125 per 1K tokens
-      "gemini-1.0-pro": 0.001, // $0.001 per 1K tokens
+      "claude-3.5-haiku": 0.0008, // $0.0008 per 1K tokens
+      "claude-3.5-sonnet": 0.003, // $0.003 per 1K tokens
+      "claude-3-opus": 0.015, // $0.015 per 1K tokens
+      "claude-3-haiku": 0.00025, // $0.00025 per 1K tokens
     };
 
-    return pricing[model] || 0.0005;
+    return pricing[model] || 0.0008;
   }
 
   /**

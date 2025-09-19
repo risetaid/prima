@@ -9,6 +9,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 ## Development Commands
 
 ### Core Development
+
 - `bun run dev` - Start Next.js development server with Turbo
 - `bun run build` - Production build with type checking
 - `bun run start` - Start production server
@@ -16,12 +17,14 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 - `bunx tsc --noEmit` - Run TypeScript type checking
 
 ### Database Management (Drizzle ORM)
+
 - `bun run db:generate` - Generate Drizzle schema from schema.ts
 - `bun run db:migrate` - Run database migrations
 - `bun run db:push` - Push schema changes to database
 - `bun run db:studio` - Open Drizzle Studio GUI for database inspection
 
 ### Administrative Scripts
+
 - `bun run nuke-recreate-db` - Nuclear option to recreate database (use with caution)
 - `bun run setup-first-user` - Set up initial admin user
 - `bun run start-message-worker` - Start background message processing worker
@@ -29,6 +32,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 ## Architecture Overview
 
 ### Tech Stack
+
 - **Framework**: Next.js 15 + React 19 + TypeScript 5
 - **Authentication**: Clerk with Gmail OAuth and role-based access control
 - **Database**: PostgreSQL with Drizzle ORM and comprehensive soft delete patterns
@@ -43,16 +47,18 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 The application follows a clean architecture with domain-driven service layers:
 
 - **Domain Services**: Located in `src/services/` with business domain modules:
+
   - `patient/` - Patient management, compliance tracking, health notes
   - `reminder/` - Smart reminders, confirmations, scheduling
   - `whatsapp/` - WhatsApp Business API integration
   - `verification/` - Patient verification workflows
-  - `llm/` - OpenAI and Google Gemini integration for content
+  - `llm/` - OpenAI and Anthropic integration for content
   - `analytics/` - Compliance tracking and reporting
 
 - **Repository Pattern**: Each service has corresponding repository files for data access with transaction safety
 
 - **Data Layer**:
+
   - Modular schema files in `src/db/` (core-schema.ts, patient-schema.ts, etc.)
   - All tables use soft deletes via `deletedAt` timestamp
   - 16 optimized tables with comprehensive foreign key relationships
@@ -67,6 +73,7 @@ The application follows a clean architecture with domain-driven service layers:
 ### Critical Timezone Handling
 
 The system operates in WIB (UTC+7) timezone for Indonesian healthcare workers:
+
 - All reminder scheduling uses `src/lib/timezone.ts` utilities
 - Cron jobs at `src/app/api/cron/route.ts` handle automated reminders
 - Store timestamps in UTC, convert via timezone utilities
@@ -85,7 +92,7 @@ The system operates in WIB (UTC+7) timezone for Indonesian healthcare workers:
 
 ### LLM Integration
 
-- Multi-provider support (OpenAI and Google Gemini)
+- Multi-provider support (OpenAI and Anthropic)
 - A/B testing framework for prompt optimization
 - Safety filtering for medical advice
 - Template-based prompt management system
@@ -101,6 +108,7 @@ The system operates in WIB (UTC+7) timezone for Indonesian healthcare workers:
 ## File Structure Conventions
 
 ### Directory Organization
+
 ```
 src/
 ├── app/                        # Next.js app router
@@ -127,6 +135,7 @@ src/
 ```
 
 ### Naming Conventions
+
 - Files: kebab-case (e.g., `patient-list.tsx`)
 - React components: PascalCase in `.tsx` files
 - Variables/functions: camelCase
@@ -136,17 +145,20 @@ src/
 ## Code Quality Standards
 
 ### TypeScript Configuration
+
 - Strict TypeScript with comprehensive type checking
 - All inputs validated with Zod schemas in `src/lib/validations.ts`
 - 2-space indentation enforced by ESLint
 
 ### Database Patterns
+
 - All tables implement soft delete via `deletedAt` timestamp
 - Foreign key relationships properly defined in schema
 - Use repository pattern for complex queries
 - Cache frequently accessed data with appropriate TTL
 
 ### Security Best Practices
+
 - Role-based access control enforced on all protected routes
 - Environment variables for secrets (never commit to repo)
 - Input validation with Zod on all API endpoints
@@ -155,17 +167,21 @@ src/
 ## Development Workflow
 
 ### Pre-commit Checklist
+
 1. Run type checking: `bunx tsc --noEmit`
 2. Run linting: `bun run lint --quiet`
 3. Address all errors before committing
 
 ### Commit Standards
+
 - Use conventional commit format: `feat(scope): description`
 - Include scope when relevant (e.g., `feat(reminders): add retry logic`)
 - Present tense, imperative mood
 
 ### Environment Setup
+
 Essential environment variables (never commit actual values):
+
 - `DATABASE_URL` - PostgreSQL connection (pooled for app operations)
 - `DIRECT_URL` - PostgreSQL direct connection (for migrations)
 - `REDIS_URL` - Redis cache connection
@@ -178,6 +194,7 @@ Essential environment variables (never commit actual values):
 ## Important Architecture Patterns
 
 ### Error Handling Patterns
+
 - **Custom Error Types**: ValidationError, NotFoundError, ReminderError per service
 - **Exponential Backoff**: WhatsApp API retry logic
 - **Circuit Breakers**: Redis fallback patterns
@@ -185,12 +202,14 @@ Essential environment variables (never commit actual values):
 - **Transaction Safety**: Critical operations wrapped in database transactions
 
 ### Database Optimization
+
 - Comprehensive indexing on frequently queried columns
 - Soft delete patterns maintain data integrity
 - Drizzle ORM with prepared statements for performance
 - Connection pooling (separate URLs for app vs. migrations)
 
 ### WhatsApp Rate Limiting
+
 - Built-in retry logic for failed message delivery
 - Idempotency checks to prevent duplicate sends
 - Batch processing for bulk operations
@@ -207,6 +226,7 @@ Essential environment variables (never commit actual values):
 ## Text-Based Interaction System
 
 ### Implementation Patterns
+
 - **Text response verification**: Simple text message patterns for patient verification
 - **Medication confirmation**: Text-based responses for medication compliance tracking
 - **Response-driven workflow**: Auto-confirmation based on patient text responses, not timers
@@ -214,6 +234,7 @@ Essential environment variables (never commit actual values):
 - **Status flow**: TERJADWAL → PERLU_DIPERBARUI → SELESAI based on patient responses
 
 ### Technical Requirements
+
 - Text responses processed via webhook at `/api/webhooks/fonnte/incoming/route.ts`
 - Database schema includes response tracking in `reminderLogs` and conversation tables
 - Implement robust text pattern matching for Indonesian language responses
@@ -221,6 +242,7 @@ Essential environment variables (never commit actual values):
 - Implement proper error handling and fallback mechanisms
 
 ### API Integration Rules
+
 - Always reference official Fonnte documentation at https://docs.fonnte.com/
 - Use simple text message format for reliable delivery across all WhatsApp clients
 - Never implement timer-based auto-confirmation - always response-driven
