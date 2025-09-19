@@ -62,6 +62,7 @@ function CMSPageContent() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [contentLoading, setContentLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [error, setError] = useState<string | null>(null);
 
   // Progressive loading: Statistics first, then content
   const fetchContent = useCallback(async () => {
@@ -73,22 +74,23 @@ function CMSPageContent() {
       const contentResponse = await fetch(`/api/cms/content?type=${activeTab}`);
       logger.info("Content response received", { status: contentResponse.status });
 
-      if (!contentResponse.ok) {
-        logger.error("Content API request failed", new Error(`HTTP ${contentResponse.status}: ${contentResponse.statusText}`), { status: contentResponse.status });
+        if (!contentResponse.ok) {
+          logger.error("Content API request failed", new Error(`HTTP ${contentResponse.status}: ${contentResponse.statusText}`), { status: contentResponse.status });
 
-        if (contentResponse.status === 401) {
-          toast.error("Tidak memiliki akses ke CMS. Hubungi administrator.");
-        } else if (contentResponse.status === 403) {
-          toast.error("Akses ditolak. Butuh role ADMIN atau SUPERADMIN.");
-        } else if (contentResponse.status === 500) {
-          toast.error("Server error. Silakan coba lagi nanti.");
-        } else {
-          toast.error(
-            `HTTP ${contentResponse.status}: ${contentResponse.statusText}`
-          );
+          let errorMessage = `Gagal memuat konten: HTTP ${contentResponse.status}`;
+
+          if (contentResponse.status === 401) {
+            errorMessage = "Tidak memiliki akses ke CMS. Hubungi administrator.";
+          } else if (contentResponse.status === 403) {
+            errorMessage = "Akses ditolak. Butuh role ADMIN atau DEVELOPER.";
+          } else if (contentResponse.status === 500) {
+            errorMessage = "Server error. Silakan coba lagi nanti.";
+          }
+
+          toast.error(errorMessage);
+          setError(errorMessage);
+          return;
         }
-        return;
-      }
 
       const contentData = await contentResponse.json();
       logger.info("Content data received", {
@@ -105,11 +107,14 @@ function CMSPageContent() {
     } catch (error) {
       logger.error("Content loading error", error instanceof Error ? error : new Error(String(error)));
 
+      let errorMessage = "Terjadi kesalahan saat memuat konten";
+
       if (error instanceof TypeError && error.message.includes("fetch")) {
-        toast.error("Koneksi bermasalah. Periksa internet Anda.");
-      } else {
-        toast.error("Terjadi kesalahan saat memuat konten");
+        errorMessage = "Koneksi bermasalah. Periksa internet Anda.";
       }
+
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setContentLoading(false);
       setLoading(false);
@@ -131,7 +136,36 @@ function CMSPageContent() {
           if (data.success && data.statistics) {
             setStatistics(data.statistics);
             logger.info("Statistics loaded (one-time)", { statistics: data.statistics });
+          } else {
+            // Fallback: set empty statistics so content can load
+            logger.warn("Statistics API returned success but no data, using fallback", { data });
+            setStatistics({
+              articles: { total: 0, published: 0, draft: 0 },
+              videos: { total: 0, published: 0, draft: 0 },
+              total: { content: 0, published: 0, draft: 0 }
+            });
           }
+        } else {
+          // Handle HTTP errors
+          logger.error("Statistics API failed", new Error(`HTTP ${response.status}`), {
+            status: response.status,
+            statusText: response.statusText
+          });
+
+          if (response.status === 401) {
+            toast.error("Akses ditolak. Role Anda tidak memiliki izin CMS.");
+          } else if (response.status === 403) {
+            toast.error("Akses ditolak. Butuh role ADMIN atau DEVELOPER.");
+          } else {
+            toast.error(`Gagal memuat statistik: ${response.status}`);
+          }
+
+          // Fallback: set empty statistics so content can still load
+          setStatistics({
+            articles: { total: 0, published: 0, draft: 0 },
+            videos: { total: 0, published: 0, draft: 0 },
+            total: { content: 0, published: 0, draft: 0 }
+          });
         }
       } catch (error) {
         logger.error("Statistics loading error", error instanceof Error ? error : new Error(String(error)));
@@ -143,13 +177,14 @@ function CMSPageContent() {
     fetchStatistics();
   }, []); // Empty dependency array - only run once on mount
 
-  // Load content when tab changes
+  // Load content when tab changes or when statistics become available (including empty fallback)
   useEffect(() => {
-    if (statistics) {
-      // Only fetch content after statistics are loaded
+    if (statistics !== null) {
+      // Load content regardless of statistics content (allow empty stats)
       fetchContent();
     }
-  }, [activeTab, statistics, fetchContent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, statistics]); // Note: fetchContent omitted to prevent infinite loops
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -189,6 +224,47 @@ function CMSPageContent() {
       minute: "2-digit",
     });
   };
+
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <div className="text-red-500 mb-4">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Gagal Memuat Halaman CMS
+          </h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            {error}
+          </p>
+          <div className="flex justify-center gap-3">
+            <Button onClick={() => window.location.reload()}>
+              Refresh Halaman
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setStatistics(null);
+                setContent([]);
+                setLoading(true);
+                setStatsLoading(true);
+                setContentLoading(true);
+                // Re-trigger data loading
+                window.location.reload();
+              }}
+            >
+              Coba Lagi
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show progressive loading states
   if (loading && statsLoading) {
