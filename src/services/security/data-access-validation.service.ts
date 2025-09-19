@@ -290,7 +290,7 @@ export class DataAccessValidationService {
     ];
     if (
       requiresVerification.includes(request.requestedDataType) &&
-      patientProfile.verificationStatus !== "verified"
+      patientProfile.verificationStatus !== "VERIFIED"
     ) {
       violations.push({
         type: "consent_required",

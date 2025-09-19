@@ -311,7 +311,7 @@ export function getResponseTemplate(
 function mapIntentToTemplate(intent: string, context: TemplateContext): string | null {
   switch (intent) {
     case 'verification_response':
-      return context.verificationStatus === 'verified' ? 'verification_success' : 'verification_pending'
+      return context.verificationStatus === 'VERIFIED' ? 'verification_success' : 'verification_pending'
 
     case 'medication_confirmation':
       // Enhanced medication confirmation logic

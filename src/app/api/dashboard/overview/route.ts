@@ -16,8 +16,8 @@ export async function GET() {
     // Combine all dashboard data in optimized Drizzle queries
     let patientsData, userStats;
 
-    if (user.role === "ADMIN") {
-      // Admin dashboard - optimized for all patients
+    if (user.role === "ADMIN" || user.role === "DEVELOPER") {
+      // Admin/Developer dashboard - optimized for all patients
       [patientsData, userStats] = await Promise.all([
         // Get basic patients data first (separate from compliance calculation for better performance)
         db
@@ -45,7 +45,7 @@ export async function GET() {
           .where(isNull(patients.deletedAt)),
       ]);
     } else {
-      // Member dashboard - only their patients
+      // RELAWAN dashboard - only their assigned patients
       [patientsData, userStats] = await Promise.all([
         db
           .select({

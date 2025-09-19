@@ -227,7 +227,7 @@ export class VerificationWebhookService {
       await this.messageHandler.sendConfirmationMessage(patient, "VERIFIED");
 
       console.log(`✅ ACCEPT: Successfully processed for ${patient.name}`);
-      return "verified";
+      return "VERIFIED";
     } catch (error) {
       console.error(`💥 ACCEPT: Error processing acceptance for ${patient.name}`, error);
       throw error;
@@ -240,7 +240,7 @@ export class VerificationWebhookService {
       await this.messageHandler.sendConfirmationMessage(patient, "DECLINED");
 
       console.log(`✅ DECLINE: Successfully processed for ${patient.name}`);
-      return "declined";
+      return "DECLINED";
     } catch (error) {
       console.error(`💥 DECLINE: Error processing decline for ${patient.name}`, error);
       throw error;
@@ -503,13 +503,13 @@ class MessageHandler {
   }
 
   private generateConfirmationMessage(patient: Patient, status: string): string {
-    if (status === "VERIFIED" || status === "verified") {
+    if (status === "VERIFIED") {
       return `Terima kasih ${patient.name}! ✅
 
 Anda akan menerima reminder dari relawan PRIMA.
 
 Untuk berhenti, ketik: BERHENTI`;
-    } else if (status === "DECLINED" || status === "declined") {
+    } else if (status === "DECLINED") {
       return `Baik ${patient.name}, terima kasih atas responsnya.
 
 Semoga sehat selalu! 🙏`;

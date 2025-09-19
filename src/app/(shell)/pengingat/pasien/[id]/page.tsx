@@ -84,7 +84,7 @@ export default function PatientReminderPage() {
         const patient = await response.json();
         setPatientName(patient.name);
         const allowed =
-          patient.verificationStatus === "verified" &&
+          patient.verificationStatus === "VERIFIED" &&
           patient.isActive === true;
         setCanAddReminders(allowed);
       }

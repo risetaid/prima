@@ -154,13 +154,14 @@ export default function PatientDetailPage() {
         setHealthNotes([]);
       } else {
         logger.error("Health notes fetch error", undefined, {
+          patientId,
           status: response.status,
           statusText: response.statusText,
         });
         toast.error("Gagal memuat catatan kesehatan");
       }
-    } catch {
-      logger.error("Health notes fetch error");
+    } catch (error) {
+      logger.error("Health notes fetch error", error instanceof Error ? error : new Error(String(error)), { patientId });
       toast.error("Gagal memuat catatan kesehatan");
     }
   }, []);
@@ -171,19 +172,42 @@ export default function PatientDetailPage() {
         `/api/patients/${patientId}/reminders/completed`
       );
       if (response.ok) {
-        const data: CompletedReminder[] = await response.json();
-        const transformedData = data.map((item) => ({
-          ...item,
-          medicationTaken: Array.isArray(item.medicationTaken)
-            ? item.medicationTaken.length > 0
-            : !!item.medicationTaken,
-        }));
-        setCompletedReminders(transformedData);
+        const data = await response.json();
+
+        // Check if the endpoint is disabled
+        if (data.disabled) {
+          logger.warn("Completed reminders endpoint disabled", { patientId, reason: data.reason });
+          setCompletedReminders([]);
+          return;
+        }
+
+        // Process the data if it's valid
+        if (Array.isArray(data)) {
+          const transformedData = data.map((item) => ({
+            ...item,
+            medicationTaken: Array.isArray(item.medicationTaken)
+              ? item.medicationTaken.length > 0
+              : !!item.medicationTaken,
+          }));
+          setCompletedReminders(transformedData);
+        } else {
+          logger.error("Invalid response format for completed reminders", undefined, {
+            patientId,
+            dataType: typeof data,
+            dataKeys: Object.keys(data || {})
+          });
+          setCompletedReminders([]);
+        }
       } else {
+        logger.error("Failed to fetch completed reminders", undefined, {
+          patientId,
+          status: response.status,
+          statusText: response.statusText
+        });
         setCompletedReminders([]);
       }
-    } catch {
-      logger.error("Error fetching completed reminders");
+    } catch (error) {
+      logger.error("Error fetching completed reminders", error instanceof Error ? error : new Error(String(error)), { patientId });
       setCompletedReminders([]);
     }
   }, []);
@@ -234,8 +258,8 @@ export default function PatientDetailPage() {
         const error = await response.json();
         toast.error(error.error || "Gagal menambahkan catatan");
       }
-    } catch {
-      logger.error("Error adding health note");
+    } catch (error) {
+      logger.error("Error adding health note", error instanceof Error ? error : new Error(String(error)), { patientId: params.id as string });
       toast.error("Gagal menambahkan catatan");
     }
   };

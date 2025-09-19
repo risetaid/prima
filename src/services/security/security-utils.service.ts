@@ -452,7 +452,7 @@ export class SecurityUtilsService {
     dataType: string,
     verificationStatus: string
   ): string[] {
-    const isVerified = verificationStatus === "verified";
+    const isVerified = verificationStatus === "VERIFIED";
 
     if (!isVerified) {
       return [
@@ -494,7 +494,7 @@ export class SecurityUtilsService {
       const securityProfile = await this.getPatientSecurityProfile(patientId);
 
       // Only verified patients can perform sensitive operations
-      if (securityProfile.verificationStatus !== "verified") {
+      if (securityProfile.verificationStatus !== "VERIFIED") {
         return false;
       }
 

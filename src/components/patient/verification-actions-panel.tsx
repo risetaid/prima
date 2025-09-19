@@ -168,7 +168,7 @@ export default function VerificationActionsPanel({
             </button>
             
             <button
-              onClick={() => handleManualVerification('verified')}
+              onClick={() => handleManualVerification('VERIFIED')}
               className="flex-1 sm:flex-none px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-all duration-200 font-medium"
             >
               Setujui Manual

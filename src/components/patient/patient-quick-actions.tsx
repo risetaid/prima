@@ -31,12 +31,12 @@ export function PatientQuickActions({
           onClick={onAddReminder}
           disabled={
             !(
-              patient.verificationStatus === "verified" &&
+              patient.verificationStatus === "VERIFIED" &&
               patient.isActive
             )
           }
           className={`cursor-pointer py-3 sm:py-4 px-4 sm:px-6 rounded-xl font-semibold flex items-center justify-center space-x-2 sm:space-x-3 transition-all duration-200 ${
-            patient.verificationStatus === "verified" &&
+            patient.verificationStatus === "VERIFIED" &&
             patient.isActive
               ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl"
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
@@ -48,7 +48,7 @@ export function PatientQuickActions({
           </span>
         </button>
         {!(
-          patient.verificationStatus === "verified" &&
+          patient.verificationStatus === "VERIFIED" &&
           patient.isActive
         ) && (
           <p className="text-xs text-gray-500 sm:col-span-2 text-center">

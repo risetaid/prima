@@ -98,7 +98,7 @@ export function PatientRemindersTab({
             <CardTitle>Aksi Cepat</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={onAddReminder} className="w-full" disabled={!patient.isActive || patient.verificationStatus !== 'verified'}>
+            <Button onClick={onAddReminder} className="w-full" disabled={!patient.isActive || patient.verificationStatus !== 'VERIFIED'}>
               <Plus className="w-4 h-4 mr-2" />
               Tambah Pengingat Baru
             </Button>

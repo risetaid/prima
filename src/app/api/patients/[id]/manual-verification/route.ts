@@ -95,13 +95,13 @@ function generateConfirmationMessage(
   patient: { name: string },
   status: string
 ): string {
-  if (status === "verified") {
+  if (status === "VERIFIED") {
     return `Terima kasih ${patient.name}! ✅
 
 Anda akan menerima reminder dari relawan PRIMA.
 
 Untuk berhenti, ketik: BERHENTI`;
-  } else if (status === "declined") {
+  } else if (status === "DECLINED") {
     return `Baik ${patient.name}, terima kasih atas responsnya.
 
 Semoga sehat selalu! 🙏`;

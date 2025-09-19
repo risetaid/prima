@@ -48,8 +48,8 @@ export const GET = createApiHandler(
       limit: parseInt(searchParams.get("limit") || "50"),
     };
 
-    // For non-admin users, filter by their assigned patients using consolidated access control
-    if (user.role !== "ADMIN") {
+    // For non-admin and non-developer users, filter by their assigned patients using consolidated access control
+    if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
       filters.assignedVolunteerId = user.id;
     }
 

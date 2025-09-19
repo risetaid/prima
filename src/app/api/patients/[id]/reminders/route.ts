@@ -267,7 +267,7 @@ async function validateReminderInput(requestBody: { message: string; time: strin
   }
 
   // Enforce verification before allowing reminder creation
-  if (patient.verificationStatus !== 'verified' || !patient.isActive) {
+  if (patient.verificationStatus !== 'VERIFIED' || !patient.isActive) {
     throw new PatientVerificationError(
       'Patient must be verified and active to create reminders',
       {

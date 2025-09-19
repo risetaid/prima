@@ -81,7 +81,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
       });
 
       // Check if patient is verified
-      if (context.verificationStatus !== "verified") {
+      if (context.verificationStatus !== "VERIFIED") {
         return createErrorResponse(
           "Patient is not verified",
           "Patient must be verified to process general inquiries",
