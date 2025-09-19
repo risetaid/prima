@@ -56,9 +56,7 @@ class Logger {
         break
     }
 
-    // TODO: In production, send logs to external service (e.g., DataDog, CloudWatch)
-    // this.sendToExternalService({ timestamp: new Date().toISOString(), level, message, context, error })
-  }
+    }
 
   debug(message: string, context?: LogContext): void {
     this.log(LogLevel.DEBUG, message, context)

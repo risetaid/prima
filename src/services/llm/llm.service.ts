@@ -7,10 +7,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
 import { responseCache } from "@/lib/response-cache";
 import { safetyFilterService } from "./safety-filter";
-import { CircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from "@/lib/circuit-breaker";
-import { withRetry, DEFAULT_RETRY_CONFIGS } from "@/lib/retry";
+import { withRetry, DEFAULT_RETRY_CONFIGS, isRetryableError } from "@/lib/simple-retry";
 import { messageQueueService } from "@/services/message-queue.service";
-import { usageLimits } from "@/lib/usage-limits";
+import { llmCostService } from "@/lib/llm-cost-service";
 import {
   LLMConfig,
   LLMRequest,
@@ -22,8 +21,6 @@ import {
 export class LLMService {
   private client: Anthropic;
   private config: LLMConfig;
-  private circuitBreaker: CircuitBreaker;
-  private isCircuitBreakerEnabled: boolean;
 
   constructor() {
     this.config = {
@@ -43,15 +40,9 @@ export class LLMService {
       apiKey: this.config.apiKey,
     });
 
-    // Initialize circuit breaker
-    this.isCircuitBreakerEnabled =
-      process.env.ENABLE_CIRCUIT_BREAKER !== "false";
-    this.circuitBreaker = new CircuitBreaker(DEFAULT_CIRCUIT_CONFIGS.llm);
-
     logger.info("LLM Service initialized", {
       model: this.config.model,
       provider: "Anthropic Claude",
-      circuitBreakerEnabled: this.isCircuitBreakerEnabled,
     });
   }
 
@@ -62,7 +53,7 @@ export class LLMService {
     const startTime = Date.now();
 
     // Check usage limits before proceeding
-    const limitCheck = await usageLimits.checkLimits();
+    const limitCheck = await llmCostService.checkLimits();
     if (!limitCheck.allowed) {
       logger.warn("Usage limits exceeded, blocking LLM request", {
         limits: limitCheck.limits,
@@ -76,25 +67,11 @@ export class LLMService {
       );
     }
 
-    // Check if circuit breaker allows the request
-    if (this.isCircuitBreakerEnabled && !this.circuitBreaker.canExecute()) {
-      logger.warn(
-        "Circuit breaker is open, queuing message for later processing",
-        {
-          state: this.circuitBreaker.getStats().state,
-        }
-      );
-
-      // Queue the message for later processing
-      await this.queueMessageForRetry(request, "LLM circuit breaker open");
-      throw new Error(
-        "LLM service temporarily unavailable (circuit breaker open)"
-      );
-    }
+    // Simple retry logic - no complex circuit breaker needed
 
     try {
-      // Execute with retry logic and circuit breaker protection
-      const response = await this.executeWithFallbacks(async () => {
+      // Execute with retry logic
+      const response = await withRetry(async () => {
         logger.debug("Sending Anthropic Claude LLM request", {
           messageCount: request.messages.length,
           maxTokens: request.maxTokens || this.config.maxTokens,
@@ -113,7 +90,7 @@ export class LLMService {
         });
 
         return result;
-      });
+      }, DEFAULT_RETRY_CONFIGS.llm);
 
       const responseTime = Date.now() - startTime;
       const content =
@@ -144,8 +121,7 @@ export class LLMService {
         {
           responseTime,
           model: this.config.model,
-          circuitBreakerState: this.circuitBreaker.getStats().state,
-          messageCount: request.messages.length,
+              messageCount: request.messages.length,
           maxTokens: request.maxTokens || this.config.maxTokens,
           temperature: request.temperature || this.config.temperature,
           errorType: err.constructor.name,
@@ -155,7 +131,7 @@ export class LLMService {
       );
 
       // Queue message for later retry if it's a temporary failure
-      if (this.isRetryableError(err)) {
+      if (isRetryableError(err)) {
         logger.info("Queueing failed LLM request for retry", {
           patientId: this.extractPatientInfoFromRequest(request)?.patientId,
           errorType: err.constructor.name,
@@ -245,29 +221,20 @@ export class LLMService {
         conversationLength: context.previousMessages.length,
       };
 
-      const cachedResponse = await responseCache.get(
-        `intent:${intent}`,
-        patientContext
-      );
+      const cachedResponse = await responseCache.get(intent, patientContext);
       if (cachedResponse) {
         logger.debug("Using cached LLM response", {
           intent,
-          cacheAge: Date.now() - cachedResponse.createdAt.getTime(),
+          cacheAge: Date.now() - cachedResponse.cachedAt,
         });
 
-        // Parse the cached response from JSON string or object
-        const parsedResponse =
-          typeof cachedResponse.response === "string"
-            ? JSON.parse(cachedResponse.response)
-            : cachedResponse.response;
-
-        // Type assertion to ProcessedLLMResponse
-        const typedResponse = parsedResponse as ProcessedLLMResponse;
+        // Parse the cached response from JSON string
+        const parsedResponse = JSON.parse(cachedResponse.response) as ProcessedLLMResponse;
 
         const cachedResponseObj = {
-          content: typedResponse.content,
-          tokensUsed: typedResponse.tokensUsed || 0,
-          model: typedResponse.model || this.config.model,
+          content: parsedResponse.content,
+          tokensUsed: parsedResponse.tokensUsed || 0,
+          model: parsedResponse.model || this.config.model,
           responseTime: 0, // Cached response
           finishReason: "cached",
         };
@@ -344,7 +311,7 @@ export class LLMService {
       };
 
       await responseCache.set(
-        `intent:${intent}`,
+        intent,
         patientContext,
         JSON.stringify({
           content: finalResponse.content,
@@ -494,43 +461,7 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
     };
   }
 
-  /**
-   * Execute LLM request with circuit breaker and retry logic
-   */
-  private async executeWithFallbacks<T>(fn: () => Promise<T>): Promise<T> {
-    if (!this.isCircuitBreakerEnabled) {
-      // Simple retry without circuit breaker
-      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm);
-    }
-
-    // Execute with circuit breaker protection
-    return this.circuitBreaker.execute(async () => {
-      return withRetry(fn, DEFAULT_RETRY_CONFIGS.llm);
-    });
-  }
-
-  /**
-   * Check if an error is retryable
-   */
-  private isRetryableError(error: Error): boolean {
-    const message = error.message.toLowerCase();
-    const retryablePatterns = [
-      "timeout",
-      "network",
-      "connection",
-      "rate limit",
-      "server error",
-      "internal server error",
-      "bad gateway",
-      "service unavailable",
-      "gateway timeout",
-      "too many requests",
-      "temporary failure",
-    ];
-
-    return retryablePatterns.some((pattern) => message.includes(pattern));
-  }
-
+  
   /**
    * Queue message for later retry when LLM is unavailable
    */
@@ -740,16 +671,12 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   }
 
   /**
-   * Get current configuration and circuit breaker stats (for debugging)
+   * Get current configuration (for debugging)
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getConfig(): Partial<LLMConfig> & { circuitBreaker?: any } {
+  getConfig(): Partial<LLMConfig> {
     return {
       ...this.config,
       apiKey: this.config.apiKey ? "***" : "", // Hide API key
-      circuitBreaker: this.isCircuitBreakerEnabled
-        ? this.circuitBreaker.getStats()
-        : null,
     };
   }
 }

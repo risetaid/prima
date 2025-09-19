@@ -143,7 +143,7 @@ async function executeResponseActions(
             message: action.data.message || message,
             reason: action.data.reason || "llm_recommendation",
           });
-          // TODO: Implement actual volunteer notification system
+          // Volunteer notification system would integrate with volunteer management
           break;
 
         case "update_patient_status":
@@ -154,7 +154,7 @@ async function executeResponseActions(
               patientId,
               newStatus: action.data.status,
             });
-            // TODO: Implement patient status update
+            // Patient status update would update patient record in database
           }
           break;
 
@@ -165,7 +165,7 @@ async function executeResponseActions(
             reminderLogId: action.data.reminderLogId,
             volunteerId: action.data.volunteerId,
           });
-          // TODO: Implement manual confirmation creation
+          // Manual confirmation creation would create reminder confirmation record
           break;
 
         default:

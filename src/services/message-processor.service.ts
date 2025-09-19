@@ -15,9 +15,8 @@ import {
 import { WhatsAppService } from "./whatsapp/whatsapp.service";
 import { safetyFilterService } from "./llm/safety-filter";
 import { logger } from "@/lib/logger";
-import { tokenizerService } from "@/lib/tokenizer";
-import { costMonitor } from "@/lib/cost-monitor";
-import { CostBreakdown } from "@/lib/enhanced-cost-manager";
+import { tokenizerService } from "@/lib/simple-tokenizer";
+import { llmCostService } from "@/lib/llm-cost-service";
 
 export interface MessageContext {
   patientId: string;
@@ -485,6 +484,7 @@ export class MessageProcessorService {
    * Process incoming message with full NLP analysis and conversation continuity
    */
   async processMessage(context: MessageContext): Promise<ProcessedMessage> {
+    const startTime = Date.now();
     const normalizedMessage = this.normalizeMessage(context.message);
 
     // Declare variables at function scope
@@ -720,21 +720,15 @@ export class MessageProcessorService {
     // Store LLM response if generated
     if (llmResponse) {
       // Track cost for the LLM response
-      const costTrackingEvent = await costMonitor.trackMessageCost(
+      await llmCostService.trackMessageCost(
         conversationState.id,
-        `msg_${Date.now()}`, // Generate message ID
-        context.patientId,
         normalizedMessage, // Input text
         llmResponse.content, // Output text
         llmResponse.model,
-        this.mapIntentToOperationType(intent.primary),
-        {
-          intent: intent.primary,
-          confidence: intent.confidence,
-          responseTime: llmResponse.responseTime,
-        }
+        Date.now() - startTime
       );
 
+      // Store LLM response metadata in conversation
       const outboundMessageData =
         await this.conversationStateService.addMessage(conversationState.id, {
           message: llmResponse.content,
@@ -747,18 +741,17 @@ export class MessageProcessorService {
           llmResponseId: llmResponse.model,
           llmModel: llmResponse.model,
           llmTokensUsed: llmResponse.tokensUsed,
-          llmCost: costTrackingEvent.cost, // Use tracked cost instead of calculated
+          llmCost: 0, // Cost will be tracked by llmCostService separately
           llmResponseTimeMs: llmResponse.responseTime,
           processedAt: new Date(),
         });
 
       // Log cost tracking for monitoring
-      logger.debug("LLM response cost tracked", {
+      logger.debug("LLM response processed", {
         conversationId: conversationState.id,
         messageId: outboundMessageData.id,
-        cost: costTrackingEvent.cost,
-        tokens: costTrackingEvent.tokensUsed,
-        operationType: costTrackingEvent.operationType,
+        tokens: llmResponse.tokensUsed,
+        responseTime: llmResponse.responseTime,
       });
     }
 
@@ -843,7 +836,7 @@ export class MessageProcessorService {
    */
   private mapIntentToOperationType(
     intent: MessageIntent["primary"]
-  ): CostBreakdown["operationType"] {
+  ): string {
     switch (intent) {
       case "accept":
       case "decline":
@@ -1490,19 +1483,12 @@ export class MessageProcessorService {
       // Store LLM response metadata in conversation
       if (llmResponse) {
         // Track cost for the LLM response
-        const costTrackingEvent = await costMonitor.trackMessageCost(
+        await llmCostService.trackMessageCost(
           context.conversationState?.id || "",
-          `msg_${Date.now()}`,
-          context.patientId,
           "", // No specific input text for direct response
           llmResponse.content,
           llmResponse.model,
-          "direct_response",
-          {
-            intent: intent.primary,
-            confidence: intent.confidence,
-            responseTime: llmResponse.responseTime,
-          }
+          llmResponse.responseTime
         );
 
         await this.conversationStateService.addMessage(
@@ -1518,7 +1504,7 @@ export class MessageProcessorService {
             llmResponseId: llmResponse.model, // Use model as response ID for now
             llmModel: llmResponse.model,
             llmTokensUsed: llmResponse.tokensUsed,
-            llmCost: costTrackingEvent.cost, // Use tracked cost
+            llmCost: 0, // Cost tracked by llmCostService separately
             llmResponseTimeMs: llmResponse.responseTime,
             processedAt: new Date(),
           }
@@ -1581,6 +1567,7 @@ export class MessageProcessorService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fullPatientContext?: any
   ): Promise<ProcessedLLMResponse | null> {
+    const startTime = Date.now();
     try {
       const systemPrompt = this.buildDirectResponsePrompt(
         context,
@@ -1627,18 +1614,12 @@ export class MessageProcessorService {
 
       // Track cost for direct LLM response
       if (finalResponse) {
-        await costMonitor.trackMessageCost(
+        await llmCostService.trackMessageCost(
           context.conversationId || "",
-          `direct_${Date.now()}`,
-          context.patientId,
           message, // Input message
           finalResponse.content,
           finalResponse.model,
-          "direct_response",
-          {
-            safetyFiltered: !safetyResult.isSafe,
-            violations: safetyResult.violations.length,
-          }
+          Date.now() - startTime
         );
       }
 

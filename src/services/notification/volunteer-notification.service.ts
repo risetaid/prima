@@ -1,5 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/db/index";
+import { logger } from "@/lib/logger";
 import {
   volunteerNotifications,
   patients,
@@ -255,8 +256,9 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
    * Get volunteer WhatsApp numbers (placeholder - should be from database)
    */
   private async getVolunteerWhatsAppNumbers(): Promise<string[]> {
-    // TODO: Get from users table where role is volunteer and has whatsapp number
-    // For now, return empty array
+    // Volunteer WhatsApp numbers would be retrieved from users table
+    // Requires proper user management system with volunteer role assignment
+    logger.debug('Volunteer WhatsApp lookup not implemented - requires user management system')
     return [];
   }
 

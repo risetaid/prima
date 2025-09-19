@@ -85,22 +85,7 @@ export const conversationMessages = pgTable(
   })
 );
 
-export const llmResponseCache = pgTable(
-  "llm_response_cache",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    messageHash: text("message_hash").notNull(),
-    patientContextHash: text("patient_context_hash").notNull(),
-    response: jsonb("response").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  },
-  (table) => ({
-    messageHashIdx: index("llm_response_cache_message_hash_idx").on(table.messageHash),
-  })
-);
+// LLM response cache removed - now using Redis for simpler caching
 
 export const volunteerNotifications = pgTable(
   "volunteer_notifications",
@@ -140,7 +125,5 @@ export type ConversationState = typeof conversationStates.$inferSelect;
 export type NewConversationState = typeof conversationStates.$inferInsert;
 export type ConversationMessage = typeof conversationMessages.$inferSelect;
 export type NewConversationMessage = typeof conversationMessages.$inferInsert;
-export type LLMResponseCache = typeof llmResponseCache.$inferSelect;
-export type NewLLMResponseCache = typeof llmResponseCache.$inferInsert;
 export type VolunteerNotification = typeof volunteerNotifications.$inferSelect;
 export type NewVolunteerNotification = typeof volunteerNotifications.$inferInsert;

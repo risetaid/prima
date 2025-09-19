@@ -1,42 +1,33 @@
 /**
- * Conversation Cost API
- * Get detailed cost information for a specific conversation
+ * Simplified Conversation Cost API
+ * Returns basic cost tracking information (conversation cost tracking removed for simplicity)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { enhancedCostManager } from '@/lib/enhanced-cost-manager';
+import { llmCostService } from '@/lib/llm-cost-service';
 import { logger } from '@/lib/logger';
 
-// GET /api/admin/cost-management/conversation/[id] - Get conversation cost summary
+// GET /api/admin/cost-management/conversation/[id] - Get basic cost info
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: conversationId } = await params;
 
   try {
-    const { searchParams } = new URL(request.url);
-    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined;
-    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined;
-
-    const costSummary = await enhancedCostManager.getConversationCostSummary(
-      conversationId,
-      startDate,
-      endDate
-    );
-
-    if (!costSummary) {
-      return NextResponse.json(
-        { success: false, error: 'Conversation not found or no cost data available' },
-        { status: 404 }
-      );
-    }
+    // Return basic usage statistics instead of detailed conversation costs
+    const stats = await llmCostService.getUsageStats();
 
     return NextResponse.json({
       success: true,
-      data: costSummary
+      data: {
+        conversationId,
+        message: "Conversation cost tracking simplified. See global usage stats.",
+        globalStats: stats,
+        note: "Individual conversation cost tracking has been removed to reduce complexity."
+      }
     });
    } catch (error) {
-    logger.error('Failed to get conversation cost summary', error as Error, { conversationId });
+    logger.error('Failed to get cost info', error as Error, { conversationId });
     return NextResponse.json(
-      { success: false, error: 'Failed to get conversation cost summary' },
+      { success: false, error: 'Failed to get cost info' },
       { status: 500 }
     );
   }

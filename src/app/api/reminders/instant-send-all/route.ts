@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 import {
   db,
   reminders,
@@ -30,17 +31,19 @@ function createWIBDateRange(dateString: string) {
 
 export async function POST() {
   try {
-    console.log("🚀 Instant send API called");
+    logger.debug('Instant send API called');
 
     const user = await getAuthUser();
     if (!user) {
-      console.log("❌ User not authenticated");
+      logger.warn('User not authenticated');
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log(
-      `👤 User authenticated: ${user.email || user.id} (${user.role})`
-    );
+    logger.debug('User authenticated', {
+      email: user.email,
+      id: user.id,
+      role: user.role
+    });
 
     // All authenticated users can send instant reminders to their assigned patients
 
@@ -69,24 +72,28 @@ export async function POST() {
     const todayWIB = getWIBDateString();
     const { startOfDay, endOfDay } = createWIBDateRange(todayWIB);
 
-    console.log(
-      `📅 Querying reminders for today: ${todayWIB} (${startOfDay.toISOString()} to ${endOfDay.toISOString()})`
-    );
-    console.log(
-      `🕐 Current WIB time: ${getWIBDateString()} ${getWIBTimeString()}`
-    );
-    console.log(`👤 User role filter: ${user.role} (ID: ${user.id})`);
+    logger.debug('Querying reminders for today', {
+      today: todayWIB,
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+      currentTimeWIB: `${getWIBDateString()} ${getWIBTimeString()}`,
+      userRole: user.role,
+      userId: user.id
+    });
 
-    // Debug: Check what reminders exist (excluding already delivered ones)
-    console.log(
-      "🔍 DEBUG: Checking active reminders for user (excluding already delivered today)..."
-    );
+    // Check for active reminders excluding already delivered ones
+    logger.debug('Checking active reminders for user', {
+      userId: user.id,
+      excludeDeliveredToday: true
+    });
 
     let activeReminders;
     try {
-      console.log("🔍 DEBUG: About to query active reminders");
-      console.log("🔍 DEBUG: startOfDay:", startOfDay.toISOString());
-      console.log("🔍 DEBUG: endOfDay:", endOfDay.toISOString());
+      logger.debug('Querying active reminders', {
+        startOfDay: startOfDay.toISOString(),
+        endOfDay: endOfDay.toISOString(),
+        userRole: user.role
+      });
 
       activeReminders = await db
         .select({
@@ -121,15 +128,15 @@ export async function POST() {
           )
         );
 
-      console.log(
-        "🔍 DEBUG: Query completed, found reminders:",
-        activeReminders.length
-      );
+      logger.debug('Query completed, found reminders', {
+        count: activeReminders.length
+      });
       if (activeReminders.length > 0) {
-        console.log("🔍 DEBUG: First reminder details:");
-        console.log("  - ID:", activeReminders[0].id);
-        console.log("  - startDate:", activeReminders[0].startDate);
-        console.log("  - scheduledTime:", activeReminders[0].scheduledTime);
+        logger.debug('First reminder details', {
+          id: activeReminders[0].id,
+          startDate: activeReminders[0].startDate,
+          scheduledTime: activeReminders[0].scheduledTime
+        });
       }
     } catch (dbError) {
       console.error("❌ Database query error:", dbError);
@@ -152,13 +159,12 @@ export async function POST() {
 
     // Log details about found reminders for debugging
     if (activeReminders.length > 0) {
-      console.log("📝 Reminder details:");
-      activeReminders.forEach((reminder, index) => {
-        console.log(
-          `  ${index + 1}. ${reminder.patientName} - pengingat at ${
-            reminder.scheduledTime
-          } (${reminder.patientPhoneNumber})`
-        );
+      logger.debug('Reminder details', {
+        reminders: activeReminders.map(r => ({
+          patientName: r.patientName,
+          scheduledTime: r.scheduledTime,
+          patientPhoneNumber: r.patientPhoneNumber
+        }))
       });
     }
 

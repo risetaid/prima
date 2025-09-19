@@ -206,9 +206,14 @@ Segera hubungi pasien atau koordinasikan dengan tim medis.
 
 💙 Tim PRIMA`
 
-    // TODO: Send to volunteer WhatsApp numbers
-    // For now, return empty array
-    logger.warn('Emergency Alert (not implemented)', { alertMessage })
+    // Emergency alerts require volunteer WhatsApp configuration
+    // Implementation would send to configured volunteer numbers
+    logger.warn('Emergency alert system requires volunteer WhatsApp configuration', {
+      patientPhone,
+      patientName,
+      priority,
+      alertMessageLength: alertMessage.length
+    })
     return []
   }
 

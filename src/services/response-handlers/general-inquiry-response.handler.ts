@@ -15,9 +15,7 @@ import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { llmService } from "../llm/llm.service";
-import {
-  getGeneralInquiryPrompt,
-} from "../llm/prompts";
+import { getPromptForContext } from "../llm/prompts";
 import { ConversationContext } from "../llm/llm.types";
 import { PatientContextService } from "../patient/patient-context.service";
 import { safetyFilterService } from "../llm/safety-filter";
@@ -281,7 +279,7 @@ export class GeneralInquiryResponseHandler extends StandardResponseHandler {
   ): Promise<GeneralInquiryResult> {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const prompt = getGeneralInquiryPrompt(context);
+      const prompt = getPromptForContext("general", context);
       const llmResponse = await llmService.generatePatientResponse(
         "general",
         context,

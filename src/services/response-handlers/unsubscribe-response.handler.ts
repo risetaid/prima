@@ -16,7 +16,7 @@ import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 import { safetyFilterService } from "@/services/llm/safety-filter";
 import { llmService } from "@/services/llm/llm.service";
-import { getUnsubscribePrompt } from "@/services/llm/prompts";
+import { getPromptForContext } from "@/services/llm/prompts";
 import { ConversationContext } from "@/services/llm/llm.types";
 
 export interface UnsubscribeAnalysisResult {
@@ -178,7 +178,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
     context: ConversationContext
   ): Promise<UnsubscribeAnalysisResult> {
     try {
-      const prompt = getUnsubscribePrompt(context);
+      const prompt = getPromptForContext("unsubscribe", context);
       const llmRequest = {
         messages: [
           { role: "system" as const, content: prompt.systemPrompt },
@@ -195,10 +195,10 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         intent: parsedResponse.response || "TIDAK_PASTI",
         confidence: parsedResponse.confidence || 0.5,
         reason: parsedResponse.reason || undefined,
-        urgency: parsedResponse.urgency || "sedang",
+        urgency: "sedang", // Simplified - not in new prompt
         needsHumanHelp: parsedResponse.needs_human_help || false,
-        confirmationRequired: parsedResponse.confirmation_required || false,
-        sentiment: parsedResponse.sentiment || "netral",
+        confirmationRequired: parsedResponse.intent === "unsubscribe", // Simplified logic
+        sentiment: "netral", // Simplified - not in new prompt
       };
     } catch (error) {
       logger.error(
