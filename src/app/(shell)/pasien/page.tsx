@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Search, Plus } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
+import { Search, Plus } from 'lucide-react'
 import { Header } from '@/components/ui/header'
+import { MobileHeader } from '@/components/ui/mobile-header'
 import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
 import Image from 'next/image'
 import { logger } from '@/lib/logger'
@@ -143,18 +143,7 @@ export default function PatientPage() {
 
       {/* Mobile: Header */}
       <div className="lg:hidden relative z-10">
-        <header className="bg-white shadow-sm">
-          <div className="flex justify-between items-center px-4 py-5">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
-            >
-              <ArrowLeft className="w-6 h-6 text-blue-600" />
-            </button>
-            <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
-            <UserButton />
-          </div>
-        </header>
+        <MobileHeader showNavigation={true} />
       </div>
 
       {/* Desktop: Header Section with Dashboard Style */}
