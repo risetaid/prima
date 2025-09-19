@@ -345,7 +345,20 @@ export class SafetyFilterService {
 
     for (const violation of violations) {
       if (violation.matchedText) {
-        const placeholder = `[${violation.type.toUpperCase()} REMOVED]`;
+        let placeholder;
+        switch (violation.type) {
+          case 'medical_advice':
+            placeholder = '*Informasi medis spesifik tidak dapat disediakan*';
+            break;
+          case 'personal_info':
+            placeholder = '*Informasi pribadi dihapus untuk privasi*';
+            break;
+          case 'emergency':
+            placeholder = '*Silakan hubungi layanan darurat segera*';
+            break;
+          default:
+            placeholder = '*Konten tidak sesuai telah dihapus*';
+        }
         sanitized = sanitized.replace(
           new RegExp(violation.matchedText, "gi"),
           placeholder

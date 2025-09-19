@@ -1779,7 +1779,7 @@ RESPONSE GUIDELINES:
         .replace(/#{1,6}\s/g, "") // Remove headers
         .replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1") // Convert links to just text
         .replace(/^\s*[-*+]\s/gm, "• ") // Convert list items to bullet points
-        .replace(/^\s*\d+\.\s/gm, "$1 ")
+        .replace(/^\s*\d+\.\s/gm, "")
     ); // Keep numbered lists but clean them up
   }
 

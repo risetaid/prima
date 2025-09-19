@@ -24,7 +24,7 @@ SAFETY RULES:
 - Jaga kerahasiaan pasien
 - Gunakan bahasa Indonesia yang sopan dan empati
 
-DISCLAIMER: Saya adalah asisten AI PRIMA, bukan pengganti tenaga medis profesional.`;
+DISCLAIMER: Saya adalah asisten AI PRIMA, bukan pengganti tenaga medis profesional. Sistem HANYA menyediakan informasi kesehatan umum.`;
 
 /**
  * General purpose intent analysis prompt
@@ -93,12 +93,15 @@ PEDOMAN:
 - Gunakan format WhatsApp (*bold*)
 - Sertakan branding PRIMA
 - Akhiri dengan penawaran bantuan
+- HANYA berikan informasi, JANGAN menawarkan untuk menghubungkan dengan sumber daya atau relawan
 
 ${additionalContext ? `KONTEKS: ${additionalContext}` : ""}
 
 ${SAFETY_GUIDELINES}
 
-Hasilkan respons alami dan membantu.`;
+Hasilkan respons alami dan membantu.
+
+INGAT: Sistem HANYA dapat memberikan informasi kesehatan umum, tidak dapat menghubungkan dengan sumber daya atau relawan.`;
 
   return {
     systemPrompt,
