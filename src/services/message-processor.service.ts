@@ -15,7 +15,6 @@ import {
 import { WhatsAppService } from "./whatsapp/whatsapp.service";
 import { safetyFilterService } from "./llm/safety-filter";
 import { logger } from "@/lib/logger";
-import { MedicationParser, MedicationDetails } from "@/lib/medication-parser";
 import { tokenizerService } from "@/lib/tokenizer";
 import { costMonitor } from "@/lib/cost-monitor";
 import { CostBreakdown } from "@/lib/enhanced-cost-manager";
@@ -132,9 +131,7 @@ export interface FullPatientContext {
     id: string;
     scheduledTime: string;
     frequency: string;
-    medicationName?: string;
     customMessage?: string;
-    medicationDetails?: MedicationDetails;
     isCompleted?: boolean;
     lastCompletedAt?: Date;
   }>;
@@ -158,14 +155,7 @@ export interface FullPatientContext {
       notedDate: Date;
       notes?: string;
     }>;
-    medications?: Array<{
-      name: string;
-      dosage?: string;
-      frequency?: string;
-      startDate?: Date;
-      notes?: string;
-    }>;
-  };
+      };
   recentHealthNotes: Array<{
     id: string;
     note: string;
@@ -246,15 +236,10 @@ export class MessageProcessorService {
       "belum",
       "udh",
       "blm",
-      "minum",
-      "ambil obat",
-      "makan obat",
-      "telan",
-      "konsumsi",
+      "selesai",
+      "lakukan",
       "keduanya",
       "semuanya",
-      "obat",
-      "pil",
     ];
 
     const hasVerificationKeywords = verificationKeywords.some((keyword) =>
@@ -291,7 +276,6 @@ export class MessageProcessorService {
       "tidak mau lagi",
       "sudah sembuh",
       "tidak sakit lagi",
-      "obat habis",
       "tidak butuh lagi",
       "berhenti dong",
       "cukup sampai sini",
@@ -417,16 +401,11 @@ export class MessageProcessorService {
     "pengingat",
     "jadwal",
     "schedule",
-    "obat hari ini",
-    "obat besok",
-    "kapan minum obat",
     "apa reminder saya",
     "lihat reminder",
     "cek reminder",
     "reminder hari ini",
     "reminder besok",
-    "jadwal obat",
-    "waktu minum obat",
     "ada reminder",
     "apa ada pengingat",
     "kapan pengingat",
@@ -472,7 +451,7 @@ export class MessageProcessorService {
     switch (llmIntent) {
       case "verification_response":
         return "accept"; // Will be refined based on YA/TIDAK in response generation
-      case "medication_confirmation":
+      case "reminder_confirmation":
         return "confirm_taken"; // Will be refined based on SUDAH/BELUM
       case "unsubscribe":
         return "unsubscribe";
@@ -658,18 +637,10 @@ export class MessageProcessorService {
               verificationStatus:
                 patientContext.context.patient.verificationStatus,
               activeReminders: patientContext.context.activeReminders.map(
-                (r) => {
-                  // Parse structured medication data for LLM context
-                  const medicationDetails = MedicationParser.parseFromReminder(
-                    r.customMessage,
-                    r.customMessage
-                  );
-                  return {
-                    medicationName: medicationDetails.name,
-                    medicationDetails,
-                    scheduledTime: r.scheduledTime,
-                  };
-                }
+                (r) => ({
+                  reminderMessage: r.customMessage || "pengingat",
+                  scheduledTime: r.scheduledTime,
+                })
               ),
             }
           : undefined,
@@ -923,19 +894,10 @@ export class MessageProcessorService {
                 verificationStatus:
                   patientContext.context.patient.verificationStatus,
                 activeReminders: patientContext.context.activeReminders.map(
-                  (r) => {
-                    // Parse structured medication data for LLM context
-                    const medicationDetails =
-                      MedicationParser.parseFromReminder(
-                        r.customMessage,
-                        r.customMessage
-                      );
-                    return {
-                      medicationName: medicationDetails.name,
-                      medicationDetails,
-                      scheduledTime: r.scheduledTime,
-                    };
-                  }
+                  (r) => ({
+                    reminderMessage: r.customMessage || "pengingat",
+                    scheduledTime: r.scheduledTime,
+                  })
                 ),
               }
             : undefined,
@@ -1225,7 +1187,7 @@ export class MessageProcessorService {
     return {
       type: "auto_reply",
       message:
-        "Terima kasih atas konfirmasinya! Anda akan menerima pengingat obat secara otomatis.",
+        "Terima kasih atas konfirmasinya! Anda akan menerima pengingat secara otomatis.",
       actions,
       priority: "low",
     };
@@ -1262,7 +1224,7 @@ export class MessageProcessorService {
     });
     return {
       type: "auto_reply",
-      message: "Bagus! Terus jaga kesehatan ya. 💊❤️",
+      message: "Bagus! Terus jaga kesehatan ya. 💙",
       actions,
       priority: "low",
     };
@@ -1286,7 +1248,7 @@ export class MessageProcessorService {
     return {
       type: "auto_reply",
       message:
-        "Jangan lupa minum obat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙",
+        "Jangan lupa pengingat berikutnya ya. Jika ada kendala, hubungi relawan PRIMA. 💙",
       actions,
       priority: "medium",
     };
@@ -1338,7 +1300,7 @@ export class MessageProcessorService {
     return {
       type: "auto_reply",
       message:
-        "Baik, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙",
+        "Baik, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙",
       actions,
       priority: "low",
     };
@@ -1358,33 +1320,33 @@ export class MessageProcessorService {
 
     let message = `Halo ${
       context.patientName || "pasien"
-    }, berikut informasi pengingat obat Anda:\n\n`;
+    }, berikut informasi pengingat Anda:\n\n`;
 
     if (todaysReminders.length > 0) {
       message += "📅 *Pengingat Hari Ini:*\n";
       todaysReminders.forEach((reminder, index) => {
-        const medicationName =
-          reminder.medicationName || reminder.customMessage || "obat";
+        const reminderMessage =
+          reminder.customMessage || "pengingat";
         const scheduledTime =
           reminder.scheduledTime || "waktu yang dijadwalkan";
-        message += `${index + 1}. ${medicationName} - pukul ${scheduledTime}\n`;
+        message += `${index + 1}. ${reminderMessage} - pukul ${scheduledTime}\n`;
       });
       message += "\n";
     } else {
       message +=
-        "📅 *Hari Ini:* Tidak ada pengingat obat yang dijadwalkan.\n\n";
+        "📅 *Hari Ini:* Tidak ada pengingat yang dijadwalkan.\n\n";
     }
 
     if (activeReminders.length > 0) {
       message += "📋 *Jadwal Pengingat Aktif:*\n";
       activeReminders.slice(0, 5).forEach((reminder, index) => {
-        const medicationName = reminder.customMessage || "obat";
+        const reminderMessage = reminder.customMessage || "pengingat";
         const scheduledTime =
           reminder.scheduledTime || "waktu yang dijadwalkan";
         const frequency = reminder.frequency || "sekali sehari";
         message += `${
           index + 1
-        }. ${medicationName} - ${scheduledTime} (${frequency})\n`;
+        }. ${reminderMessage} - ${scheduledTime} (${frequency})\n`;
       });
 
       if (activeReminders.length > 5) {
@@ -1393,7 +1355,7 @@ export class MessageProcessorService {
       message += "\n";
     } else {
       message +=
-        "📋 *Status:* Tidak ada pengingat obat yang aktif saat ini.\n\n";
+        "📋 *Status:* Tidak ada pengingat yang aktif saat ini.\n\n";
     }
 
     message +=
@@ -1509,19 +1471,10 @@ export class MessageProcessorService {
                 verificationStatus:
                   patientContext.context.patient.verificationStatus,
                 activeReminders: patientContext.context.activeReminders.map(
-                  (r) => {
-                    // Parse structured medication data for LLM context
-                    const medicationDetails =
-                      MedicationParser.parseFromReminder(
-                        r.customMessage,
-                        r.customMessage
-                      );
-                    return {
-                      medicationName: medicationDetails.name,
-                      medicationDetails,
-                      scheduledTime: r.scheduledTime,
-                    };
-                  }
+                  (r) => ({
+                    reminderMessage: r.customMessage || "pengingat",
+                    scheduledTime: r.scheduledTime,
+                  })
                 ),
               }
             : undefined,
@@ -1713,9 +1666,9 @@ export class MessageProcessorService {
     }`;
 
     if (activeReminders.length > 0) {
-      patientDetails += `, Active meds: ${activeReminders
+      patientDetails += `, Active reminders: ${activeReminders
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((r: any) => r.medicationName || r.customMessage || "obat")
+        .map((r: any) => r.reminderMessage || r.customMessage || "pengingat")
         .join(", ")}`;
     }
 
@@ -1984,12 +1937,12 @@ RESPONSE GUIDELINES:
 
     // Check for greeting patterns
     if (this.isGreetingMessage(normalizedMessage)) {
-      return "Halo! Saya adalah asisten PRIMA yang siap membantu Anda. Ada yang bisa saya bantu terkait kesehatan atau pengingat obat Anda? 💙";
+      return "Halo! Saya adalah asisten PRIMA yang siap membantu Anda. Ada yang bisa saya bantu terkait kesehatan atau pengingat Anda? 💙";
     }
 
     // Check for question patterns
     if (this.isQuestionMessage(normalizedMessage)) {
-      return "Saya melihat Anda memiliki pertanyaan. Untuk memberikan jawaban yang tepat, bisakah Anda memberikan sedikit detail lebih lanjut? Atau saya bisa membantu dengan informasi tentang pengingat obat Anda. 💊";
+      return "Saya melihat Anda memiliki pertanyaan. Untuk memberikan jawaban yang tepat, bisakah Anda memberikan sedikit detail lebih lanjut? Atau saya bisa membantu dengan informasi tentang pengingat Anda. 💙";
     }
 
     // Check for thank you patterns
@@ -1997,9 +1950,9 @@ RESPONSE GUIDELINES:
       return "Sama-sama! Saya di sini untuk membantu Anda. Jika ada hal lain yang bisa saya bantu, jangan ragu untuk bertanya. Semoga sehat selalu! 🙏💙";
     }
 
-    // Check for medication-related keywords
-    if (this.isMedicationRelated(normalizedMessage)) {
-      return "Saya melihat pesan Anda berkaitan dengan obat. Untuk informasi yang akurat, saya bisa membantu dengan:\n\n• Jadwal pengingat obat Anda\n• Status kepatuhan minum obat\n• Informasi umum tentang pengobatan\n\nApa yang ingin Anda ketahui? 💊";
+    // Check for reminder-related keywords
+    if (this.isReminderRelated(normalizedMessage)) {
+      return "Saya melihat pesan Anda berkaitan dengan pengingat. Untuk informasi yang akurat, saya bisa membantu dengan:\n\n• Jadwal pengingat Anda\n• Status pengingat aktif\n• Informasi umum\n\nApa yang ingin Anda ketahui? 💙";
     }
 
     // Check for health-related keywords
@@ -2013,13 +1966,13 @@ RESPONSE GUIDELINES:
         return "Saya menerima pertanyaan Anda. Untuk memberikan bantuan yang lebih baik, bisakah Anda memberikan sedikit konteks atau detail lebih lanjut? Atau saya bisa membantu dengan informasi tentang layanan PRIMA. 💙";
 
       case "reminder_inquiry":
-        return "Untuk informasi tentang pengingat obat, saya bisa membantu dengan:\n\n• Melihat jadwal obat hari ini\n• Mengecek status pengingat aktif\n• Memberikan ringkasan kepatuhan\n\nApa yang ingin Anda ketahui? ⏰";
+        return "Untuk informasi tentang pengingat, saya bisa membantu dengan:\n\n• Melihat jadwal pengingat hari ini\n• Mengecek status pengingat aktif\n• Memberikan ringkasan\n\nApa yang ingin Anda ketahui? ⏰";
 
       case "emergency":
         return "Saya mendeteksi ini mungkin berkaitan dengan keadaan darurat. Jika Anda membutuhkan bantuan medis segera, silakan hubungi:\n\n• Layanan darurat: 112\n• Rumah sakit terdekat\n• Relawan PRIMA untuk dukungan\n\nApakah ini benar keadaan darurat? 🚨";
 
       default:
-        return "Terima kasih atas pesan Anda. Saya adalah asisten PRIMA yang siap membantu dengan:\n\n• Informasi tentang pengingat obat\n• Dukungan kesehatan paliatif\n• Edukasi kanker dan pengobatan\n• Bantuan untuk pasien dan relawan\n\nAda yang spesifik yang bisa saya bantu? 💙";
+        return "Terima kasih atas pesan Anda. Saya adalah asisten PRIMA yang siap membantu dengan:\n\n• Informasi tentang pengingat\n• Dukungan kesehatan paliatif\n• Edukasi kesehatan\n• Bantuan untuk pasien dan relawan\n\nAda yang spesifik yang bisa saya bantu? 💙";
     }
   }
 
@@ -2093,29 +2046,19 @@ RESPONSE GUIDELINES:
   }
 
   /**
-   * Check if message is medication-related
+   * Check if message is reminder-related
    */
-  private isMedicationRelated(message: string): boolean {
-    const medicationPatterns = [
-      "obat",
-      "pil",
-      "tablet",
-      "kapsul",
-      "sirup",
-      "salep",
-      "injeksi",
-      "minum obat",
-      "ambil obat",
-      "makan obat",
-      "telan",
-      "konsumsi",
-      "dosis",
-      "jadwal",
+  private isReminderRelated(message: string): boolean {
+    const reminderPatterns = [
       "pengingat",
       "reminder",
+      "jadwal",
       "schedule",
+      "ingat",
+      "waktu",
+      "janji",
     ];
-    return medicationPatterns.some((pattern) => message.includes(pattern));
+    return reminderPatterns.some((pattern) => message.includes(pattern));
   }
 
   /**

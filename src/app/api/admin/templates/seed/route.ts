@@ -45,7 +45,7 @@ const messageTemplates: TemplateData[] = [
   {
     templateName: "pengingat-minum-air",
     templateText:
-      "Halo {nama}! Ingat minum air putih minimal 8 gelas sehari. Air membantu obat bekerja lebih baik! 💧✨",
+      "Halo {nama}! Ingat minum air putih minimal 8 gelas sehari. Air membantu kesehatan bekerja lebih baik! 💧✨",
     variables: ["{nama}"],
     category: "REMINDER",
   },
@@ -73,9 +73,9 @@ const messageTemplates: TemplateData[] = [
     category: "APPOINTMENT",
   },
   {
-    templateName: "reminder-bawa-obat",
+    templateName: "reminder-bawa-dokumen",
     templateText:
-      "Hai {nama}! Saat kontrol nanti, bawa semua obat yang sedang diminum untuk ditunjukkan ke dokter ya! 💊👨‍⚕️",
+      "Hai {nama}! Saat kontrol nanti, bawa semua dokumen kesehatan yang diperlukan untuk ditunjukkan ke dokter ya! 📋👨‍⚕️",
     variables: ["{nama}"],
     category: "APPOINTMENT",
   },
@@ -91,7 +91,7 @@ const messageTemplates: TemplateData[] = [
   {
     templateName: "motivasi-pagi",
     templateText:
-      "Selamat pagi {nama}! 🌅 Setiap hari adalah kesempatan baru untuk sembuh. Tetap optimis & patuh minum obat! 💪✨",
+      "Selamat pagi {nama}! 🌅 Setiap hari adalah kesempatan baru untuk sembuh. Tetap optimis & jaga kesehatan! 💪✨",
     variables: ["{nama}"],
     category: "EDUCATIONAL",
   },

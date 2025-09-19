@@ -6,7 +6,7 @@ import { StandardResponseHandler, ResponseContext, StandardResponse, createError
 
 export class FollowupResponseHandler extends StandardResponseHandler {
   constructor() {
-    super("followup_response", 20); // Lower priority than verification and medication
+    super("followup_response", 20); // Lower priority than verification
   }
 
   async handle(context: ResponseContext): Promise<StandardResponse> {

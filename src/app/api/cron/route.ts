@@ -69,7 +69,7 @@ async function processReminders() {
         message: reminders.message,
         scheduledTime: reminders.scheduledTime,
         startDate: reminders.startDate,
-        medicationDetails: reminders.medicationDetails,
+        // medicationDetails removed - system now uses custom message field only
         // Patient info
         patientName: patients.name,
         patientPhone: patients.phoneNumber,
@@ -100,18 +100,9 @@ async function processReminders() {
       try {
         processedCount++;
 
-        // Generate enhanced message with content attachments if available
+        // Use simplified message system - medicationDetails removed
         let enhancedMessage = reminder.message;
-        if (reminder.medicationDetails && typeof reminder.medicationDetails === 'object') {
-          const details = reminder.medicationDetails as { content?: Array<{ title: string; url: string; type: string }> };
-          if (details.content && Array.isArray(details.content) && details.content.length > 0) {
-            enhancedMessage += '\n\n📚 Informasi tambahan:';
-            details.content.forEach(content => {
-              const icon = content.type === 'video' ? '🎥' : '📄';
-              enhancedMessage += `\n${icon} ${content.title}\n   ${content.url}`;
-            });
-          }
-        }
+        // Content attachment system simplified - no longer uses medicationDetails
         enhancedMessage += '\n\n💙 Tim PRIMA';
 
         // Send WhatsApp message

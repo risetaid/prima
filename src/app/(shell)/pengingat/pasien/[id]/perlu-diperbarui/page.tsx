@@ -60,7 +60,7 @@ export default function PendingUpdatePage() {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            medicationTaken: taken,
+            confirmationStatus: taken ? "CONFIRMED" : "NOT_CONFIRMED",
             reminderLogId: reminderId, // Pass the ReminderLog ID
           }),
         }

@@ -15,6 +15,13 @@
       "when": 1758207394337,
       "tag": "0001_lonely_tyger_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758281622930,
+      "tag": "0002_complex_ultimates",
+      "breakpoints": true
     }
   ]
 }

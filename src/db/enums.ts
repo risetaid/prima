@@ -46,7 +46,6 @@ export const confirmationStatusEnum = pgEnum("confirmation_status", [
 ]);
 
 export const reminderTypeEnum = pgEnum("reminder_type", [
-  "MEDICATION",
   "APPOINTMENT",
   "GENERAL",
 ]);

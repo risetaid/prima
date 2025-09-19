@@ -46,7 +46,7 @@ export interface PatientContext {
     id: string;
     scheduledTime: string;
     frequency: string;
-    medicationName?: string;
+    reminderName?: string;
     customMessage?: string;
     isCompleted?: boolean;
     lastCompletedAt?: Date;
@@ -285,7 +285,7 @@ export class PatientContextService {
           scheduledTime: reminders.scheduledTime,
           reminderType: reminders.reminderType,
           message: reminders.message,
-          medicationDetails: reminders.medicationDetails,
+                // medicationDetails removed - using message field instead
           createdAt: reminders.createdAt,
           status: reminders.status,
           sentAt: reminders.sentAt,
@@ -304,14 +304,12 @@ export class PatientContextService {
         .limit(10);
 
       return todaysReminders.map((reminder) => {
-        // Parse structured medication data
-        const medicationDetails = reminder.medicationDetails as Record<string, unknown> || {};
-
+        // Simplified reminder system - use message content instead of structured data
         return {
           id: reminder.id,
           scheduledTime: reminder.scheduledTime,
-          frequency: reminder.reminderType, // Use reminderType as frequency
-          medicationName: String(medicationDetails.name || 'Unknown Medication'),
+          frequency: reminder.reminderType,
+          reminderName: reminder.message ? reminder.message.substring(0, 50) + '...' : 'Pengingat',
           customMessage: reminder.message || undefined,
           isCompleted: reminder.status === 'DELIVERED',
           lastCompletedAt: reminder.sentAt || undefined,
@@ -386,33 +384,30 @@ export class PatientContextService {
         }
       }
 
-      // Get medications from reminders using structured parsing
-      const medicationReminders = await db
+      // Get active reminders - simplified system without medication types
+      const activeReminders = await db
         .select({
-          medicationDetails: reminders.medicationDetails,
+          id: reminders.id,
           message: reminders.message,
+          reminderType: reminders.reminderType,
         })
         .from(reminders)
         .where(
           and(
             eq(reminders.patientId, patientId),
             eq(reminders.isActive, true),
-            eq(reminders.reminderType, 'MEDICATION'),
             isNull(reminders.deletedAt)
           )
         );
 
-      // Parse medications from reminder details
-      const medicationsList = medicationReminders.map(reminder => {
-        const details = reminder.medicationDetails as Record<string, unknown> || {};
-        return {
-          name: String(details.name || 'Unknown Medication'),
-          dosage: details.dosage ? String(details.dosage) : undefined,
-          frequency: details.frequency ? String(details.frequency) : undefined,
-          startDate: undefined,
-          notes: reminder.message || undefined,
-        };
-      });
+      // Return simple reminder info instead of medication details
+      const medicationsList = activeReminders.map(reminder => ({
+        name: reminder.message ? reminder.message.substring(0, 50) + '...' : 'Pengingat',
+        dosage: undefined,
+        frequency: reminder.reminderType,
+        startDate: undefined,
+        notes: reminder.message || undefined,
+      }));
 
       const patient = patientData[0] || {};
 

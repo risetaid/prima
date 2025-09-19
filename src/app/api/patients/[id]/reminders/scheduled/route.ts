@@ -122,17 +122,8 @@ export async function GET(
             .where(inArray(manualConfirmations.reminderId, reminderIds))
         : [];
 
-    // Get content attachments for reminders (from medicationDetails JSON)
-    const contentAttachments =
-      reminderIds.length > 0
-        ? await db
-            .select({
-              id: reminders.id,
-              medicationDetails: reminders.medicationDetails,
-            })
-            .from(reminders)
-            .where(inArray(reminders.id, reminderIds))
-        : [];
+    // Content attachments system simplified - medicationDetails removed
+    // Content attachments are now handled separately
 
     // Create lookup maps
     const patientMap = new Map();
@@ -148,26 +139,8 @@ export async function GET(
       logsMap.get(log.id).push(log);
     });
 
+    // Content attachments map - simplified system without medicationDetails
     const contentAttachmentsMap = new Map();
-    contentAttachments.forEach((attachment) => {
-      if (!contentAttachmentsMap.has(attachment.id)) {
-        contentAttachmentsMap.set(attachment.id, []);
-      }
-      // Extract attachments from medicationDetails JSON
-      const medicationDetails = attachment.medicationDetails as Record<string, unknown> | null;
-      if (medicationDetails?.attachments && Array.isArray(medicationDetails.attachments)) {
-        medicationDetails.attachments.forEach((content: Record<string, unknown>, index: number) => {
-          contentAttachmentsMap.get(attachment.id).push({
-            id: String(content.id || ''),
-            type: String(content.type || ''),
-            title: String(content.title || ''),
-            url: `/content/${String(content.type || '')}s/${String(content.id || '')}`,
-            slug: String(content.id || ''),
-            order: index + 1,
-          });
-        });
-      }
-    });
 
     // Filter reminders using the same logic as the stats API
     const filteredReminders = scheduledReminders.filter((reminder) => {
@@ -209,22 +182,7 @@ export async function GET(
       `Filter results: ${scheduledReminders.length} total, ${filteredReminders.length} after filtering`
     );
 
-    // Get medication details for all reminders
-    const medicationDetailsMap = new Map();
-    for (const reminder of filteredReminders) {
-      try {
-        // Get medication details from reminder (new schema approach)
-        // Parse medication details - disabled since MedicationParser was removed
-        const parsedMedicationDetails = null;
-        medicationDetailsMap.set(reminder.id, parsedMedicationDetails);
-      } catch (error) {
-        console.warn(
-          `Failed to get medication details for reminder ${reminder.id}:`,
-          error
-        );
-        medicationDetailsMap.set(reminder.id, null);
-      }
-    }
+    // Medication details system removed - no longer needed
 
     // Transform to match frontend interface
     const formattedReminders = filteredReminders.map((reminder) => ({
@@ -235,7 +193,6 @@ export async function GET(
       patient: patientMap.get(reminder.patientId) || null,
       reminderLogs: logsMap.get(reminder.id) || [],
       attachedContent: contentAttachmentsMap.get(reminder.id) || [],
-      medicationDetails: medicationDetailsMap.get(reminder.id) || null,
     }));
 
     return NextResponse.json(formattedReminders);

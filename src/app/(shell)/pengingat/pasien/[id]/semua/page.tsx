@@ -32,7 +32,7 @@ interface CompletedReminder {
   scheduledTime: string;
   reminderDate: string;
   customMessage?: string;
-  medicationTaken: boolean;
+  confirmationStatus?: string;
 }
 
 export default function AllRemindersPage() {
@@ -79,7 +79,7 @@ export default function AllRemindersPage() {
         ...pendingData.map((r: PendingReminder) => ({ ...r, status: "pending" })),
         ...completedData.map((r: CompletedReminder) => ({
           ...r,
-          status: r.medicationTaken ? "completed_taken" : "completed_not_taken",
+          status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" : "completed_not_taken",
         })),
       ];
 

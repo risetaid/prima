@@ -24,7 +24,7 @@ interface AutoFillData {
   waktu?: string;
   tanggal?: string;
   dataContext?: {
-    hasActiveMedications: boolean;
+    hasActiveReminders: boolean;
     hasRecentReminders: boolean;
     hasMedicalRecords: boolean;
     assignedVolunteerName?: string;

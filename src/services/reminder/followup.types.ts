@@ -7,7 +7,7 @@ export interface FollowupData {
   reminderId: string;
   phoneNumber: string;
   patientName: string;
-  medicationName?: string;
+  reminderName?: string;
   followupType: FollowupType;
   stage: FollowupStage;
   scheduledAt: Date;
@@ -24,9 +24,9 @@ export interface FollowupData {
 }
 
 export type FollowupType =
-  | 'MEDICATION_REMINDER_15MIN'
-  | 'MEDICATION_REMINDER_2H'
-  | 'MEDICATION_REMINDER_24H'
+  | 'REMINDER_15MIN'
+  | 'REMINDER_2H'
+  | 'REMINDER_24H'
   | 'GENERAL_CONFIRMATION';
 
 export type FollowupStage =
@@ -51,7 +51,7 @@ export interface FollowupScheduleRequest {
   reminderId: string;
   phoneNumber: string;
   patientName: string;
-  medicationName?: string;
+  reminderName?: string;
   followupType?: FollowupType;
 }
 

@@ -155,7 +155,7 @@ export async function POST() {
       console.log("📝 Reminder details:");
       activeReminders.forEach((reminder, index) => {
         console.log(
-          `  ${index + 1}. ${reminder.patientName} - obat at ${
+          `  ${index + 1}. ${reminder.patientName} - pengingat at ${
             reminder.scheduledTime
           } (${reminder.patientPhoneNumber})`
         );
@@ -201,7 +201,7 @@ export async function POST() {
           // Generate basic message
           const basicMessage =
             reminder.customMessage ||
-            `Halo ${reminder.patientName}, jangan lupa minum obat pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
+            `Halo ${reminder.patientName}, jangan lupa melakukan pengingat pada waktu yang tepat. Kesehatan Anda adalah prioritas kami.`;
 
           // Get content attachments for this reminder and enhance message
           const attachments = contentAttachmentsMap.get(reminder.id) || [];

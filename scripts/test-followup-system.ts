@@ -23,7 +23,7 @@ async function testFollowupSystem() {
       reminderId: 'test-reminder-456',
       phoneNumber: '+6281234567890',
       patientName: 'Test Patient',
-      medicationName: 'Paracetamol 500mg',
+      reminderName: 'Paracetamol 500mg',
     });
 
     console.log(`✅ Scheduled ${followupIds.length} followups:`, followupIds);

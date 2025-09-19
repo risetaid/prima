@@ -1,18 +1,15 @@
 /**
  * Response Templates for LLM-generated patient messages
- * Provides structured templates for different conversation contexts with enhanced medication support
+ * Provides structured templates for different conversation contexts
  */
 
-import { ConversationContext } from './llm.types'
-import { MedicationDetails } from '@/lib/medication-parser'
 
 export interface ResponseTemplate {
   template: string
   variables: string[]
   tone: 'friendly' | 'professional' | 'empathetic' | 'urgent'
   maxLength?: number
-  category?: 'GENERAL' | 'MEDICATION' | 'VERIFICATION' | 'EMERGENCY' | 'EDUCATIONAL'
-  medicationAware?: boolean
+  category?: 'GENERAL' | 'VERIFICATION' | 'EMERGENCY' | 'EDUCATIONAL'
 }
 
 export interface TemplateContext {
@@ -22,21 +19,6 @@ export interface TemplateContext {
   conversationHistory: number
   hasActiveReminders: boolean
   verificationStatus?: string
-  medicationDetails?: MedicationDetails
-  medicationContext?: MedicationContext
-}
-
-export interface MedicationContext {
-  medicationName: string
-  dosage?: string
-  frequency?: string
-  timing?: string
-  category?: string
-  isHighPriority: boolean
-  hasSideEffects: boolean
-  requiresSpecialInstructions: boolean
-  lastTaken?: Date
-  nextDue?: Date
 }
 
 /**
@@ -49,544 +31,217 @@ export const RESPONSE_TEMPLATES: Record<string, ResponseTemplate> = {
 
 Terima kasih atas konfirmasinya. Nomor WhatsApp Anda telah berhasil diverifikasi untuk layanan PRIMA.
 
-Anda akan menerima pengingat kesehatan secara otomatis. Jika ada pertanyaan, silakan hubungi kami kapan saja.
+Sistem kami sekarang dapat mengirimkan pengingat dan dukungan kesehatan melalui WhatsApp ini.
+
+Jika ada yang bisa dibantu, jangan ragu untuk menghubungi kami.
 
 💙 Tim PRIMA`,
     variables: ['patientName'],
     tone: 'friendly',
+    category: 'VERIFICATION',
     maxLength: 300
   },
 
   verification_pending: {
-    template: `Halo {patientName}!
+    template: `Halo {patientName},
 
-Kami sedang memproses verifikasi nomor WhatsApp Anda. Mohon tunggu sebentar ya.
+Kami menunggu konfirmasi verifikasi WhatsApp Anda untuk mengaktifkan layanan PRIMA.
 
-Jika dalam 24 jam belum menerima konfirmasi, silakan hubungi relawan PRIMA.
+Silakan balas pesan ini dengan "YA" untuk memverifikasi nomor WhatsApp Anda.
 
-🙏 Terima kasih atas kesabarannya.`,
+Fitur yang akan aktif setelah verifikasi:
+- Pengingat kesehatan otomatis
+- Dukungan kesehatan personal
+- Monitoring kesehatan jarak jauh
+
+💙 Tim PRIMA`,
     variables: ['patientName'],
     tone: 'professional',
-    maxLength: 250
+    category: 'VERIFICATION',
+    maxLength: 350
   },
 
-  // Enhanced Medication confirmation responses
-  medication_confirmed: {
-    template: `Bagus sekali, {patientName}! 💊✅
+  verification_declined: {
+    template: `Halo {patientName},
 
-Terima kasih sudah mengonfirmasi bahwa Anda telah minum {medicationName} {dosage}. Konsistensi seperti ini sangat penting untuk kesehatan Anda.
+Kami menerima penolakan verifikasi WhatsApp Anda.
 
-{medicationInstructions}
+Jika ini adalah kesalahan atau Anda berubah pikiran, silakan hubungi relawan kesehatan Anda untuk verifikasi ulang.
 
-Jaga terus pola hidup sehatnya ya!
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName', 'dosage', 'medicationInstructions'],
-    tone: 'friendly',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 300
-  },
-
-  medication_confirmed_simple: {
-    template: `Bagus, {patientName}! 💊✅
-
-Terima kasih sudah minum {medicationName}. Semoga lekas sembuh!
+Layanan PRIMA tetap tersedia jika Anda membutuhkannya nanti.
 
 💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName'],
-    tone: 'friendly',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 150
-  },
-
-  medication_missed: {
-    template: `Tidak apa-apa, {patientName}. 😊
-
-Yang penting segera minum {medicationName} {dosage} ya. Jika ada kendala atau lupa, ceritakan saja kepada relawan PRIMA agar bisa membantu.
-
-{missedMedicationInstructions}
-
-Kesehatan Anda adalah prioritas kami!
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName', 'dosage', 'missedMedicationInstructions'],
+    variables: ['patientName'],
     tone: 'empathetic',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 300
-  },
-
-  medication_reminder: {
-    template: `Halo {patientName}! 💊⏰
-
-Saatnya minum {medicationName} {dosage} sesuai jadwal ya. {timingInstructions}
-
-Apakah sudah minum obatnya? Balas "SUDAH" atau "BELUM".
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName', 'dosage', 'timingInstructions'],
-    tone: 'friendly',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 250
-  },
-
-  medication_reminder_detailed: {
-    template: `Halo {patientName}! 💊⏰
-
-{reminderHeader}
-
-📋 *Detail Obat:*
-• Nama: {medicationName}
-• Dosis: {dosage}
-• Frekuensi: {frequency}
-• Waktu: {timing}
-
-{specialInstructions}
-
-Apakah sudah minum obatnya? Balas "SUDAH" atau "BELUM".
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'reminderHeader', 'medicationName', 'dosage', 'frequency', 'timing', 'specialInstructions'],
-    tone: 'professional',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 400
-  },
-
-  medication_side_effect_reminder: {
-    template: `Halo {patientName}! 💊⏰
-
-Saatnya minum {medicationName} {dosage}. {timingInstructions}
-
-⚠️ *Catatan:* Jika mengalami {sideEffects}, segera hubungi relawan PRIMA.
-
-Apakah sudah minum obatnya? Balas "SUDAH" atau "BELUM".
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName', 'dosage', 'timingInstructions', 'sideEffects'],
-    tone: 'professional',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 300
-  },
-
-  medication_help_requested: {
-    template: `🤝 *Bantuan Diperlukan*
-
-Baik {patientName}, relawan kami akan segera menghubungi Anda untuk membantu.
-
-Apakah terkait {medicationName}? Ceritakan lebih detail ya agar kami bisa membantu dengan tepat.
-
-💙 Tim PRIMA`,
-    variables: ['patientName', 'medicationName'],
-    tone: 'empathetic',
-    category: 'MEDICATION',
-    medicationAware: true,
-    maxLength: 200
-  },
-
-  // General inquiry responses
-  general_greeting: {
-    template: `Halo {patientName}! 😊
-
-Ada yang bisa PRIMA bantu hari ini? Kami siap membantu dengan informasi kesehatan atau pertanyaan lainnya.
-
-💙 Tim PRIMA`,
-    variables: ['patientName'],
-    tone: 'friendly',
-    maxLength: 150
-  },
-
-  general_help: {
-    template: `Halo {patientName}!
-
-PRIMA di sini untuk membantu. Anda bisa bertanya tentang:
-• Jadwal pengobatan
-• Cara minum obat
-• Informasi kesehatan umum
-• Bantuan darurat
-
-Apa yang bisa kami bantu?
-
-💙 Tim PRIMA`,
-    variables: ['patientName'],
-    tone: 'professional',
-    maxLength: 200
-  },
-
-  // Emergency responses
-  emergency_detected: {
-    template: `🚨 DARURAT MEDIS TERDETEKSI 🚨
-
-{patientName}, kami mendeteksi ini sebagai situasi darurat. Relawan PRIMA akan segera menghubungi Anda untuk memberikan bantuan.
-
-Jangan panik, bantuan sedang dalam perjalanan!
-
-📞 Hubungi: [Emergency Contact]
-💙 Tim PRIMA`,
-    variables: ['patientName'],
-    tone: 'urgent',
+    category: 'VERIFICATION',
     maxLength: 250
   },
 
   // Unsubscribe responses
-  unsubscribe_confirm: {
-    template: `Baik, {patientName}. 😔
+  unsubscribe_confirmed: {
+    template: `Halo {patientName},
 
-Kami akan menghentikan semua pengingat kesehatan melalui WhatsApp sesuai permintaan Anda.
+Kami konfirmasi bahwa Anda telah berhenti dari layanan pengingat PRIMA.
 
-Jika suatu saat ingin bergabung kembali, Anda bisa menghubungi relawan PRIMA.
+Semua data pribadi Anda akan tetap aman dan terlindungi sesuai kebijakan privasi kami.
 
-Semoga tetap sehat selalu!
+Terima kasih telah menggunakan layanan PRIMA. Semoga sehat selalu! 🙏
 
 💙 Tim PRIMA`,
     variables: ['patientName'],
     tone: 'empathetic',
+    category: 'GENERAL',
+    maxLength: 250
+  },
+
+  unsubscribe_unclear: {
+    template: `Halo {patientName},
+
+Kami menerima pesan Anda. Untuk berhenti dari layanan PRIMA, silakan balas dengan "BERHENTI" atau "STOP".
+
+Jika ini bukan maksud Anda, silakan beri tahu kami bagaimana kami bisa membantu.
+
+💙 Tim PRIMA`,
+    variables: ['patientName'],
+    tone: 'friendly',
+    category: 'GENERAL',
     maxLength: 200
   },
 
-  unsubscribe_cancel: {
-    template: `Baik, {patientName}! 😊
+  // General inquiry responses
+  general_info: {
+    template: `Halo {patientName},
 
-Pengiriman pengingat kesehatan akan dilanjutkan seperti biasa.
+Terima kasih telah menghubungi PRIMA. Kami siap membantu dengan informasi layanan dan dukungan kesehatan.
 
-Jika ada perubahan, beri tahu kami ya.
+Yang bisa kami bantu:
+- Informasi status akun dan verifikasi
+- Jadwal pengingat aktif
+- Panduan penggunaan sistem
+- Bantuan teknis
+
+Silakan sampaikan pertanyaan spesifik Anda.
 
 💙 Tim PRIMA`,
     variables: ['patientName'],
     tone: 'friendly',
-    maxLength: 150
+    category: 'GENERAL',
+    maxLength: 300
   },
 
-  // Low confidence responses
-  low_confidence: {
-    template: `Maaf {patientName}, pesan Anda agak sulit dipahami. 🤔
+  reminder_info: {
+    template: `Halo {patientName},
 
-Bisa dijelaskan lebih detail? Atau relawan PRIMA akan segera membantu Anda.
+Berikut informasi pengingat Anda saat ini:
+{hasActiveReminders}
+
+Untuk melihat detail lengkap atau mengubah pengingat, silakan hubungi relawan kesehatan Anda.
+
+💙 Tim PRIMA`,
+    variables: ['patientName', 'hasActiveReminders'],
+    tone: 'professional',
+    category: 'GENERAL',
+    maxLength: 250
+  },
+
+  // Emergency responses
+  emergency_guidance: {
+    template: `🚨 *Panduan Darurat*
+
+Halo {patientName},
+
+Jika Anda mengalami keadaan darurat medis:
+1. Segera hubungi layanan darurat (118/119)
+2. Hubungi keluarga terdekat
+3. Kunjungi fasilitas kesehatan terdekat
+
+Untuk bantuan non-darurat, Anda dapat menghubungi relawan kesehatan Anda.
+
+PRIMA bukan layanan darurat. Harap segera cari bantuan medis profesional!
 
 💙 Tim PRIMA`,
     variables: ['patientName'],
+    tone: 'urgent',
+    category: 'EMERGENCY',
+    maxLength: 300
+  },
+
+  // Error responses
+  error_message: {
+    template: `Maaf, terjadi kesalahan dalam memproses pesan Anda.
+
+Silakan coba beberapa saat lagi atau hubungi relawan kesehatan Anda jika masalah berlanjut.
+
+Terima kasih pengertiannya.
+
+💙 Tim PRIMA`,
+    variables: [],
     tone: 'empathetic',
-    maxLength: 150
+    category: 'GENERAL',
+    maxLength: 200
   },
 
-  // Follow-up responses
-  follow_up_check: {
-    template: `Halo {patientName}! 📅
+  // Default response
+  default_response: {
+    template: `Halo {patientName},
 
-Bagaimana kondisi kesehatan Anda hari ini? Sudah minum obat sesuai jadwal?
+Terima kasih telah menghubungi PRIMA. Kami akan membantu permintaan Anda.
 
-Balas "SUDAH" jika sudah, atau "BANTUAN" jika butuh bantuan.
+Agar kami dapat memberikan bantuan yang tepat, silakan berikan informasi lebih detail tentang apa yang Anda butuhkan.
 
 💙 Tim PRIMA`,
     variables: ['patientName'],
     tone: 'friendly',
-    maxLength: 180
+    category: 'GENERAL',
+    maxLength: 200
   }
 }
 
 /**
- * Get appropriate template based on context
+ * Get template based on intent and context
  */
 export function getResponseTemplate(
   intent: string,
-  context: TemplateContext
-): ResponseTemplate | null {
-  // Map intent to template key
-  const templateKey = mapIntentToTemplate(intent, context)
-
-  if (!templateKey || !RESPONSE_TEMPLATES[templateKey]) {
-    return null
-  }
-
-  return RESPONSE_TEMPLATES[templateKey]
-}
-
-/**
- * Map intent to template key based on context with medication awareness
- */
-function mapIntentToTemplate(intent: string, context: TemplateContext): string | null {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _context: TemplateContext
+): ResponseTemplate {
+  // Intent-based template selection
   switch (intent) {
-    case 'verification_response':
-      return context.verificationStatus === 'VERIFIED' ? 'verification_success' : 'verification_pending'
-
-    case 'medication_confirmation':
-      // Enhanced medication confirmation logic
-      if (context.medicationContext) {
-        if (context.medicationContext.isHighPriority) {
-          return 'medication_confirmed' // Use detailed template for high priority
-        }
-        return 'medication_confirmed_simple' // Use simple template for regular medications
-      }
-      return 'medication_confirmed' // Default fallback
-
-    case 'medication_reminder':
-      // Enhanced medication reminder logic
-      if (context.medicationContext) {
-        if (context.medicationContext.hasSideEffects) {
-          return 'medication_side_effect_reminder'
-        }
-        if (context.medicationContext.requiresSpecialInstructions) {
-          return 'medication_reminder_detailed'
-        }
-      }
-      return 'medication_reminder'
-
-    case 'medication_missed':
-      return 'medication_missed'
-
-    case 'medication_help':
-      return 'medication_help_requested'
-
-    case 'unsubscribe':
-      return 'unsubscribe_confirm'
-
+    case 'verified':
+      return RESPONSE_TEMPLATES.verification_success
+    case 'declined':
+      return RESPONSE_TEMPLATES.verification_declined
+    case 'unsubscribed':
+      return RESPONSE_TEMPLATES.unsubscribe_confirmed
     case 'emergency':
-      return 'emergency_detected'
-
+      return RESPONSE_TEMPLATES.emergency_guidance
     case 'general_inquiry':
-      return context.conversationHistory === 0 ? 'general_greeting' : 'general_help'
-
+      return RESPONSE_TEMPLATES.general_info
+    case 'reminder_info':
+      return RESPONSE_TEMPLATES.reminder_info
     default:
-      if (context.confidence < 0.6) {
-        return 'low_confidence'
-      }
-      return null
+      return RESPONSE_TEMPLATES.default_response
   }
 }
 
 /**
- * Fill template variables
+ * Format template with context variables
  */
-export function fillTemplate(template: ResponseTemplate, variables: Record<string, string>): string {
-  let filled = template.template
+export function formatTemplate(
+  template: string,
+  variables: Record<string, string | number | boolean>
+): string {
+  let formatted = template
 
-  for (const variable of template.variables) {
-    const value = variables[variable] || `{${variable}}`
-    filled = filled.replace(new RegExp(`{${variable}}`, 'g'), value)
-  }
+  Object.entries(variables).forEach(([key, value]) => {
+    const placeholder = `{${key}}`
+    formatted = formatted.replace(
+      new RegExp(placeholder, 'g'),
+      String(value)
+    )
+  })
 
-  return filled
+  return formatted
 }
 
-/**
- * Generate personalized response using template with medication awareness
- */
-export function generateFromTemplate(
-  intent: string,
-  context: ConversationContext,
-  templateContext: TemplateContext
-): string | null {
-  const template = getResponseTemplate(intent, templateContext)
-
-  if (!template) {
-    return null
-  }
-
-  const variables: Record<string, string> = {
-    patientName: context.patientInfo?.name || 'Pasien yang terhormat'
-  }
-
-  // Add medication-specific variables if available
-  if (templateContext.medicationContext) {
-    const medContext = templateContext.medicationContext
-    variables.medicationName = medContext.medicationName || 'obat'
-    variables.dosage = medContext.dosage || ''
-    variables.frequency = medContext.frequency || ''
-    variables.timing = medContext.timing || ''
-
-    // Generate contextual instructions
-    variables.timingInstructions = generateTimingInstructions(medContext.timing)
-    variables.medicationInstructions = generateMedicationInstructions(medContext)
-    variables.missedMedicationInstructions = generateMissedMedicationInstructions(medContext)
-    variables.specialInstructions = generateSpecialInstructions(medContext)
-    variables.sideEffects = medContext.hasSideEffects ? 'efek samping seperti mual atau pusing' : ''
-    variables.reminderHeader = medContext.isHighPriority ?
-      '⚠️ *Pengingat Obat Penting*' : '💊 *Pengingat Obat*'
-  }
-
-  // Add medication details from parsed data if available
-  if (templateContext.medicationDetails) {
-    const medDetails = templateContext.medicationDetails
-    if (!variables.medicationName) variables.medicationName = medDetails.name
-    if (!variables.dosage) variables.dosage = medDetails.dosage
-    if (!variables.frequency) variables.frequency = medDetails.frequency
-    if (!variables.timing) variables.timing = medDetails.timing
-  }
-
-  return fillTemplate(template, variables)
-}
-
-/**
- * Generate timing instructions based on medication timing
- */
-function generateTimingInstructions(timing?: string): string {
-  const timingMap: Record<string, string> = {
-    'BEFORE_MEAL': 'Minum 30 menit sebelum makan',
-    'WITH_MEAL': 'Minum saat makan',
-    'AFTER_MEAL': 'Minum 30 menit setelah makan',
-    'BEDTIME': 'Minum sebelum tidur',
-    'MORNING': 'Minum di pagi hari',
-    'AFTERNOON': 'Minum di siang hari',
-    'EVENING': 'Minum di sore hari',
-    'ANYTIME': 'Minum sesuai jadwal'
-  }
-
-  return timingMap[timing || ''] || 'Minum sesuai jadwal'
-}
-
-/**
- * Generate medication instructions based on context
- */
-function generateMedicationInstructions(medContext: MedicationContext): string {
-  const instructions = []
-
-  if (medContext.category === 'CHEMOTHERAPY') {
-    instructions.push('Obat kemoterapi ini sangat penting untuk pengobatan Anda.')
-  }
-
-  if (medContext.isHighPriority) {
-    instructions.push('Pastikan tidak melewatkan dosis ini.')
-  }
-
-  if (medContext.requiresSpecialInstructions) {
-    instructions.push('Ikuti petunjuk khusus dari dokter dengan teliti.')
-  }
-
-  return instructions.join(' ') || 'Teruskan pengobatan sesuai anjuran dokter.'
-}
-
-/**
- * Generate missed medication instructions
- */
-function generateMissedMedicationInstructions(medContext: MedicationContext): string {
-  const instructions = []
-
-  if (medContext.isHighPriority) {
-    instructions.push('Segera minum obat ini dan hubungi relawan jika perlu bantuan.')
-  } else {
-    instructions.push('Minum segera dan jangan lupa dosis berikutnya.')
-  }
-
-  if (medContext.category === 'CHEMOTHERAPY') {
-    instructions.push('Kemoterapi membutuhkan konsistensi waktu yang tepat.')
-  }
-
-  return instructions.join(' ')
-}
-
-/**
- * Generate special instructions for medications
- */
-function generateSpecialInstructions(medContext: MedicationContext): string {
-  const instructions = []
-
-  if (medContext.hasSideEffects) {
-    instructions.push('⚠️ Perhatikan efek samping dan segera hubungi relawan jika diperlukan.')
-  }
-
-  if (medContext.requiresSpecialInstructions) {
-    instructions.push('📋 Ikuti petunjuk khusus dari dokter dengan teliti.')
-  }
-
-  if (medContext.category === 'CHEMOTHERAPY') {
-    instructions.push('💉 Obat kemoterapi - pastikan istirahat yang cukup setelah minum obat.')
-  }
-
-  return instructions.join('\n') || ''
-}
-
-/**
- * Get template suggestions for LLM prompt engineering with medication awareness
- */
-export function getTemplateSuggestions(intent: string): string[] {
-  const suggestions: Record<string, string[]> = {
-    verification_response: [
-      'Konfirmasi verifikasi berhasil',
-      'Minta konfirmasi ulang jika ambigu',
-      'Jelaskan langkah selanjutnya'
-    ],
-    medication_confirmation: [
-      'Berikan apresiasi atas kepatuhan',
-      'Ingatkan pentingnya konsistensi',
-      'Tawarkan bantuan jika ada masalah',
-      'Sebutkan nama obat secara spesifik',
-      'Sertakan instruksi khusus jika diperlukan'
-    ],
-    medication_reminder: [
-      'Sebutkan nama obat dan dosis dengan jelas',
-      'Berikan instruksi waktu minum yang spesifik',
-      'Sertakan peringatan efek samping jika ada',
-      'Gunakan emoji yang sesuai untuk jenis obat',
-      'Prioritaskan obat kemoterapi atau obat penting'
-    ],
-    medication_help: [
-      'Tawarkan bantuan relawan dengan segera',
-      'Tanyakan detail masalah yang dialami',
-      'Sebutkan nama obat yang terkait',
-      'Berikan rasa aman dan empati'
-    ],
-    general_inquiry: [
-      'Sapa dengan ramah',
-      'Tawarkan bantuan spesifik',
-      'Jaga nada positif dan membantu'
-    ],
-    emergency: [
-      'Prioritaskan keselamatan',
-      'Arahkan ke bantuan profesional',
-      'Jaga ketenangan dan empati',
-      'Sebutkan apakah terkait obat tertentu'
-    ]
-  }
-
-  return suggestions[intent] || []
-}
-
-/**
- * Get medication-aware template based on medication details
- */
-export function getMedicationAwareTemplate(
-  intent: string,
-  medicationDetails: MedicationDetails
-): ResponseTemplate | null {
-  const context: MedicationContext = {
-    medicationName: medicationDetails.name,
-    dosage: medicationDetails.dosage,
-    frequency: medicationDetails.frequency,
-    timing: medicationDetails.timing,
-    category: medicationDetails.category,
-    isHighPriority: ['CHEMOTHERAPY', 'TARGETED_THERAPY', 'IMMUNOTHERAPY'].includes(medicationDetails.category),
-    hasSideEffects: (medicationDetails.sideEffects && medicationDetails.sideEffects.length > 0) || false,
-    requiresSpecialInstructions: (!!medicationDetails.instructions) || false
-  }
-
-  const templateContext: TemplateContext = {
-    intent,
-    confidence: 1.0,
-    conversationHistory: 0,
-    hasActiveReminders: true,
-    medicationContext: context,
-    medicationDetails
-  }
-
-  return getResponseTemplate(intent, templateContext)
-}
-
-/**
- * Create medication context from medication details
- */
-export function createMedicationContext(medicationDetails: MedicationDetails): MedicationContext {
-  return {
-    medicationName: medicationDetails.name,
-    dosage: medicationDetails.dosage,
-    frequency: medicationDetails.frequency,
-    timing: medicationDetails.timing,
-    category: medicationDetails.category,
-    isHighPriority: ['CHEMOTHERAPY', 'TARGETED_THERAPY', 'IMMUNOTHERAPY', 'HORMONAL_THERAPY'].includes(medicationDetails.category),
-    hasSideEffects: (medicationDetails.sideEffects && medicationDetails.sideEffects.length > 0) || false,
-    requiresSpecialInstructions: (!!medicationDetails.instructions || medicationDetails.category === 'CHEMOTHERAPY') || false
-  }
-}
+export type { ResponseTemplate as ResponseTemplateType }

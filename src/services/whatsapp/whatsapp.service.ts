@@ -213,20 +213,20 @@ Segera hubungi pasien atau koordinasikan dengan tim medis.
   }
 
   /**
-    * Send follow-up message for missed medication
+    * Send follow-up message for missed reminder
     */
   async sendFollowUpReminder(
     phoneNumber: string,
     patientName: string,
-    medicationName: string
+    reminderMessage: string
   ): Promise<WhatsAppMessageResult> {
-    const message = `⏰ *Follow-up: Pengingat Obat*
+    const message = `⏰ *Follow-up: Pengingat*
 
 Halo ${patientName}!
 
-Kami ingin memastikan Anda sudah minum ${medicationName} sesuai jadwal.
+Kami ingin memastikan Anda sudah mengikuti pengingat: "${reminderMessage}"
 
-Apakah sudah diminum? Balas "SUDAH" atau "BELUM".
+Apakah sudah dilakukan? Balas "SUDAH" atau "BELUM".
 
 Jika ada kendala, jangan ragu untuk menghubungi kami.
 

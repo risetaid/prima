@@ -50,7 +50,6 @@ interface CompletedReminder {
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
-  medicationTaken: boolean;
   confirmedAt: string;
   sentAt: string | null;
   notes?: string;
@@ -183,13 +182,7 @@ export default function PatientDetailPage() {
 
         // Process the data if it's valid
         if (Array.isArray(data)) {
-          const transformedData = data.map((item) => ({
-            ...item,
-            medicationTaken: Array.isArray(item.medicationTaken)
-              ? item.medicationTaken.length > 0
-              : !!item.medicationTaken,
-          }));
-          setCompletedReminders(transformedData);
+          setCompletedReminders(data);
         } else {
           logger.error("Invalid response format for completed reminders", undefined, {
             patientId,

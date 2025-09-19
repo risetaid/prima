@@ -36,7 +36,6 @@ export class KnowledgeResponseHandler extends StandardResponseHandler {
         "penyakit",
         "gejala",
         "pengobatan",
-        "obat",
         "makanan",
         "diet",
         "olahraga",
@@ -236,7 +235,7 @@ export class KnowledgeResponseHandler extends StandardResponseHandler {
     const healthKeywords = [
       "kesehatan",
       "medis",
-      "obat",
+      "pengobatan",
       "sakit",
       "demam",
       "nyeri",

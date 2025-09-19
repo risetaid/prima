@@ -344,7 +344,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
         unsubscribed: true,
         responseMessage: `🛑 *Berhenti dari Layanan PRIMA*\n\nTerima kasih ${
           patientData.name
-        } atas kepercayaan Anda selama ini.\n\nKami menghormati keputusan Anda untuk berhenti dari layanan pengingat obat dan dukungan kesehatan PRIMA.\n\n${
+        } atas kepercayaan Anda selama ini.\n\nKami menghormati keputusan Anda untuk berhenti dari layanan pengingat dan dukungan kesehatan PRIMA.\n\n${
           analysis.reason ? `Alasan: ${analysis.reason}\n\n` : ""
         }Jika suatu saat nanti Anda atau orang terdekat membutuhkan dukungan kesehatan, PRIMA akan selalu siap membantu.\n\nJangan ragu untuk menghubungi kami kembali kapan saja.\n\nSemoga Anda selalu sehat dan berbahagia! 🙏💙\n\n---\nPRIMA - Palliative Remote Integrated Monitoring and Assistance`,
       },
@@ -381,7 +381,7 @@ export class UnsubscribeResponseHandler extends StandardResponseHandler {
       "Continue request processed successfully",
       {
         unsubscribed: false,
-        responseMessage: `✅ *Layanan PRIMA Dilanjutkan*\n\nTerima kasih ${patientData.name}! Kami senang Anda masih ingin melanjutkan layanan PRIMA.\n\nAnda akan terus menerima pengingat obat dan dukungan kesehatan dari kami.\n\nJika ada pertanyaan atau butuh bantuan, jangan ragu untuk menghubungi kami.\n\n💙 Tim PRIMA`,
+        responseMessage: `✅ *Layanan PRIMA Dilanjutkan*\n\nTerima kasih ${patientData.name}! Kami senang Anda masih ingin melanjutkan layanan PRIMA.\n\nAnda akan terus menerima pengingat dan dukungan kesehatan dari kami.\n\nJika ada pertanyaan atau butuh bantuan, jangan ragu untuk menghubungi kami.\n\n💙 Tim PRIMA`,
       },
       {
         patientId: context.patientId,

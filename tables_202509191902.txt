@@ -1,0 +1,33 @@
+|table_name                    |
+|------------------------------|
+|analytics_events              |
+|audit_logs                    |
+|cms_articles                  |
+|cms_videos                    |
+|cohort_analysis               |
+|conversation_messages         |
+|conversation_states           |
+|data_access_logs              |
+|health_notes                  |
+|llm_prompt_metrics            |
+|llm_prompt_templates          |
+|llm_prompt_test_results       |
+|llm_prompt_test_variants      |
+|llm_prompt_tests              |
+|llm_response_cache            |
+|manual_confirmations          |
+|medical_records               |
+|medication_administration_logs|
+|medication_schedules          |
+|patient_variables             |
+|patients                      |
+|performance_metrics           |
+|reminder_content_attachments  |
+|reminder_followups            |
+|reminder_logs                 |
+|reminder_schedules            |
+|system_health_metrics         |
+|users                         |
+|verification_logs             |
+|volunteer_notifications       |
+|whatsapp_templates            |

@@ -26,7 +26,7 @@ interface Reminder {
   reminderDate: string;
   customMessage?: string;
   status: string;
-  medicationTaken?: boolean;
+  confirmationStatus?: string;
   sentAt?: string;
   confirmedAt?: string;
   attachedContent?: ContentItem[];

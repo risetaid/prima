@@ -16,7 +16,6 @@ interface AutoFillData {
   waktu?: string;
   tanggal?: string;
   dataContext?: {
-    hasActiveMedications: boolean;
     hasRecentReminders: boolean;
     hasMedicalRecords: boolean;
     assignedVolunteerName?: string;
@@ -173,7 +172,7 @@ export function MessageInput({
                         if (categoryTemplates.length === 0) return null;
 
                         const categoryLabels = {
-                          REMINDER: "💊 Pengingat",
+                          REMINDER: "⏰ Pengingat",
                           APPOINTMENT: "📅 Janji Temu",
                           EDUCATIONAL: "📚 Edukasi",
                         };

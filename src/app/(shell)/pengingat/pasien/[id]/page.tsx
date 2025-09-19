@@ -23,7 +23,7 @@ interface ReminderStats {
 }
 
 interface CompletedReminder {
-  medicationTaken: boolean;
+  confirmationStatus?: string;
 }
 
 export default function PatientReminderPage() {
@@ -283,10 +283,10 @@ export default function PatientReminderPage() {
           {(() => {
             // Calculate compliance stats from completed reminders
             const taken = completedReminders.filter(
-              (r: CompletedReminder) => r.medicationTaken
+              (r: CompletedReminder) => r.confirmationStatus === 'CONFIRMED'
             ).length;
             const notTaken = completedReminders.filter(
-              (r: CompletedReminder) => !r.medicationTaken
+              (r: CompletedReminder) => r.confirmationStatus !== 'CONFIRMED'
             ).length;
             const total = taken + notTaken;
             const complianceRate =

@@ -29,7 +29,7 @@ interface CompletedReminderApi {
   scheduledTime?: string;
   completedDate?: string;
   customMessage?: string;
-  medicationTaken?: boolean;
+  confirmationStatus?: string;
   confirmedAt?: string;
 }
 
@@ -150,7 +150,7 @@ export function PatientReminderDashboard({
             item.completedDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "completed",
-          medicationTaken: item.medicationTaken,
+          confirmationStatus: item.confirmationStatus,
           confirmedAt: item.confirmedAt,
         }));
         setSelesaiReminders(mappedData);
@@ -372,7 +372,7 @@ export function PatientReminderDashboard({
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            medicationTaken: action === "ya",
+            confirmationStatus: action === "ya" ? "CONFIRMED" : "NOT_CONFIRMED",
             reminderLogId: reminderId,
           }),
         }

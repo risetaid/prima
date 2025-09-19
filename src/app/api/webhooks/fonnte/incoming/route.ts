@@ -599,14 +599,15 @@ async function findPendingReminder(patientId: string) {
  * Get patient medication details for personalization
  * Note: This is a simplified version since patientVariables table no longer exists
  */
-async function getPatientMedicationDetails(
+async function getPatientReminderInfo(
   patientId: string
 ): Promise<Record<string, unknown> | null> {
   try {
-    // Get medication details from reminders table
+    // Medication details system removed - get message from reminders table instead
     const recentReminders = await db
       .select({
-        medicationDetails: reminders.medicationDetails,
+        message: reminders.message,
+        reminderType: reminders.reminderType,
       })
       .from(reminders)
       .where(
@@ -618,16 +619,18 @@ async function getPatientMedicationDetails(
       .orderBy(desc(reminders.createdAt))
       .limit(5);
 
-    // Extract medication details from the most recent reminders
-    for (const reminder of recentReminders) {
-      if (reminder.medicationDetails) {
-        return reminder.medicationDetails as Record<string, unknown>;
-      }
+    // Return basic reminder info instead of medication details
+    // System simplified to use message content instead of structured medication data
+    if (recentReminders.length > 0) {
+      return {
+        recentReminder: recentReminders[0],
+        hasRecentReminders: true,
+      };
     }
 
     return null;
   } catch (error) {
-    logger.warn("Failed to get patient medication details", {
+    logger.warn("Failed to get patient reminder info", {
       patientId,
       error: error instanceof Error ? error.message : String(error),
     });
@@ -655,12 +658,12 @@ function buildMedicationMessage(
 
 async function handleMedicationLowConfidence(patient: Patient) {
   // Get patient medication details for personalization
-  const medicationDetails = await getPatientMedicationDetails(patient.id);
+  const reminderInfo = await getPatientReminderInfo(patient.id);
 
   const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
   const personalizedMessage = buildMedicationMessage(
-    medicationDetails,
+    reminderInfo,
     baseMessage
   );
 
@@ -668,8 +671,8 @@ async function handleMedicationLowConfidence(patient: Patient) {
 
   logger.info("Medication low confidence response sent", {
     patientId: patient.id,
-    medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null,
+    reminderInfo: reminderInfo,
+    personalized: reminderInfo !== null,
   });
 
   return {
@@ -687,12 +690,12 @@ async function handleMedicationNoPendingReminder(
 
   if (intentResult.intent !== "other" && intentResult.confidence > 0.5) {
     // Get patient medication details for personalization
-    const medicationDetails = await getPatientMedicationDetails(patient.id);
+    const reminderInfo = await getPatientReminderInfo(patient.id);
 
     const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
 
     const personalizedMessage = buildMedicationMessage(
-      medicationDetails,
+      reminderInfo,
       baseMessage
     );
 
@@ -700,8 +703,8 @@ async function handleMedicationNoPendingReminder(
 
     logger.info("No pending reminder response sent", {
       patientId: patient.id,
-      medicationDetails: medicationDetails,
-      personalized: medicationDetails !== null,
+      reminderInfo: reminderInfo,
+      personalized: reminderInfo !== null,
     });
     return {
       processed: true,
@@ -719,7 +722,7 @@ async function handleMedicationTaken(
   patient: Patient
 ) {
   // Get patient medication details for personalization
-  const medicationDetails = await getPatientMedicationDetails(patient.id);
+  const reminderInfo = await getPatientReminderInfo(patient.id);
 
   await db
     .update(reminders)
@@ -738,7 +741,7 @@ async function handleMedicationTaken(
   )}\n\n💙 Tim PRIMA`;
 
   const personalizedMessage = buildMedicationMessage(
-    medicationDetails,
+    reminderInfo,
     baseMessage
   );
 
@@ -747,8 +750,8 @@ async function handleMedicationTaken(
   logger.info("Medication taken confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
-    medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null,
+    reminderInfo: reminderInfo,
+    personalized: reminderInfo !== null,
   });
 
   return {
@@ -764,7 +767,7 @@ async function handleMedicationPending(
   patient: Patient
 ) {
   // Get patient medication details for personalization
-  const medicationDetails = await getPatientMedicationDetails(patient.id);
+  const reminderInfo = await getPatientReminderInfo(patient.id);
 
   await db
     .update(reminders)
@@ -777,7 +780,7 @@ async function handleMedicationPending(
   const baseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
 
   const personalizedMessage = buildMedicationMessage(
-    medicationDetails,
+    reminderInfo,
     baseMessage
   );
 
@@ -786,8 +789,8 @@ async function handleMedicationPending(
   logger.info("Medication pending confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
-    medicationDetails: medicationDetails,
-    personalized: medicationDetails !== null,
+    reminderInfo: reminderInfo,
+    personalized: reminderInfo !== null,
   });
 
   return {
@@ -1110,7 +1113,7 @@ async function handleUnrecognizedMessage(
   });
 
   // Get patient medication details for personalization
-  const medicationDetails = await getPatientMedicationDetails(patient.id);
+  const reminderInfo = await getPatientReminderInfo(patient.id);
 
   if (patient.verificationStatus === "PENDING") {
     await sendAck(
@@ -1123,7 +1126,7 @@ async function handleUnrecognizedMessage(
       const baseMessage = `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
       const personalizedMessage = buildMedicationMessage(
-        medicationDetails,
+        reminderInfo,
         baseMessage
       );
 
@@ -1131,8 +1134,8 @@ async function handleUnrecognizedMessage(
 
       logger.info("Verified patient unrecognized message response sent", {
         patientId: patient.id,
-        medicationDetails: medicationDetails,
-        personalized: medicationDetails !== null,
+        reminderInfo: reminderInfo,
+        personalized: reminderInfo !== null,
       });
     } else {
       await sendAck(

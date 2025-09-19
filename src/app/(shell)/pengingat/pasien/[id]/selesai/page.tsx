@@ -10,7 +10,7 @@ interface CompletedReminder {
   scheduledTime: string
   completedDate: string
   customMessage?: string
-  medicationTaken: boolean
+  confirmationStatus?: string
   confirmedAt: string
   sentAt?: string
 }
@@ -142,11 +142,11 @@ export default function CompletedRemindersPage() {
               {/* Status Button */}
               <div className="p-0">
                 <div className={`w-full py-3 text-center font-semibold text-white ${
-                  reminder.medicationTaken 
+                  reminder.confirmationStatus === 'CONFIRMED'
                     ? 'bg-green-500' 
                     : 'bg-red-500'
                 }`}>
-                  {reminder.medicationTaken ? 'Dipatuhi' : 'Tidak Dipatuhi'}
+                  {reminder.confirmationStatus === 'CONFIRMED' ? 'Dikonfirmasi' : 'Tidak Dikonfirmasi'}
                 </div>
               </div>
             </div>

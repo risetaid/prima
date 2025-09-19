@@ -4,7 +4,6 @@
 
 import { ResponseContext, StandardResponse, responseHandlerRegistry, ResponseHandler } from "./response-handler";
 import { VerificationResponseHandler } from "./response-handlers/verification-response.handler";
-import { MedicationResponseHandler } from "./response-handlers/medication-response.handler";
 import { FollowupResponseHandler } from "./response-handlers/followup-response.handler";
 import { UnsubscribeResponseHandler } from "./response-handlers/unsubscribe-response.handler";
 import { GeneralInquiryResponseHandler } from "./response-handlers/general-inquiry-response.handler";
@@ -23,7 +22,6 @@ export class ResponseProcessorService {
   private initializeHandlers(): void {
     // Register handlers in priority order
     responseHandlerRegistry.registerHandler(new VerificationResponseHandler());
-    responseHandlerRegistry.registerHandler(new MedicationResponseHandler());
     responseHandlerRegistry.registerHandler(new UnsubscribeResponseHandler());
     responseHandlerRegistry.registerHandler(new FollowupResponseHandler());
     responseHandlerRegistry.registerHandler(new GeneralInquiryResponseHandler());
@@ -115,7 +113,7 @@ export class ResponseProcessorService {
     phoneNumber: string,
     message: string,
     verificationStatus: string,
-    interactionType: "verification" | "medication_reminder" | "followup_response" | "emergency" | "general_inquiry" | "unsubscribe",
+    interactionType: "verification" | "followup_response" | "emergency" | "general_inquiry" | "unsubscribe",
     additionalData?: Record<string, unknown>
   ): ResponseContext {
     return {

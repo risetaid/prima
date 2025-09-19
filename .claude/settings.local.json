@@ -12,7 +12,9 @@
       "Bash(timeout:*)",
       "Bash(grep:*)",
       "Bash(node:*)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

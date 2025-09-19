@@ -29,25 +29,21 @@ export async function PUT(
       );
     }
 
-    // Handle both parameter names for backward compatibility
-    const confirmed =
-      requestBody.confirmed !== undefined
-        ? requestBody.confirmed
-        : requestBody.medicationTaken;
+    // Handle confirmed parameter
+    const confirmed = requestBody.confirmed;
     const { reminderLogId } = requestBody;
     console.log("📥 Request body:", {
       confirmed,
-      medicationTaken: requestBody.medicationTaken,
       reminderLogId,
     });
 
     if (typeof confirmed !== "boolean") {
       console.error(
-        "❌ VALIDATION ERROR: confirmed/medicationTaken is not boolean:",
+        "❌ VALIDATION ERROR: confirmed is not boolean:",
         typeof confirmed
       );
       return NextResponse.json(
-        { error: "confirmed or medicationTaken must be boolean" },
+        { error: "confirmed must be boolean" },
         { status: 400 }
       );
     }

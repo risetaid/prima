@@ -29,15 +29,12 @@ interface WhatsAppTemplate {
 interface AutoFillData {
   nama: string;
   nomor: string;
-  obat?: string;
-  dosis?: string;
   dokter?: string;
   rumahSakit?: string;
   volunteer: string;
   waktu?: string;
   tanggal?: string;
   dataContext?: {
-    hasActiveMedications: boolean;
     hasRecentReminders: boolean;
     hasMedicalRecords: boolean;
     assignedVolunteerName?: string;

@@ -50,7 +50,7 @@ export class SmartReminderService {
   /**
    * Generate smart reminder message - simplified version
    */
-  async generateSmartReminder(patientId: string, medicationName?: string): Promise<string> {
+  async generateSmartReminder(patientId: string, reminderName?: string): Promise<string> {
     try {
       const patient = await db
         .select()
@@ -59,11 +59,11 @@ export class SmartReminderService {
         .limit(1)
 
       const patientName = patient[0]?.name || 'Pasien'
-      const medication = medicationName || 'obat Anda'
+      const reminder = reminderName || 'pengingat Anda'
 
-      return `Halo ${patientName}! 💊 Waktunya minum ${medication}. Jaga kesehatan dengan konsisten minum obat ya. 💙 Tim PRIMA`
+      return `Halo ${patientName}! ⏰ Waktunya mengikuti ${reminder}. Jaga kesehatan dengan konsisten ya. 💙 Tim PRIMA`
     } catch {
-      return 'Waktunya minum obat! Jaga kesehatan dengan konsisten minum obat ya. 💙 Tim PRIMA'
+      return 'Waktunya mengikuti pengingat! Jaga kesehatan dengan konsisten ya. 💙 Tim PRIMA'
     }
   }
 
@@ -76,7 +76,7 @@ export class SmartReminderService {
       recommendations: [
         'Maintain consistent reminder schedule',
         'Monitor patient response patterns',
-        'Consider medication adjustments if needed'
+        'Consider reminder adjustments if needed'
       ],
       riskLevel: 'low' as const,
       confidenceScore: 0.7

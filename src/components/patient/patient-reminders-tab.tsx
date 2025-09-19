@@ -1,16 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Eye, Pill, Clock, Calendar } from "lucide-react";
-import { MedicationDetails } from "@/lib/medication-parser";
-import { getMedicationCategoryColor, getMedicationFormIcon, getFrequencyDisplay, getTimingDisplay } from "@/lib/medication-display-utils";
+import { Plus, Eye, Clock, Calendar } from "lucide-react";
 
 interface Patient {
   name: string;
   complianceRate: number;
   isActive: boolean;
   verificationStatus: string;
-  medicationDetails?: MedicationDetails;
 }
 
 interface CompletedReminder {
@@ -18,11 +15,9 @@ interface CompletedReminder {
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
-  medicationTaken: boolean;
   confirmedAt: string;
   sentAt: string | null;
   notes?: string;
-  medicationDetails?: MedicationDetails;
 }
 
 interface PatientRemindersTabProps {
@@ -30,57 +25,6 @@ interface PatientRemindersTabProps {
   completedReminders: CompletedReminder[];
   onAddReminder: () => void;
   onViewReminders: () => void;
-}
-
-
-
-function MedicationSummary({ medication }: { medication: MedicationDetails | undefined }) {
-  if (!medication) return null;
-
-  return (
-    <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-      <div className="flex items-center space-x-2">
-        <span className="text-xl">{getMedicationFormIcon(medication.form)}</span>
-        <div>
-          <h4 className="font-medium text-gray-900">{medication.name}</h4>
-          {medication.genericName && (
-            <p className="text-sm text-gray-600">{medication.genericName}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className={getMedicationCategoryColor(medication.category)}>
-          {medication.category}
-        </Badge>
-        <Badge variant="outline">
-          {medication.form}
-        </Badge>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <div>
-          <span className="text-gray-500">Dosis:</span>
-          <span className="font-medium ml-1">{medication.dosage}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">Frekuensi:</span>
-          <span className="font-medium ml-1">{getFrequencyDisplay(medication.frequency)}</span>
-        </div>
-        <div>
-          <span className="text-gray-500">Waktu:</span>
-          <span className="font-medium ml-1">{getTimingDisplay(medication.timing)}</span>
-        </div>
-      </div>
-
-      {medication.instructions && (
-        <div className="text-sm">
-          <span className="text-gray-500">Instruksi:</span>
-          <p className="text-gray-700 mt-1">{medication.instructions}</p>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function PatientRemindersTab({
@@ -91,50 +35,31 @@ export function PatientRemindersTab({
 }: PatientRemindersTabProps) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Aksi Cepat</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={onAddReminder} className="w-full" disabled={!patient.isActive || patient.verificationStatus !== 'VERIFIED'}>
-              <Plus className="w-4 h-4 mr-2" />
-              Tambah Pengingat Baru
-            </Button>
-            <Button variant="outline" onClick={onViewReminders} className="w-full">
-              <Eye className="w-4 h-4 mr-2" />
-              Lihat Semua Pengingat
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Current Medication */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Pill className="w-5 h-5" />
-              <span>Obat Saat Ini</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {patient.medicationDetails ? (
-              <MedicationSummary medication={patient.medicationDetails} />
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Pill className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Belum ada informasi obat terstruktur</p>
-                <p className="text-sm">Tambahkan pengingat untuk mengatur obat</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Aksi Cepat</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            onClick={onAddReminder}
+            className="w-full"
+            disabled={!patient.isActive || patient.verificationStatus !== 'VERIFIED'}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Tambah Pengingat Baru
+          </Button>
+          <Button variant="outline" onClick={onViewReminders} className="w-full">
+            <Eye className="w-4 h-4 mr-2" />
+            Lihat Semua Pengingat
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Compliance Stats */}
       <Card>
         <CardHeader>
-          <CardTitle>Statistik Kepatuhan</CardTitle>
+          <CardTitle>Statistik Pengingat</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -146,15 +71,15 @@ export function PatientRemindersTab({
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-green-600 mb-2">
-                {completedReminders.filter(r => r.medicationTaken).length}
+                {completedReminders.length}
               </div>
-              <p className="text-gray-600">Dikonfirmasi</p>
+              <p className="text-gray-600">Total Pengingat</p>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-orange-600 mb-2">
-                {completedReminders.filter(r => !r.medicationTaken).length}
+                {completedReminders.filter(r => r.sentAt).length}
               </div>
-              <p className="text-gray-600">Belum Dikonfirmasi</p>
+              <p className="text-gray-600">Terkirim</p>
             </div>
           </div>
         </CardContent>
@@ -173,17 +98,12 @@ export function PatientRemindersTab({
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-2">
-                        <Badge variant={reminder.medicationTaken ? "default" : "secondary"}>
-                          {reminder.medicationTaken ? "Dikonfirmasi" : "Tidak Dikonfirmasi"}
+                        <Badge variant={reminder.sentAt ? "default" : "secondary"}>
+                          {reminder.sentAt ? "Terkirim" : "Terjadwal"}
                         </Badge>
-                        {reminder.medicationDetails && (
-                          <Badge variant="outline" className={getMedicationCategoryColor(reminder.medicationDetails.category)}>
-                            {reminder.medicationDetails.category}
-                          </Badge>
-                        )}
                       </div>
                       <p className="font-medium text-gray-900">
-                        {reminder.customMessage || reminder.medicationDetails?.name || "Pengingat obat"}
+                        {reminder.customMessage || "Pengingat"}
                       </p>
                       <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                         <div className="flex items-center space-x-1">
@@ -196,33 +116,13 @@ export function PatientRemindersTab({
                         </div>
                       </div>
                     </div>
-                    <div className="ml-4">
-                      {reminder.medicationDetails && (
-                        <div className="text-2xl">{getMedicationFormIcon(reminder.medicationDetails.form)}</div>
-                      )}
-                    </div>
                   </div>
 
-                  {reminder.medicationDetails && (
+                  {reminder.notes && (
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-500">Dosis:</span>
-                          <span className="font-medium ml-1">{reminder.medicationDetails.dosage}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Frekuensi:</span>
-                          <span className="font-medium ml-1">{getFrequencyDisplay(reminder.medicationDetails.frequency)}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Waktu:</span>
-                          <span className="font-medium ml-1">{getTimingDisplay(reminder.medicationDetails.timing)}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Bentuk:</span>
-                          <span className="font-medium ml-1">{reminder.medicationDetails.form}</span>
-                        </div>
-                      </div>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Catatan:</span> {reminder.notes}
+                      </p>
                     </div>
                   )}
                 </div>

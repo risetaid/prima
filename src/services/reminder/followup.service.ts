@@ -43,7 +43,7 @@ export class FollowupService {
       // Schedule 15-minute followup
       const followup15Min = await this.createFollowup({
         ...request,
-        followupType: 'MEDICATION_REMINDER_15MIN',
+        followupType: 'REMINDER_15MIN',
         scheduledAt: new Date(now.getTime() + 15 * 60 * 1000), // 15 minutes
         stage: 'FOLLOWUP_15MIN',
       });
@@ -52,7 +52,7 @@ export class FollowupService {
       // Schedule 2-hour followup
       const followup2H = await this.createFollowup({
         ...request,
-        followupType: 'MEDICATION_REMINDER_2H',
+        followupType: 'REMINDER_2H',
         scheduledAt: new Date(now.getTime() + 2 * 60 * 60 * 1000), // 2 hours
         stage: 'FOLLOWUP_2H',
       });
@@ -61,7 +61,7 @@ export class FollowupService {
       // Schedule 24-hour followup
       const followup24H = await this.createFollowup({
         ...request,
-        followupType: 'MEDICATION_REMINDER_24H',
+        followupType: 'REMINDER_24H',
         scheduledAt: new Date(now.getTime() + 24 * 60 * 60 * 1000), // 24 hours
         stage: 'FOLLOWUP_24H',
       });
@@ -93,7 +93,7 @@ export class FollowupService {
     reminderId: string;
     phoneNumber: string;
     patientName: string;
-    medicationName?: string;
+    reminderName?: string;
     followupType: FollowupType;
     scheduledAt: Date;
     stage: FollowupStage;
@@ -107,7 +107,7 @@ export class FollowupService {
       reminderId: params.reminderId,
       phoneNumber: params.phoneNumber,
       patientName: params.patientName,
-      medicationName: params.medicationName,
+      reminderName: params.reminderName,
       followupType: params.followupType,
       stage: params.stage,
       scheduledAt: params.scheduledAt,
@@ -469,7 +469,7 @@ export class FollowupService {
       reminderId: followup.reminderId,
       phoneNumber: followup.phoneNumber,
       patientName: followup.patientName,
-      medicationName: followup.medicationName || '',
+      reminderName: followup.reminderName || '',
       followupType: followup.followupType,
       stage: followup.stage,
       scheduledAt: followup.scheduledAt.toISOString(),
@@ -503,7 +503,7 @@ export class FollowupService {
       reminderId: data.reminderId,
       phoneNumber: data.phoneNumber,
       patientName: data.patientName,
-      medicationName: data.medicationName || undefined,
+      reminderName: data.reminderName || undefined,
       followupType: data.followupType as FollowupType,
       stage: data.stage as FollowupStage,
       scheduledAt: new Date(data.scheduledAt),
@@ -534,12 +534,12 @@ export class FollowupService {
   }
 
   private buildFollowupMessage(followup: FollowupData): string {
-    const medicationText = followup.medicationName
-      ? ` untuk mengonsumsi ${followup.medicationName}`
+    const medicationText = followup.reminderName
+      ? ` untuk mengonsumsi ${followup.reminderName}`
       : '';
 
     switch (followup.followupType) {
-      case 'MEDICATION_REMINDER_15MIN':
+      case 'REMINDER_15MIN':
         return `⏰ *Follow-up: Pengingat Obat*
 
 Halo ${followup.patientName}!
@@ -550,7 +550,7 @@ Apakah sudah diminum? Balas "SUDAH" atau "BELUM".
 
 💙 Tim PRIMA`;
 
-      case 'MEDICATION_REMINDER_2H':
+      case 'REMINDER_2H':
         return `⏰ *Follow-up: Pengingat Obat*
 
 Halo ${followup.patientName}!
@@ -561,7 +561,7 @@ Bagaimana kondisinya? Apakah sudah diminum?
 
 💙 Tim PRIMA`;
 
-      case 'MEDICATION_REMINDER_24H':
+      case 'REMINDER_24H':
         return `⏰ *Follow-up: Pengingat Obat*
 
 Halo ${followup.patientName}!

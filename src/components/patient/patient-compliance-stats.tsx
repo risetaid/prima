@@ -7,7 +7,7 @@ interface CompletedReminder {
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
-  medicationTaken: boolean;
+  confirmed: boolean;
   confirmedAt: string;
   sentAt: string | null;
   notes?: string;
@@ -21,15 +21,15 @@ export function PatientComplianceStats({
   completedReminders,
 }: PatientComplianceStatsProps) {
   // Calculate compliance stats from completed reminders
-  const taken = completedReminders.filter(
-    (r: CompletedReminder) => r.medicationTaken
+  const confirmed = completedReminders.filter(
+    (r: CompletedReminder) => r.confirmed
   ).length;
-  const notTaken = completedReminders.filter(
-    (r: CompletedReminder) => !r.medicationTaken
+  const notConfirmed = completedReminders.filter(
+    (r: CompletedReminder) => !r.confirmed
   ).length;
-  const total = taken + notTaken;
+  const total = confirmed + notConfirmed;
   const complianceRate =
-    total > 0 ? Math.round((taken / total) * 100) : 0;
+    total > 0 ? Math.round((confirmed / total) * 100) : 0;
 
   return (
     <div className="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-4 sm:p-6 shadow-sm">
@@ -55,18 +55,18 @@ export function PatientComplianceStats({
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {taken}
+              {confirmed}
             </div>
             <div className="text-sm text-gray-600">
-              Dipatuhi
+              Dikonfirmasi
             </div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">
-              {notTaken}
+              {notConfirmed}
             </div>
             <div className="text-sm text-gray-600">
-              Tidak Dipatuhi
+              Belum Dikonfirmasi
             </div>
           </div>
         </div>

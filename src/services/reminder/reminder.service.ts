@@ -271,22 +271,21 @@ export class ReminderService {
         fonnteMessageId: result.messageId,
       });
 
-      // Schedule followups for medication reminders
-      if (result.success && this.isMedicationReminder(message)) {
+      // Log reminder send and schedule followups for all reminders
+      if (result.success) {
         try {
-          const medicationName = this.extractMedicationName(message);
           await this.followupService.scheduleMedicationFollowups({
             patientId: patient.id,
             reminderId: scheduleId,
             phoneNumber: patient.phoneNumber,
             patientName: patient.name,
-            medicationName,
+            reminderName: message,
           });
 
-          logger.info('Followups scheduled for medication reminder', {
+          logger.info('Followups scheduled for reminder', {
             reminderScheduleId: scheduleId,
             patientId: patient.id,
-            medicationName,
+            reminderMessage: message,
             operation: 'schedule_followups_after_reminder'
           });
         } catch (followupError) {
@@ -310,35 +309,7 @@ export class ReminderService {
     }
   }
 
-  // Helper methods for followup integration
-
-  private isMedicationReminder(message: string): boolean {
-    const medicationKeywords = ['obat', 'pil', 'tablet', 'kapsul', 'sirup', 'salep', 'tetes'];
-    const lowerMessage = message.toLowerCase();
-    return medicationKeywords.some(keyword => lowerMessage.includes(keyword));
-  }
-
-  private extractMedicationName(message: string): string | undefined {
-    // Simple extraction - look for medication names in the message
-    // This could be enhanced with more sophisticated NLP in the future
-    const medicationPatterns = [
-      /obat\s+([A-Za-z\s]+)/i,
-      /pil\s+([A-Za-z\s]+)/i,
-      /tablet\s+([A-Za-z\s]+)/i,
-      /kapsul\s+([A-Za-z\s]+)/i,
-      /sirup\s+([A-Za-z\s]+)/i,
-    ];
-
-    for (const pattern of medicationPatterns) {
-      const match = message.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-
-    return undefined;
-  }
-
+  
   private generateRecurrenceDates(recurrence: CustomRecurrence): string[] {
     const dates: string[] = [];
     const today = new Date();

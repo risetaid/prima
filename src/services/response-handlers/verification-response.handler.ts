@@ -110,7 +110,7 @@ export class VerificationResponseHandler extends StandardResponseHandler {
 
       if (message.includes("ya") || message.includes("sudah") || message.includes("benar")) {
         verificationStatus = "VERIFIED";
-        responseMessage = `✅ *Verifikasi Berhasil*\n\nTerima kasih ${patientData.name}! Nomor WhatsApp Anda telah berhasil diverifikasi.\n\nSekarang Anda dapat menerima pengingat obat dan layanan kesehatan lainnya dari PRIMA.\n\n💙 Tim PRIMA`;
+        responseMessage = `✅ *Verifikasi Berhasil*\n\nTerima kasih ${patientData.name}! Nomor WhatsApp Anda telah berhasil diverifikasi.\n\nSekarang Anda dapat menerima pengingat dan layanan kesehatan lainnya dari PRIMA.\n\n💙 Tim PRIMA`;
       } else if (message.includes("tidak") || message.includes("belum") || message.includes("salah")) {
         verificationStatus = "DECLINED";
         responseMessage = `❌ *Verifikasi Dibatalkan*\n\nMaaf ${patientData.name}, verifikasi dibatalkan sesuai permintaan Anda.\n\nJika ini adalah kesalahan, silakan hubungi relawan kami untuk bantuan.\n\n💙 Tim PRIMA`;

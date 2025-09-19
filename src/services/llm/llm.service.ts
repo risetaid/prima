@@ -366,14 +366,14 @@ export class LLMService {
     const activeReminders = context.patientInfo?.activeReminders || [];
     const reminderContext =
       activeReminders.length > 0
-        ? `\nActive Medication Reminders: ${activeReminders
+        ? `\nActive Reminders: ${activeReminders
             .map((r: unknown) => {
               const reminder = r as {
-                medicationName?: string;
+                reminderName?: string;
                 customMessage?: string;
               };
               return (
-                reminder.medicationName || reminder.customMessage || "obat"
+                reminder.reminderName || reminder.customMessage || "pengingat"
               );
             })
             .join(", ")}`

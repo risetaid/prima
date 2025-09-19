@@ -24,7 +24,7 @@ interface Reminder {
   reminderDate: string;
   customMessage?: string;
   status: string;
-  medicationTaken?: boolean;
+  confirmationStatus?: string;
   sentAt?: string;
   confirmedAt?: string;
   attachedContent?: ContentItem[];
@@ -208,13 +208,13 @@ const renderSelesaiCard = (reminder: Reminder, index: number) => (
     </div>
 
     <div className="mt-3">
-      {reminder.medicationTaken === true ? (
+      {reminder.confirmationStatus === "CONFIRMED" ? (
         <div className="bg-green-500 text-white py-2 px-4 rounded text-center font-medium">
-          Dipatuhi
+          Dikonfirmasi
         </div>
-      ) : reminder.medicationTaken === false ? (
+      ) : reminder.confirmationStatus === "NOT_CONFIRMED" ? (
         <div className="bg-red-500 text-white py-2 px-4 rounded text-center font-medium">
-          Tidak Dipatuhi
+          Tidak Dikonfirmasi
         </div>
       ) : (
         <div className="bg-gray-500 text-white py-2 px-4 rounded text-center font-medium">

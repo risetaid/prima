@@ -10,7 +10,7 @@ interface CompletedReminder {
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
-  medicationTaken: boolean;
+  confirmed: boolean;
   confirmedAt: string;
   sentAt: string | null;
   notes?: string | null;
@@ -70,7 +70,7 @@ export async function GET(
         scheduledTime: reminder.scheduledTime,
         completedDate: reminder.completedDate.toISOString(),
         customMessage: reminder.customMessage,
-        medicationTaken: reminder.confirmationStatus === 'CONFIRMED',
+        confirmed: reminder.confirmationStatus === 'CONFIRMED',
         confirmedAt: reminder.confirmedAt?.toISOString() || reminder.completedDate.toISOString(),
         sentAt: reminder.sentAt?.toISOString() || null,
         notes: reminder.notes || undefined,

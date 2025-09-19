@@ -25,12 +25,11 @@ export interface ResponseMetadata {
   responseResult?: unknown;
   analysisResult?: unknown;
   notesFound?: number;
-  medicationsFound?: number;
-  hasActiveMedications?: boolean;
+  hasActiveReminders?: boolean;
   hasSchedule?: boolean;
   hasComplianceData?: boolean;
   remindersFound?: number;
-  medicationStatus?: string;
+  confirmationStatus?: string;
   healthCondition?: string;
 }
 

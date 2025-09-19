@@ -5,7 +5,6 @@ import {
   boolean,
   uuid,
   index,
-  jsonb,
 } from "drizzle-orm/pg-core";
 
 // Import clean enums
@@ -36,10 +35,9 @@ export const reminders = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
-    reminderType: reminderTypeEnum("reminder_type").notNull().default("MEDICATION"),
+    reminderType: reminderTypeEnum("reminder_type").notNull().default("GENERAL"),
     scheduledTime: text("scheduled_time").notNull(),
     message: text("message").notNull(),
-    medicationDetails: jsonb("medication_details"), // Structured medication data
     startDate: timestamp("start_date", { withTimezone: true }).notNull(),
     endDate: timestamp("end_date", { withTimezone: true }),
     isActive: boolean("is_active").notNull().default(true),
@@ -91,7 +89,6 @@ export const manualConfirmations = pgTable(
     notes: text("notes"),
     followUpNeeded: boolean("follow_up_needed").notNull().default(false),
     followUpNotes: text("follow_up_notes"),
-    medicationsTaken: text("medications_taken").array().default([]),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

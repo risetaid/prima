@@ -317,7 +317,7 @@ async function createReminderSchedules(
       .values({
         patientId,
         scheduledTime: time,
-        reminderType: "MEDICATION", // Default type
+        reminderType: "GENERAL", // Default type
         message: message,
         startDate: reminderDate,
         endDate: reminderDate, // Each reminder has its own single date
@@ -330,21 +330,6 @@ async function createReminderSchedules(
 
     createdSchedules.push(reminder);
 
-    // Note: Content attachments are not supported in the new schema
-    // The medication details can be stored in the medicationDetails JSON field
-    if (validatedContent.length > 0) {
-      // Update reminder with medication details
-      await db.update(reminders).set({
-        medicationDetails: {
-          content: validatedContent,
-          attachments: validatedContent.map(content => ({
-            id: content.id,
-            type: content.type,
-            title: content.title || 'Untitled',
-          }))
-        }
-      }).where(eq(reminders.id, reminder.id));
-    }
   }
 
   return createdSchedules;
