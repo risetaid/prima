@@ -817,7 +817,7 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
     patientId: string,
     responseType: "taken" | "not_taken",
     message: string
-  ): Promise<{ success: boolean; updatedReminderId?: string; error?: string }> {
+  ): Promise<{ success: boolean; updatedReminderId?: string; reminderType?: string; error?: string }> {
     try {
       // Import dynamically to avoid circular dependencies
       const { db, reminders } = await import("@/db");
@@ -878,7 +878,8 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
 
       return {
         success: true,
-        updatedReminderId: reminder.id
+        updatedReminderId: reminder.id,
+        reminderType: reminder.reminderType
       };
 
     } catch (error) {

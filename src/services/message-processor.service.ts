@@ -869,7 +869,8 @@ export class MessageProcessorService {
   private async checkSimpleMedicationResponse(
     message: string,
     context: MessageContext,
-    conversationState: ConversationState
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _conversationState: ConversationState
   ): Promise<{
     isMedicationResponse: boolean;
     responseType: "taken" | "not_taken" | "unknown";

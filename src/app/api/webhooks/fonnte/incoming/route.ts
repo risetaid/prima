@@ -733,9 +733,17 @@ async function handleMedicationTaken(
     })
     .where(eq(reminders.id, reminder.id));
 
+  // Get reminder type to customize the confirmation message
+  const reminderType = reminderInfo?.reminderType || "GENERAL";
   const baseMessage = `Terima kasih ${
     patient.name
-  }! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString(
+  }! ✅\n\n${
+    reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
+      ? "Obat sudah dikonfirmasi diminum"
+      : reminderType === "APPOINTMENT"
+        ? "Janji temu sudah dikonfirmasi"
+        : "Pengingat sudah dikonfirmasi selesai"
+  } pada ${new Date().toLocaleTimeString(
     "id-ID",
     { timeZone: "Asia/Jakarta" }
   )}\n\n💙 Tim PRIMA`;
@@ -1244,9 +1252,22 @@ async function processMessageWithUnifiedProcessor(
           // Send appropriate response based on medication status
           let responseMessage = "";
           if (simpleResponse.responseType === "taken") {
-            responseMessage = `Terima kasih ${patient.name}! ✅\n\nObat sudah dikonfirmasi diminum pada ${new Date().toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n💙 Tim PRIMA`;
+            // Get reminder type from the updated reminder
+            const reminderType = updateResult.reminderType || "GENERAL";
+            const confirmationText =
+              reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
+                ? "Obat sudah dikonfirmasi diminum"
+                : reminderType === "APPOINTMENT"
+                  ? "Janji temu sudah dikonfirmasi"
+                  : "Pengingat sudah dikonfirmasi selesai";
+
+            responseMessage = `Terima kasih ${patient.name}! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n💙 Tim PRIMA`;
           } else {
-            responseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+            responseMessage = `Baik ${patient.name}, jangan lupa ${
+              updateResult.reminderType === "MEDICATION" || updateResult.reminderType === "APPOINTMENT"
+                ? "minum obatnya"
+                : "melakukan pengingatnya"
+            } ya! ${updateResult.reminderType === "MEDICATION" || updateResult.reminderType === "APPOINTMENT" ? "💊" : "📝"}\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
           }
 
           await sendAck(patient.phoneNumber || "", responseMessage);
