@@ -63,11 +63,10 @@ export function WhatsAppVerificationSection({
             <VerificationBadge
               status={
                 patient.verificationStatus as
-                  | "pending_verification"
-                  | "verified"
-                  | "declined"
-                  | "expired"
-                  | "unsubscribed"
+                  | "PENDING"
+                  | "VERIFIED"
+                  | "DECLINED"
+                  | "EXPIRED"
               }
               size="large"
               patient={patient}
