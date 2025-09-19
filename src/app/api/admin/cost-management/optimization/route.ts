@@ -1,72 +1,42 @@
 /**
- * Cost Optimization API
- * Provides endpoints for cost optimization analysis and implementation
+ * Simplified Cost Optimization API
+ * Provides basic cost information for optimization display
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { costOptimizer } from '@/lib/cost-optimizer';
+import { llmCostService } from '@/lib/llm-cost-service';
 import { logger } from '@/lib/logger';
 
-// GET /api/admin/cost-management/optimization - Get optimization report
-export async function GET(request: NextRequest) {
+// GET /api/admin/cost-management/optimization - Get basic cost info
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
+    // Get basic usage statistics
+    const stats = await llmCostService.getUsageStats();
 
-    if (action === 'recommendations') {
-      // Get cost-saving recommendations
-      const recommendations = await costOptimizer.getCostSavingRecommendations();
-      return NextResponse.json({
-        success: true,
-        data: recommendations
-      });
-    } else {
-      // Get full optimization report
-      const report = await costOptimizer.generateOptimizationReport();
-      return NextResponse.json({
-        success: true,
-        data: report
-      });
+    // Simple optimization suggestions based on usage
+    const suggestions = [];
+
+    if (stats.dailyTokens > 10000) {
+      suggestions.push("Consider implementing response caching for frequent queries");
     }
+
+    if (stats.monthlyTokens > 500000) {
+      suggestions.push("High monthly usage detected. Consider optimizing prompts or using smaller models.");
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        stats,
+        suggestions,
+        generatedAt: new Date()
+      }
+    });
   } catch (error) {
-    logger.error('Failed to get optimization data', error as Error);
+    logger.error('Failed to get cost info', error as Error);
     return NextResponse.json(
-      { success: false, error: 'Failed to get optimization data' },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/admin/cost-management/optimization - Apply optimization
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { optimizationId } = body;
-
-    if (!optimizationId) {
-      return NextResponse.json(
-        { success: false, error: 'Optimization ID is required' },
-        { status: 400 }
-      );
-    }
-
-    const success = await costOptimizer.applyOptimization(optimizationId);
-
-    if (success) {
-      return NextResponse.json({
-        success: true,
-        message: 'Optimization applied successfully'
-      });
-    } else {
-      return NextResponse.json(
-        { success: false, error: 'Failed to apply optimization' },
-        { status: 400 }
-      );
-    }
-  } catch (error) {
-    logger.error('Failed to apply optimization', error as Error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to apply optimization' },
+      { success: false, error: 'Failed to get cost info' },
       { status: 500 }
     );
   }

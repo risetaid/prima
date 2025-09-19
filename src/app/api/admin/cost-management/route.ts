@@ -1,48 +1,36 @@
 /**
- * Cost Management API Routes
- * Provides endpoints for cost monitoring, analytics, and optimization
+ * Simplified Cost Management API Routes
+ * Provides basic cost monitoring and limits
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { enhancedCostManager } from '@/lib/enhanced-cost-manager';
-import { costMonitor } from '@/lib/cost-monitor';
-import { costOptimizer } from '@/lib/cost-optimizer';
+import { llmCostService } from '@/lib/llm-cost-service';
 import { logger } from '@/lib/logger';
 
-// GET /api/admin/cost-management/dashboard - Get cost dashboard data
-export async function GET(request: NextRequest) {
+// GET /api/admin/cost-management - Get basic cost data
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function GET(_request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') || '30d';
-
-    // Parse period
-    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const endDate = new Date();
-
-    // Get comprehensive dashboard data
-    const dashboard = await enhancedCostManager.getCostDashboard();
-
-    // Get monitoring dashboard
-    const monitoring = await costMonitor.getMonitoringDashboard();
-
-    // Get optimization recommendations
-    const recommendations = await costOptimizer.getCostSavingRecommendations();
+    // Get basic usage statistics and limits
+    const [stats, limits] = await Promise.all([
+      llmCostService.getUsageStats(),
+      llmCostService.checkLimits()
+    ]);
 
     return NextResponse.json({
       success: true,
       data: {
-        period: { start: startDate, end: endDate },
-        dashboard,
-        monitoring,
-        recommendations,
+        stats,
+        limits: limits.limits,
+        alerts: limits.alerts,
+        allowed: limits.allowed,
         generatedAt: new Date()
       }
     });
   } catch (error) {
-    logger.error('Failed to get cost dashboard', error as Error);
+    logger.error('Failed to get cost data', error as Error);
     return NextResponse.json(
-      { success: false, error: 'Failed to get cost dashboard' },
+      { success: false, error: 'Failed to get cost data' },
       { status: 500 }
     );
   }

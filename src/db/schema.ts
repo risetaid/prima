@@ -9,6 +9,7 @@ export * from "./patient-schema";
 export * from "./reminder-schema";
 export * from "./cms-schema";
 export * from "./llm-schema";
+export * from "./message-queue-schema";
 
 // Import tables for relations
 import { users } from "./core-schema";
