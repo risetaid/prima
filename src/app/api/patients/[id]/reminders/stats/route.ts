@@ -65,6 +65,8 @@ export async function GET(
         reminderScheduleId: reminders.id, // Use same ID for compatibility
         status: reminders.status,
         sentAt: reminders.sentAt,
+        confirmationStatus: reminders.confirmationStatus,
+        confirmationResponse: reminders.confirmationResponse,
       })
       .from(reminders)
       .where(
@@ -94,15 +96,15 @@ export async function GET(
 
     // Process each individual log to determine its status
     for (const log of allLogs) {
-      // Check if this specific log has been confirmed
+      // Check if this specific log has been confirmed (manually or automatically)
       const logConfirmation = allConfirmations.find(
         (conf) => conf.reminderId === log.id
       );
 
-      if (logConfirmation) {
-        // Log has been confirmed - completed
+      if (logConfirmation || log.confirmationStatus === "CONFIRMED" || log.confirmationResponse) {
+        // Log has been confirmed (manually or automatically) - completed
         selesai++;
-      } else if (["SENT", "DELIVERED"].includes(log.status)) {
+      } else if (["SENT", "DELIVERED"].includes(log.status) || log.sentAt) {
         // Log sent but not confirmed - needs update
         perluDiperbarui++;
       } else if (log.status === "FAILED") {

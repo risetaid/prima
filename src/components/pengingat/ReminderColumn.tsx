@@ -212,9 +212,13 @@ const renderSelesaiCard = (reminder: Reminder, index: number) => (
         <div className="bg-green-500 text-white py-2 px-4 rounded text-center font-medium">
           Dikonfirmasi
         </div>
-      ) : reminder.confirmationStatus === "NOT_CONFIRMED" ? (
+      ) : reminder.confirmationStatus === "MISSED" ? (
         <div className="bg-red-500 text-white py-2 px-4 rounded text-center font-medium">
-          Tidak Dikonfirmasi
+          Belum Dikonfirmasi
+        </div>
+      ) : reminder.confirmationStatus === "PENDING" ? (
+        <div className="bg-yellow-500 text-white py-2 px-4 rounded text-center font-medium">
+          Menunggu Konfirmasi
         </div>
       ) : (
         <div className="bg-gray-500 text-white py-2 px-4 rounded text-center font-medium">
