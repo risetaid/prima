@@ -14,7 +14,9 @@
       "Bash(node:*)",
       "Bash(bun run:*)",
       "Bash(cat:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(bun test:*)"
     ],
     "deny": [],
     "ask": []
