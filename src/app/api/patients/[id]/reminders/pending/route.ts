@@ -4,10 +4,12 @@ import { db, reminders, manualConfirmations } from "@/db";
 import {
   eq,
   and,
+  or,
   desc,
   gte,
   lte,
   notExists,
+  isNull,
 } from "drizzle-orm";
 
 export async function GET(
@@ -29,11 +31,17 @@ export async function GET(
     const dateFilter = searchParams.get("date");
     const offset = (page - 1) * limit;
 
-    // Build where conditions with proper logic
+    // Build where conditions with proper logic - match stats API criteria
     const whereConditions = [
       eq(reminders.patientId, id),
-      // Show SENT reminders that haven't been confirmed yet
-      eq(reminders.status, "SENT"),
+      // Match stats API logic: include SENT or DELIVERED reminders
+      or(
+        eq(reminders.status, "SENT"),
+        eq(reminders.status, "DELIVERED")
+      ),
+      // Include soft delete filter like other APIs
+      isNull(reminders.deletedAt),
+      eq(reminders.isActive, true),
       // Must not have manual confirmation
       notExists(
         db
@@ -41,26 +49,40 @@ export async function GET(
           .from(manualConfirmations)
           .where(eq(manualConfirmations.reminderId, reminders.id))
       ),
+      // Must not be confirmed (manually or automatically)
+      and(
+        isNull(reminders.confirmationStatus),
+        isNull(reminders.confirmationResponse)
+      ),
     ];
 
     // Add date range filter if provided - use consistent timezone logic
     if (dateFilter) {
-      // Use the same helper function for consistency
-      function createWIBDateRange(dateString: string) {
-        const date = new Date(dateString);
-        const startOfDay = new Date(date);
-        startOfDay.setUTCHours(17, 0, 0, 0); // 17:00 UTC = 00:00 WIB (UTC+7)
+      try {
+        // Use the same helper function for consistency
+        function createWIBDateRange(dateString: string) {
+          const date = new Date(dateString);
+          if (isNaN(date.getTime())) {
+            throw new Error(`Invalid date format: ${dateString}`);
+          }
 
-        const endOfDay = new Date(date);
-        endOfDay.setUTCHours(16, 59, 59, 999); // 16:59 UTC next day = 23:59 WIB
-        endOfDay.setDate(endOfDay.getDate() + 1);
+          const startOfDay = new Date(date);
+          startOfDay.setUTCHours(17, 0, 0, 0); // 17:00 UTC = 00:00 WIB (UTC+7)
 
-        return { startOfDay, endOfDay };
+          const endOfDay = new Date(date);
+          endOfDay.setUTCHours(16, 59, 59, 999); // 16:59 UTC next day = 23:59 WIB
+          endOfDay.setDate(endOfDay.getDate() + 1);
+
+          return { startOfDay, endOfDay };
+        }
+
+        const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
+        whereConditions.push(gte(reminders.sentAt, startOfDay));
+        whereConditions.push(lte(reminders.sentAt, endOfDay));
+      } catch (dateError) {
+        console.error("Error in date filtering:", dateError);
+        // Continue without date filter if there's an error
       }
-
-      const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
-      whereConditions.push(gte(reminders.sentAt, startOfDay));
-      whereConditions.push(lte(reminders.sentAt, endOfDay));
     }
 
     // Get reminders that are SENT but don't have manual confirmation yet
@@ -68,7 +90,6 @@ export async function GET(
       .select({
         id: reminders.id,
         sentAt: reminders.sentAt,
-        message: reminders.message,
         // Automated confirmation fields
         confirmationStatus: reminders.confirmationStatus,
         confirmationResponse: reminders.confirmationResponse,
@@ -89,7 +110,7 @@ export async function GET(
       id: reminder.id,
       scheduledTime: reminder.scheduledTime || "12:00",
       sentDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-      customMessage: reminder.customMessage || reminder.message,
+      customMessage: reminder.customMessage,
       status: "PENDING_UPDATE",
       // Include automated confirmation fields for UI to handle properly
       confirmationStatus: reminder.confirmationStatus,

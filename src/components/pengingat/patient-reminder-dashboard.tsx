@@ -43,6 +43,7 @@ export function PatientReminderDashboard({
   canAddReminders = true,
 }: PatientReminderDashboardProps) {
   const params = useParams();
+  const patientId = params.id as string;
   const [terjadwalReminders, setTerjadwalReminders] = useState<Reminder[]>([]);
   const [perluDiperbaruiReminders, setPerluDiperbaruiReminders] = useState<
     Reminder[]
@@ -64,9 +65,10 @@ export function PatientReminderDashboard({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchStats = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(
-        `/api/patients/${params.id}/reminders/stats`
+        `/api/patients/${patientId}/reminders/stats`
       );
       if (response.ok) {
         const statsData = await response.json();
@@ -79,12 +81,13 @@ export function PatientReminderDashboard({
       console.error("Error fetching stats:", error);
       toast.error("Gagal memuat statistik pengingat");
     }
-  }, [params.id]);
+  }, [patientId]);
 
   const fetchScheduledReminders = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(
-        `/api/patients/${params.id}/reminders/scheduled`
+        `/api/patients/${patientId}/reminders/scheduled`
       );
       if (response.ok) {
         const data = await response.json();
@@ -107,12 +110,13 @@ export function PatientReminderDashboard({
       console.error("Error fetching scheduled reminders:", error);
       toast.error("Gagal memuat pengingat terjadwal");
     }
-  }, [params.id]);
+  }, [patientId]);
 
   const fetchPendingReminders = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(
-        `/api/patients/${params.id}/reminders/pending`
+        `/api/patients/${patientId}/reminders/pending`
       );
       if (response.ok) {
         const data = await response.json();
@@ -133,12 +137,13 @@ export function PatientReminderDashboard({
       console.error("Error fetching pending reminders:", error);
       toast.error("Gagal memuat pengingat perlu diperbarui");
     }
-  }, [params.id]);
+  }, [patientId]);
 
   const fetchCompletedReminders = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(
-        `/api/patients/${params.id}/reminders/completed`
+        `/api/patients/${patientId}/reminders/completed`
       );
       if (response.ok) {
         const data = await response.json();
@@ -162,11 +167,11 @@ export function PatientReminderDashboard({
       console.error("Error fetching completed reminders:", error);
       toast.error("Gagal memuat pengingat selesai");
     }
-  }, [params.id]);
+  }, [patientId]);
 
   const fetchAllReminders = useCallback(async (retryCount = 0) => {
     try {
-      console.log("Fetching all reminders for patient:", params.id);
+      console.log("Fetching all reminders for patient:", patientId);
       await Promise.all([
         fetchScheduledReminders(),
         fetchPendingReminders(),
@@ -190,25 +195,51 @@ export function PatientReminderDashboard({
         setLoading(false);
       }
     }
-  }, [fetchScheduledReminders, fetchPendingReminders, fetchCompletedReminders, params.id]);
+  }, [fetchScheduledReminders, fetchPendingReminders, fetchCompletedReminders, patientId]);
 
   useEffect(() => {
-    if (params.id) {
+    if (patientId) {
       fetchStats();
       fetchAllReminders();
     }
-  }, [params.id, fetchStats, fetchAllReminders]);
+  }, [patientId, fetchStats, fetchAllReminders]);
+
+  // Validate data consistency after reminders are loaded
+  useEffect(() => {
+    if (loading) return; // Don't validate while loading
+
+    const actualCounts = {
+      terjadwal: terjadwalReminders.length,
+      perluDiperbarui: perluDiperbaruiReminders.length,
+      selesai: selesaiReminders.length,
+    };
+
+    console.log("Data consistency check:", { stats, actualCounts });
+
+    // Warn if counts don't match (within tolerance of 1 for timing issues)
+    const tolerance = 1;
+    if (Math.abs(stats.terjadwal - actualCounts.terjadwal) > tolerance ||
+        Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > tolerance ||
+        Math.abs(stats.selesai - actualCounts.selesai) > tolerance) {
+      console.warn("Reminder counts don't match stats:", { stats, actualCounts });
+
+      // Only show toast for significant discrepancies
+      if (Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > 2) {
+        toast.warning("Jumlah pengingat perlu diperbarui tidak akurat. Silakan refresh halaman.");
+      }
+    }
+  }, [stats, terjadwalReminders.length, perluDiperbaruiReminders.length, selesaiReminders.length, loading]);
 
   // Refresh stats periodically to catch cron updates
   useEffect(() => {
+    if (!patientId) return;
+
     const interval = setInterval(() => {
-      if (params.id) {
-        fetchStats();
-      }
+      fetchStats();
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(interval);
-  }, [params.id, fetchStats]);
+  }, [patientId, fetchStats]);
 
 
 

@@ -41,15 +41,10 @@ export default function PatientReminderPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
 
-  useEffect(() => {
-    if (params.id) {
-      fetchReminderStats(params.id as string);
-      fetchPatientName(params.id as string);
-      fetchCompletedReminders(params.id as string);
-    }
-  }, [params.id]);
+  const patientId = params.id as string;
 
-  const fetchReminderStats = async (patientId: string) => {
+  const fetchReminderStats = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(
         `/api/patients/${patientId}/reminders/stats`
@@ -75,9 +70,10 @@ export default function PatientReminderPage() {
         semua: 0,
       });
     }
-  };
+  }, [patientId]);
 
-  const fetchPatientName = async (patientId: string) => {
+  const fetchPatientName = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(`/api/patients/${patientId}`);
       if (response.ok) {
@@ -93,9 +89,10 @@ export default function PatientReminderPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientId]);
 
-  const fetchCompletedReminders = async (patientId: string) => {
+  const fetchCompletedReminders = useCallback(async () => {
+    if (!patientId) return;
     try {
       const response = await fetch(`/api/patients/${patientId}/reminders/completed`);
       if (response.ok) {
@@ -108,7 +105,15 @@ export default function PatientReminderPage() {
       console.error("Error fetching completed reminders:", error);
       setCompletedReminders([]);
     }
-  };
+  }, [patientId]);
+
+  useEffect(() => {
+    if (patientId) {
+      fetchReminderStats();
+      fetchPatientName();
+      fetchCompletedReminders();
+    }
+  }, [patientId, fetchReminderStats, fetchPatientName, fetchCompletedReminders]);
 
   const handleAddReminder = () => {
     if (!canAddReminders) return;
@@ -117,13 +122,11 @@ export default function PatientReminderPage() {
 
   const handleModalSuccess = async () => {
     // Refresh stats after successful reminder creation
-    if (params.id) {
-      await fetchReminderStats(params.id as string);
-    }
+    await fetchReminderStats();
   };
 
   const handleStatusClick = (status: string) => {
-    router.push(`/pengingat/pasien/${params.id}/${status}`);
+    router.push(`/pengingat/pasien/${patientId}/${status}`);
   };
 
   if (loading) {

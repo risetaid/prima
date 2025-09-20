@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, reminders } from "@/db";
-import { eq, and, isNotNull, or, desc } from "drizzle-orm";
+import { eq, and, isNotNull, isNull, or, desc } from "drizzle-orm";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { logger } from "@/lib/logger";
 
@@ -10,7 +10,7 @@ interface CompletedReminder {
   scheduledTime: string;
   completedDate: string;
   customMessage?: string;
-  confirmed: boolean;
+  confirmationStatus?: string;
   confirmedAt: string;
   sentAt: string | null;
   notes?: string | null;
@@ -37,7 +37,7 @@ export async function GET(
     );
 
     // Fetch completed reminders using the existing reminders table
-    // Consider a reminder "completed" if it has been sent and/or has a confirmation status
+    // Consider a reminder "completed" if it has been confirmed (manually or automatically)
     const completedReminders = await db
       .select({
         id: reminders.id,
@@ -47,17 +47,21 @@ export async function GET(
         confirmationStatus: reminders.confirmationStatus,
         confirmedAt: reminders.confirmationResponseAt,
         sentAt: reminders.sentAt,
+        confirmationResponse: reminders.confirmationResponse,
         notes: reminders.confirmationResponse,
       })
       .from(reminders)
       .where(
         and(
           eq(reminders.patientId, patientId),
+          // Only include reminders that have been confirmed
           or(
-            isNotNull(reminders.sentAt), // Has been sent
-            isNotNull(reminders.confirmationResponseAt) // Has been responded to
+            eq(reminders.confirmationStatus, "CONFIRMED"),
+            isNotNull(reminders.confirmationResponse)
           ),
-          eq(reminders.isActive, true)
+          // Must be active and not deleted
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
         )
       )
       .orderBy(desc(reminders.startDate))
@@ -70,7 +74,8 @@ export async function GET(
         scheduledTime: reminder.scheduledTime,
         completedDate: reminder.completedDate.toISOString(),
         customMessage: reminder.customMessage,
-        confirmed: reminder.confirmationStatus === 'CONFIRMED',
+        // Determine confirmation status - default to confirmed if we have response
+        confirmationStatus: reminder.confirmationStatus || (reminder.confirmationResponse ? 'CONFIRMED' : 'MISSED'),
         confirmedAt: reminder.confirmedAt?.toISOString() || reminder.completedDate.toISOString(),
         sentAt: reminder.sentAt?.toISOString() || null,
         notes: reminder.notes || undefined,

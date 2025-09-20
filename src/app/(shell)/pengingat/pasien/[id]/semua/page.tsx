@@ -79,7 +79,9 @@ export default function AllRemindersPage() {
         ...pendingData.map((r: PendingReminder) => ({ ...r, status: "pending" })),
         ...completedData.map((r: CompletedReminder) => ({
           ...r,
-          status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" : "completed_not_taken",
+          status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" :
+                  r.confirmationStatus === 'MISSED' ? "completed_not_taken" :
+                  r.confirmationStatus === 'PENDING' ? "completed_not_taken" : "completed_not_taken",
         })),
       ];
 
