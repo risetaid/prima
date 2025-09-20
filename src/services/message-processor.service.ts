@@ -155,7 +155,7 @@ export interface FullPatientContext {
       notedDate: Date;
       notes?: string;
     }>;
-      };
+  };
   recentHealthNotes: Array<{
     id: string;
     note: string;
@@ -251,9 +251,10 @@ export class MessageProcessorService {
     const hasReminderInquiryKeywords = this.REMINDER_INQUIRY_KEYWORDS.some(
       (keyword) => normalizedMessage.includes(keyword)
     );
-    const hasHealthNotesInquiryKeywords = this.HEALTH_NOTES_INQUIRY_KEYWORDS.some(
-      (keyword) => normalizedMessage.includes(keyword)
-    );
+    const hasHealthNotesInquiryKeywords =
+      this.HEALTH_NOTES_INQUIRY_KEYWORDS.some((keyword) =>
+        normalizedMessage.includes(keyword)
+      );
 
     // Use intent detection if message contains relevant keywords
     return (
@@ -591,9 +592,14 @@ export class MessageProcessorService {
         conversationState
       );
 
-        let updateResult: { success: boolean; updatedReminderId?: string; error?: string } | undefined;
+      let updateResult:
+        | { success: boolean; updatedReminderId?: string; error?: string }
+        | undefined;
 
-    if (simpleMedicationResponse.isMedicationResponse && simpleMedicationResponse.responseType !== "unknown") {
+      if (
+        simpleMedicationResponse.isMedicationResponse &&
+        simpleMedicationResponse.responseType !== "unknown"
+      ) {
         // Handle simple medication response with automatic status update
         updateResult = await llmService.updateReminderStatusFromResponse(
           context.patientId,
@@ -604,32 +610,45 @@ export class MessageProcessorService {
         if (updateResult.success) {
           // Set intent based on response type
           intent = {
-            primary: simpleMedicationResponse.responseType === "taken" ? "confirm_taken" : "confirm_missed",
-            sentiment: simpleMedicationResponse.responseType === "taken" ? "positive" : "negative",
+            primary:
+              simpleMedicationResponse.responseType === "taken"
+                ? "confirm_taken"
+                : "confirm_missed",
+            sentiment:
+              simpleMedicationResponse.responseType === "taken"
+                ? "positive"
+                : "negative",
             confidence: simpleMedicationResponse.confidence,
           };
           entities = [];
           needsIntentDetection = false;
 
-          logger.info("Simple medication response processed and status updated", {
-            patientId: context.patientId,
-            responseType: simpleMedicationResponse.responseType,
-            updatedReminderId: updateResult.updatedReminderId,
-            confidence: simpleMedicationResponse.confidence
-          });
+          logger.info(
+            "Simple medication response processed and status updated",
+            {
+              patientId: context.patientId,
+              responseType: simpleMedicationResponse.responseType,
+              updatedReminderId: updateResult.updatedReminderId,
+              confidence: simpleMedicationResponse.confidence,
+            }
+          );
         } else {
           // Fallback to general processing if status update fails
           logger.warn("Failed to update reminder status from simple response", {
             patientId: context.patientId,
             error: updateResult.error,
-            responseType: simpleMedicationResponse.responseType
+            responseType: simpleMedicationResponse.responseType,
           });
           // Continue with normal processing flow
         }
       }
 
       // If not a simple medication response or processing failed, continue with normal flow
-      if (!simpleMedicationResponse.isMedicationResponse || simpleMedicationResponse.responseType === "unknown" || !updateResult?.success) {
+      if (
+        !simpleMedicationResponse.isMedicationResponse ||
+        simpleMedicationResponse.responseType === "unknown" ||
+        !updateResult?.success
+      ) {
         // Always check for unsubscribe keywords first, regardless of context
         const shouldUseLLMForUnsubscribe =
           this.shouldUseLLMUnsubscribeDetection(normalizedMessage);
@@ -895,7 +914,10 @@ export class MessageProcessorService {
     );
 
     // Additional context check: only treat as medication response if there are active reminders
-    if (detectionResult.isMedicationResponse && context.verificationStatus === "VERIFIED") {
+    if (
+      detectionResult.isMedicationResponse &&
+      context.verificationStatus === "VERIFIED"
+    ) {
       // Check if patient has recent reminders (simplified check)
       try {
         const { db, reminders } = await import("@/db");
@@ -917,10 +939,13 @@ export class MessageProcessorService {
           return detectionResult;
         } else {
           // No recent reminders, don't treat as medication response
-          logger.debug("Ignoring medication response - no recent reminders found", {
-            patientId: context.patientId,
-            message: message.substring(0, 50),
-          });
+          logger.debug(
+            "Ignoring medication response - no recent reminders found",
+            {
+              patientId: context.patientId,
+              message: message.substring(0, 50),
+            }
+          );
           return {
             isMedicationResponse: false,
             responseType: "unknown",
@@ -995,9 +1020,7 @@ export class MessageProcessorService {
   /**
    * Map intent to operation type for cost tracking
    */
-  private mapIntentToOperationType(
-    intent: MessageIntent["primary"]
-  ): string {
+  private mapIntentToOperationType(intent: MessageIntent["primary"]): string {
     switch (intent) {
       case "accept":
       case "decline":
@@ -1073,9 +1096,9 @@ export class MessageProcessorService {
         secondary: [llmResult.intent], // Keep original LLM intent as secondary
       };
     } catch (error) {
-      console.error(
+      logger.error(
         "LLM intent detection failed, falling back to keyword-based:",
-        error
+        error instanceof Error ? error : new Error(String(error))
       );
 
       // Fallback to keyword-based detection if LLM fails
@@ -1280,9 +1303,9 @@ export class MessageProcessorService {
           return llmResponse;
         }
       } catch (error) {
-        console.warn(
+        logger.warn(
           "LLM response generation failed, falling back to template:",
-          error
+          { error: error instanceof Error ? error.message : String(error) }
         );
       }
     }
@@ -1472,11 +1495,15 @@ export class MessageProcessorService {
 
     try {
       // Import reminder service for real-time data access
-      const { ReminderService } = await import("@/services/reminder/reminder.service");
+      const { ReminderService } = await import(
+        "@/services/reminder/reminder.service"
+      );
       const reminderService = new ReminderService();
 
       // Get today's reminders in real-time
-      const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
+      const todaysReminders = await reminderService.getTodaysReminders(
+        context.patientId
+      );
 
       let message = `Halo ${
         context.patientName || "pasien"
@@ -1486,45 +1513,57 @@ export class MessageProcessorService {
         message += "📅 *Pengingat Hari Ini:*\n";
         todaysReminders.forEach((reminder, index) => {
           const reminderMessage = reminder.message || "pengingat";
-          const scheduledTime = reminder.scheduledTime || "waktu yang dijadwalkan";
+          const scheduledTime =
+            reminder.scheduledTime || "waktu yang dijadwalkan";
           const status = reminder.isCompleted ? "✅ Selesai" : "⏰ Menunggu";
-          const timeRemaining = reminder.timeRemaining ? `(${reminder.timeRemaining})` : "";
+          const timeRemaining = reminder.timeRemaining
+            ? `(${reminder.timeRemaining})`
+            : "";
 
-          message += `${index + 1}. Pukul ${scheduledTime}: ${reminderMessage} ${status} ${timeRemaining}\n`;
+          message += `${
+            index + 1
+          }. Pukul ${scheduledTime}: ${reminderMessage} ${status} ${timeRemaining}\n`;
         });
         message += "\n";
       } else {
-        message +=
-          "📅 *Hari Ini:* Tidak ada pengingat yang dijadwalkan.\n\n";
+        message += "📅 *Hari Ini:* Tidak ada pengingat yang dijadwalkan.\n\n";
       }
 
       // Add summary statistics
-      const completedCount = todaysReminders.filter(r => r.isCompleted).length;
-      const pendingCount = todaysReminders.filter(r => !r.isCompleted).length;
+      const completedCount = todaysReminders.filter(
+        (r) => r.isCompleted
+      ).length;
+      const pendingCount = todaysReminders.filter((r) => !r.isCompleted).length;
 
       message += "📊 *Ringkasan Hari Ini:*\n";
       message += `- Total pengingat: ${todaysReminders.length}\n`;
       message += `- Selesai: ${completedCount}\n`;
       message += `- Menunggu: ${pendingCount}\n\n`;
 
-    message +=
-      "💙 Jika ada pertanyaan, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
+      message +=
+        "💙 Jika ada pertanyaan, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
 
-    return {
-      type: "auto_reply",
-      message,
-      actions,
-      priority: "low",
-    };
+      return {
+        type: "auto_reply",
+        message,
+        actions,
+        priority: "low",
+      };
     } catch (error) {
-      logger.error("Failed to generate reminder inquiry response", error as Error, {
-        patientId: context.patientId,
-      });
+      logger.error(
+        "Failed to generate reminder inquiry response",
+        error as Error,
+        {
+          patientId: context.patientId,
+        }
+      );
 
       // Fallback response if service fails
       return {
         type: "auto_reply",
-        message: `Halo ${context.patientName || "pasien"}, maaf saat ini tidak dapat mengambil jadwal pengingat Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
+        message: `Halo ${
+          context.patientName || "pasien"
+        }, maaf saat ini tidak dapat mengambil jadwal pengingat Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
         actions,
         priority: "low",
       };
@@ -1541,39 +1580,54 @@ export class MessageProcessorService {
 
     try {
       // Import health notes service
-      const { healthNotesQueryService } = await import("@/services/patient/health-notes-query.service");
+      const { healthNotesQueryService } = await import(
+        "@/services/patient/health-notes-query.service"
+      );
 
       // Get today's health notes for the patient
-      const todayNotes = await healthNotesQueryService.queryHealthNotes(context.patientId, {
-        timeRange: "hari_ini",
-        limit: 10
-      });
+      const todayNotes = await healthNotesQueryService.queryHealthNotes(
+        context.patientId,
+        {
+          timeRange: "hari_ini",
+          limit: 10,
+        }
+      );
 
       // Get recent health summary
-      const healthSummary = await healthNotesQueryService.getRecentHealthSummary(context.patientId, 7);
+      const healthSummary =
+        await healthNotesQueryService.getRecentHealthSummary(
+          context.patientId,
+          7
+        );
 
-      let message = `Halo ${context.patientName || "pasien"}, berikut informasi catatan kesehatan Anda:\n\n`;
+      let message = `Halo ${
+        context.patientName || "pasien"
+      }, berikut informasi catatan kesehatan Anda:\n\n`;
 
       if (todayNotes.notes.length > 0) {
         message += "📋 *Catatan Kesehatan Hari Ini:*\n";
         todayNotes.notes.forEach((note, index) => {
-          const date = new Date(note.noteDate).toLocaleDateString('id-ID', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
+          const date = new Date(note.noteDate).toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
           });
-          message += `${index + 1}. ${date}: ${note.note.substring(0, 100)}${note.note.length > 100 ? '...' : ''}\n`;
+          message += `${index + 1}. ${date}: ${note.note.substring(0, 100)}${
+            note.note.length > 100 ? "..." : ""
+          }\n`;
         });
         message += "\n";
       } else {
-        message += "📋 *Hari Ini:* Tidak ada catatan kesehatan yang dicatat hari ini.\n\n";
+        message +=
+          "📋 *Hari Ini:* Tidak ada catatan kesehatan yang dicatat hari ini.\n\n";
       }
 
       // Add recent health summary
       message += "📊 *Ringkasan Kesehatan Terkini:*\n";
       message += `${healthSummary}\n\n`;
 
-      message += "💙 Jika ada pertanyaan tentang catatan kesehatan Anda, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
+      message +=
+        "💙 Jika ada pertanyaan tentang catatan kesehatan Anda, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏";
 
       return {
         type: "auto_reply",
@@ -1582,14 +1636,20 @@ export class MessageProcessorService {
         priority: "low",
       };
     } catch (error) {
-      logger.error("Failed to generate health notes inquiry response", error as Error, {
-        patientId: context.patientId,
-      });
+      logger.error(
+        "Failed to generate health notes inquiry response",
+        error as Error,
+        {
+          patientId: context.patientId,
+        }
+      );
 
       // Fallback response if service fails
       return {
         type: "auto_reply",
-        message: `Halo ${context.patientName || "pasien"}, maaf saat ini tidak dapat mengambil catatan kesehatan Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
+        message: `Halo ${
+          context.patientName || "pasien"
+        }, maaf saat ini tidak dapat mengambil catatan kesehatan Anda. Silakan hubungi relawan PRIMA untuk informasi lebih lengkap. 💙`,
         actions,
         priority: "low",
       };
@@ -1787,7 +1847,10 @@ export class MessageProcessorService {
         priority: (intent.primary as string) === "emergency" ? "urgent" : "low",
       };
     } catch (error) {
-      console.error("LLM response generation failed:", error);
+      logger.error(
+        "LLM response generation failed:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       return null;
     }
   }

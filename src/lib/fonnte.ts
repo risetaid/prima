@@ -1,5 +1,6 @@
 // Fonnte WhatsApp API integration for PRIMA
 import * as crypto from 'crypto'
+import { logger } from './logger'
 
 // Primary WhatsApp provider for Indonesian healthcare system
 
@@ -23,7 +24,7 @@ export interface WhatsAppMessageResult {
 }
 
 if (!FONNTE_TOKEN) {
-  console.warn('Fonnte credentials not configured. WhatsApp messaging will be disabled.')
+  logger.warn('Fonnte credentials not configured. WhatsApp messaging will be disabled.')
 }
 
 /**
@@ -75,7 +76,10 @@ export const sendWhatsAppMessage = async (
       }
     }
   } catch (error) {
-    console.error('Fonnte WhatsApp send error:', error)
+    logger.error(
+      'Fonnte WhatsApp send error',
+      error instanceof Error ? error : new Error(String(error))
+    )
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -181,7 +185,10 @@ export const validateFonnteWebhook = (
 
     return signature === expectedSignature
   } catch (error) {
-    console.error('Fonnte webhook validation error:', error)
+    logger.error(
+      'Fonnte webhook validation error',
+      error instanceof Error ? error : new Error(String(error))
+    )
     return false
   }
 }

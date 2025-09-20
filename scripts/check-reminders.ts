@@ -1,11 +1,12 @@
-import { db, reminders, patients } from '@/db/index.js'
-import { eq, and, sql, isNull } from 'drizzle-orm'
-import { getWIBDateString } from '@/lib/timezone.js'
+import { db, reminders, patients } from "@/db/index.js";
+import { eq, and, sql, isNull } from "drizzle-orm";
+import { getWIBDateString } from "@/lib/timezone.js";
+import { logger } from "@/lib/logger.js";
 
 async function checkReminders() {
   try {
-    console.log('🔍 Checking current reminder state...')
-    console.log('📅 Today WIB:', getWIBDateString())
+    logger.info("🔍 Checking current reminder state...");
+    logger.info("📅 Today WIB:", { date: getWIBDateString() });
 
     // Get today's active reminders
     const todayReminders = await db
@@ -15,7 +16,7 @@ async function checkReminders() {
         scheduledTime: reminders.scheduledTime,
         startDate: reminders.startDate,
         isActive: reminders.isActive,
-        status: reminders.status
+        status: reminders.status,
       })
       .from(reminders)
       .leftJoin(patients, eq(reminders.patientId, patients.id))
@@ -26,12 +27,18 @@ async function checkReminders() {
           isNull(reminders.deletedAt),
           isNull(patients.deletedAt)
         )
-      )
+      );
 
-    console.log(`\n📋 Found ${todayReminders.length} active reminders for today:`)
+    logger.info(
+      `\n📋 Found ${todayReminders.length} active reminders for today:`
+    );
     todayReminders.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime} (${reminder.status})`)
-    })
+      logger.info(
+        `  ${index + 1}. ${reminder.patientName} - Pengingat at ${
+          reminder.scheduledTime
+        } (${reminder.status})`
+      );
+    });
 
     // Get today's sent reminders
     const todaySent = await db
@@ -40,7 +47,7 @@ async function checkReminders() {
         patientName: patients.name,
         status: reminders.status,
         sentAt: reminders.sentAt,
-        message: reminders.message
+        message: reminders.message,
       })
       .from(reminders)
       .leftJoin(patients, eq(reminders.patientId, patients.id))
@@ -50,20 +57,24 @@ async function checkReminders() {
           isNull(reminders.deletedAt),
           isNull(patients.deletedAt)
         )
-      )
+      );
 
-    console.log(`\n📨 Found ${todaySent.length} reminders sent today:`)
+    logger.info(`\n📨 Found ${todaySent.length} reminders sent today:`);
     todaySent.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - ${reminder.status} at ${reminder.sentAt}`)
-    })
+      logger.info(
+        `  ${index + 1}. ${reminder.patientName} - ${reminder.status} at ${
+          reminder.sentAt
+        }`
+      );
+    });
 
     // Check which reminders would be sent with our new logic
-    console.log('\n🎯 Testing smart duplicate prevention:')
+    logger.info("\n🎯 Testing smart duplicate prevention:");
     const remindersToSend = await db
       .select({
         id: reminders.id,
         patientName: patients.name,
-        scheduledTime: reminders.scheduledTime
+        scheduledTime: reminders.scheduledTime,
       })
       .from(reminders)
       .leftJoin(patients, eq(reminders.patientId, patients.id))
@@ -74,20 +85,27 @@ async function checkReminders() {
           isNull(reminders.deletedAt),
           isNull(patients.deletedAt),
           // SMART DUPLICATE PREVENTION: Only send reminders that haven't been delivered today
-          sql`(${reminders.status} != 'DELIVERED' OR ${reminders.sentAt} IS NULL OR DATE(${reminders.sentAt}) != ${getWIBDateString()})`
+          sql`(${reminders.status} != 'DELIVERED' OR ${
+            reminders.sentAt
+          } IS NULL OR DATE(${reminders.sentAt}) != ${getWIBDateString()})`
         )
-      )
+      );
 
-    console.log(`\n✅ Reminders that would be sent with smart duplicate prevention: ${remindersToSend.length}`)
+    logger.info(
+      `\n✅ Reminders that would be sent with smart duplicate prevention: ${remindersToSend.length}`
+    );
     remindersToSend.forEach((reminder, index) => {
-      console.log(`  ${index + 1}. ${reminder.patientName} - Pengingat at ${reminder.scheduledTime}`)
-    })
-
+      logger.info(
+        `  ${index + 1}. ${reminder.patientName} - Pengingat at ${
+          reminder.scheduledTime
+        }`
+      );
+    });
   } catch (error) {
-    console.error('❌ Error checking reminders:', error)
+    logger.error("❌ Error checking reminders:", error instanceof Error ? error : new Error(String(error)));
   } finally {
-    process.exit(0)
+    process.exit(0);
   }
 }
 
-checkReminders()
+checkReminders();

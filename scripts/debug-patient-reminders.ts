@@ -1,35 +1,36 @@
 import { db, reminders, manualConfirmations } from '@/db'
 import { eq, and, isNull, desc } from 'drizzle-orm'
+import { logger } from '@/lib/logger'
 
 async function debugPatientReminders() {
   const patientId = '9831df16-f7e1-4f8a-82ed-dd201ace984d'
 
   try {
-    console.log('🔍 Debugging patient reminders for:', patientId)
-    console.log('=' .repeat(60))
+    logger.info('🔍 Debugging patient reminders for:', { patientId })
+    logger.info('=' .repeat(60))
 
     // 1. Get all reminders (active and inactive)
-    console.log('\n📅 REMINDERS:')
+    logger.info('\n📅 REMINDERS:')
     const allReminders = await db
       .select()
       .from(reminders)
       .where(eq(reminders.patientId, patientId))
       .orderBy(desc(reminders.createdAt))
 
-    console.log(`Total reminders found: ${allReminders.length}`)
+    logger.info(`Total reminders found: ${allReminders.length}`)
     allReminders.forEach((reminder, index) => {
-      console.log(`${index + 1}. ID: ${reminder.id}`)
-      console.log(`   Active: ${reminder.isActive}`)
-      console.log(`   Status: ${reminder.status}`)
-      console.log(`   Deleted: ${reminder.deletedAt ? 'Yes' : 'No'}`)
-      console.log(`   Start Date: ${reminder.startDate}`)
-      console.log(`   Sent At: ${reminder.sentAt || 'Not sent'}`)
-      console.log(`   Created: ${reminder.createdAt}`)
-      console.log('')
+      logger.info(`${index + 1}. ID: ${reminder.id}`)
+      logger.info(`   Active: ${reminder.isActive}`)
+      logger.info(`   Status: ${reminder.status}`)
+      logger.info(`   Deleted: ${reminder.deletedAt ? 'Yes' : 'No'}`)
+      logger.info(`   Start Date: ${reminder.startDate}`)
+      logger.info(`   Sent At: ${reminder.sentAt || 'Not sent'}`)
+      logger.info(`   Created: ${reminder.createdAt}`)
+      logger.info('')
     })
 
     // 2. Get active reminders only (what the API uses)
-    console.log('\n✅ ACTIVE REMINDERS ONLY (what API uses):')
+    logger.info('\n✅ ACTIVE REMINDERS ONLY (what API uses):')
     const activeReminders = await db
       .select()
       .from(reminders)
@@ -41,13 +42,13 @@ async function debugPatientReminders() {
         )
       )
 
-    console.log(`Active reminders: ${activeReminders.length}`)
+    logger.info(`Active reminders: ${activeReminders.length}`)
     activeReminders.forEach((reminder, index) => {
-      console.log(`${index + 1}. ID: ${reminder.id} - ${reminder.status}`)
+      logger.info(`${index + 1}. ID: ${reminder.id} - ${reminder.status}`)
     })
 
     // 3. Get delivered reminders only
-    console.log('\n📨 DELIVERED REMINDERS ONLY:')
+    logger.info('\n📨 DELIVERED REMINDERS ONLY:')
     const deliveredReminders = await db
       .select()
       .from(reminders)
@@ -59,40 +60,40 @@ async function debugPatientReminders() {
       )
       .orderBy(desc(reminders.sentAt))
 
-    console.log(`Delivered reminders: ${deliveredReminders.length}`)
+    logger.info(`Delivered reminders: ${deliveredReminders.length}`)
     deliveredReminders.forEach((reminder, index) => {
-      console.log(`${index + 1}. ID: ${reminder.id}`)
-      console.log(`   Sent At: ${reminder.sentAt}`)
+      logger.info(`${index + 1}. ID: ${reminder.id}`)
+      logger.info(`   Sent At: ${reminder.sentAt}`)
     })
 
     // 4. Get confirmations
-    console.log('\n✅ MANUAL CONFIRMATIONS:')
+    logger.info('\n✅ MANUAL CONFIRMATIONS:')
     const confirmations = await db
       .select()
       .from(manualConfirmations)
       .where(eq(manualConfirmations.patientId, patientId))
       .orderBy(desc(manualConfirmations.confirmedAt))
 
-    console.log(`Total confirmations: ${confirmations.length}`)
+    logger.info(`Total confirmations: ${confirmations.length}`)
     confirmations.forEach((conf, index) => {
-      console.log(`${index + 1}. Reminder ID: ${conf.reminderId}`)
-      console.log(`   Confirmed At: ${conf.confirmedAt}`)
+      logger.info(`${index + 1}. Reminder ID: ${conf.reminderId}`)
+      logger.info(`   Confirmed At: ${conf.confirmedAt}`)
     })
 
-    console.log('\n🔍 ANALYSIS:')
-    console.log(`- Total reminders: ${allReminders.length}`)
-    console.log(`- Active reminders: ${activeReminders.length}`)
-    console.log(`- Delivered reminders: ${deliveredReminders.length}`)
-    console.log(`- Confirmations: ${confirmations.length}`)
+    logger.info('\n🔍 ANALYSIS:')
+    logger.info(`- Total reminders: ${allReminders.length}`)
+    logger.info(`- Active reminders: ${activeReminders.length}`)
+    logger.info(`- Delivered reminders: ${deliveredReminders.length}`)
+    logger.info(`- Confirmations: ${confirmations.length}`)
 
     const inactiveReminders = allReminders.length - activeReminders.length
     const pendingReminders = allReminders.length - deliveredReminders.length
 
-    console.log(`- Inactive/deleted reminders: ${inactiveReminders}`)
-    console.log(`- Pending/failed reminders: ${pendingReminders}`)
+    logger.info(`- Inactive/deleted reminders: ${inactiveReminders}`)
+    logger.info(`- Pending/failed reminders: ${pendingReminders}`)
 
   } catch (error) {
-    console.error('❌ Error debugging patient reminders:', error)
+    logger.error('❌ Error debugging patient reminders:', error as Error)
   }
 }
 

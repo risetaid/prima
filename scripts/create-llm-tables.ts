@@ -3,15 +3,16 @@
  * Executes the SQL to create missing LLM tables
  */
 
-import { sql } from 'drizzle-orm'
-import { db } from '@/db'
+import { sql } from "drizzle-orm";
+import { db } from "@/db";
+import { logger } from "@/lib/logger";
 
 async function createLLMTables() {
   try {
-    console.log('🚀 Creating LLM tables...')
+    logger.info("🚀 Creating LLM tables...");
 
     // Create conversation_messages table
-    console.log('📝 Creating conversation_messages table...')
+    logger.info("📝 Creating conversation_messages table...");
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "conversation_messages" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -29,10 +30,10 @@ async function createLLMTables() {
         "llm_response_time_ms" integer,
         "created_at" timestamp with time zone DEFAULT now() NOT NULL
       );
-    `)
+    `);
 
     // Create conversation_states table
-    console.log('📝 Creating conversation_states table...')
+    logger.info("📝 Creating conversation_states table...");
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "conversation_states" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -52,10 +53,10 @@ async function createLLMTables() {
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
         "deleted_at" timestamp with time zone
       );
-    `)
+    `);
 
     // Create llm_response_cache table
-    console.log('📝 Creating llm_response_cache table...')
+    logger.info("📝 Creating llm_response_cache table...");
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "llm_response_cache" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -65,10 +66,10 @@ async function createLLMTables() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL,
         "expires_at" timestamp with time zone NOT NULL
       );
-    `)
+    `);
 
     // Create volunteer_notifications table
-    console.log('📝 Creating volunteer_notifications table...')
+    logger.info("📝 Creating volunteer_notifications table...");
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "volunteer_notifications" (
         "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -86,39 +87,38 @@ async function createLLMTables() {
         "created_at" timestamp with time zone DEFAULT now() NOT NULL,
         "updated_at" timestamp with time zone DEFAULT now() NOT NULL
       );
-    `)
+    `);
 
     // Add foreign key constraints
-    console.log('🔗 Adding foreign key constraints...')
+    logger.info("🔗 Adding foreign key constraints...");
     await db.execute(sql`
       ALTER TABLE "conversation_messages" ADD CONSTRAINT "conversation_messages_conversation_state_id_conversation_states_id_fk"
         FOREIGN KEY ("conversation_state_id") REFERENCES "conversation_states"("id") ON DELETE cascade;
-    `)
+    `);
 
     await db.execute(sql`
       ALTER TABLE "conversation_states" ADD CONSTRAINT "conversation_states_patient_id_patients_id_fk"
         FOREIGN KEY ("patient_id") REFERENCES "patients"("id") ON DELETE no action;
-    `)
+    `);
 
     await db.execute(sql`
       ALTER TABLE "volunteer_notifications" ADD CONSTRAINT "volunteer_notifications_patient_id_patients_id_fk"
         FOREIGN KEY ("patient_id") REFERENCES "patients"("id") ON DELETE no action;
-    `)
+    `);
 
     // Create essential indexes
-    console.log('🔍 Creating indexes...')
+    logger.info("🔍 Creating indexes...");
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS "conversation_messages_conversation_state_id_idx" ON "conversation_messages" USING btree ("conversation_state_id");
       CREATE INDEX IF NOT EXISTS "conversation_states_patient_id_idx" ON "conversation_states" USING btree ("patient_id");
       CREATE INDEX IF NOT EXISTS "llm_response_cache_message_hash_idx" ON "llm_response_cache" USING btree ("message_hash");
       CREATE INDEX IF NOT EXISTS "volunteer_notifications_patient_id_idx" ON "volunteer_notifications" USING btree ("patient_id");
-    `)
+    `);
 
-    console.log('✅ LLM tables created successfully!')
-
+    logger.info("✅ LLM tables created successfully!");
   } catch (error) {
-    console.error('❌ Failed to create LLM tables:', error)
-    process.exit(1)
+    logger.error("❌ Failed to create LLM tables:", error as Error);
+    process.exit(1);
   }
 }
 
@@ -127,9 +127,9 @@ if (require.main === module) {
   createLLMTables()
     .then(() => process.exit(0))
     .catch((error) => {
-      console.error('Table creation failed:', error)
-      process.exit(1)
-    })
+      logger.error("Table creation failed:", error instanceof Error ? error : new Error(String(error)));
+      process.exit(1);
+    });
 }
 
-export { createLLMTables }
+export { createLLMTables };

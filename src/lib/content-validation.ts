@@ -7,6 +7,7 @@
 
 import { db, cmsArticles, cmsVideos } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
+import { logger } from "./logger";
 
 export interface ContentAttachment {
   id: string;
@@ -88,7 +89,10 @@ export async function validateContentAttachments(
         }
       }
     } catch (error) {
-      console.warn(`Failed to validate content ${content.id}:`, error);
+      logger.warn(`Failed to validate content ${content.id}`, {
+        error: error instanceof Error ? error.message : String(error),
+        contentId: content.id,
+      });
       continue;
     }
   }
@@ -157,7 +161,10 @@ export async function isValidContentAttachments(
         }
       }
     } catch (error) {
-      console.warn(`Error validating content ${content.id}:`, error);
+      logger.warn(`Error validating content ${content.id}`, {
+        error: error instanceof Error ? error.message : String(error),
+        contentId: content.id,
+      });
       return false;
     }
   }
@@ -211,9 +218,11 @@ export async function getContentUrl(
       }
     }
   } catch (error) {
-    console.warn(`Error getting content URL for ${contentId}:`, error);
+    logger.warn(`Error getting content URL for ${contentId}`, {
+      error: error instanceof Error ? error.message : String(error),
+      contentId,
+    });
   }
 
   return null;
 }
-

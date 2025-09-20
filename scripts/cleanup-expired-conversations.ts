@@ -4,7 +4,7 @@
  * This script is no longer functional due to schema simplification
  */
 
-import { logger } from '@/lib/logger'
+import { logger } from "@/lib/logger";
 
 class ConversationCleanupService {
   /**
@@ -12,15 +12,17 @@ class ConversationCleanupService {
    * DISABLED: Returns empty results since conversation tables were removed
    */
   async cleanupExpiredConversations(): Promise<{
-    expiredStatesCount: number
-    deletedMessagesCount: number
+    expiredStatesCount: number;
+    deletedMessagesCount: number;
   }> {
-    logger.info('Conversation cleanup disabled - tables removed in schema cleanup')
+    logger.info(
+      "Conversation cleanup disabled - tables removed in schema cleanup"
+    );
 
     return {
       expiredStatesCount: 0,
-      deletedMessagesCount: 0
-    }
+      deletedMessagesCount: 0,
+    };
   }
 
   /**
@@ -28,15 +30,18 @@ class ConversationCleanupService {
    * DISABLED: Returns empty results since conversation tables were removed
    */
   async cleanupOldInactiveConversations(daysOld: number = 30): Promise<{
-    deletedStatesCount: number
-    deletedMessagesCount: number
+    deletedStatesCount: number;
+    deletedMessagesCount: number;
   }> {
-    logger.info('Old conversation cleanup disabled - tables removed in schema cleanup', { daysOld })
+    logger.info(
+      "Old conversation cleanup disabled - tables removed in schema cleanup",
+      { daysOld }
+    );
 
     return {
       deletedStatesCount: 0,
-      deletedMessagesCount: 0
-    }
+      deletedMessagesCount: 0,
+    };
   }
 
   /**
@@ -44,42 +49,48 @@ class ConversationCleanupService {
    * DISABLED: Returns empty stats since conversation tables were removed
    */
   async getCleanupStats(): Promise<{
-    totalActiveConversations: number
-    totalInactiveConversations: number
-    expiredConversations: number
-    totalMessages: number
-    averageMessagesPerConversation: number
+    totalActiveConversations: number;
+    totalInactiveConversations: number;
+    expiredConversations: number;
+    totalMessages: number;
+    averageMessagesPerConversation: number;
   }> {
-    logger.info('Conversation stats disabled - tables removed in schema cleanup')
+    logger.info(
+      "Conversation stats disabled - tables removed in schema cleanup"
+    );
 
     return {
       totalActiveConversations: 0,
       totalInactiveConversations: 0,
       expiredConversations: 0,
       totalMessages: 0,
-      averageMessagesPerConversation: 0
-    }
+      averageMessagesPerConversation: 0,
+    };
   }
 }
 
 // Main execution function
 async function main() {
-  const cleanupService = new ConversationCleanupService()
+  const cleanupService = new ConversationCleanupService();
 
   try {
-    console.log('🚫 Conversation cleanup is DISABLED')
-    console.log('Reason: Conversation tables were removed during schema cleanup')
+    logger.info("🚫 Conversation cleanup is DISABLED");
+    logger.info(
+      "Reason: Conversation tables were removed during schema cleanup"
+    );
 
     // Get stats (will return empty)
-    console.log('\n📊 Statistics (disabled):')
-    const stats = await cleanupService.getCleanupStats()
-    console.table(stats)
+    logger.info("\n📊 Statistics (disabled):");
+    const stats = await cleanupService.getCleanupStats();
+    logger.info("Stats:", { stats });
 
-    console.log('\nℹ️  No cleanup performed - functionality disabled')
-
+    logger.info("\nℹ️  No cleanup performed - functionality disabled");
   } catch (error) {
-    console.error('❌ Conversation cleanup failed:', error)
-    process.exit(1)
+    logger.error(
+      "❌ Conversation cleanup failed:",
+      error instanceof Error ? error : new Error(String(error))
+    );
+    process.exit(1);
   }
 }
 
@@ -88,9 +99,9 @@ if (require.main === module) {
   main()
     .then(() => process.exit(0))
     .catch((error) => {
-      console.error('Script execution failed:', error)
-      process.exit(1)
-    })
+      logger.error("Script execution failed:", error instanceof Error ? error : new Error(String(error)));
+      process.exit(1);
+    });
 }
 
-export { ConversationCleanupService }
+export { ConversationCleanupService };

@@ -98,14 +98,14 @@ async function runMigration() {
 
     logger.info('🎉 Race condition protection migration completed successfully!');
 
-    console.log('\n=== Migration Summary ===');
-    console.log('✅ Distributed locks table created');
-    console.log('✅ Rate limits table created');
-    console.log('✅ Missing columns added to reminders table');
-    console.log('\nNext steps:');
-    console.log('1. Run: bun run db:generate');
-    console.log('2. Test the race condition protection features');
-    console.log('3. Monitor logs for race condition warnings');
+    logger.info('\n=== Migration Summary ===');
+    logger.info('✅ Distributed locks table created');
+    logger.info('✅ Rate limits table created');
+    logger.info('✅ Missing columns added to reminders table');
+    logger.info('\nNext steps:');
+    logger.info('1. Run: bun run db:generate');
+    logger.info('2. Test the race condition protection features');
+    logger.info('3. Monitor logs for race condition warnings');
 
   } catch (error) {
     logger.error('❌ Migration failed', error as Error);

@@ -7,20 +7,13 @@
  * 3. Update status and send confirmation
  */
 
-import {
-  db,
-  patients,
-  reminders,
-  Patient,
-} from "@/db";
+import { db, patients, reminders, Patient } from "@/db";
 // Note: verificationLogs, reminderSchedules, and reminderLogs tables were removed from schema
 import { eq, and, or, desc } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 import { generatePhoneAlternatives } from "@/lib/phone-utils";
-
-
 
 export interface WebhookPayload {
   device: string;
@@ -73,7 +66,9 @@ export class VerificationWebhookService {
       }
 
       // Step 2: Find patient
-      const patient = await this.databaseHandler.findPatientByPhone(payload.sender);
+      const patient = await this.databaseHandler.findPatientByPhone(
+        payload.sender
+      );
       if (!patient) {
         logger.info(`❌ WEBHOOK: No patient found for ${payload.sender}`);
         return this.createErrorResult(
@@ -87,7 +82,10 @@ export class VerificationWebhookService {
       );
 
       // Step 3: Process response
-      const result = await this.processVerificationResponse(patient, payload.message);
+      const result = await this.processVerificationResponse(
+        patient,
+        payload.message
+      );
 
       logger.info(`📋 WEBHOOK: Processing result: ${result}`);
       return {
@@ -102,15 +100,20 @@ export class VerificationWebhookService {
     }
   }
 
-  private createErrorResult(message: string, status: number): VerificationResult {
+  private createErrorResult(
+    message: string,
+    status: number
+  ): VerificationResult {
     logger.info(`❌ WEBHOOK: ${message}`);
     return { success: false, message, status };
   }
 
-  private handleProcessingError(error: unknown, sender: string): VerificationResult {
-    console.error(`💥 WEBHOOK: Processing error`, error);
+  private handleProcessingError(
+    error: unknown,
+    sender: string
+  ): VerificationResult {
     logger.error(
-      "Verification webhook processing error",
+      "💥 WEBHOOK: Processing error",
       error instanceof Error ? error : new Error(String(error)),
       {
         api: true,
@@ -143,20 +146,24 @@ export class VerificationWebhookService {
     patient: Patient,
     message: string
   ): Promise<string> {
-    console.log(
+    logger.info(
       `🔍 PROCESSING: "${message}" for ${patient.name} (${patient.verificationStatus})`
     );
 
     // Detect response type
     const responseType = this.responseDetector.detectResponseType(message);
-    console.log(`📋 DETECTED: ${responseType}`);
+    logger.info(`📋 DETECTED: ${responseType}`);
 
     // Handle confirmation responses separately
     if (this.responseDetector.isConfirmationResponse(responseType)) {
-      console.log(
+      logger.info(
         `📋 CONFIRMATION: Processing confirmation response for ${patient.name}`
       );
-      return await this.handleConfirmationResponse(patient, message, responseType);
+      return await this.handleConfirmationResponse(
+        patient,
+        message,
+        responseType
+      );
     }
 
     // Always log the response
@@ -172,15 +179,17 @@ export class VerificationWebhookService {
   ): Promise<string> {
     switch (responseType) {
       case "unsubscribe":
-        console.log(`🛑 UNSUBSCRIBE: Processing unsubscribe for ${patient.name}`);
+        logger.info(
+          `🛑 UNSUBSCRIBE: Processing unsubscribe for ${patient.name}`
+        );
         return await this.handleUnsubscribe(patient);
 
       case "accept":
         if (patient.verificationStatus === "PENDING") {
-          console.log(`✅ ACCEPT: Processing acceptance for ${patient.name}`);
+          logger.info(`✅ ACCEPT: Processing acceptance for ${patient.name}`);
           return await this.handleAccept(patient);
         } else {
-          console.log(
+          logger.info(
             `⚠️ ACCEPT: Patient ${patient.name} already ${patient.verificationStatus}`
           );
           return `already_${patient.verificationStatus}`;
@@ -188,35 +197,41 @@ export class VerificationWebhookService {
 
       case "decline":
         if (patient.verificationStatus === "PENDING") {
-          console.log(`❌ DECLINE: Processing decline for ${patient.name}`);
+          logger.info(`❌ DECLINE: Processing decline for ${patient.name}`);
           return await this.handleDecline(patient);
         } else {
-          console.log(
+          logger.info(
             `⚠️ DECLINE: Patient ${patient.name} already ${patient.verificationStatus}`
           );
           return `already_${patient.verificationStatus}`;
         }
 
       default:
-        console.log(
-          `❓ UNKNOWN: Unknown response from ${patient.name}`
-        );
+        logger.info(`❓ UNKNOWN: Unknown response from ${patient.name}`);
         return "unknown_response";
     }
   }
 
   private async handleUnsubscribe(patient: Patient): Promise<string> {
-    console.log(`🛑 UNSUBSCRIBE: Starting unsubscribe process for ${patient.name}`);
+    logger.info(
+      `🛑 UNSUBSCRIBE: Starting unsubscribe process for ${patient.name}`
+    );
 
     try {
       await this.databaseHandler.updatePatientStatus(patient, "unsubscribed");
       await this.databaseHandler.deactivatePatientReminders(patient);
-      await this.messageHandler.sendConfirmationMessage(patient, "unsubscribed");
+      await this.messageHandler.sendConfirmationMessage(
+        patient,
+        "unsubscribed"
+      );
 
-      console.log(`✅ UNSUBSCRIBE: Successfully processed for ${patient.name}`);
+      logger.info(`✅ UNSUBSCRIBE: Successfully processed for ${patient.name}`);
       return "unsubscribed";
     } catch (error) {
-      console.error(`💥 UNSUBSCRIBE: Error processing unsubscribe for ${patient.name}`, error);
+      logger.error(
+        `💥 UNSUBSCRIBE: Error processing unsubscribe for ${patient.name}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -226,10 +241,13 @@ export class VerificationWebhookService {
       await this.databaseHandler.updatePatientStatus(patient, "VERIFIED");
       await this.messageHandler.sendConfirmationMessage(patient, "VERIFIED");
 
-      console.log(`✅ ACCEPT: Successfully processed for ${patient.name}`);
+      logger.info(`✅ ACCEPT: Successfully processed for ${patient.name}`);
       return "VERIFIED";
     } catch (error) {
-      console.error(`💥 ACCEPT: Error processing acceptance for ${patient.name}`, error);
+      logger.error(
+        `💥 ACCEPT: Error processing acceptance for ${patient.name}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -239,10 +257,13 @@ export class VerificationWebhookService {
       await this.databaseHandler.updatePatientStatus(patient, "DECLINED");
       await this.messageHandler.sendConfirmationMessage(patient, "DECLINED");
 
-      console.log(`✅ DECLINE: Successfully processed for ${patient.name}`);
+      logger.info(`✅ DECLINE: Successfully processed for ${patient.name}`);
       return "DECLINED";
     } catch (error) {
-      console.error(`💥 DECLINE: Error processing decline for ${patient.name}`, error);
+      logger.error(
+        `💥 DECLINE: Error processing decline for ${patient.name}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -253,15 +274,21 @@ export class VerificationWebhookService {
     responseType: ResponseType
   ): Promise<string> {
     try {
-      console.log(`📋 CONFIRMATION: Processing ${responseType} for ${patient.name}`);
+      logger.info(
+        `📋 CONFIRMATION: Processing ${responseType} for ${patient.name}`
+      );
 
-      const recentConfirmation = await this.databaseHandler.findRecentPendingConfirmation(patient.id);
+      const recentConfirmation =
+        await this.databaseHandler.findRecentPendingConfirmation(patient.id);
       if (!recentConfirmation) {
-        console.log(`⚠️ CONFIRMATION: No pending confirmation found for ${patient.name}`);
+        logger.info(
+          `⚠️ CONFIRMATION: No pending confirmation found for ${patient.name}`
+        );
         return "no_pending_confirmation";
       }
 
-      const confirmationStatus = this.responseDetector.mapConfirmationResponseToStatus(responseType);
+      const confirmationStatus =
+        this.responseDetector.mapConfirmationResponseToStatus(responseType);
 
       await this.databaseHandler.updateConfirmationLog(recentConfirmation.id, {
         confirmationStatus: confirmationStatus,
@@ -274,10 +301,15 @@ export class VerificationWebhookService {
         responseType
       );
 
-      console.log(`✅ CONFIRMATION: Successfully processed ${responseType} for ${patient.name}`);
+      logger.info(
+        `✅ CONFIRMATION: Successfully processed ${responseType} for ${patient.name}`
+      );
       return `confirmation_${confirmationStatus.toLowerCase()}`;
     } catch (error) {
-      console.error(`💥 CONFIRMATION: Error processing confirmation for ${patient.name}`, error);
+      logger.error(
+        `💥 CONFIRMATION: Error processing confirmation for ${patient.name}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -390,14 +422,7 @@ class ResponseDetector {
   }
 
   private isConfirmationTaken(message: string): boolean {
-    const takenWords = [
-      "sudah",
-      "minum",
-      "telah",
-      "udh",
-      "done",
-      "selesai",
-    ];
+    const takenWords = ["sudah", "minum", "telah", "udh", "done", "selesai"];
     return takenWords.includes(message);
   }
 
@@ -436,11 +461,14 @@ class ResponseDetector {
  * Message Handler - Handles all WhatsApp message sending logic
  */
 class MessageHandler {
-  async sendConfirmationMessage(patient: Patient, status: string): Promise<void> {
+  async sendConfirmationMessage(
+    patient: Patient,
+    status: string
+  ): Promise<void> {
     const message = this.generateConfirmationMessage(patient, status);
     if (!message) return;
 
-    console.log(
+    logger.info(
       `📤 MESSAGE: Sending ${status} confirmation to ${patient.name}`
     );
 
@@ -458,18 +486,26 @@ class MessageHandler {
 
     if (!acknowledgmentMessage) return;
 
-    console.log(
+    logger.info(
       `📤 CONFIRMATION ACK: Sending acknowledgment to ${patient.name}`
     );
 
-    await this.sendMessage(patient.phoneNumber, acknowledgmentMessage, patient.name);
+    await this.sendMessage(
+      patient.phoneNumber,
+      acknowledgmentMessage,
+      patient.name
+    );
   }
 
-  private async sendMessage(phoneNumber: string, message: string, patientName: string): Promise<void> {
+  private async sendMessage(
+    phoneNumber: string,
+    message: string,
+    patientName: string
+  ): Promise<void> {
     try {
       const fonnte_token = process.env.FONNTE_TOKEN;
       if (!fonnte_token) {
-        console.warn(
+        logger.warn(
           `⚠️ MESSAGE: FONNTE_TOKEN not configured, skipping message to ${phoneNumber}`
         );
         return;
@@ -489,20 +525,24 @@ class MessageHandler {
       });
 
       if (!response.ok) {
-        console.warn(
+        logger.warn(
           `⚠️ MESSAGE: Failed to send to ${phoneNumber}, status: ${response.status}`
         );
       } else {
-        console.log(
-          `✅ MESSAGE: Successfully sent message to ${patientName}`
-        );
+        logger.info(`✅ MESSAGE: Successfully sent message to ${patientName}`);
       }
     } catch (error) {
-      console.error(`💥 MESSAGE: Error sending to ${patientName}`, error);
+      logger.error(
+        `💥 MESSAGE: Error sending to ${patientName}`,
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }
 
-  private generateConfirmationMessage(patient: Patient, status: string): string {
+  private generateConfirmationMessage(
+    patient: Patient,
+    status: string
+  ): string {
     if (status === "VERIFIED") {
       return `Terima kasih ${patient.name}! ✅
 
@@ -587,14 +627,19 @@ class DatabaseHandler {
     );
 
     // Verification logs table was removed from schema
-    console.log(`📝 LOGGED: ${action} - ${responseType} for ${patient.name} (verification result: ${verificationResult})`);
+    logger.info(
+      `📝 LOGGED: ${action} - ${responseType} for ${patient.name} (verification result: ${verificationResult})`
+    );
 
-    console.log(`📝 LOGGED: ${action} - ${responseType} for ${patient.name}`);
+    logger.info(`📝 LOGGED: ${action} - ${responseType} for ${patient.name}`);
   }
 
-  async updatePatientStatus(patient: Patient, verificationResult: string): Promise<void> {
+  async updatePatientStatus(
+    patient: Patient,
+    verificationResult: string
+  ): Promise<void> {
     const updateData: Partial<Patient> = {
-      verificationStatus: verificationResult as Patient['verificationStatus'],
+      verificationStatus: verificationResult as Patient["verificationStatus"],
       verificationResponseAt: new Date(),
       updatedAt: new Date(),
     };
@@ -603,10 +648,10 @@ class DatabaseHandler {
     if (verificationResult === "unsubscribed") {
       updateData.verificationStatus = "DECLINED";
       updateData.isActive = false;
-      console.log(`🔄 STATUS: Setting ${patient.name} to declined + inactive`);
+      logger.info(`🔄 STATUS: Setting ${patient.name} to declined + inactive`);
     }
 
-    console.log(
+    logger.info(
       `💾 DB UPDATE: ${patient.name} from ${patient.verificationStatus} to ${updateData.verificationStatus}`
     );
 
@@ -618,11 +663,11 @@ class DatabaseHandler {
     // Invalidate cache
     await invalidateAfterPatientOperation(patient.id, "update");
 
-    console.log(`✅ DB UPDATED: ${patient.name} status changed successfully`);
+    logger.info(`✅ DB UPDATED: ${patient.name} status changed successfully`);
   }
 
   async deactivatePatientReminders(patient: Patient): Promise<void> {
-    console.log(`🔕 REMINDERS: Deactivating reminders for ${patient.name}`);
+    logger.info(`🔕 REMINDERS: Deactivating reminders for ${patient.name}`);
 
     try {
       await db
@@ -633,14 +678,14 @@ class DatabaseHandler {
         })
         .where(eq(reminders.patientId, patient.id));
 
-      console.log(`✅ REMINDERS: Successfully deactivated for ${patient.name}`);
+      logger.info(`✅ REMINDERS: Successfully deactivated for ${patient.name}`);
     } catch (error) {
-      console.error(
+      logger.error(
         `💥 REMINDERS: Error deactivating reminders for ${patient.name}`,
-        error
+        error instanceof Error ? error : new Error(String(error))
       );
       // Don't throw - reminder deactivation failure shouldn't stop unsubscribe
-      console.warn(
+      logger.warn(
         `⚠️ REMINDERS: Continuing unsubscribe despite reminder deactivation error`
       );
     }
@@ -692,10 +737,7 @@ class DatabaseHandler {
       case "decline":
         return "DECLINED";
       default:
-        return currentStatus as
-          | "VERIFIED"
-          | "DECLINED"
-          | "PENDING";
+        return currentStatus as "VERIFIED" | "DECLINED" | "PENDING";
     }
   }
 }

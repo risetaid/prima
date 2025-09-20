@@ -1,6 +1,8 @@
 // DateTime utilities with UTC+7 timezone support for Indonesian users
 // Enhanced with explicit 24-hour format enforcement
 
+import { logger } from "./logger";
+
 export const TIMEZONE_WIB = "Asia/Jakarta";
 
 // Indonesian locale configuration for consistent 24-hour formatting
@@ -267,7 +269,9 @@ export const ensure24HourFormat = (timeString: string): string => {
   }
 
   // If parsing fails, return current time as fallback
-  console.warn(`Invalid time format: ${timeString}, using current time`);
+  logger.warn(`Invalid time format: ${timeString}, using current time`, {
+    timeString,
+  });
   return getCurrentTimeWIB();
 };
 

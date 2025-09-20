@@ -1,10 +1,11 @@
 import { db } from "@/db";
 import { whatsappTemplates } from "@/db/reminder-schema";
 import { eq } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 async function updateFollowupTemplate() {
   try {
-    console.log("Updating follow-up reminder template...");
+    logger.info("Updating follow-up reminder template...");
 
     const result = await db
       .update(whatsappTemplates)
@@ -15,12 +16,12 @@ async function updateFollowupTemplate() {
       .where(eq(whatsappTemplates.templateName, "follow_up_reminder"))
       .returning();
 
-    console.log("Template updated successfully:", result);
-    console.log("✅ Follow-up template has been updated to use general language");
+    logger.info("Template updated successfully:", { result });
+    logger.info("✅ Follow-up template has been updated to use general language");
 
     return result;
   } catch (error) {
-    console.error("Failed to update follow-up template:", error);
+    logger.error("Failed to update follow-up template:", error instanceof Error ? error : new Error(String(error)));
     throw error;
   }
 }
@@ -28,10 +29,10 @@ async function updateFollowupTemplate() {
 // Run the update
 updateFollowupTemplate()
   .then(() => {
-    console.log("✅ Follow-up template update completed");
+    logger.info("✅ Follow-up template update completed");
     process.exit(0);
   })
   .catch((error) => {
-    console.error("❌ Follow-up template update failed:", error);
+    logger.error("❌ Follow-up template update failed:", error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   });

@@ -1,5 +1,6 @@
-import { db } from '../src/db/index';
-import { sql } from 'drizzle-orm';
+import { db } from "../src/db/index";
+import { sql } from "drizzle-orm";
+import { logger } from "../src/lib/logger";
 
 async function listTables() {
   try {
@@ -10,11 +11,14 @@ async function listTables() {
       AND table_type = 'BASE TABLE'
       ORDER BY table_name;
     `);
-    
-    console.log('Tables in database:');
-    console.log(result);
+
+    logger.info("Tables in database:");
+    logger.info("Result:", { result });
   } catch (error) {
-    console.error('Error listing tables:', error);
+    logger.error(
+      "Error listing tables:",
+      error instanceof Error ? error : new Error(String(error))
+    );
   }
 }
 

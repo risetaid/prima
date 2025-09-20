@@ -12,7 +12,7 @@ import {
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientContextService } from "@/services/patient/patient-context.service";
 import { ReminderService } from "@/services/reminder/reminder.service";
-import { logger } from "@/lib/logger";
+import { logger, LogValue } from "@/lib/logger";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 
 // Validation schema for WhatsApp webhook payload
@@ -67,11 +67,16 @@ async function executeResponseActions(
 
             if (recentReminders.length > 0) {
               // Update the most recent pending confirmation
-              const reminderToUpdate = recentReminders[recentReminders.length - 1]; // Most recent
+              const reminderToUpdate =
+                recentReminders[recentReminders.length - 1]; // Most recent
 
               const status = (action.data.status as string) || "CONFIRMED";
               const validStatuses = ["CONFIRMED", "MISSED", "PENDING"] as const;
-              const confirmationStatus = validStatuses.includes(status as typeof validStatuses[number]) ? status as "CONFIRMED" | "MISSED" | "PENDING" : "CONFIRMED";
+              const confirmationStatus = validStatuses.includes(
+                status as (typeof validStatuses)[number]
+              )
+                ? (status as "CONFIRMED" | "MISSED" | "PENDING")
+                : "CONFIRMED";
 
               await db
                 .update(reminders)
@@ -162,8 +167,8 @@ async function executeResponseActions(
           // Create manual confirmation record
           logger.info("Manual confirmation requested", {
             patientId,
-            reminderLogId: action.data.reminderLogId,
-            volunteerId: action.data.volunteerId,
+            reminderLogId: action.data.reminderLogId as LogValue,
+            volunteerId: action.data.volunteerId as LogValue,
           });
           // Manual confirmation creation would create reminder confirmation record
           break;

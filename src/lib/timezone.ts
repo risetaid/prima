@@ -54,19 +54,18 @@ export const createWIBDateTime = (dateStr: string, timeStr: string): Date => {
  * Only send at the exact scheduled minute (WIB)
  */
 export const shouldSendReminderNow = (startDate: string, scheduledTime: string): boolean => {
-  // const nowWIB = getWIBTime() // Available for future use
   const todayWIB = getWIBDateString()
   const currentTimeWIB = getWIBTimeString()
-  
+
   // Only send if it's the scheduled date
   if (startDate !== todayWIB) {
     return false
   }
-  
+
   // Compare times properly - convert to minutes for accurate comparison
   const [currentHour, currentMinute] = currentTimeWIB.split(':').map(Number)
   const [scheduledHour, scheduledMinute] = scheduledTime.split(':').map(Number)
-  
+
   const currentTotalMinutes = currentHour * 60 + currentMinute
   const scheduledTotalMinutes = scheduledHour * 60 + scheduledMinute
 

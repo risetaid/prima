@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { distributedLockService } from "@/services/distributed-lock.service";
 import { reminderProcessingRateLimiter } from "@/services/rate-limit.service";
+import { apiSuccess, apiError } from "@/lib/api-response";
 
 // Import reminder service for follow-up scheduling
 let reminderService:
@@ -13,16 +14,23 @@ export async function GET(request: NextRequest) {
   // Verify this is called by cron with secret
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
-    console.error("CRON_SECRET environment variable is not set");
-    return NextResponse.json(
-      { error: "Server configuration error" },
-      { status: 500 }
-    );
+    logger.error("CRON_SECRET environment variable is not set", undefined, {
+      operation: "cron_auth",
+    });
+    return apiError("Server configuration error", {
+      status: 500,
+      code: "CONFIG_ERROR",
+      operation: "cron_auth",
+    });
   }
 
   const authHeader = request.headers.get("Authorization");
   if (authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", {
+      status: 401,
+      code: "AUTH_REQUIRED",
+      operation: "cron_auth",
+    });
   }
 
   return await processReminders();
@@ -34,15 +42,20 @@ export async function POST(request: NextRequest) {
   if (process.env.NODE_ENV === "production") {
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
-      return NextResponse.json(
-        { error: "Server configuration error" },
-        { status: 500 }
-      );
+      return apiError("Server configuration error", {
+        status: 500,
+        code: "CONFIG_ERROR",
+        operation: "cron_auth",
+      });
     }
 
     const authHeader = request.headers.get("Authorization");
     if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", {
+        status: 401,
+        code: "AUTH_REQUIRED",
+        operation: "cron_auth",
+      });
     }
   }
 
@@ -65,15 +78,12 @@ async function processReminders() {
         cronInstance,
         rateLimitResult,
       });
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Global processing rate limit exceeded",
-          details: `Try again after ${rateLimitResult.resetTime.toISOString()}`,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 429 }
-      );
+      return apiError("Global processing rate limit exceeded", {
+        status: 429,
+        code: "RATE_LIMIT_EXCEEDED",
+        details: { resetTime: rateLimitResult.resetTime.toISOString() },
+        operation: "cron_rate_limit",
+      });
     }
 
     // Use distributed lock to prevent multiple cron instances from running simultaneously
@@ -90,28 +100,24 @@ async function processReminders() {
 
     if (!lockResult) {
       logger.warn("Could not acquire cron processing lock", { cronInstance });
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Cron already running",
-          timestamp: new Date().toISOString(),
-        },
-        { status: 409 }
-      );
+      return apiError("Cron already running", {
+        status: 409,
+        code: "CRON_LOCK_CONFLICT",
+        operation: "cron_lock",
+      });
     }
 
     return lockResult;
   } catch (error) {
     logger.error("Cron processing failed", error as Error, { cronInstance });
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Cron processing failed",
-        details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+    return apiError("Cron processing failed", {
+      status: 500,
+      code: "CRON_PROCESSING_ERROR",
+      details: {
+        originalError: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
-    );
+      operation: "cron_processing",
+    });
   }
 }
 
@@ -311,32 +317,35 @@ async function processRemindersWithLock() {
     // Process followups
     const followupResult = await processFollowups();
 
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      reminders: {
-        totalFound: remindersDue.length,
-        processed: processedCount,
-        successful: successCount,
-        failed: failedCount,
-        errors: errors.slice(0, 5), // Only show first 5 errors
+    return apiSuccess(
+      {
+        reminders: {
+          totalFound: remindersDue.length,
+          processed: processedCount,
+          successful: successCount,
+          failed: failedCount,
+          errors: errors.slice(0, 5), // Only show first 5 errors
+        },
+        followups: followupResult,
+        message: `Processed ${processedCount} reminders (${successCount} sent, ${failedCount} failed) and ${
+          followupResult.processed || 0
+        } followups`,
       },
-      followups: followupResult,
-      message: `Processed ${processedCount} reminders (${successCount} sent, ${failedCount} failed) and ${
-        followupResult.processed || 0
-      } followups`,
-    });
+      {
+        message: "Cron job completed successfully",
+        operation: "cron_completion",
+      }
+    );
   } catch (error) {
     logger.error("Cron job failed", error as Error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Cron processing failed",
-        details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+    return apiError("Cron processing failed", {
+      status: 500,
+      code: "CRON_JOB_ERROR",
+      details: {
+        originalError: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
-    );
+      operation: "cron_job",
+    });
   }
 }
 

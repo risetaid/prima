@@ -1,29 +1,30 @@
 // Linked Confirmation Service - Simplified stub since tables were removed
+import { logger } from "@/lib/logger";
 
 export interface LinkedConfirmation {
-  id: string
-  reminderLogId: string
-  patientId: string
-  response: string | null
-  responseType: 'confirmed' | 'missed' | 'later' | 'unknown'
-  confidence: number
-  linkedAt: Date
-  metadata: Record<string, unknown>
+  id: string;
+  reminderLogId: string;
+  patientId: string;
+  response: string | null;
+  responseType: "confirmed" | "missed" | "later" | "unknown";
+  confidence: number;
+  linkedAt: Date;
+  metadata: Record<string, unknown>;
 }
 
 export interface ConfirmationLinkResult {
-  success: boolean
-  linkedConfirmation?: LinkedConfirmation
-  message: string
-  requiresFollowUp?: boolean
+  success: boolean;
+  linkedConfirmation?: LinkedConfirmation;
+  message: string;
+  requiresFollowUp?: boolean;
 }
 
 interface PendingConfirmation {
-  id: string
-  reminderScheduleId: string | null
-  sentAt: Date
-  confirmationMessage: string | null
-  message: string | null
+  id: string;
+  reminderScheduleId: string | null;
+  sentAt: Date;
+  confirmationMessage: string | null;
+  message: string | null;
 }
 
 export class LinkedConfirmationService {
@@ -39,18 +40,25 @@ export class LinkedConfirmationService {
     response: string,
     conversationStateId?: string
   ): Promise<ConfirmationLinkResult> {
-    const conversationContext = conversationStateId ? ` (conversation: ${conversationStateId})` : '';
+    const conversationContext = conversationStateId
+      ? ` (conversation: ${conversationStateId})`
+      : "";
     return {
       success: false,
-      message: `Linked confirmation functionality disabled for patient ${patientId} with response "${response.substring(0, 20)}..."${conversationContext}`
+      message: `Linked confirmation functionality disabled for patient ${patientId} with response "${response.substring(
+        0,
+        20
+      )}..."${conversationContext}`,
     };
   }
 
   /**
    * Find pending confirmations for a patient - returns empty array
    */
-  async findPendingConfirmations(patientId: string): Promise<PendingConfirmation[]> {
-    console.log(`Finding pending confirmations for patient ${patientId}`);
+  async findPendingConfirmations(
+    patientId: string
+  ): Promise<PendingConfirmation[]> {
+    logger.info(`Finding pending confirmations for patient ${patientId}`);
     return [];
   }
 
@@ -61,7 +69,9 @@ export class LinkedConfirmationService {
     patientId: string,
     limit: number = 20
   ): Promise<LinkedConfirmation[]> {
-    console.log(`Getting confirmation history for patient ${patientId} with limit ${limit}`);
+    logger.info(
+      `Getting confirmation history for patient ${patientId} with limit ${limit}`
+    );
     return [];
   }
 
@@ -69,12 +79,12 @@ export class LinkedConfirmationService {
    * Get confirmation stats - returns empty stats
    */
   async getConfirmationStats(patientId: string) {
-    console.log(`Getting confirmation stats for patient ${patientId}`);
+    logger.info(`Getting confirmation stats for patient ${patientId}`);
     return {
       totalConfirmations: 0,
       confirmedCount: 0,
       missedCount: 0,
-      confirmationRate: 0
+      confirmationRate: 0,
     };
   }
 }

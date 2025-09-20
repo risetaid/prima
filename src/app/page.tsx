@@ -3,7 +3,6 @@
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/ui/header";
-// import { UserButton } from "@clerk/nextjs"; // Available for future use
 
 export default function LandingPage() {
   const { user } = useUser();

@@ -16,8 +16,8 @@ const eslintConfig = [
       // Downgrade unused variable warnings to warnings (not errors)
       "@typescript-eslint/no-unused-vars": "warn",
       
-      // Allow any types in specific cases (medical/healthcare context may need flexibility)
-      "@typescript-eslint/no-explicit-any": "warn",
+      // Enforce no explicit any types (strict TypeScript rules)
+      "@typescript-eslint/no-explicit-any": "error",
       
       // Allow empty object types (common in UI libraries)
       "@typescript-eslint/no-empty-object-type": "warn",

@@ -1,16 +1,12 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
-import {
-  db,
-  reminders,
-  patients,
-} from "@/db";
+import { db, reminders, patients } from "@/db";
 import { eq, and, isNull, sql, or, ne } from "drizzle-orm";
 import { getWIBTime, getWIBDateString, getWIBTimeString } from "@/lib/timezone";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ValidatedContent } from "@/services/reminder/reminder.types";
-// Rate limiter temporarily disabled
+import { RateLimiter } from "@/lib/rate-limiter";
 
 const whatsappService = new WhatsAppService();
 
@@ -31,21 +27,49 @@ function createWIBDateRange(dateString: string) {
 
 export async function POST() {
   try {
-    logger.debug('Instant send API called');
+    logger.debug("Instant send API called");
 
     const user = await getAuthUser();
     if (!user) {
-      logger.warn('User not authenticated');
+      logger.warn("User not authenticated");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    logger.debug('User authenticated', {
+    logger.debug("User authenticated", {
       email: user.email,
       id: user.id,
-      role: user.role
+      role: user.role,
     });
 
     // All authenticated users can send instant reminders to their assigned patients
+
+    // Rate limiting: 5 instant send requests per hour per user
+    const rateLimitResult = await RateLimiter.checkRateLimit(`user:${user.id}`, {
+      windowMs: 60 * 60 * 1000, // 1 hour
+      maxRequests: 5,
+      keyPrefix: 'instant_send'
+    });
+
+    if (!rateLimitResult.allowed) {
+      logger.warn('Rate limit exceeded for instant send', {
+        userId: user.id,
+        remaining: rateLimitResult.remaining,
+        resetTime: new Date(rateLimitResult.resetTime).toISOString()
+      });
+      return NextResponse.json({
+        error: 'Too many requests',
+        message: 'You have exceeded the rate limit for instant send operations. Please try again later.',
+        retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
+      }, {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
+          'X-RateLimit-Limit': '5',
+          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+          'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetTime / 1000).toString()
+        }
+      });
+    }
 
     const startTime = Date.now();
     let processedCount = 0;
@@ -72,27 +96,27 @@ export async function POST() {
     const todayWIB = getWIBDateString();
     const { startOfDay, endOfDay } = createWIBDateRange(todayWIB);
 
-    logger.debug('Querying reminders for today', {
+    logger.debug("Querying reminders for today", {
       today: todayWIB,
       startOfDay: startOfDay.toISOString(),
       endOfDay: endOfDay.toISOString(),
       currentTimeWIB: `${getWIBDateString()} ${getWIBTimeString()}`,
       userRole: user.role,
-      userId: user.id
+      userId: user.id,
     });
 
     // Check for active reminders excluding already delivered ones
-    logger.debug('Checking active reminders for user', {
+    logger.debug("Checking active reminders for user", {
       userId: user.id,
-      excludeDeliveredToday: true
+      excludeDeliveredToday: true,
     });
 
     let activeReminders;
     try {
-      logger.debug('Querying active reminders', {
+      logger.debug("Querying active reminders", {
         startOfDay: startOfDay.toISOString(),
         endOfDay: endOfDay.toISOString(),
-        userRole: user.role
+        userRole: user.role,
       });
 
       activeReminders = await db
@@ -128,14 +152,14 @@ export async function POST() {
           )
         );
 
-      logger.debug('Query completed, found reminders', {
-        count: activeReminders.length
+      logger.debug("Query completed, found reminders", {
+        count: activeReminders.length,
       });
       if (activeReminders.length > 0) {
-        logger.debug('First reminder details', {
+        logger.debug("First reminder details", {
           id: activeReminders[0].id,
           startDate: activeReminders[0].startDate,
-          scheduledTime: activeReminders[0].scheduledTime
+          scheduledTime: activeReminders[0].scheduledTime,
         });
       }
     } catch (dbError) {
@@ -159,12 +183,12 @@ export async function POST() {
 
     // Log details about found reminders for debugging
     if (activeReminders.length > 0) {
-      logger.debug('Reminder details', {
-        reminders: activeReminders.map(r => ({
+      logger.debug("Reminder details", {
+        reminders: activeReminders.map((r) => ({
           patientName: r.patientName,
           scheduledTime: r.scheduledTime,
-          patientPhoneNumber: r.patientPhoneNumber
-        }))
+          patientPhoneNumber: r.patientPhoneNumber,
+        })),
       });
     }
 
@@ -200,8 +224,6 @@ export async function POST() {
         debugLogs.push(
           `🚀 Instant send: bypassing time check for ${reminder.patientName}`
         );
-
-        // Rate limiting temporarily disabled
 
         try {
           // Generate basic message

@@ -4,7 +4,6 @@ import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
-// import { addHours } from 'date-fns'
 
 // Send verification message to patient
 export async function POST(

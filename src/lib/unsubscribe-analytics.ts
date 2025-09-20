@@ -9,14 +9,6 @@ import { getWIBTime } from "@/lib/timezone";
 import { logger } from "@/lib/logger";
 
 // TypeScript interfaces for analysis data
-// Disabled - related tables removed
-/*
-interface UnsubscribeAnalysis {
-  confidence: number;
-  sentiment: string;
-  urgency: string;
-}
-*/
 
 export interface UnsubscribeAnalyticsData {
   totalUnsubscribes: number;
@@ -285,7 +277,11 @@ export class UnsubscribeAnalyticsService {
   ): Promise<Array<{ sentiment: string; count: number; percentage: number }>> {
     // Since verificationLogs table was removed, return default sentiment distribution
     // In the future, this could be enhanced to store sentiment data in patient records
-    const totalUnsubscribes = await this.getTotalUnsubscribes(startDate, endDate, {});
+    const totalUnsubscribes = await this.getTotalUnsubscribes(
+      startDate,
+      endDate,
+      {}
+    );
 
     // Return a default distribution since detailed sentiment data is no longer available
     return [
@@ -307,7 +303,11 @@ export class UnsubscribeAnalyticsService {
   ): Promise<Array<{ urgency: string; count: number; percentage: number }>> {
     // Since verificationLogs table was removed, return default urgency distribution
     // In the future, this could be enhanced to store urgency data in patient records
-    const totalUnsubscribes = await this.getTotalUnsubscribes(startDate, endDate, {});
+    const totalUnsubscribes = await this.getTotalUnsubscribes(
+      startDate,
+      endDate,
+      {}
+    );
 
     // Return a default distribution since detailed urgency data is no longer available
     return [

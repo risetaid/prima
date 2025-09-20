@@ -144,70 +144,70 @@ async function runTests() {
   logger.info('🧪 Starting race condition protection tests...');
 
   try {
-    console.log('\n=== Race Condition Protection Tests ===\n');
+    logger.info('\n=== Race Condition Protection Tests ===\n');
 
     // Test 1: Distributed Locks
-    console.log('1. Testing Distributed Locks');
+    logger.info('1. Testing Distributed Locks');
     const lockResults = await testDistributedLocks();
-    console.log('');
+    logger.info('');
 
     // Test 2: Rate Limiting
-    console.log('2. Testing Rate Limiting');
+    logger.info('2. Testing Rate Limiting');
     const rateLimitResults = await testRateLimiting();
-    console.log('');
+    logger.info('');
 
     // Test 3: Lock with Function
-    console.log('3. Testing Lock with Function Execution');
+    logger.info('3. Testing Lock with Function Execution');
     const functionResults = await testLockWithFunction();
-    console.log('');
+    logger.info('');
 
     // Test 4: Cleanup Functions
-    console.log('4. Testing Cleanup Functions');
+    logger.info('4. Testing Cleanup Functions');
     const cleanupResults = await testCleanupFunctions();
-    console.log('');
+    logger.info('');
 
     // Summary
-    console.log('=== Test Summary ===');
-    console.log('🔒 Distributed Locks:');
-    console.log(`   Successful: ${lockResults.successful}`);
-    console.log(`   Failed: ${lockResults.failed}`);
-    console.log(`   Concurrent: ${lockResults.concurrent}`);
-    console.log('');
+    logger.info('=== Test Summary ===');
+    logger.info('🔒 Distributed Locks:');
+    logger.info(`   Successful: ${lockResults.successful}`);
+    logger.info(`   Failed: ${lockResults.failed}`);
+    logger.info(`   Concurrent: ${lockResults.concurrent}`);
+    logger.info('');
 
-    console.log('🚦 Rate Limiting:');
-    console.log(`   Allowed: ${rateLimitResults.allowed}`);
-    console.log(`   Blocked: ${rateLimitResults.blocked}`);
-    console.log(`   Total: ${rateLimitResults.total}`);
-    console.log('');
+    logger.info('🚦 Rate Limiting:');
+    logger.info(`   Allowed: ${rateLimitResults.allowed}`);
+    logger.info(`   Blocked: ${rateLimitResults.blocked}`);
+    logger.info(`   Total: ${rateLimitResults.total}`);
+    logger.info('');
 
-    console.log('🔧 Lock with Function:');
-    console.log(`   Successful executions: ${functionResults.successful}`);
-    console.log(`   Failed executions: ${functionResults.failed}`);
-    console.log(`   Total function calls: ${functionResults.executionCount}`);
-    console.log('');
+    logger.info('🔧 Lock with Function:');
+    logger.info(`   Successful executions: ${functionResults.successful}`);
+    logger.info(`   Failed executions: ${functionResults.failed}`);
+    logger.info(`   Total function calls: ${functionResults.executionCount}`);
+    logger.info('');
 
-    console.log('🧹 Cleanup:');
-    console.log(`   Locks cleaned: ${cleanupResults.locksCleaned}`);
-    console.log(`   Rate limits cleaned: ${cleanupResults.rateLimitsCleaned}`);
-    console.log('');
+    logger.info('🧹 Cleanup:');
+    logger.info(`   Locks cleaned: ${cleanupResults.locksCleaned}`);
+    logger.info(`   Rate limits cleaned: ${cleanupResults.rateLimitsCleaned}`);
+    logger.info('');
 
     // Validate results
     const lockTestPassed = lockResults.successful === 1 && lockResults.failed === 9;
     const rateLimitTestPassed = rateLimitResults.allowed === 5 && rateLimitResults.blocked === 5;
     const functionTestPassed = functionResults.successful === 1 && functionResults.executionCount === 1;
 
-    console.log('=== Test Results ===');
-    console.log(`🔒 Distributed Locks: ${lockTestPassed ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`🚦 Rate Limiting: ${rateLimitTestPassed ? '✅ PASS' : '❌ FAIL'}`);
-    console.log(`🔧 Lock with Function: ${functionTestPassed ? '✅ PASS' : '❌ FAIL'}`);
-    console.log('');
+    logger.info('=== Test Results ===');
+    logger.info(`🔒 Distributed Locks: ${lockTestPassed ? '✅ PASS' : '❌ FAIL'}`);
+    logger.info(`🚦 Rate Limiting: ${rateLimitTestPassed ? '✅ PASS' : '❌ FAIL'}`);
+    logger.info(`🔧 Lock with Function: ${functionTestPassed ? '✅ PASS' : '❌ FAIL'}`);
+    logger.info('');
 
     const allTestsPassed = lockTestPassed && rateLimitTestPassed && functionTestPassed;
 
     if (allTestsPassed) {
-      console.log('🎉 All race condition protection tests passed!');
+      logger.info('🎉 All race condition protection tests passed!');
     } else {
-      console.log('❌ Some tests failed. Check the logs above for details.');
+      logger.error('❌ Some tests failed. Check the logs above for details.');
       process.exit(1);
     }
 

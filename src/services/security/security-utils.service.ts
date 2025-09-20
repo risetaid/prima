@@ -3,7 +3,7 @@
  * Provides common security validation utilities for patient data access
  */
 
-import { logger } from "@/lib/logger";
+import { logger, LogValue } from "@/lib/logger";
 import { db, patients } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { ConversationContext } from "@/services/llm/llm.types";
@@ -586,7 +586,7 @@ export class SecurityUtilsService {
         alertType: "high_risk_security_event",
         patientId: auditEntry.patientId,
         eventType: auditEntry.eventType,
-        riskScore: auditEntry.riskScore,
+        riskScore: auditEntry.riskScore as LogValue,
         timestamp: auditEntry.timestamp,
       });
 

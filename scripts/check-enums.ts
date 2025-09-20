@@ -1,5 +1,6 @@
-import { db } from '../src/db/index';
-import { sql } from 'drizzle-orm';
+import { db } from "../src/db/index";
+import { sql } from "drizzle-orm";
+import { logger } from "../src/lib/logger";
 
 async function checkEnums() {
   try {
@@ -11,11 +12,14 @@ async function checkEnums() {
       GROUP BY t.typname
       ORDER BY t.typname;
     `);
-    
-    console.log('Enums in database:');
-    console.log(result);
+
+    logger.info("Enums in database:");
+    logger.info("Result:", { result });
   } catch (error) {
-    console.error('Error checking enums:', error);
+    logger.error(
+      "Error checking enums:",
+      error instanceof Error ? error : new Error(String(error))
+    );
   }
 }
 

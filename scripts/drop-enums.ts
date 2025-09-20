@@ -1,33 +1,34 @@
 import { db } from '../src/db/index';
 import { sql } from 'drizzle-orm';
+import { logger } from '../src/lib/logger';
 
 async function dropAllEnums() {
   try {
     // Get all enum types
     const enumsResult = await db.execute(sql`
       SELECT t.typname as enum_name
-      FROM pg_type t 
+      FROM pg_type t
       WHERE t.typtype = 'e'
       ORDER BY t.typname;
     `);
-    
+
     const enums = enumsResult.map((row: any) => row.enum_name as string);
-    
-    console.log('Dropping enums:', enums);
-    
+
+    logger.info('Dropping enums:', { enums });
+
     // Drop each enum
     for (const enumName of enums) {
       try {
         await db.execute(sql`DROP TYPE IF EXISTS ${sql.identifier(enumName)} CASCADE;`);
-        console.log(`Dropped enum: ${enumName}`);
+        logger.info(`Dropped enum: ${enumName}`);
       } catch (error) {
-        console.error(`Error dropping enum ${enumName}:`, error);
+        logger.error(`Error dropping enum ${enumName}:`, error as Error);
       }
     }
-    
-    console.log('All enums dropped successfully');
+
+    logger.info('All enums dropped successfully');
   } catch (error) {
-    console.error('Error dropping enums:', error);
+    logger.error('Error dropping enums:', error as Error);
   }
 }
 

@@ -23,8 +23,24 @@ import {
 import { getCachedData, setCachedData } from "@/lib/cache";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
+import {
+  apiSuccess,
+  apiError,
+  apiValidationError,
+  apiAuthError,
+  apiAuthzError,
+  apiRateLimitError,
+} from "@/lib/api-response";
 
 // ===== TYPES =====
+
+type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 export interface ApiContext {
   user: AuthUser;
@@ -40,8 +56,8 @@ export interface ApiConfig<TInput = unknown> {
 
   // Request validation
   body?: z.ZodSchema<TInput>;
-  query?: z.ZodSchema<Record<string, unknown>>;
-  params?: z.ZodSchema<Record<string, unknown>>;
+  query?: z.ZodSchema<Record<string, string>>;
+  params?: z.ZodSchema<Record<string, string>>;
 
   // Caching configuration
   cache?: {
@@ -67,30 +83,7 @@ export type ApiHandler<TInput = unknown, TOutput = unknown> = (
   context: ApiContext
 ) => Promise<TOutput> | TOutput;
 
-// ===== MEDICAL ERROR RESPONSES =====
-
-interface MedicalError {
-  error: string;
-  code?: string;
-  details?: Record<string, unknown>;
-  timestamp: string;
-  userId?: string;
-}
-
-function createMedicalError(
-  message: string,
-  code?: string,
-  details?: Record<string, unknown>,
-  userId?: string
-): MedicalError {
-  return {
-    error: message,
-    code,
-    details,
-    timestamp: new Date().toISOString(),
-    userId,
-  };
-}
+// ===== MEDICAL ERROR CONSTANTS =====
 
 // Standard medical error messages in Indonesian
 export const MedicalErrors = {
@@ -187,10 +180,7 @@ async function handleAuthentication(
 
 // ===== RATE LIMIT HANDLER =====
 
-function handleRateLimit(
-  config: ApiConfig,
-  apiContext: ApiContext
-): void {
+function handleRateLimit(config: ApiConfig, apiContext: ApiContext): void {
   if (!config.rateLimit) return;
 
   const rateLimitKey =
@@ -391,94 +381,80 @@ function handleError(
       error.message.includes("database") ||
       error.message.includes("connection")
     ) {
-      return NextResponse.json(
-        createMedicalError(
-          MedicalErrors.DATABASE_ERROR,
-          "DATABASE_ERROR",
-          { originalError: error.message, errorId },
-          apiContext?.user?.id
-        ),
-        { status: 500 }
-      );
+      return apiError(MedicalErrors.DATABASE_ERROR, {
+        status: 500,
+        code: "DATABASE_ERROR",
+        details: { originalError: error.message, errorId },
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
 
     // Cache errors
-    if (
-      error.message.includes("cache") ||
-      error.message.includes("redis")
-    ) {
-      return NextResponse.json(
-        createMedicalError(
-          MedicalErrors.CACHE_ERROR,
-          "CACHE_ERROR",
-          { originalError: error.message, errorId },
-          apiContext?.user?.id
-        ),
-        { status: 500 }
-      );
+    if (error.message.includes("cache") || error.message.includes("redis")) {
+      return apiError(MedicalErrors.CACHE_ERROR, {
+        status: 500,
+        code: "CACHE_ERROR",
+        details: { originalError: error.message, errorId },
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
 
     // Auth errors
     if (error.message === MedicalErrors.UNAUTHORIZED) {
-      return NextResponse.json(
-        createMedicalError(MedicalErrors.UNAUTHORIZED, "AUTH_REQUIRED"),
-        { status: 401 }
-      );
+      return apiAuthError(MedicalErrors.UNAUTHORIZED, {
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
 
     if (
       error.message === MedicalErrors.ADMIN_REQUIRED ||
       error.message === MedicalErrors.SUPERADMIN_REQUIRED
     ) {
-      return NextResponse.json(
-        createMedicalError(error.message, "INSUFFICIENT_PERMISSIONS"),
-        { status: 403 }
-      );
+      return apiAuthzError(error.message, {
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
 
     // Rate limit
     if (error.message === MedicalErrors.RATE_LIMIT_EXCEEDED) {
-      return NextResponse.json(
-        createMedicalError(
-          MedicalErrors.RATE_LIMIT_EXCEEDED,
-          "RATE_LIMIT",
-          {
-            limit: 0, // Would need to pass from config, but for now
-            window: 0,
-          },
-          apiContext?.user?.id
-        ),
-        { status: 429 }
-      );
+      return apiRateLimitError({
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
 
     // Validation errors
     if (error.message === MedicalErrors.INVALID_REQUEST) {
-      return NextResponse.json(
-        createMedicalError(
-          MedicalErrors.INVALID_REQUEST,
-          "VALIDATION_ERROR",
-          { validationErrors: [] }, // Would need to pass actual errors
-          apiContext?.user?.id
-        ),
-        { status: 400 }
-      );
+      return apiValidationError([], {
+        message: MedicalErrors.INVALID_REQUEST,
+        requestId: errorId,
+        userId: apiContext?.user?.id,
+        duration,
+      });
     }
   }
 
   // Generic internal error
-  return NextResponse.json(
-    createMedicalError(
-      MedicalErrors.INTERNAL_ERROR,
-      "INTERNAL_ERROR",
-      {
-        errorId,
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      apiContext?.user?.id
-    ),
-    { status: 500 }
-  );
+  return apiError(MedicalErrors.INTERNAL_ERROR, {
+    status: 500,
+    code: "INTERNAL_ERROR",
+    details: {
+      errorId,
+      message: error instanceof Error ? error.message : "Unknown error",
+    },
+    requestId: errorId,
+    userId: apiContext?.user?.id,
+    duration,
+  });
 }
 
 // ===== UNIVERSAL API HANDLER =====
@@ -518,7 +494,16 @@ export function createApiHandler<TInput = unknown, TOutput = unknown>(
       // 4. Check Cache (GET requests only)
       const cachedResult = await handleCacheCheck(config, apiContext);
       if (cachedResult) {
-        return NextResponse.json(cachedResult);
+        return apiSuccess(cachedResult, {
+          message: "Request completed from cache",
+          requestId: crypto.randomUUID().slice(0, 8),
+          userId: user?.id,
+          operation: "api_cache_hit",
+          context: {
+            method: request.method,
+            path: new URL(request.url).pathname,
+          },
+        });
       }
 
       // 5. Request Validation
@@ -528,8 +513,10 @@ export function createApiHandler<TInput = unknown, TOutput = unknown>(
       // 6. Execute Handler
       const result = await handler(validatedData || ({} as TInput), {
         ...apiContext,
-        searchParams: (validatedQuery as Record<string, string>) || apiContext.searchParams,
-        params: (validatedParams as Record<string, string>) || apiContext.params,
+        searchParams:
+          (validatedQuery as Record<string, string>) || apiContext.searchParams,
+        params:
+          (validatedParams as Record<string, string>) || apiContext.params,
       });
 
       // 7. Cache Result (GET requests only)
@@ -537,23 +524,19 @@ export function createApiHandler<TInput = unknown, TOutput = unknown>(
 
       // 8. Log Performance
       const duration = Date.now() - startTime;
-      logger.info("API request completed", {
-        api: true,
-        performance: true,
-        operation: "api_request",
-        method: request.method,
-        path: url.pathname,
-        duration,
-        userId: user?.id || "anonymous",
-        status: config.successStatus || 200,
-      });
+      const requestId = crypto.randomUUID().slice(0, 8);
 
       // 9. Return Success Response
-      return NextResponse.json(result, {
+      return apiSuccess(result, {
         status: config.successStatus || 200,
-        headers: {
-          "X-Response-Time": `${duration}ms`,
-          "X-Request-Id": crypto.randomUUID().slice(0, 8),
+        message: "Request completed successfully",
+        requestId,
+        userId: user?.id,
+        operation: "api_request",
+        duration,
+        context: {
+          method: request.method,
+          path: url.pathname,
         },
       });
     } catch (error) {
@@ -650,11 +633,13 @@ export function successResponse<T>(data: T, message?: string, status = 200) {
 export function errorResponse(
   message: string,
   code?: string,
-  details?: Record<string, unknown>,
+  details?: Record<string, JsonValue>,
   status = 400
 ) {
-  return NextResponse.json(createMedicalError(message, code, details), {
+  return apiError(message, {
     status,
+    code,
+    details,
   });
 }
 

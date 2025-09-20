@@ -158,14 +158,16 @@ export class PatientService {
         message: l.message,
         sentAt: l.sentAt,
         status: l.status,
-
       })),
 
       complianceRate: rate,
     };
   }
 
-  async createPatient(body: CreatePatientDTO, currentUser: { id: string; role: string }) {
+  async createPatient(
+    body: CreatePatientDTO,
+    currentUser: { id: string; role: string }
+  ) {
     const name = (body?.name || "").trim();
     const phoneNumber = (body?.phoneNumber || "").trim();
     if (!name || !phoneNumber)
@@ -213,7 +215,12 @@ export class PatientService {
 
     const created = await this.repo.insertPatient(values);
 
-    let assignedVolunteer: { id: string; firstName: string | null; lastName: string | null; email: string | null } | null = null;
+    let assignedVolunteer: {
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string | null;
+    } | null = null;
     if (created.assignedVolunteerId) {
       const v = await this.repo.getUserById(created.assignedVolunteerId);
       if (v)
@@ -306,14 +313,6 @@ export class PatientService {
       `${currentUser.firstName || ""} ${currentUser.lastName || ""}`.trim() ||
       currentUser.email ||
       currentUser.id;
-    // Verification logs table was removed - skip logging
-    // await this.repo.insertVerificationLog({
-    //   patientId: id,
-    //   action: "reactivated",
-    //   patientResponse: `Patient reactivated by: ${processedByName}`,
-    //   verificationResult: "PENDING",
-    //   processedBy: currentUser.id,
-    // });
 
     await invalidateAfterPatientOperation(id, "reactivate");
 

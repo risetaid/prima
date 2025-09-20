@@ -1,4 +1,5 @@
 import { VolunteerNotificationService, EscalationData } from './volunteer-notification.service';
+import { logger } from '@/lib/logger';
 
 export interface MessageAnalysis {
   intent: string;
@@ -74,7 +75,7 @@ export class EscalationService {
     try {
       await this.notificationService.createNotification(data);
     } catch (error) {
-      console.error('Failed to create volunteer notification:', error);
+      logger.error('Failed to create volunteer notification:', error instanceof Error ? error : new Error(String(error)));
       // TODO: Add proper error handling/logging
     }
   }

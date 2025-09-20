@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
 
-
 import {
   getCachedData,
   setCachedData,
@@ -29,16 +28,6 @@ export const GET = withRateLimit(async function GET(
 
     const paramsResolved = await params;
     const id = paramsResolved.id;
-    // Validate patient ID
-    if (!id || typeof id !== "string") {
-      return createErrorResponse(
-        "Invalid patient ID",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
-
     // Validate patient ID
     if (!id || typeof id !== "string") {
       return createErrorResponse(

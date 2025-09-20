@@ -6,7 +6,7 @@ import {
   patients,
   users,
   VolunteerNotification,
-  NewVolunteerNotification
+  NewVolunteerNotification,
 } from "@/db/schema";
 
 type Patient = typeof patients.$inferSelect;
@@ -27,7 +27,7 @@ export interface EscalationData {
 }
 
 export interface NotificationChannel {
-  type: 'whatsapp' | 'email' | 'dashboard';
+  type: "whatsapp" | "email" | "dashboard";
   enabled: boolean;
   recipients?: string[];
 }
@@ -42,7 +42,9 @@ export class VolunteerNotificationService {
   /**
    * Create a new volunteer notification based on escalation rules
    */
-  async createNotification(data: EscalationData): Promise<VolunteerNotification> {
+  async createNotification(
+    data: EscalationData
+  ): Promise<VolunteerNotification> {
     const priority = this.determinePriority(data.reason, data.confidence);
     const patient = await db
       .select()
@@ -78,16 +80,19 @@ export class VolunteerNotificationService {
   /**
    * Determine notification priority based on escalation reason and confidence
    */
-  private determinePriority(reason: EscalationReason, confidence?: number): string {
+  private determinePriority(
+    reason: EscalationReason,
+    confidence?: number
+  ): string {
     switch (reason) {
-      case 'emergency_detection':
-        return 'emergency';
-      case 'low_confidence':
-        return confidence && confidence < 30 ? 'high' : 'medium';
-      case 'complex_inquiry':
-        return 'medium';
+      case "emergency_detection":
+        return "emergency";
+      case "low_confidence":
+        return confidence && confidence < 30 ? "high" : "medium";
+      case "complex_inquiry":
+        return "medium";
       default:
-        return 'low';
+        return "low";
     }
   }
 
@@ -101,8 +106,8 @@ export class VolunteerNotificationService {
     const channels = await this.getNotificationChannels();
 
     const promises = channels
-      .filter(channel => channel.enabled)
-      .map(channel => this.sendToChannel(channel, notification, patient));
+      .filter((channel) => channel.enabled)
+      .map((channel) => this.sendToChannel(channel, notification, patient));
 
     await Promise.allSettled(promises);
   }
@@ -115,16 +120,16 @@ export class VolunteerNotificationService {
     // For now, return default channels
     return [
       {
-        type: 'dashboard',
+        type: "dashboard",
         enabled: true,
       },
       {
-        type: 'whatsapp',
+        type: "whatsapp",
         enabled: true,
         recipients: await this.getVolunteerWhatsAppNumbers(),
       },
       {
-        type: 'email',
+        type: "email",
         enabled: false, // Email service not implemented yet
       },
     ];
@@ -139,13 +144,13 @@ export class VolunteerNotificationService {
     patient: Patient
   ): Promise<void> {
     switch (channel.type) {
-      case 'whatsapp':
+      case "whatsapp":
         await this.sendWhatsAppNotification(channel, notification, patient);
         break;
-      case 'email':
+      case "email":
         await this.sendEmailNotification(channel, notification, patient);
         break;
-      case 'dashboard':
+      case "dashboard":
         // Dashboard notifications are handled by the UI
         break;
     }
@@ -165,7 +170,7 @@ export class VolunteerNotificationService {
 
     const message = this.buildWhatsAppMessage(notification, patient);
 
-    const promises = channel.recipients.map(recipient =>
+    const promises = channel.recipients.map((recipient) =>
       this.whatsappService.send(recipient, message)
     );
 
@@ -181,13 +186,16 @@ export class VolunteerNotificationService {
     patient: Patient
   ): Promise<void> {
     // TODO: Implement email service
-    console.log('Email notification:', { channel, notification, patient });
+    logger.info("Email notification:", { channel, notification, patient });
   }
 
   /**
    * Build WhatsApp message for volunteer notification
    */
-  private buildWhatsAppMessage(notification: VolunteerNotification, patient: Patient): string {
+  private buildWhatsAppMessage(
+    notification: VolunteerNotification,
+    patient: Patient
+  ): string {
     const priorityEmoji = this.getPriorityEmoji(notification.priority);
     const reasonText = this.getReasonText(notification.escalationReason);
 
@@ -223,16 +231,16 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
    */
   private getPriorityEmoji(priority: NotificationPriority): string {
     switch (priority) {
-      case 'emergency':
-        return '🚨';
-      case 'high':
-        return '⚠️';
-      case 'medium':
-        return '📋';
-      case 'low':
-        return 'ℹ️';
+      case "emergency":
+        return "🚨";
+      case "high":
+        return "⚠️";
+      case "medium":
+        return "📋";
+      case "low":
+        return "ℹ️";
       default:
-        return '📝';
+        return "📝";
     }
   }
 
@@ -241,12 +249,12 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
    */
   private getReasonText(reason: EscalationReason): string {
     switch (reason) {
-      case 'emergency_detection':
-        return 'Deteksi Darurat';
-      case 'low_confidence':
-        return 'Respons Tidak Yakin';
-      case 'complex_inquiry':
-        return 'Pertanyaan Kompleks';
+      case "emergency_detection":
+        return "Deteksi Darurat";
+      case "low_confidence":
+        return "Respons Tidak Yakin";
+      case "complex_inquiry":
+        return "Pertanyaan Kompleks";
       default:
         return reason;
     }
@@ -258,7 +266,9 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
   private async getVolunteerWhatsAppNumbers(): Promise<string[]> {
     // Volunteer WhatsApp numbers would be retrieved from users table
     // Requires proper user management system with volunteer role assignment
-    logger.debug('Volunteer WhatsApp lookup not implemented - requires user management system')
+    logger.debug(
+      "Volunteer WhatsApp lookup not implemented - requires user management system"
+    );
     return [];
   }
 
@@ -276,7 +286,8 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
     if (status || priority) {
       const conditions = [];
       if (status) conditions.push(eq(volunteerNotifications.status, status));
-      if (priority) conditions.push(eq(volunteerNotifications.priority, priority));
+      if (priority)
+        conditions.push(eq(volunteerNotifications.priority, priority));
       whereClause = and(...conditions);
     }
 
@@ -299,17 +310,20 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
     priority?: NotificationPriority,
     limit: number = 50,
     offset: number = 0
-  ): Promise<Array<{
-    notification: VolunteerNotification;
-    patient: Patient | null;
-    assignedVolunteer: User | null;
-  }>> {
+  ): Promise<
+    Array<{
+      notification: VolunteerNotification;
+      patient: Patient | null;
+      assignedVolunteer: User | null;
+    }>
+  > {
     let whereClause = undefined;
 
     if (status || priority) {
       const conditions = [];
       if (status) conditions.push(eq(volunteerNotifications.status, status));
-      if (priority) conditions.push(eq(volunteerNotifications.priority, priority));
+      if (priority)
+        conditions.push(eq(volunteerNotifications.priority, priority));
       whereClause = and(...conditions);
     }
 
@@ -339,7 +353,7 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
       .update(volunteerNotifications)
       .set({
         assignedVolunteerId: volunteerId,
-        status: 'assigned',
+        status: "assigned",
         updatedAt: new Date(),
       })
       .where(eq(volunteerNotifications.id, notificationId))
@@ -362,7 +376,7 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
     const [notification] = await db
       .update(volunteerNotifications)
       .set({
-        status: 'responded',
+        status: "responded",
         respondedAt: new Date(),
         response,
         updatedAt: new Date(),
@@ -380,11 +394,13 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
   /**
    * Resolve notification
    */
-  async resolveNotification(notificationId: string): Promise<VolunteerNotification> {
+  async resolveNotification(
+    notificationId: string
+  ): Promise<VolunteerNotification> {
     const [notification] = await db
       .update(volunteerNotifications)
       .set({
-        status: 'resolved',
+        status: "resolved",
         updatedAt: new Date(),
       })
       .where(eq(volunteerNotifications.id, notificationId))
@@ -407,26 +423,30 @@ Silakan periksa dashboard untuk detail lengkap dan respons yang sesuai.
     high: number;
     avgResponseTime: number;
   }> {
-    const notifications = await db
-      .select()
-      .from(volunteerNotifications);
+    const notifications = await db.select().from(volunteerNotifications);
 
     const total = notifications.length;
-    const pending = notifications.filter(n => n.status === 'pending').length;
-    const emergency = notifications.filter(n => n.priority === 'emergency').length;
-    const high = notifications.filter(n => n.priority === 'high').length;
+    const pending = notifications.filter((n) => n.status === "pending").length;
+    const emergency = notifications.filter(
+      (n) => n.priority === "emergency"
+    ).length;
+    const high = notifications.filter((n) => n.priority === "high").length;
 
     // Calculate average response time for resolved notifications
     const resolvedNotifications = notifications.filter(
-      n => n.status === 'responded' && n.respondedAt
+      (n) => n.status === "responded" && n.respondedAt
     );
 
-    const avgResponseTime = resolvedNotifications.length > 0
-      ? resolvedNotifications.reduce((sum, n) => {
-          const responseTime = n.respondedAt!.getTime() - n.createdAt.getTime();
-          return sum + responseTime;
-        }, 0) / resolvedNotifications.length / (1000 * 60) // Convert to minutes
-      : 0;
+    const avgResponseTime =
+      resolvedNotifications.length > 0
+        ? resolvedNotifications.reduce((sum, n) => {
+            const responseTime =
+              n.respondedAt!.getTime() - n.createdAt.getTime();
+            return sum + responseTime;
+          }, 0) /
+          resolvedNotifications.length /
+          (1000 * 60) // Convert to minutes
+        : 0;
 
     return {
       total,

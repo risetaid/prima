@@ -1,9 +1,10 @@
-import { db, patients, reminders, manualConfirmations } from '@/db'
-import { eq, and, isNull, not, desc } from 'drizzle-orm'
+import { db, patients, reminders, manualConfirmations } from "@/db";
+import { eq, and, isNull, not, desc } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 async function showReminderHistory() {
-  console.log('📋 Reminder History Analysis')
-  console.log('===========================')
+  logger.info("📋 Reminder History Analysis");
+  logger.info("===========================");
 
   try {
     // Get a patient to analyze (you can modify this to get a specific patient)
@@ -11,82 +12,83 @@ async function showReminderHistory() {
       .select()
       .from(patients)
       .where(and(isNull(patients.deletedAt), eq(patients.isActive, true)))
-      .limit(1)
+      .limit(1);
 
     if (testPatient.length === 0) {
-      console.log('❌ No active patients found')
-      return
+      logger.info("❌ No active patients found");
+      return;
     }
 
-    const patient = testPatient[0]
-    console.log(`👤 Patient: ${patient.name} (${patient.id})`)
-    console.log(`📅 Created: ${patient.createdAt}`)
-    console.log(`📊 Status: ${patient.isActive ? 'Active' : 'Inactive'}`)
-    console.log()
+    const patient = testPatient[0];
+    logger.info(`👤 Patient: ${patient.name} (${patient.id})`);
+    logger.info(`📅 Created: ${patient.createdAt}`);
+    logger.info(`📊 Status: ${patient.isActive ? "Active" : "Inactive"}`);
+    logger.info("");
 
     // Get ALL reminders (including inactive ones)
     const allReminders = await db
       .select()
       .from(reminders)
       .where(eq(reminders.patientId, patient.id))
-      .orderBy(desc(reminders.createdAt))
+      .orderBy(desc(reminders.createdAt));
 
-    console.log(`📋 ALL REMINDERS (${allReminders.length}):`)
-    console.log('=====================================')
+    logger.info(`📋 ALL REMINDERS (${allReminders.length}):`);
+    logger.info("=====================================");
 
     allReminders.forEach((reminder, index) => {
-      console.log(`${index + 1}. ${reminder.message}`)
-      console.log(`   ⏰ Time: ${reminder.scheduledTime}`)
-      console.log(`   📅 Start: ${reminder.startDate.toISOString().split('T')[0]}`)
-      console.log(`   ✅ Active: ${reminder.isActive ? 'Yes' : 'No'}`)
-      console.log(`   📊 Status: ${reminder.status}`)
-      console.log(`   🕒 Created: ${reminder.createdAt}`)
-      console.log()
-    })
+      logger.info(`${index + 1}. ${reminder.message}`);
+      logger.info(`   ⏰ Time: ${reminder.scheduledTime}`);
+      logger.info(
+        `   📅 Start: ${reminder.startDate.toISOString().split("T")[0]}`
+      );
+      logger.info(`   ✅ Active: ${reminder.isActive ? "Yes" : "No"}`);
+      logger.info(`   📊 Status: ${reminder.status}`);
+      logger.info(`   🕒 Created: ${reminder.createdAt}`);
+      logger.info("");
+    });
 
     // Get only ACTIVE reminders
-    const activeReminders = allReminders.filter(r => r.isActive)
-    console.log(`📋 ACTIVE REMINDERS (${activeReminders.length}):`)
-    console.log('===============================================')
+    const activeReminders = allReminders.filter((r) => r.isActive);
+    logger.info(`📋 ACTIVE REMINDERS (${activeReminders.length}):`);
+    logger.info("===============================================");
 
     if (activeReminders.length === 0) {
-      console.log('❌ No active reminders found!')
-      console.log('💡 This explains why Terjadwal/Perlu Diperbarui/Semua = 0')
+      logger.info("❌ No active reminders found!");
+      logger.info("💡 This explains why Terjadwal/Perlu Diperbarui/Semua = 0");
     } else {
       activeReminders.forEach((reminder, index) => {
-        console.log(`${index + 1}. ${reminder.message} - ${reminder.scheduledTime}`)
-      })
+        logger.info(
+          `${index + 1}. ${reminder.message} - ${reminder.scheduledTime}`
+        );
+      });
     }
-    console.log()
+    logger.info("");
 
     // Get sent reminders history
     const sentReminders = await db
       .select()
       .from(reminders)
       .where(
-        and(
-          eq(reminders.patientId, patient.id),
-          not(isNull(reminders.sentAt))
-        )
+        and(eq(reminders.patientId, patient.id), not(isNull(reminders.sentAt)))
       )
-      .orderBy(desc(reminders.sentAt))
+      .orderBy(desc(reminders.sentAt));
 
-    console.log(`📨 SENT REMINDERS HISTORY (${sentReminders.length}):`)
-    console.log('===============================================')
+    logger.info(`📨 SENT REMINDERS HISTORY (${sentReminders.length}):`);
+    logger.info("===============================================");
 
     if (sentReminders.length === 0) {
-      console.log('❌ No sent reminders found')
+      logger.info("❌ No sent reminders found");
     } else {
       sentReminders.slice(0, 10).forEach((reminder, index) => {
-        console.log(`${index + 1}. ${reminder.message} (${reminder.status})`)
-        console.log(`   📅 Sent: ${reminder.sentAt}`)
-        console.log(`   📋 Active: ${reminder.isActive ? 'Yes' : 'No'}`)
-        console.log(`   💬 Message: ${reminder.message.substring(0, 50)}...`)
-        console.log()
-      })
+        logger.info(`${index + 1}. ${reminder.message} (${reminder.status})`);
+        logger.info(`   📅 Sent: ${reminder.sentAt}`);
+        logger.info(`   📋 Active: ${reminder.isActive ? "Yes" : "No"}`);
+        logger.info(`   💬 Message: ${reminder.message.substring(0, 50)}...`);
+        logger.info("");
+      });
 
       if (sentReminders.length > 10) {
-        console.log(`... and ${sentReminders.length - 10} more reminders`)
+        logger.info(`... and ${sentReminders.length - 10} more reminders`);
       }
     }
 
@@ -95,52 +97,59 @@ async function showReminderHistory() {
       .select()
       .from(manualConfirmations)
       .where(eq(manualConfirmations.patientId, patient.id))
-      .orderBy(desc(manualConfirmations.confirmedAt))
+      .orderBy(desc(manualConfirmations.confirmedAt));
 
-    console.log(`✅ CONFIRMATIONS HISTORY (${allConfirmations.length}):`)
-    console.log('===============================================')
+    logger.info(`✅ CONFIRMATIONS HISTORY (${allConfirmations.length}):`);
+    logger.info("===============================================");
 
     if (allConfirmations.length === 0) {
-      console.log('❌ No confirmations found')
+      logger.info("❌ No confirmations found");
     } else {
       allConfirmations.slice(0, 10).forEach((conf, index) => {
-        const reminder = allReminders.find(r => r.id === conf.reminderId)
-        const reminderMessage = reminder ? reminder.message : 'Unknown'
+        const reminder = allReminders.find((r) => r.id === conf.reminderId);
+        const reminderMessage = reminder ? reminder.message : "Unknown";
 
-        console.log(`${index + 1}. ${reminderMessage}`)
-        console.log(`   📅 Confirmed: ${conf.confirmedAt}`)
-        console.log(`   📋 Reminder Active: ${reminder?.isActive ? 'Yes' : 'No'}`)
-        console.log()
-      })
+        logger.info(`${index + 1}. ${reminderMessage}`);
+        logger.info(`   📅 Confirmed: ${conf.confirmedAt}`);
+        logger.info(
+          `   📋 Reminder Active: ${reminder?.isActive ? "Yes" : "No"}`
+        );
+        logger.info("");
+      });
 
       if (allConfirmations.length > 10) {
-        console.log(`... and ${allConfirmations.length - 10} more confirmations`)
+        logger.info(
+          `... and ${allConfirmations.length - 10} more confirmations`
+        );
       }
     }
 
     // Analysis
-    console.log('🔍 ANALYSIS:')
-    console.log('============')
-    console.log(`Total Reminders: ${allReminders.length}`)
-    console.log(`Active Reminders: ${activeReminders.length}`)
-    console.log(`Inactive Reminders: ${allReminders.length - activeReminders.length}`)
-    console.log(`Sent Reminders: ${sentReminders.length}`)
-    console.log(`Total Confirmations: ${allConfirmations.length}`)
+    logger.info("🔍 ANALYSIS:");
+    logger.info("============");
+    logger.info(`Total Reminders: ${allReminders.length}`);
+    logger.info(`Active Reminders: ${activeReminders.length}`);
+    logger.info(
+      `Inactive Reminders: ${allReminders.length - activeReminders.length}`
+    );
+    logger.info(`Sent Reminders: ${sentReminders.length}`);
+    logger.info(`Total Confirmations: ${allConfirmations.length}`);
 
     // Note: Patient reactivation tracking is handled in the database
     // Old reminders may be deactivated and not counted in stats
     // But compliance calculation includes historical data
 
-    console.log()
-    console.log('🎯 RECOMMENDATION:')
-    console.log('==================')
+    logger.info("");
+    logger.info("🎯 RECOMMENDATION:");
+    logger.info("==================");
     if (activeReminders.length === 0 && allReminders.length > 0) {
-      console.log('✅ Reactivate old reminders OR create new ones')
-      console.log('✅ This will fix the "Terjadwal/Perlu Diperbarui/Semua = 0" issue')
+      logger.info("✅ Reactivate old reminders OR create new ones");
+      logger.info(
+        '✅ This will fix the "Terjadwal/Perlu Diperbarui/Semua = 0" issue'
+      );
     }
-
   } catch (error) {
-    console.error('❌ Error:', error)
+    logger.error("❌ Error:", error as Error);
   }
 }
 
@@ -148,6 +157,6 @@ async function showReminderHistory() {
 showReminderHistory()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error('Script failed:', error)
-    process.exit(1)
-  })
+    logger.error("Script failed:", error);
+    process.exit(1);
+  });

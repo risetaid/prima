@@ -17,11 +17,12 @@ import postgres from "postgres";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
+import { logger } from "@/lib/logger";
 
 // Database connection
 const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
 if (!connectionString) {
-  console.error("❌ No DATABASE_URL or DIRECT_URL found in environment");
+  logger.error("❌ No DATABASE_URL or DIRECT_URL found in environment");
   process.exit(1);
 }
 
@@ -29,7 +30,7 @@ const client = postgres(connectionString, { prepare: false });
 const db = drizzle(client);
 
 async function dropAllTables() {
-  console.log("🗑️  Dropping all tables and types...");
+  logger.info("🗑️  Dropping all tables and types...");
 
   try {
     // Drop tables in reverse dependency order
@@ -79,20 +80,20 @@ async function dropAllTables() {
       try {
         await client.unsafe(query);
       } catch (error) {
-        console.warn(`⚠️  Warning during drop: ${error}`);
+        logger.warn(`⚠️  Warning during drop: ${error}`);
         // Continue with other drops
       }
     }
 
-    console.log("✅ All tables and types dropped successfully");
+    logger.info("✅ All tables and types dropped successfully");
   } catch (error) {
-    console.error("❌ Error dropping tables:", error);
+    logger.error("❌ Error dropping tables:", error as Error);
     throw error;
   }
 }
 
 async function recreateSchema() {
-  console.log("🔨 Recreating database schema from migrations...");
+  logger.info("🔨 Recreating database schema from migrations...");
 
   try {
     // Get migration files
@@ -105,20 +106,20 @@ async function recreateSchema() {
       throw new Error("No migration files found");
     }
 
-    console.log(`📁 Found ${migrationFiles.length} migration files`);
+    logger.info(`📁 Found ${migrationFiles.length} migration files`);
 
     // Run each migration file as a whole (to handle dollar-quoted strings properly)
     for (const migrationFile of migrationFiles) {
       const migrationPath = join(migrationsPath, migrationFile);
       const migrationSQL = readFileSync(migrationPath, "utf-8");
 
-      console.log(`🚀 Running migration: ${migrationFile}`);
+      logger.info(`🚀 Running migration: ${migrationFile}`);
 
       try {
         // Execute the entire migration file as one statement
         // This handles dollar-quoted strings properly
         await client.unsafe(migrationSQL);
-        console.log(`✅ Migration ${migrationFile} completed successfully`);
+        logger.info(`✅ Migration ${migrationFile} completed successfully`);
       } catch (error) {
         // Check if it's an expected error we can skip
         if (error instanceof Error) {
@@ -130,7 +131,7 @@ async function recreateSchema() {
             errorMsg.includes("duplicate") ||
             errorMsg.includes("does not exist, skipping")
           ) {
-            console.log(
+            logger.info(
               `⚠️  Skipping expected error in ${migrationFile}: ${errorMsg}`
             );
             continue;
@@ -138,7 +139,7 @@ async function recreateSchema() {
 
           // Skip constraint errors for non-existent constraints
           if (errorMsg.includes("does not exist")) {
-            console.log(
+            logger.info(
               `⚠️  Skipping non-existent constraint in ${migrationFile}`
             );
             continue;
@@ -146,23 +147,23 @@ async function recreateSchema() {
         }
 
         // If it's not an expected error, re-throw it
-        console.error(`❌ Error in migration ${migrationFile}:`, error);
+        logger.error(`❌ Error in migration ${migrationFile}:`, error as Error);
         throw error;
       }
     }
 
-    console.log("✅ Schema recreated successfully");
+    logger.info("✅ Schema recreated successfully");
   } catch (error) {
-    console.error("❌ Error recreating schema:", error);
+    logger.error("❌ Error recreating schema:", error as Error);
     throw error;
   }
 }
 
 async function nukeAndRecreateDatabase() {
-  console.log("🚨 STARTING COMPLETE DATABASE DROP & RECREATE 🚨");
-  console.log("💀 This will DELETE ALL TABLES AND DATA permanently!");
-  console.log("🔄 Then recreate the entire schema with new role names");
-  console.log("⏳ Starting process...\n");
+  logger.info("🚨 STARTING COMPLETE DATABASE DROP & RECREATE 🚨");
+  logger.info("💀 This will DELETE ALL TABLES AND DATA permanently!");
+  logger.info("🔄 Then recreate the entire schema with new role names");
+  logger.info("⏳ Starting process...\n");
 
   try {
     // Step 1: Drop everything
@@ -171,13 +172,13 @@ async function nukeAndRecreateDatabase() {
     // Step 2: Recreate schema
     await recreateSchema();
 
-    console.log("\n🎉 DATABASE RECREATION COMPLETE!");
-    console.log("✅ All tables dropped and recreated with new schema");
-    console.log("📝 New role enum: DEVELOPER, ADMIN, RELAWAN");
-    console.log("💡 You can now run seed scripts to populate data");
+    logger.info("\n🎉 DATABASE RECREATION COMPLETE!");
+    logger.info("✅ All tables dropped and recreated with new schema");
+    logger.info("📝 New role enum: DEVELOPER, ADMIN, RELAWAN");
+    logger.info("💡 You can now run seed scripts to populate data");
   } catch (error) {
-    console.error("❌ Error during database recreation:", error);
-    console.error("💡 You may need to manually recreate the database");
+    logger.error("❌ Error during database recreation:", error as Error);
+    logger.error("💡 You may need to manually recreate the database");
     process.exit(1);
   } finally {
     await client.end();
@@ -185,25 +186,25 @@ async function nukeAndRecreateDatabase() {
 }
 
 // Enhanced confirmation prompt
-console.log("🚨 EXTREME DANGER: This will DROP ALL TABLES AND DATA!");
-console.log("💀 This action CANNOT be undone!");
-console.log("🔄 Database will be recreated with new role names");
-console.log("");
-console.log("New role enum will be: DEVELOPER, ADMIN, RELAWAN");
-console.log("");
-console.log('Type "NUKE_AND_RECREATE" to confirm:');
+logger.info("🚨 EXTREME DANGER: This will DROP ALL TABLES AND DATA!");
+logger.info("💀 This action CANNOT be undone!");
+logger.info("🔄 Database will be recreated with new role names");
+logger.info("");
+logger.info("New role enum will be: DEVELOPER, ADMIN, RELAWAN");
+logger.info("");
+logger.info('Type "NUKE_AND_RECREATE" to confirm:');
 
 process.stdin.once("data", async (data) => {
   const input = data.toString().trim();
 
   if (input === "NUKE_AND_RECREATE") {
-    console.log(
+    logger.info(
       "✅ Confirmation received. Proceeding with database drop & recreate...\n"
     );
     await nukeAndRecreateDatabase();
     process.exit(0);
   } else {
-    console.log("❌ Operation cancelled. No changes were made.");
+    logger.info("❌ Operation cancelled. No changes were made.");
     process.exit(0);
   }
 });
