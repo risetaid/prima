@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 import { isDuplicateEvent, hashFallbackId } from "@/lib/idempotency";
-import {
-  db,
-  patients,
-  reminders,
-} from "@/db";
+import { db, patients, reminders } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { Patient, Reminder } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
@@ -110,14 +106,33 @@ function detectIntentEnhanced(
 
   // Check for general inquiry patterns that should NOT be classified as verification/medication
   const generalInquiryPatterns = [
-    'halo', 'hai', 'hello', 'hi', 'siapa', 'apa', 'bagaimana', 'gimana',
-    'kenapa', 'kapan', 'dimana', 'berapa', 'info', 'informasi', 'kabar',
-    'bantuan', 'help', 'tolong', 'tanya', 'pertanyaan', 'kamu', 'nama'
+    "halo",
+    "hai",
+    "hello",
+    "hi",
+    "siapa",
+    "apa",
+    "bagaimana",
+    "gimana",
+    "kenapa",
+    "kapan",
+    "dimana",
+    "berapa",
+    "info",
+    "informasi",
+    "kabar",
+    "bantuan",
+    "help",
+    "tolong",
+    "tanya",
+    "pertanyaan",
+    "kamu",
+    "nama",
   ];
 
   // If message contains general inquiry patterns and is in verification/reminder context,
   // reduce confidence significantly to avoid false classification
-  const hasGeneralInquiry = generalInquiryPatterns.some(pattern =>
+  const hasGeneralInquiry = generalInquiryPatterns.some((pattern) =>
     msg.includes(pattern)
   );
 
@@ -224,13 +239,18 @@ function detectIntentEnhanced(
       confidence *= 1.2;
     } else if (
       context === "reminder" &&
-      ["confirmation_taken", "confirmation_pending", "need_help"].includes(intent)
+      ["confirmation_taken", "confirmation_pending", "need_help"].includes(
+        intent
+      )
     ) {
       confidence *= 1.2;
     }
 
     // General inquiry penalty - significantly reduce confidence for general chat
-    if (hasGeneralInquiry && (context === "verification" || context === "reminder")) {
+    if (
+      hasGeneralInquiry &&
+      (context === "verification" || context === "reminder")
+    ) {
       confidence *= 0.1; // Massive penalty to prevent misclassification
     }
 
@@ -588,10 +608,7 @@ async function findPendingReminder(patientId: string) {
     .select()
     .from(reminders)
     .where(
-      and(
-        eq(reminders.patientId, patientId),
-        eq(reminders.status, "SENT")
-      )
+      and(eq(reminders.patientId, patientId), eq(reminders.status, "SENT"))
     )
     .orderBy(desc(reminders.sentAt))
     .limit(1);
@@ -613,10 +630,7 @@ async function getPatientReminderInfo(
       })
       .from(reminders)
       .where(
-        and(
-          eq(reminders.patientId, patientId),
-          eq(reminders.isActive, true)
-        )
+        and(eq(reminders.patientId, patientId), eq(reminders.isActive, true))
       )
       .orderBy(desc(reminders.createdAt))
       .limit(5);
@@ -651,7 +665,8 @@ function buildPersonalizedMessage(
     return template.replace(/obat/gi, "pengingat");
   }
 
-  const recentReminder = (reminderInfo.recentReminder as Record<string, unknown>) || {};
+  const recentReminder =
+    (reminderInfo.recentReminder as Record<string, unknown>) || {};
   const reminderType = recentReminder.reminderType || "GENERAL";
 
   let personalization = "pengingat";
@@ -660,7 +675,10 @@ function buildPersonalizedMessage(
 
   return template
     .replace(/obat/gi, personalization)
-    .replace(/\{name\}/gi, String((recentReminder as Record<string, unknown>).title || "pengingat"))
+    .replace(
+      /\{name\}/gi,
+      String((recentReminder as Record<string, unknown>).title || "pengingat")
+    )
     .replace(/\{type\}/gi, personalization);
 }
 
@@ -744,19 +762,17 @@ async function handleReminderConfirmed(
     .where(eq(reminders.id, reminder.id));
 
   // Get reminder type to customize the confirmation message
-  const reminderType = reminder.reminderType || reminderInfo?.reminderType || "GENERAL";
-  const baseMessage = `Terima kasih ${
-    patient.name
-  }! ✅\n\n${
+  const reminderType =
+    reminder.reminderType || reminderInfo?.reminderType || "GENERAL";
+  const baseMessage = `Terima kasih ${patient.name}! ✅\n\n${
     reminderType === "MEDICATION"
       ? "Obat sudah dikonfirmasi diminum"
       : reminderType === "APPOINTMENT"
-        ? "Janji temu sudah dikonfirmasi hadir"
-        : "Pengingat sudah dikonfirmasi selesai"
-  } pada ${new Date().toLocaleTimeString(
-    "id-ID",
-    { timeZone: "Asia/Jakarta" }
-  )}\n\n💙 Tim PRIMA`;
+      ? "Janji temu sudah dikonfirmasi hadir"
+      : "Pengingat sudah dikonfirmasi selesai"
+  } pada ${new Date().toLocaleTimeString("id-ID", {
+    timeZone: "Asia/Jakarta",
+  })}\n\n💙 Tim PRIMA`;
 
   const personalizedMessage = buildPersonalizedMessage(
     reminderInfo,
@@ -1041,61 +1057,75 @@ async function processVerificationResponse(
 
   try {
     // Use distributed locking for verification processing
-    const lockKey = `verification_processing:${patient.id}`
-    const lockResult = await distributedLockService.withLock(lockKey, async () => {
-      // Double-check patient verification status to prevent race conditions
-      const [currentPatient] = await db
-        .select({ verificationStatus: patients.verificationStatus })
-        .from(patients)
-        .where(eq(patients.id, patient.id))
-        .limit(1)
+    const lockKey = `verification_processing:${patient.id}`;
+    const lockResult = await distributedLockService.withLock(
+      lockKey,
+      async () => {
+        // Double-check patient verification status to prevent race conditions
+        const [currentPatient] = await db
+          .select({ verificationStatus: patients.verificationStatus })
+          .from(patients)
+          .where(eq(patients.id, patient.id))
+          .limit(1);
 
-      if (currentPatient && currentPatient.verificationStatus !== "PENDING") {
-        logger.info("Patient verification already processed", {
-          patientId: patient.id,
-          currentStatus: currentPatient.verificationStatus
-        })
-        return { alreadyProcessed: true }
+        if (currentPatient && currentPatient.verificationStatus !== "PENDING") {
+          logger.info("Patient verification already processed", {
+            patientId: patient.id,
+            currentStatus: currentPatient.verificationStatus,
+          });
+          return { alreadyProcessed: true };
+        }
+
+        return await handleVerificationResponse(message || "", patient);
+      },
+      {
+        ttl: 30000, // 30 second lock
+        maxRetries: 2,
       }
-
-      return await handleVerificationResponse(message || "", patient)
-    }, {
-      ttl: 30000, // 30 second lock
-      maxRetries: 2
-    })
+    );
 
     if (!lockResult) {
       logger.warn("Failed to acquire verification processing lock", {
-        patientId: patient.id
-      })
+        patientId: patient.id,
+      });
       return NextResponse.json(
         { error: "Could not acquire processing lock - please try again" },
         { status: 409 }
-      )
+      );
     }
 
-    if ('alreadyProcessed' in lockResult && lockResult.alreadyProcessed) {
+    if ("alreadyProcessed" in lockResult && lockResult.alreadyProcessed) {
       return NextResponse.json({
         ok: true,
         processed: false,
         action: "already_processed",
         source: "text_verification",
-      })
+      });
     }
 
-    const verificationResult = 'processed' in lockResult ? lockResult : lockResult
+    const verificationResult =
+      "processed" in lockResult ? lockResult : lockResult;
 
-    if ('processed' in verificationResult && verificationResult.processed) {
+    if ("processed" in verificationResult && verificationResult.processed) {
       logger.info("Verification response processed successfully", {
         patientId: patient.id,
-        action: 'action' in verificationResult ? verificationResult.action : undefined,
-        message: 'message' in verificationResult ? verificationResult.message : undefined,
+        action:
+          "action" in verificationResult
+            ? verificationResult.action
+            : undefined,
+        message:
+          "message" in verificationResult
+            ? verificationResult.message
+            : undefined,
       });
 
       return NextResponse.json({
         ok: true,
         processed: true,
-        action: 'action' in verificationResult ? verificationResult.action : undefined,
+        action:
+          "action" in verificationResult
+            ? verificationResult.action
+            : undefined,
         source: "text_verification",
       });
     }
@@ -1125,10 +1155,7 @@ async function processReminderResponse(
   });
 
   try {
-    const reminderResult = await handleReminderResponse(
-      message || "",
-      patient
-    );
+    const reminderResult = await handleReminderResponse(message || "", patient);
 
     if (reminderResult.processed) {
       logger.info("Reminder response processed successfully", {
@@ -1157,17 +1184,20 @@ async function processReminderResponse(
   return null;
 }
 
-
 async function handleUnrecognizedMessage(
   message: string | undefined,
   patient: Patient
 ) {
-  logger.info("Message not processed by specific handlers", {
+  logger.info("Sending unrecognized message response", {
     patientId: patient.id,
     verificationStatus: patient.verificationStatus,
-    messageLength: message?.length || 0,
-    message:
-      message?.substring(0, 50) + (message && message.length > 50 ? "..." : ""),
+    messageType:
+      patient.verificationStatus === "PENDING"
+        ? "verification_clarification"
+        : "generic_thanks",
+    messagePreview: message
+      ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
+      : "no message",
   });
 
   // Get patient medication details for personalization
@@ -1210,33 +1240,66 @@ async function handleUnrecognizedMessage(
  */
 function isActualVerificationResponse(message: string | undefined): boolean {
   if (!message) return false;
-  
+
   const normalizedMessage = message.toLowerCase().trim();
   const words = normalizedMessage.split(/\s+/);
-  
+
   // Must be short response (max 3 words) to be verification
   if (words.length > 3) return false;
-  
+
   // Explicit verification keywords
   const verificationKeywords = [
-    'ya', 'iya', 'yes', 'y', 'ok', 'oke', 'setuju', 'terima', 'mau',
-    'tidak', 'no', 'n', 'ga', 'gak', 'engga', 'enggak', 'tolak', 'nolak'
+    "ya",
+    "iya",
+    "yes",
+    "y",
+    "ok",
+    "oke",
+    "setuju",
+    "terima",
+    "mau",
+    "tidak",
+    "no",
+    "n",
+    "ga",
+    "gak",
+    "engga",
+    "enggak",
+    "tolak",
+    "nolak",
   ];
-  
+
   // General inquiry keywords that should NOT be treated as verification
   const generalKeywords = [
-    'halo', 'hai', 'hello', 'siapa', 'apa', 'bagaimana', 'gimana', 
-    'kenapa', 'kapan', 'dimana', 'berapa', 'info', 'informasi',
-    'bantuan', 'help', 'tolong', 'tanya', 'kabar'
+    "halo",
+    "hai",
+    "hello",
+    "siapa",
+    "apa",
+    "bagaimana",
+    "gimana",
+    "kenapa",
+    "kapan",
+    "dimana",
+    "berapa",
+    "info",
+    "informasi",
+    "bantuan",
+    "help",
+    "tolong",
+    "tanya",
+    "kabar",
   ];
-  
+
   // If contains general inquiry keywords, not verification
-  if (generalKeywords.some(keyword => normalizedMessage.includes(keyword))) {
+  if (generalKeywords.some((keyword) => normalizedMessage.includes(keyword))) {
     return false;
   }
-  
+
   // Must contain verification keywords to be considered verification
-  return verificationKeywords.some(keyword => normalizedMessage.includes(keyword));
+  return verificationKeywords.some((keyword) =>
+    normalizedMessage.includes(keyword)
+  );
 }
 
 /**
@@ -1249,7 +1312,10 @@ async function processMessageWithUnifiedProcessor(
   patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
   // Smart verification detection: only skip unified processor for actual verification responses
-  if (patient.verificationStatus === "PENDING" && isActualVerificationResponse(message)) {
+  if (
+    patient.verificationStatus === "PENDING" &&
+    isActualVerificationResponse(message)
+  ) {
     logger.info("Skipping unified processor for actual verification response", {
       patientId: patient.id,
       verificationStatus: patient.verificationStatus,
@@ -1290,7 +1356,10 @@ async function processMessageWithUnifiedProcessor(
         llmContext
       );
 
-      if (simpleResponse.isMedicationResponse && simpleResponse.responseType !== "unknown") {
+      if (
+        simpleResponse.isMedicationResponse &&
+        simpleResponse.responseType !== "unknown"
+      ) {
         // Handle simple medication response with automatic status update
         const updateResult = await llmService.updateReminderStatusFromResponse(
           patient.id,
@@ -1308,31 +1377,48 @@ async function processMessageWithUnifiedProcessor(
               reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
                 ? "Obat sudah dikonfirmasi diminum"
                 : reminderType === "APPOINTMENT"
-                  ? "Janji temu sudah dikonfirmasi"
-                  : "Pengingat sudah dikonfirmasi selesai";
+                ? "Janji temu sudah dikonfirmasi"
+                : "Pengingat sudah dikonfirmasi selesai";
 
-            responseMessage = `Terima kasih ${patient.name}! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta" })}\n\n💙 Tim PRIMA`;
+            responseMessage = `Terima kasih ${
+              patient.name
+            }! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString(
+              "id-ID",
+              { timeZone: "Asia/Jakarta" }
+            )}\n\n💙 Tim PRIMA`;
           } else {
             responseMessage = `Baik ${patient.name}, jangan lupa ${
-              updateResult.reminderType === "MEDICATION" || updateResult.reminderType === "APPOINTMENT"
+              updateResult.reminderType === "MEDICATION" ||
+              updateResult.reminderType === "APPOINTMENT"
                 ? "minum obatnya"
                 : "melakukan pengingatnya"
-            } ya! ${updateResult.reminderType === "MEDICATION" || updateResult.reminderType === "APPOINTMENT" ? "💊" : "📝"}\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+            } ya! ${
+              updateResult.reminderType === "MEDICATION" ||
+              updateResult.reminderType === "APPOINTMENT"
+                ? "💊"
+                : "📝"
+            }\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
           }
 
           await sendAck(patient.phoneNumber || "", responseMessage);
 
-          logger.info("Simple medication response processed via unified processor", {
-            patientId: patient.id,
-            responseType: simpleResponse.responseType,
-            updatedReminderId: updateResult.updatedReminderId,
-            confidence: simpleResponse.confidence,
-            operation: "simple_medication_response",
-          });
+          logger.info(
+            "Simple medication response processed via unified processor",
+            {
+              patientId: patient.id,
+              responseType: simpleResponse.responseType,
+              updatedReminderId: updateResult.updatedReminderId,
+              confidence: simpleResponse.confidence,
+              operation: "simple_medication_response",
+            }
+          );
 
           return {
             processed: true,
-            action: simpleResponse.responseType === "taken" ? "medication_taken" : "medication_not_taken",
+            action:
+              simpleResponse.responseType === "taken"
+                ? "medication_taken"
+                : "medication_not_taken",
             message: `Simple medication response processed: ${simpleResponse.responseType}`,
           };
         } else {
@@ -1394,10 +1480,13 @@ async function processMessageWithUnifiedProcessor(
     });
 
     // Log the failure but don't fail the webhook - continue to legacy processing
-    logger.warn("Continuing with legacy processing after unified processor failure", {
-      patientId: patient.id,
-      operation: "fallback_to_legacy",
-    });
+    logger.warn(
+      "Continuing with legacy processing after unified processor failure",
+      {
+        patientId: patient.id,
+        operation: "fallback_to_legacy",
+      }
+    );
 
     // Fall back to legacy processing
     return {
@@ -1486,11 +1575,7 @@ async function executeResponseActions(
  */
 async function updatePatientStatus(
   patientId: string,
-  status:
-    | "PENDING"
-    | "VERIFIED"
-    | "DECLINED"
-    | "EXPIRED"
+  status: "PENDING" | "VERIFIED" | "DECLINED" | "EXPIRED"
 ): Promise<void> {
   const { db, patients } = await import("@/db");
   const { eq } = await import("drizzle-orm");
@@ -1518,10 +1603,7 @@ async function logConfirmationResponse(
     .select()
     .from(reminders)
     .where(
-      and(
-        eq(reminders.patientId, patientId),
-        eq(reminders.status, "SENT")
-      )
+      and(eq(reminders.patientId, patientId), eq(reminders.status, "SENT"))
     )
     .orderBy(desc(reminders.sentAt))
     .limit(1);
@@ -1610,7 +1692,9 @@ async function processFollowupResponse(
   patient: Patient
 ): Promise<NextResponse | null> {
   try {
-    const { FollowupService } = await import("@/services/reminder/followup.service");
+    const { FollowupService } = await import(
+      "@/services/reminder/followup.service"
+    );
     const followupService = new FollowupService();
 
     const result = await followupService.processFollowupResponse(
@@ -1625,7 +1709,7 @@ async function processFollowupResponse(
         processed: result.processed,
         emergencyDetected: result.emergencyDetected,
         escalated: result.escalated,
-        operation: "process_followup_response"
+        operation: "process_followup_response",
       });
 
       return NextResponse.json({
@@ -1641,7 +1725,7 @@ async function processFollowupResponse(
   } catch (error) {
     logger.error("Failed to process followup response", error as Error, {
       patientId: patient.id,
-      operation: "process_followup_response"
+      operation: "process_followup_response",
     });
     return null; // Don't fail the webhook, continue processing
   }
@@ -1671,26 +1755,40 @@ export async function POST(request: NextRequest) {
     sender,
     device,
     hasId: Boolean(id),
+    messagePreview: message
+      ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
+      : "no message",
   });
 
   const patientResult = await findPatient(sender, parsed);
   if (patientResult instanceof NextResponse) return patientResult;
   const patient = patientResult as Patient;
 
+  logger.info("Patient found for incoming message", {
+    patientId: patient.id,
+    patientName: patient.name,
+    verificationStatus: patient.verificationStatus,
+    messagePreview: message
+      ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
+      : "no message",
+  });
+
   // Check patient response rate limiting
-  const rateLimitResult = await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id)
+  const rateLimitResult =
+    await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id);
   if (!rateLimitResult.allowed) {
     logger.warn("Patient response rate limit exceeded", {
       patientId: patient.id,
       phoneNumber: sender,
-      rateLimitResult
-    })
+      rateLimitResult,
+    });
     return NextResponse.json({
       ok: true,
       processed: false,
       action: "rate_limited",
-      message: "Too many responses - please wait before sending another message"
-    })
+      message:
+        "Too many responses - please wait before sending another message",
+    });
   }
 
   await logConversation(patient, sender, message || "");

@@ -35,12 +35,12 @@ export class DistributedLockService {
         // Try to insert a new lock record
         const result = await db.execute(sql`
           INSERT INTO distributed_locks (lock_key, expires_at, created_at)
-          VALUES (${lockKey}, ${expiresAt}, NOW())
+          VALUES (${lockKey}, ${expiresAt.toISOString()}, NOW())
           ON CONFLICT (lock_key) DO NOTHING
           RETURNING lock_key
         `)
 
-        if ('rows' in result && Array.isArray(result.rows) && result.rows.length > 0) {
+        if (Array.isArray(result) && result.length > 0) {
           logger.debug('Lock acquired successfully', {
             resourceKey,
             lockKey,
@@ -58,16 +58,16 @@ export class DistributedLockService {
           RETURNING lock_key
         `)
 
-        if ('rows' in expiredResult && Array.isArray(expiredResult.rows) && expiredResult.rows.length > 0) {
+        if (Array.isArray(expiredResult) && expiredResult.length > 0) {
           // Lock was expired and deleted, try to acquire new one
           const newResult = await db.execute(sql`
             INSERT INTO distributed_locks (lock_key, expires_at, created_at)
-            VALUES (${lockKey}, ${expiresAt}, NOW())
+            VALUES (${lockKey}, ${expiresAt.toISOString()}, NOW())
             ON CONFLICT (lock_key) DO NOTHING
             RETURNING lock_key
           `)
 
-          if ('rows' in newResult && Array.isArray(newResult.rows) && newResult.rows.length > 0) {
+          if (Array.isArray(newResult) && newResult.length > 0) {
             logger.debug('Lock acquired after cleanup', {
               resourceKey,
               lockKey,
@@ -159,7 +159,7 @@ export class DistributedLockService {
         RETURNING lock_key
       `)
 
-      const cleanedCount = 'rows' in result && Array.isArray(result.rows) ? result.rows.length : 0
+      const cleanedCount = Array.isArray(result) ? result.length : 0
       if (cleanedCount > 0) {
         logger.info('Cleaned up expired locks', { cleanedCount })
       }
@@ -185,7 +185,7 @@ export class DistributedLockService {
         AND expires_at > NOW()
       `)
 
-      const count = 'rows' in result && Array.isArray(result.rows) && result.rows[0] ? parseInt((result.rows[0] as Record<string, unknown>).count as string || '0', 10) : 0
+      const count = Array.isArray(result) && result[0] ? parseInt((result[0] as Record<string, unknown>).count as string || '0', 10) : 0
       return count > 0
     } catch (error) {
       logger.error('Error checking lock status', error as Error, {
@@ -211,7 +211,7 @@ export class DistributedLockService {
         LIMIT 1
       `)
 
-      const ttl = 'rows' in result && Array.isArray(result.rows) && result.rows[0] && (result.rows[0] as Record<string, unknown>).ttl_ms ? parseInt((result.rows[0] as Record<string, unknown>).ttl_ms as string, 10) : 0
+      const ttl = Array.isArray(result) && result[0] && (result[0] as Record<string, unknown>).ttl_ms ? parseInt((result[0] as Record<string, unknown>).ttl_ms as string, 10) : 0
       return ttl
     } catch (error) {
       logger.error('Error getting lock TTL', error as Error, {

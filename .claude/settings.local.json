@@ -21,7 +21,9 @@
       "Bash(psql:*)",
       "Bash(find:*)",
       "Bash(curl:*)",
-      "Bash(bun build:*)"
+      "Bash(bun build:*)",
+      "Bash(pkill:*)",
+      "Bash(bun:*)"
     ],
     "deny": [],
     "ask": []
