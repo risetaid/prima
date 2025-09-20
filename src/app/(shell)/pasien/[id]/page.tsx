@@ -96,6 +96,7 @@ export default function PatientDetailPage() {
 
   const fetchPatient = useCallback(async (id: string, isPolling = false) => {
     try {
+      logger.info(`Fetching patient ${id}`, { isPolling, timestamp: new Date().toISOString() });
       const response = await fetch(`/api/patients/${id}`);
       if (response.ok) {
         const data = await response.json();
@@ -213,18 +214,35 @@ export default function PatientDetailPage() {
     }
   }, [params.id, fetchPatient, fetchHealthNotes, fetchCompletedReminders]);
 
-  // Add polling for real-time verification updates
+  // Add polling for real-time verification updates (reduced frequency and added safeguards)
   useEffect(() => {
     if (!params.id) return;
 
+    let pollCount = 0;
+    const maxPollsPerSession = 5; // Further reduced to be more conservative
+    let isPolling = false; // Prevent concurrent polling requests
+
     const pollInterval = setInterval(() => {
+      // Stop polling after maximum polls or if already polling
+      if (pollCount >= maxPollsPerSession || isPolling) {
+        if (pollCount >= maxPollsPerSession) {
+          clearInterval(pollInterval);
+        }
+        return;
+      }
+
       if (
         document.visibilityState === "visible" &&
         patient?.verificationStatus === "PENDING"
       ) {
-        fetchPatient(params.id as string, true);
+        isPolling = true;
+        fetchPatient(params.id as string, true)
+          .finally(() => {
+            isPolling = false;
+            pollCount++;
+          });
       }
-    }, 10000);
+    }, 120000); // Increased to 2 minutes to be very conservative
 
     return () => clearInterval(pollInterval);
   }, [params.id, patient?.verificationStatus, fetchPatient]);
