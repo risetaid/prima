@@ -26,8 +26,9 @@ const AuthContext = createContext<AuthContextState | undefined>(undefined);
 // Cache configuration
 const CACHE_KEY = "prima_user_auth_status";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const RETRY_DELAY = 1000; // 1 second
-const MAX_RETRIES = 3;
+const RETRY_DELAY = 2000; // 2 seconds
+const MAX_RETRIES = 2; // Reduced to prevent infinite loops
+const BACKGROUND_FETCH_COOLDOWN = 60000; // 1 minute cooldown between background fetches
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded: userLoaded } = useUser();
@@ -39,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [needsApproval, setNeedsApproval] = useState(true);
   const [dbUserLoaded, setDbUserLoaded] = useState(false);
   const isBackgroundFetchRunningRef = useRef(false);
+  const lastBackgroundFetchRef = useRef(0);
 
   const isLoaded = userLoaded && authLoaded && dbUserLoaded;
 
@@ -82,12 +84,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Helper function to fetch user status with retry logic
   const fetchUserStatus = useCallback(async (attempt = 1): Promise<UserStatusData> => {
     try {
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const response = await fetch("/api/user/status", {
         headers: {
           "Cache-Control": "no-cache",
           Pragma: "no-cache",
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -144,9 +153,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setDbUserLoaded(true);
 
       // Still fetch fresh data in the background to ensure accuracy
-      // Only run background fetch if not already running
-      if (!isBackgroundFetchRunningRef.current) {
+      // Only run background fetch if not already running and cooldown has passed
+      const now = Date.now();
+      if (!isBackgroundFetchRunningRef.current && now - lastBackgroundFetchRef.current > BACKGROUND_FETCH_COOLDOWN) {
         isBackgroundFetchRunningRef.current = true;
+        lastBackgroundFetchRef.current = now;
         fetchUserStatus()
           .then((data) => {
             // Only update if data has changed and component is still mounted

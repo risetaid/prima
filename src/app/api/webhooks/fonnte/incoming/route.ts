@@ -12,6 +12,8 @@ import type { Patient, Reminder } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
 import type { IntentDetectionResult } from "@/services/llm/llm.types";
 import type { RecommendedResponse } from "@/services/message-processor.service";
+import { distributedLockService } from "@/services/distributed-lock.service";
+import { patientResponseRateLimiter } from "@/services/rate-limit.service";
 
 interface WebhookBody {
   sender?: string;
@@ -730,10 +732,12 @@ async function handleReminderConfirmed(
   // Get patient medication details for personalization
   const reminderInfo = await getPatientReminderInfo(patient.id);
 
+  // Use standardized completion logic - mark as CONFIRMED
   await db
     .update(reminders)
     .set({
       status: "DELIVERED",
+      confirmationStatus: "CONFIRMED",
       confirmationResponse: message,
       confirmationResponseAt: new Date(),
     })
@@ -1036,22 +1040,62 @@ async function processVerificationResponse(
   });
 
   try {
-    const verificationResult = await handleVerificationResponse(
-      message || "",
-      patient
-    );
+    // Use distributed locking for verification processing
+    const lockKey = `verification_processing:${patient.id}`
+    const lockResult = await distributedLockService.withLock(lockKey, async () => {
+      // Double-check patient verification status to prevent race conditions
+      const [currentPatient] = await db
+        .select({ verificationStatus: patients.verificationStatus })
+        .from(patients)
+        .where(eq(patients.id, patient.id))
+        .limit(1)
 
-    if (verificationResult.processed) {
+      if (currentPatient && currentPatient.verificationStatus !== "PENDING") {
+        logger.info("Patient verification already processed", {
+          patientId: patient.id,
+          currentStatus: currentPatient.verificationStatus
+        })
+        return { alreadyProcessed: true }
+      }
+
+      return await handleVerificationResponse(message || "", patient)
+    }, {
+      ttl: 30000, // 30 second lock
+      maxRetries: 2
+    })
+
+    if (!lockResult) {
+      logger.warn("Failed to acquire verification processing lock", {
+        patientId: patient.id
+      })
+      return NextResponse.json(
+        { error: "Could not acquire processing lock - please try again" },
+        { status: 409 }
+      )
+    }
+
+    if ('alreadyProcessed' in lockResult && lockResult.alreadyProcessed) {
+      return NextResponse.json({
+        ok: true,
+        processed: false,
+        action: "already_processed",
+        source: "text_verification",
+      })
+    }
+
+    const verificationResult = 'processed' in lockResult ? lockResult : lockResult
+
+    if ('processed' in verificationResult && verificationResult.processed) {
       logger.info("Verification response processed successfully", {
         patientId: patient.id,
-        action: verificationResult.action,
-        message: verificationResult.message,
+        action: 'action' in verificationResult ? verificationResult.action : undefined,
+        message: 'message' in verificationResult ? verificationResult.message : undefined,
       });
 
       return NextResponse.json({
         ok: true,
         processed: true,
-        action: verificationResult.action,
+        action: 'action' in verificationResult ? verificationResult.action : undefined,
         source: "text_verification",
       });
     }
@@ -1632,6 +1676,22 @@ export async function POST(request: NextRequest) {
   const patientResult = await findPatient(sender, parsed);
   if (patientResult instanceof NextResponse) return patientResult;
   const patient = patientResult as Patient;
+
+  // Check patient response rate limiting
+  const rateLimitResult = await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id)
+  if (!rateLimitResult.allowed) {
+    logger.warn("Patient response rate limit exceeded", {
+      patientId: patient.id,
+      phoneNumber: sender,
+      rateLimitResult
+    })
+    return NextResponse.json({
+      ok: true,
+      processed: false,
+      action: "rate_limited",
+      message: "Too many responses - please wait before sending another message"
+    })
+  }
 
   await logConversation(patient, sender, message || "");
 

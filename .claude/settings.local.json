@@ -20,7 +20,8 @@
       "Bash(bunx:*)",
       "Bash(psql:*)",
       "Bash(find:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(bun build:*)"
     ],
     "deny": [],
     "ask": []

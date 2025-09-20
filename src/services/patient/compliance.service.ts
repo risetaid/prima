@@ -1,56 +1,60 @@
 // ComplianceService centralizes compliance calculations for patients
-import { PatientRepository } from "./patient.repository";
+// Now uses standardized CompletionCalculationService for consistency
 import { logger } from "@/lib/logger";
+import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
 
 export interface ComplianceResult {
-  deliveredCount: number; // Now represents "totalConfirmed" (completed reminders)
-  confirmedCount: number; // Now represents "takenCount" (medications actually taken)
+  deliveredCount: number; // Total reminders sent
+  confirmedCount: number; // Total completed reminders (automated + manual)
   complianceRate: number;
   lastCalculated: Date;
 }
 
 export interface ComplianceStats {
-  totalReminders: number; // Now represents "totalConfirmed" (completed reminders)
-  deliveredReminders: number; // Now represents "totalConfirmed" (completed reminders)
-  confirmedReminders: number; // Now represents "takenCount" (medications actually taken)
-  pendingConfirmations: number; // Now represents unconfirmed reminders (not applicable in simplified logic)
+  totalReminders: number; // Total active reminders
+  deliveredReminders: number; // Total reminders with delivery status
+  confirmedReminders: number; // Total completed reminders
+  pendingReminders: number; // Reminders waiting for response
+  failedReminders: number; // Reminders that failed to send
   complianceRate: number;
-  averageResponseTime?: number;
+  automatedCompletions: number; // Completions via patient text responses
+  manualCompletions: number; // Completions via manual relawan entry
 }
 
 export class ComplianceService {
-  private repo: PatientRepository;
-  constructor() {
-    this.repo = new PatientRepository();
-  }
-
-  // Compute compliance rate = confirmations / delivered * 100 (integer percent)
-  private computeRate(delivered: number, confirmations: number): number {
-    if (!delivered || delivered <= 0) return 0;
-    const rate = Math.round((confirmations / delivered) * 100);
+  /**
+   * Calculate compliance rate using standardized completion logic
+   */
+  private computeRate(totalReminders: number, completedReminders: number): number {
+    if (!totalReminders || totalReminders <= 0) return 0;
+    const rate = Math.round((completedReminders / totalReminders) * 100);
     return Math.max(0, Math.min(100, rate));
   }
 
   async getRatesMap(patientIds: string[]) {
-    const complianceData = await this.repo.getCompletedComplianceCounts(
-      patientIds
+    const results = await Promise.all(
+      patientIds.map(async (patientId) => {
+        const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+        return {
+          patientId,
+          totalReminders: stats.totalReminders,
+          completedReminders: stats.completedReminders,
+          complianceRate: stats.complianceRate,
+        };
+      })
     );
 
-    const deliveredMap = new Map<string, number>();
-    const confirmationsMap = new Map<string, number>();
+    const totalMap = new Map<string, number>();
+    const completedMap = new Map<string, number>();
     const rateMap = new Map<string, number>();
 
-    for (const data of complianceData) {
-      const totalConfirmed = data.totalConfirmed;
-      const takenCount = data.takenCount;
-      const complianceRate = this.computeRate(totalConfirmed, takenCount);
+    results.forEach(result => {
+      totalMap.set(result.patientId, result.totalReminders);
+      completedMap.set(result.patientId, result.completedReminders);
+      rateMap.set(result.patientId, result.complianceRate);
+    });
 
-      deliveredMap.set(data.patientId, totalConfirmed); // Now represents "completed/confirmed"
-      confirmationsMap.set(data.patientId, takenCount); // Now represents "taken"
-      rateMap.set(data.patientId, complianceRate);
-    }
-
-    return { deliveredMap, confirmationsMap, rateMap };
+    return { totalMap, completedMap, rateMap };
   }
 
   async attachCompliance<T extends { id: string }>(
@@ -65,36 +69,31 @@ export class ComplianceService {
   }
 
   async getPatientRate(patientId: string): Promise<number> {
-    const { rateMap } = await this.getRatesMap([patientId]);
-    return rateMap.get(patientId) || 0;
+    const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+    return stats.complianceRate;
   }
 
   /**
-   * Calculate compliance for a single patient
+   * Calculate compliance for a single patient using standardized logic
    */
   async calculatePatientCompliance(
     patientId: string
   ): Promise<ComplianceResult> {
     try {
-      const { deliveredMap, confirmationsMap, rateMap } =
-        await this.getRatesMap([patientId]);
-
-      const deliveredCount = deliveredMap.get(patientId) || 0;
-      const confirmedCount = confirmationsMap.get(patientId) || 0;
-      const complianceRate = rateMap.get(patientId) || 0;
+      const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
 
       logger.info("Compliance calculation completed", {
         patientId,
-        deliveredCount,
-        confirmedCount,
-        complianceRate,
+        totalReminders: stats.totalReminders,
+        completedReminders: stats.completedReminders,
+        complianceRate: stats.complianceRate,
         operation: "compliance_calculation",
       });
 
       return {
-        deliveredCount,
-        confirmedCount,
-        complianceRate,
+        deliveredCount: stats.totalReminders, // Total reminders
+        confirmedCount: stats.completedReminders, // Completed reminders
+        complianceRate: stats.complianceRate,
         lastCalculated: new Date(),
       };
     } catch (error) {
@@ -117,24 +116,25 @@ export class ComplianceService {
   }
 
   /**
-   * Get detailed compliance statistics for a patient
+   * Get detailed compliance statistics for a patient using standardized logic
    */
   async getPatientComplianceStats(patientId: string): Promise<ComplianceStats> {
-    const compliance = await this.calculatePatientCompliance(patientId);
+    const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
 
-    // Simplified stats - only count completed reminders
     return {
-      totalReminders: compliance.deliveredCount, // Total confirmed reminders
-      deliveredReminders: compliance.deliveredCount, // Total confirmed reminders
-      confirmedReminders: compliance.confirmedCount, // Medications actually taken
-      pendingConfirmations: 0, // Not applicable in simplified logic
-      complianceRate: compliance.complianceRate,
-      averageResponseTime: undefined, // Not applicable in simplified logic
+      totalReminders: stats.totalReminders,
+      deliveredReminders: stats.totalReminders - stats.failedReminders - stats.pendingReminders,
+      confirmedReminders: stats.completedReminders,
+      pendingReminders: stats.pendingReminders,
+      failedReminders: stats.failedReminders,
+      complianceRate: stats.complianceRate,
+      automatedCompletions: stats.automatedCompletions,
+      manualCompletions: stats.manualCompletions,
     };
   }
 
   /**
-   * Calculate compliance for multiple patients
+   * Calculate compliance for multiple patients using standardized logic
    */
   async calculateBulkCompliance(
     patientIds: string[]
@@ -143,25 +143,31 @@ export class ComplianceService {
       return {};
     }
 
-    const { deliveredMap, confirmationsMap, rateMap } = await this.getRatesMap(
-      patientIds
-    );
     const results: Record<string, ComplianceResult> = {};
 
     for (const patientId of patientIds) {
-      const deliveredCount = deliveredMap.get(patientId) || 0;
-      const confirmedCount = confirmationsMap.get(patientId) || 0;
-      const complianceRate = rateMap.get(patientId) || 0;
+      const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
 
       results[patientId] = {
-        deliveredCount,
-        confirmedCount,
-        complianceRate,
+        deliveredCount: stats.totalReminders,
+        confirmedCount: stats.completedReminders,
+        complianceRate: stats.complianceRate,
         lastCalculated: new Date(),
       };
     }
 
     return results;
+  }
+
+  /**
+   * Get reminder status counts using standardized logic
+   */
+  async getReminderStatusCounts(patientId: string): Promise<{
+    terjadwal: number;
+    perluDiperbarui: number;
+    selesai: number;
+  }> {
+    return await CompletionCalculationService.getReminderStatusCounts(patientId);
   }
 
   /**

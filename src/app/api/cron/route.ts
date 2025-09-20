@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-// Rate limiter temporarily disabled
+import { distributedLockService } from "@/services/distributed-lock.service";
+import { reminderProcessingRateLimiter } from "@/services/rate-limit.service";
 
 // Import reminder service for follow-up scheduling
 let reminderService: import('@/services/reminder/reminder.service').ReminderService | null = null;
@@ -47,13 +48,61 @@ export async function POST(request: NextRequest) {
 }
 
 async function processReminders() {
-  logger.info('Processing scheduled reminders and followups via cron job');
+  const cronInstance = `cron_${Date.now()}`
+  logger.info('Processing scheduled reminders and followups via cron job', { cronInstance });
+
+  try {
+    // Check global reminder processing rate limit
+    const rateLimitResult = await reminderProcessingRateLimiter.checkReminderProcessingRateLimit()
+    if (!rateLimitResult.allowed) {
+      logger.warn('Global reminder processing rate limit exceeded', {
+        cronInstance,
+        rateLimitResult
+      })
+      return NextResponse.json({
+        success: false,
+        error: 'Global processing rate limit exceeded',
+        details: `Try again after ${rateLimitResult.resetTime.toISOString()}`,
+        timestamp: new Date().toISOString()
+      }, { status: 429 })
+    }
+
+    // Use distributed lock to prevent multiple cron instances from running simultaneously
+    const lockResult = await distributedLockService.withLock(cronInstance, async () => {
+      return await processRemindersWithLock()
+    }, {
+      ttl: 300000, // 5 minute lock
+      maxRetries: 1
+    })
+
+    if (!lockResult) {
+      logger.warn('Could not acquire cron processing lock', { cronInstance })
+      return NextResponse.json({
+        success: false,
+        error: 'Cron already running',
+        timestamp: new Date().toISOString()
+      }, { status: 409 })
+    }
+
+    return lockResult
+  } catch (error) {
+    logger.error('Cron processing failed', error as Error, { cronInstance })
+    return NextResponse.json({
+      success: false,
+      error: 'Cron processing failed',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
+  }
+}
+
+async function processRemindersWithLock() {
+  logger.info('Processing reminders with distributed lock acquired');
 
   try {
     // Import dependencies
     const { db, reminders, patients } = await import('@/db');
     const { eq, and, lte, isNull } = await import('drizzle-orm');
-    // const { sendWhatsAppMessage, formatWhatsAppNumber } = await import('@/lib/fonnte');
     const { getWIBTime } = await import('@/lib/timezone');
 
     // Import reminder service for follow-up scheduling
@@ -111,46 +160,98 @@ async function processReminders() {
       try {
         processedCount++;
 
-        // Use ReminderService to send message with type-specific formatting
-        const sendResult = await reminderService.sendReminder({
-          patientId: reminder.patientId,
-          phoneNumber: reminder.patientPhone,
-          message: reminder.message,
-          reminderId: reminder.id,
-          reminderName: reminder.title || 'Pengingat',
-          patientName: reminder.patientName,
-          reminderType: reminder.reminderType,
-          reminderTitle: reminder.title ? reminder.title : undefined,
-          reminderDescription: reminder.description ? reminder.description : undefined,
-        });
+        // Use individual reminder locking to prevent concurrent processing
+        const reminderLockKey = `reminder_processing:${reminder.id}`
+        const reminderResult = await distributedLockService.withLock(reminderLockKey, async () => {
+          // Double-check if reminder is still pending (might have been processed by another instance)
+          const [currentReminder] = await db
+            .select({ status: reminders.status, sentAt: reminders.sentAt })
+            .from(reminders)
+            .where(eq(reminders.id, reminder.id))
+            .limit(1)
 
-        // Update reminder status based on sendResult
-        const status = sendResult.success ? 'SENT' : 'FAILED';
-        await db.update(reminders)
-          .set({
-            sentAt: getWIBTime(),
-            status: status,
-            fonnteMessageId: sendResult.messageId,
-            updatedAt: getWIBTime(),
+          if (currentReminder && currentReminder.status !== 'PENDING') {
+            logger.info('Reminder already processed, skipping', {
+              reminderId: reminder.id,
+              currentStatus: currentReminder.status
+            })
+            return { alreadyProcessed: true }
+          }
+
+          // Use ReminderService to send message with type-specific formatting
+          const sendResult = await reminderService!.sendReminder({
+            patientId: reminder.patientId,
+            phoneNumber: reminder.patientPhone,
+            message: reminder.message,
+            reminderId: reminder.id,
+            reminderName: reminder.title || 'Pengingat',
+            patientName: reminder.patientName,
+            reminderType: reminder.reminderType,
+            reminderTitle: reminder.title ? reminder.title : undefined,
+            reminderDescription: reminder.description ? reminder.description : undefined,
+          });
+
+          // Update reminder status in a transaction
+          const status = sendResult.success ? 'SENT' : 'FAILED';
+          await db.transaction(async (tx) => {
+            await tx.update(reminders)
+              .set({
+                sentAt: getWIBTime(),
+                status: status,
+                fonnteMessageId: sendResult.messageId,
+                updatedAt: getWIBTime(),
+              })
+              .where(eq(reminders.id, reminder.id))
+
+            // Log the reminder send transaction
+            logger.info('Reminder status updated in transaction', {
+              reminderId: reminder.id,
+              newStatus: status,
+              messageId: sendResult.messageId
+            })
           })
-          .where(eq(reminders.id, reminder.id));
 
-        if (sendResult.success) {
+          return {
+            sendResult,
+            alreadyProcessed: false
+          }
+        }, {
+          ttl: 60000, // 1 minute lock per reminder
+          maxRetries: 1
+        })
+
+        if (!reminderResult) {
+          logger.warn('Failed to acquire reminder processing lock', {
+            reminderId: reminder.id
+          })
+          failedCount++
+          errors.push(`Reminder ${reminder.id}: Could not acquire processing lock`)
+          continue
+        }
+
+        if (reminderResult.alreadyProcessed) {
+          // Skip this reminder as it was already processed
+          continue
+        }
+
+        const { sendResult } = reminderResult
+
+        if (sendResult?.success) {
           successCount++;
           logger.info('Reminder sent successfully', {
             reminderId: reminder.id,
             patientId: reminder.patientId,
             patientName: reminder.patientName,
-            messageId: sendResult.messageId,
-            followupsScheduled: sendResult.followupsScheduled
+            messageId: sendResult?.messageId,
+            followupsScheduled: sendResult?.followupsScheduled
           });
         } else {
           failedCount++;
-          errors.push(`Reminder ${reminder.id}: ${sendResult.error || 'Unknown error'}`);
+          errors.push(`Reminder ${reminder.id}: ${sendResult?.error || 'Unknown error'}`);
           logger.warn('Failed to send reminder', {
             reminderId: reminder.id,
             patientId: reminder.patientId,
-            error: sendResult.error
+            error: sendResult?.error
           });
         }
       } catch (error) {

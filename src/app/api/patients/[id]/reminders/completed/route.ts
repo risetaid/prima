@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminders } from "@/db";
-import { eq, and, isNotNull, isNull, or, desc } from "drizzle-orm";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { logger } from "@/lib/logger";
+import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
 
 interface CompletedReminder {
   id: string;
@@ -14,6 +13,8 @@ interface CompletedReminder {
   confirmedAt: string;
   sentAt: string | null;
   notes?: string | null;
+  completionType: 'AUTOMATED' | 'MANUAL' | 'NONE';
+  responseSource?: 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM';
 }
 
 export async function GET(
@@ -36,49 +37,25 @@ export async function GET(
       "view this patient's completed reminders"
     );
 
-    // Fetch completed reminders using the existing reminders table
-    // Consider a reminder "completed" if it has been confirmed (manually or automatically)
-    const completedReminders = await db
-      .select({
-        id: reminders.id,
-        scheduledTime: reminders.scheduledTime,
-        completedDate: reminders.startDate, // Using startDate as completedDate for now
-        customMessage: reminders.message,
-        confirmationStatus: reminders.confirmationStatus,
-        confirmedAt: reminders.confirmationResponseAt,
-        sentAt: reminders.sentAt,
-        confirmationResponse: reminders.confirmationResponse,
-        notes: reminders.confirmationResponse,
-      })
-      .from(reminders)
-      .where(
-        and(
-          eq(reminders.patientId, patientId),
-          // Only include reminders that have been confirmed
-          or(
-            eq(reminders.confirmationStatus, "CONFIRMED"),
-            isNotNull(reminders.confirmationResponse)
-          ),
-          // Must be active and not deleted
-          eq(reminders.isActive, true),
-          isNull(reminders.deletedAt)
-        )
-      )
-      .orderBy(desc(reminders.startDate))
-      .limit(50); // Limit to prevent excessive data loading
+    // Get completed reminders using standardized completion logic
+    const completedRemindersData = await CompletionCalculationService.getCompletedReminders(
+      patientId,
+      { limit: 50 }
+    );
 
     // Transform the data to match the expected interface
-    const transformedReminders: CompletedReminder[] = completedReminders.map(
+    const transformedReminders: CompletedReminder[] = completedRemindersData.map(
       (reminder) => ({
-        id: reminder.id,
+        id: reminder.reminderId,
         scheduledTime: reminder.scheduledTime,
-        completedDate: reminder.completedDate.toISOString(),
-        customMessage: reminder.customMessage,
-        // Determine confirmation status - default to confirmed if we have response
-        confirmationStatus: reminder.confirmationStatus || (reminder.confirmationResponse ? 'CONFIRMED' : 'MISSED'),
-        confirmedAt: reminder.confirmedAt?.toISOString() || reminder.completedDate.toISOString(),
+        completedDate: reminder.status.confirmedAt?.toISOString() || new Date().toISOString(),
+        customMessage: reminder.patientResponse || undefined,
+        confirmationStatus: reminder.status.confirmationStatus,
+        confirmedAt: reminder.status.confirmedAt?.toISOString() || new Date().toISOString(),
         sentAt: reminder.sentAt?.toISOString() || null,
-        notes: reminder.notes || undefined,
+        notes: reminder.patientResponse || undefined,
+        completionType: reminder.status.completionType,
+        responseSource: reminder.status.responseSource,
       })
     );
 

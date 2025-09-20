@@ -7,6 +7,7 @@ import { db } from '@/db'
 import { messageQueue, messageQueueStats, NewMessageQueue } from '@/db/message-queue-schema'
 import { eq, and, isNull, or, lt, desc, asc, sql } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
+import { distributedLockService } from '@/services/distributed-lock.service'
 
 export interface QueuedMessage {
   id: string
@@ -84,60 +85,89 @@ export class MessageQueueService {
   async dequeueMessage(): Promise<QueuedMessage | null> {
     try {
       const now = new Date()
+      const lockKey = `message_queue_dequeue:${now.getTime()}`
 
-      // Get the highest priority message (lowest score) that is ready for processing
-      const [result] = await db
-        .select()
-        .from(messageQueue)
-        .where(
-          and(
-            eq(messageQueue.status, 'pending'),
-            or(
-              isNull(messageQueue.nextRetryAt),
-              lt(messageQueue.nextRetryAt, now)
+      // Use distributed locking to prevent multiple workers from dequeuing the same message
+      return await distributedLockService.withLock(lockKey, async () => {
+        // Get the highest priority message (lowest score) that is ready for processing
+        const [result] = await db
+          .select()
+          .from(messageQueue)
+          .where(
+            and(
+              eq(messageQueue.status, 'pending'),
+              or(
+                isNull(messageQueue.nextRetryAt),
+                lt(messageQueue.nextRetryAt, now)
+              )
             )
           )
-        )
-        .orderBy(asc(messageQueue.priorityScore), asc(messageQueue.createdAt))
-        .limit(1)
+          .orderBy(asc(messageQueue.priorityScore), asc(messageQueue.createdAt))
+          .limit(1)
 
-      if (!result) {
-        return null
-      }
+        if (!result) {
+          return null
+        }
 
-      // Mark as processing
-      await db
-        .update(messageQueue)
-        .set({
-          status: 'processing',
-          processedAt: now,
-          updatedAt: now
+        // Double-check that message is still pending (race condition protection)
+        const [currentStatus] = await db
+          .select({ status: messageQueue.status })
+          .from(messageQueue)
+          .where(eq(messageQueue.id, result.id))
+          .limit(1)
+
+        if (currentStatus && currentStatus.status !== 'pending') {
+          logger.info('Message already being processed, skipping', {
+            messageId: result.id,
+            currentStatus: currentStatus.status
+          })
+          return null
+        }
+
+        // Mark as processing in a transaction
+        await db.transaction(async (tx) => {
+          await tx
+            .update(messageQueue)
+            .set({
+              status: 'processing',
+              processedAt: now,
+              updatedAt: now
+            })
+            .where(eq(messageQueue.id, result.id))
+
+          logger.debug('Message marked as processing in transaction', {
+            messageId: result.id,
+            patientId: result.patientId
+          })
         })
-        .where(eq(messageQueue.id, result.id))
 
-      const queuedMessage: QueuedMessage = {
-        id: result.id,
-        patientId: result.patientId,
-        phoneNumber: result.phoneNumber,
-        message: result.message,
-        priority: result.priority,
-        messageType: result.messageType,
-        conversationId: result.conversationId || undefined,
-        retryCount: result.retryCount,
-        maxRetries: result.maxRetries,
-        createdAt: result.createdAt,
-        nextRetryAt: result.nextRetryAt || undefined,
-        lastError: result.lastError || undefined,
-        metadata: result.metadata as Record<string, unknown>
-      }
+        const queuedMessage: QueuedMessage = {
+          id: result.id,
+          patientId: result.patientId,
+          phoneNumber: result.phoneNumber,
+          message: result.message,
+          priority: result.priority,
+          messageType: result.messageType,
+          conversationId: result.conversationId || undefined,
+          retryCount: result.retryCount,
+          maxRetries: result.maxRetries,
+          createdAt: result.createdAt,
+          nextRetryAt: result.nextRetryAt || undefined,
+          lastError: result.lastError || undefined,
+          metadata: result.metadata as Record<string, unknown>
+        }
 
-      logger.debug('Message dequeued for processing', {
-        messageId: queuedMessage.id,
-        patientId: queuedMessage.patientId,
-        priority: queuedMessage.priority
+        logger.debug('Message dequeued for processing', {
+          messageId: queuedMessage.id,
+          patientId: queuedMessage.patientId,
+          priority: queuedMessage.priority
+        })
+
+        return queuedMessage
+      }, {
+        ttl: 30000, // 30 second lock
+        maxRetries: 2
       })
-
-      return queuedMessage
     } catch (error) {
       logger.error('Failed to dequeue message', error as Error)
       return null

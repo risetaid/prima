@@ -46,9 +46,16 @@ export default function PatientReminderPage() {
   const fetchReminderStats = useCallback(async () => {
     if (!patientId) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/stats`
+        `/api/patients/${patientId}/reminders/stats`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const statsData = await response.json();
         setStats(statsData);
@@ -75,7 +82,15 @@ export default function PatientReminderPage() {
   const fetchPatientName = useCallback(async () => {
     if (!patientId) return;
     try {
-      const response = await fetch(`/api/patients/${patientId}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`/api/patients/${patientId}`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const patient = await response.json();
         setPatientName(patient.name);
@@ -94,7 +109,15 @@ export default function PatientReminderPage() {
   const fetchCompletedReminders = useCallback(async () => {
     if (!patientId) return;
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders/completed`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`/api/patients/${patientId}/reminders/completed`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         setCompletedReminders(data);
@@ -109,9 +132,18 @@ export default function PatientReminderPage() {
 
   useEffect(() => {
     if (patientId) {
-      fetchReminderStats();
-      fetchPatientName();
-      fetchCompletedReminders();
+      // Sequential fetch to avoid overwhelming the API
+      const fetchData = async () => {
+        try {
+          await fetchPatientName();
+          await fetchReminderStats();
+          await fetchCompletedReminders();
+        } catch (error) {
+          console.error("Error fetching reminder page data:", error);
+        }
+      };
+
+      fetchData();
     }
   }, [patientId, fetchReminderStats, fetchPatientName, fetchCompletedReminders]);
 

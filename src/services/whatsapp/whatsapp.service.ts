@@ -1,11 +1,13 @@
 // WhatsApp Messaging Service - centralizes WA message building and sending
-import { 
-  sendWhatsAppMessage, 
+import {
+  sendWhatsAppMessage,
   formatWhatsAppNumber,
   WhatsAppMessageResult
 } from '@/lib/fonnte'
 import { ValidatedContent } from '@/services/reminder/reminder.types'
 import { logger } from '@/lib/logger'
+import { whatsAppRateLimiter } from '@/services/rate-limit.service'
+import { distributedLockService } from '@/services/distributed-lock.service'
 
 export class WhatsAppService {
   private readonly MAX_RETRY_ATTEMPTS = 3;
@@ -110,7 +112,35 @@ export class WhatsAppService {
   }
 
   async send(toPhoneNumber: string, message: string) {
-    return await this.sendWithRetry(toPhoneNumber, message)
+    // Check rate limiting first
+    const rateLimitResult = await whatsAppRateLimiter.checkWhatsAppRateLimit(toPhoneNumber)
+
+    if (!rateLimitResult.allowed) {
+      logger.warn('WhatsApp rate limit exceeded', {
+        phoneNumber: toPhoneNumber,
+        rateLimitResult
+      })
+      throw new Error(`Rate limit exceeded for ${toPhoneNumber}. Try again after ${rateLimitResult.resetTime.toISOString()}`)
+    }
+
+    // Use distributed locking to prevent concurrent sends to the same number
+    const lockKey = `whatsapp_send:${toPhoneNumber}:${Date.now()}`
+    const lockResult = await distributedLockService.withLock(lockKey, async () => {
+      return await this.sendWithRetry(toPhoneNumber, message)
+    }, {
+      ttl: 30000, // 30 second lock
+      maxRetries: 2
+    })
+
+    if (!lockResult) {
+      logger.warn('Failed to acquire WhatsApp send lock', {
+        phoneNumber: toPhoneNumber,
+        lockKey
+      })
+      throw new Error('Could not acquire lock for WhatsApp send - please try again')
+    }
+
+    return lockResult
   }
 
 

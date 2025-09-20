@@ -43,6 +43,13 @@
       "when": 1758350248742,
       "tag": "0005_many_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1758364798315,
+      "tag": "0006_calm_shadow_king",
+      "breakpoints": true
     }
   ]
 }

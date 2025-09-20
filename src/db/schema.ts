@@ -10,6 +10,8 @@ export * from "./reminder-schema";
 export * from "./cms-schema";
 export * from "./llm-schema";
 export * from "./message-queue-schema";
+export * from "./distributed-locks-schema";
+export * from "./rate-limits-schema";
 
 // Import tables for relations
 import { users } from "./core-schema";

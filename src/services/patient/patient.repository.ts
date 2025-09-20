@@ -8,7 +8,7 @@ import {
   reminders,
   manualConfirmations,
 } from "@/db";
-import { and, eq, isNull, inArray, desc, count, sql, SQL } from "drizzle-orm";
+import { and, eq, isNull, inArray, desc, sql, SQL } from "drizzle-orm";
 import type { InferInsertModel } from "drizzle-orm";
 import type {
   PatientFilters,
@@ -219,8 +219,8 @@ export class PatientRepository {
     return rows;
   }
 
-  // ===== Simplified Compliance counts - Only count "Selesai" (completed) reminders =====
-  // Refactored to use helper functions for better readability
+  // ===== Standardized Compliance counts using CompletionCalculationService =====
+  // Uses unified completion logic for consistency across all endpoints
   async getCompletedComplianceCounts(patientIds: string[]) {
     if (!patientIds.length)
       return [] as Array<{
@@ -229,71 +229,19 @@ export class PatientRepository {
         takenCount: number;
       }>;
 
-    const countManualTaken = async (patientId: string): Promise<number> => {
-      const result = await db
-        .select({ count: count() })
-        .from(manualConfirmations)
-        .where(eq(manualConfirmations.patientId, patientId));
-      return Number(result[0]?.count || 0);
-    };
-
-    const countAutomatedTaken = async (patientId: string): Promise<number> => {
-      const result = await db
-        .select({ count: count() })
-        .from(reminders)
-        .where(
-          and(
-            eq(reminders.patientId, patientId),
-            eq(reminders.confirmationStatus, "CONFIRMED"),
-            eq(reminders.confirmationResponse, "SUDAH")
-          )
-        );
-      return Number(result[0]?.count || 0);
-    };
-
-    const countTotalManual = async (patientId: string): Promise<number> => {
-      const result = await db
-        .select({ count: count() })
-        .from(manualConfirmations)
-        .where(eq(manualConfirmations.patientId, patientId));
-      return Number(result[0]?.count || 0);
-    };
-
-    const countTotalAutomated = async (patientId: string): Promise<number> => {
-      const result = await db
-        .select({ count: count() })
-        .from(reminders)
-        .where(
-          and(
-            eq(reminders.patientId, patientId),
-            eq(reminders.confirmationStatus, "CONFIRMED")
-          )
-        );
-      return Number(result[0]?.count || 0);
-    };
-
-    const getPatientData = async (patientId: string) => {
-      const [
-        manualTaken,
-        automatedTaken,
-        totalManual,
-        totalAutomated,
-      ] = await Promise.all([
-        countManualTaken(patientId),
-        countAutomatedTaken(patientId),
-        countTotalManual(patientId),
-        countTotalAutomated(patientId),
-      ]);
-
-      return {
-        patientId,
-        totalConfirmed: totalManual + totalAutomated,
-        takenCount: manualTaken + automatedTaken,
-      };
-    };
+    // Import here to avoid circular dependency
+    const { CompletionCalculationService } = await import("@/services/reminder/completion-calculation.service");
 
     const results = await Promise.all(
-      patientIds.map(patientId => getPatientData(patientId))
+      patientIds.map(async (patientId) => {
+        const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+
+        return {
+          patientId,
+          totalConfirmed: stats.completedReminders, // Total completed reminders
+          takenCount: stats.completedReminders, // In simplified logic, completed = taken
+        };
+      })
     );
 
     return results;

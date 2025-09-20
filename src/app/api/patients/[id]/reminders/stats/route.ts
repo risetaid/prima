@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminders, manualConfirmations } from "@/db";
-import { eq, and, desc, isNull, inArray } from "drizzle-orm";
+import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
 
 import {
   getCachedData,
@@ -41,96 +40,14 @@ export async function GET(
 
 
 
-    // Get all active reminder schedules for this patient
-    const allSchedules = await db
-      .select({
-        id: reminders.id,
-        patientId: reminders.patientId,
-        startDate: reminders.startDate,
-        scheduledTime: reminders.scheduledTime,
-      })
-      .from(reminders)
-      .where(
-        and(
-          eq(reminders.patientId, id),
-          eq(reminders.isActive, true),
-          isNull(reminders.deletedAt)
-        )
-      );
-
-    // Get all reminders with their status (replaces reminder logs)
-    const allLogs = await db
-      .select({
-        id: reminders.id,
-        reminderScheduleId: reminders.id, // Use same ID for compatibility
-        status: reminders.status,
-        sentAt: reminders.sentAt,
-        confirmationStatus: reminders.confirmationStatus,
-        confirmationResponse: reminders.confirmationResponse,
-      })
-      .from(reminders)
-      .where(
-        and(
-          eq(reminders.patientId, id),
-          inArray(reminders.status, ["SENT", "DELIVERED", "FAILED"]),
-          eq(reminders.isActive, true),
-          isNull(reminders.deletedAt)
-        )
-      )
-      .orderBy(desc(reminders.sentAt));
-
-    // Get all manual confirmations for this patient
-    const allConfirmations = await db
-      .select({
-        id: manualConfirmations.id,
-        reminderId: manualConfirmations.reminderId,
-        visitDate: manualConfirmations.visitDate,
-      })
-      .from(manualConfirmations)
-      .where(eq(manualConfirmations.patientId, id));
-
-    // Initialize counters
-    let terjadwal = 0;
-    let perluDiperbarui = 0;
-    let selesai = 0;
-
-    // Process each individual log to determine its status
-    for (const log of allLogs) {
-      // Check if this specific log has been confirmed (manually or automatically)
-      const logConfirmation = allConfirmations.find(
-        (conf) => conf.reminderId === log.id
-      );
-
-      if (logConfirmation || log.confirmationStatus === "CONFIRMED" || log.confirmationResponse) {
-        // Log has been confirmed (manually or automatically) - completed
-        selesai++;
-      } else if (["SENT", "DELIVERED"].includes(log.status) || log.sentAt) {
-        // Log sent but not confirmed - needs update
-        perluDiperbarui++;
-      } else if (log.status === "FAILED") {
-        // Log failed - still scheduled (will be retried)
-        terjadwal++;
-      } else {
-        // Unknown status - treat as scheduled
-        terjadwal++;
-      }
-    }
-
-    // Add schedules that have no logs yet
-    for (const schedule of allSchedules) {
-      const hasLogs = allLogs.some(
-        (log) => log.reminderScheduleId === schedule.id
-      );
-      if (!hasLogs) {
-        terjadwal++;
-      }
-    }
+    // Get reminder status counts using standardized completion logic
+    const statusCounts = await CompletionCalculationService.getReminderStatusCounts(id);
 
     const stats = {
-      terjadwal,
-      perluDiperbarui,
-      selesai,
-      semua: terjadwal + perluDiperbarui + selesai,
+      terjadwal: statusCounts.terjadwal,
+      perluDiperbarui: statusCounts.perluDiperbarui,
+      selesai: statusCounts.selesai,
+      semua: statusCounts.terjadwal + statusCounts.perluDiperbarui + statusCounts.selesai,
     };
 
     // Cache the stats with shorter TTL since they change more frequently

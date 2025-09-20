@@ -97,7 +97,16 @@ export default function PatientDetailPage() {
   const fetchPatient = useCallback(async (id: string, isPolling = false) => {
     try {
       logger.info(`Fetching patient ${id}`, { isPolling, timestamp: new Date().toISOString() });
-      const response = await fetch(`/api/patients/${id}`);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`/api/patients/${id}`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
 
@@ -127,7 +136,8 @@ export default function PatientDetailPage() {
       } else {
         setError("Gagal memuat data pasien");
       }
-    } catch {
+    } catch (error) {
+      console.error("Error fetching patient:", error);
       setError("Terjadi kesalahan saat memuat data pasien");
     } finally {
       if (!isPolling) {
@@ -138,7 +148,15 @@ export default function PatientDetailPage() {
 
   const fetchHealthNotes = useCallback(async (patientId: string) => {
     try {
-      const response = await fetch(`/api/patients/${patientId}/health-notes`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(`/api/patients/${patientId}/health-notes`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         const formattedNotes: HealthNote[] = data.healthNotes.map(
@@ -168,9 +186,16 @@ export default function PatientDetailPage() {
 
   const fetchCompletedReminders = useCallback(async (patientId: string) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/completed`
+        `/api/patients/${patientId}/reminders/completed`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
 
@@ -219,7 +244,7 @@ export default function PatientDetailPage() {
     if (!params.id) return;
 
     let pollCount = 0;
-    const maxPollsPerSession = 5; // Further reduced to be more conservative
+    const maxPollsPerSession = 3; // Reduced further to prevent excessive calls
     let isPolling = false; // Prevent concurrent polling requests
 
     const pollInterval = setInterval(() => {
@@ -231,18 +256,26 @@ export default function PatientDetailPage() {
         return;
       }
 
+      // Only poll if page is visible and patient status is pending
       if (
         document.visibilityState === "visible" &&
         patient?.verificationStatus === "PENDING"
       ) {
         isPolling = true;
         fetchPatient(params.id as string, true)
+          .catch(error => {
+            console.error("Polling failed:", error);
+            // Stop polling on errors to prevent infinite retries
+            if (pollCount >= 2) {
+              clearInterval(pollInterval);
+            }
+          })
           .finally(() => {
             isPolling = false;
             pollCount++;
           });
       }
-    }, 120000); // Increased to 2 minutes to be very conservative
+    }, 300000); // Increased to 5 minutes to be very conservative
 
     return () => clearInterval(pollInterval);
   }, [params.id, patient?.verificationStatus, fetchPatient]);

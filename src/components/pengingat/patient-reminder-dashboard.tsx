@@ -67,9 +67,16 @@ export function PatientReminderDashboard({
   const fetchStats = useCallback(async () => {
     if (!patientId) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/stats`
+        `/api/patients/${patientId}/reminders/stats`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const statsData = await response.json();
         setStats(statsData);
@@ -86,9 +93,16 @@ export function PatientReminderDashboard({
   const fetchScheduledReminders = useCallback(async () => {
     if (!patientId) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/scheduled`
+        `/api/patients/${patientId}/reminders/scheduled`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         console.log("Scheduled reminders data:", data);
@@ -115,9 +129,16 @@ export function PatientReminderDashboard({
   const fetchPendingReminders = useCallback(async () => {
     if (!patientId) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/pending`
+        `/api/patients/${patientId}/reminders/pending`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         console.log("Pending reminders data:", data);
@@ -142,9 +163,16 @@ export function PatientReminderDashboard({
   const fetchCompletedReminders = useCallback(async () => {
     if (!patientId) return;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/completed`
+        `/api/patients/${patientId}/reminders/completed`,
+        { signal: controller.signal }
       );
+
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         console.log("Completed reminders data:", data);
@@ -181,13 +209,14 @@ export function PatientReminderDashboard({
     } catch (error) {
       console.error("Error fetching all reminders:", error);
 
-      // Retry up to 2 times for network errors
-      if (retryCount < 2) {
-        console.log(`Retrying fetch (attempt ${retryCount + 1})...`);
+      // Only retry once for network errors, then fail gracefully
+      if (retryCount === 0) {
+        console.log("Retrying fetch once...");
         setTimeout(() => {
-          fetchAllReminders(retryCount + 1);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
+          fetchAllReminders(1);
+        }, 1000);
       } else {
+        // Show error toast but don't keep retrying
         toast.error("Gagal memuat data pengingat. Silakan refresh halaman.");
       }
     } finally {
@@ -230,16 +259,8 @@ export function PatientReminderDashboard({
     }
   }, [stats, terjadwalReminders.length, perluDiperbaruiReminders.length, selesaiReminders.length, loading]);
 
-  // Refresh stats periodically to catch cron updates
-  useEffect(() => {
-    if (!patientId) return;
-
-    const interval = setInterval(() => {
-      fetchStats();
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(interval);
-  }, [patientId, fetchStats]);
+  // Remove periodic stats refresh to prevent infinite API calls
+  // Stats will be refreshed manually via the refresh button or when actions are performed
 
 
 
