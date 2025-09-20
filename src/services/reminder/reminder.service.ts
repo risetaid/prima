@@ -13,21 +13,35 @@ import {
 import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
+import { ReminderTemplatesService } from "./reminder-templates.service";
 
 import { db, patients, reminders } from "@/db";
 import { ReminderError } from "./reminder.types";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { eq, and, gte, lte, isNull } from "drizzle-orm";
 
+// Type definitions for reminder types
+export type ReminderType = 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+export interface ReminderConfig {
+  type: ReminderType;
+  title?: string;
+  description?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  recurrencePattern?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
 export class ReminderService {
   private repository: ReminderRepository;
   private whatsappService: WhatsAppService;
   private followupService: FollowupService;
+  private templateService: ReminderTemplatesService;
 
   constructor() {
     this.repository = new ReminderRepository();
     this.whatsappService = new WhatsAppService();
     this.followupService = new FollowupService();
+    this.templateService = new ReminderTemplatesService();
   }
 
   // CREATE operations
@@ -64,6 +78,9 @@ export class ReminderService {
       }
     }
 
+    // Extract reminder configuration with type awareness
+    const reminderConfig = this.extractReminderConfig(dto);
+
     // Generate dates based on recurrence
     const dates = dto.customRecurrence
       ? this.generateRecurrenceDates(dto.customRecurrence)
@@ -85,6 +102,12 @@ export class ReminderService {
         startDate: reminderDate,
         endDate: reminderDate,
         message: dto.message,
+        reminderType: reminderConfig.type,
+        title: reminderConfig.title || dto.message,
+        description: reminderConfig.description,
+        priority: reminderConfig.priority || 'medium',
+        recurrencePattern: reminderConfig.recurrencePattern,
+        metadata: reminderConfig.metadata || {},
         createdById: dto.createdById,
       });
 
@@ -102,12 +125,16 @@ export class ReminderService {
       // Check if should send immediately
       const scheduleDate = schedule.startDate.toISOString().split("T")[0];
       if (shouldSendReminderNow(scheduleDate, dto.time)) {
-        await this.sendReminder(
-          schedule.id,
-          patient,
-          dto.message,
-          validatedContent
-        );
+        await this.sendReminder({
+          patientId: patient.id,
+          phoneNumber: patient.phoneNumber,
+          message: schedule.message,
+          reminderId: schedule.id,
+          patientName: patient.name,
+          reminderType: schedule.reminderType || 'GENERAL',
+          reminderTitle: schedule.title || undefined,
+          reminderDescription: schedule.description || undefined,
+        });
       }
     }
 
@@ -243,69 +270,99 @@ export class ReminderService {
     return result[0] || null;
   }
 
-  private async sendReminder(
-    scheduleId: string,
-    patient: { id: string; name: string; phoneNumber: string },
-    message: string,
-    attachments: ValidatedContent[]
-  ) {
+  async sendReminder(params: {
+    patientId: string;
+    phoneNumber: string;
+    message: string;
+    reminderId: string;
+    reminderName?: string;
+    patientName: string;
+    reminderType: string;
+    reminderTitle?: string | null;
+    reminderDescription?: string | null;
+  }): Promise<{ success: boolean; messageId?: string; error?: string; followupsScheduled?: number }> {
     try {
-      const enhancedMessage = this.whatsappService.buildMessage(
-        message,
-        attachments
-      );
+      const reminderType = params.reminderType as ReminderType;
+      const formattedMessage = this.templateService.formatReminderMessage({
+        patientName: params.patientName,
+        reminderType,
+        title: params.reminderTitle || undefined,
+        description: params.reminderDescription || undefined,
+        message: params.message,
+        scheduledTime: '',
+        metadata: {},
+      });
+
       const result = await this.whatsappService.send(
-        patient.phoneNumber,
-        enhancedMessage
+        params.phoneNumber,
+        formattedMessage
       );
 
-      // ReminderLogs table was removed from schema
-      // Log reminder send using logger instead
+      // Log reminder send using logger
       logger.info('Reminder sent', {
-        reminderScheduleId: scheduleId,
-        patientId: patient.id,
+        reminderScheduleId: params.reminderId,
+        patientId: params.patientId,
+        reminderType,
         sentAt: getWIBTime(),
         status: result.success ? "DELIVERED" : "FAILED",
-        message: message,
-        phoneNumber: patient.phoneNumber,
+        message: formattedMessage,
+        phoneNumber: params.phoneNumber,
         fonnteMessageId: result.messageId,
       });
 
-      // Log reminder send and schedule followups for all reminders
+      let followupsScheduled = 0;
+
+      // Schedule followups if successful
       if (result.success) {
         try {
-          await this.followupService.scheduleMedicationFollowups({
-            patientId: patient.id,
-            reminderId: scheduleId,
-            phoneNumber: patient.phoneNumber,
-            patientName: patient.name,
-            reminderName: message,
+          await this.followupService.scheduleTypeAwareFollowups({
+            patientId: params.patientId,
+            reminderId: params.reminderId,
+            phoneNumber: params.phoneNumber,
+            patientName: params.patientName,
+            reminderType: reminderType,
+            reminderTitle: params.reminderTitle || params.message,
+            reminderMessage: params.message,
+            priority: 'MEDIUM',
+            metadata: {},
           });
 
+          followupsScheduled = 3; // Typically schedules 3 followups
+
           logger.info('Followups scheduled for reminder', {
-            reminderScheduleId: scheduleId,
-            patientId: patient.id,
-            reminderMessage: message,
+            reminderScheduleId: params.reminderId,
+            patientId: params.patientId,
+            reminderType: params.reminderType,
+            reminderMessage: params.message,
             operation: 'schedule_followups_after_reminder'
           });
         } catch (followupError) {
           logger.error('Failed to schedule followups after reminder', followupError as Error, {
-            reminderScheduleId: scheduleId,
-            patientId: patient.id,
+            reminderScheduleId: params.reminderId,
+            patientId: params.patientId,
             operation: 'schedule_followups_after_reminder'
           });
           // Don't fail the reminder send if followup scheduling fails
         }
       }
 
-      await invalidateCache(CACHE_KEYS.reminderStats(patient.id));
-      return result;
+      await invalidateCache(CACHE_KEYS.reminderStats(params.patientId));
+      return {
+        success: result.success,
+        messageId: result.messageId,
+        error: result.error,
+        followupsScheduled,
+      };
     } catch (error) {
       logger.error("Failed to send reminder", error as Error, {
-        scheduleId,
-        patientId: patient.id,
+        reminderId: params.reminderId,
+        patientId: params.patientId,
       });
-      throw error;
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        followupsScheduled: 0,
+      };
     }
   }
 
@@ -430,6 +487,98 @@ export class ReminderService {
   }
 
 
+  /**
+   * Extract reminder configuration from DTO with type awareness
+   */
+  private extractReminderConfig(dto: CreateReminderDTO): ReminderConfig {
+    // Default to MEDICATION for backward compatibility
+    const reminderType: ReminderType = dto.reminderType || 'MEDICATION';
+
+    // Extract configuration based on type
+    const priority = dto.priority ? (dto.priority.toLowerCase() as 'low' | 'medium' | 'high' | 'urgent') : 'medium';
+    let parsedRecurrencePattern: Record<string, unknown> | undefined = undefined;
+    if (dto.recurrencePattern) {
+      try {
+        parsedRecurrencePattern = JSON.parse(dto.recurrencePattern);
+      } catch {
+        // Invalid JSON, keep as undefined
+      }
+    }
+    
+    const config: ReminderConfig = {
+      type: reminderType,
+      title: dto.title || this.getDefaultTitle(reminderType),
+      description: dto.description || this.getDefaultDescription(reminderType),
+      priority,
+      recurrencePattern: parsedRecurrencePattern,
+      metadata: dto.metadata || {},
+    };
+
+    // Type-specific metadata
+    switch (reminderType) {
+      case 'MEDICATION':
+        config.metadata = {
+          ...config.metadata,
+          medicationName: dto.medicationName || dto.title,
+          dosage: dto.dosage,
+          form: dto.form || 'tablet',
+        };
+        break;
+      case 'APPOINTMENT':
+        config.metadata = {
+          ...config.metadata,
+          appointmentType: dto.appointmentType || 'Check-up',
+          doctorName: dto.doctorName,
+          location: dto.location,
+        };
+        break;
+      case 'GENERAL':
+        config.metadata = {
+          ...config.metadata,
+          category: dto.category || 'General',
+          customFields: dto.customFields || {},
+        };
+        break;
+    }
+
+    return config;
+  }
+
+  /**
+   * Get default title for reminder type
+   */
+  private getDefaultTitle(type: ReminderType): string {
+    switch (type) {
+      case 'MEDICATION':
+        return 'Pengingat Obat';
+      case 'APPOINTMENT':
+        return 'Janji Temu';
+      case 'GENERAL':
+        return 'Pengingat';
+      default:
+        return 'Pengingat';
+    }
+  }
+
+  /**
+   * Get default description for reminder type
+   */
+  private getDefaultDescription(type: ReminderType): string {
+    switch (type) {
+      case 'MEDICATION':
+        return 'Pengingat untuk minum obat sesuai jadwal';
+      case 'APPOINTMENT':
+        return 'Pengingat untuk janji temu dengan dokter';
+      case 'GENERAL':
+        return 'Pengingat kegiatan atau tugas penting';
+      default:
+        return 'Pengingat penting';
+    }
+  }
+
+  /**
+   * Generate recurrence dates based on recurrence pattern
+   */
   private generateRecurrenceDates(recurrence: CustomRecurrence): string[] {
     const dates: string[] = [];
     const today = new Date();

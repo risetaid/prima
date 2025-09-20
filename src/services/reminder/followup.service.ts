@@ -32,6 +32,88 @@ export class FollowupService {
   }
 
   /**
+   * Schedule type-aware followups for different reminder types
+   * Creates a series of followups: 15min, 2h, 24h with type-specific messaging
+   */
+  async scheduleTypeAwareFollowups(request: FollowupScheduleRequest & {
+    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+    reminderTitle?: string;
+    reminderMessage?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    metadata?: Record<string, unknown>;
+  }): Promise<string[]> {
+    try {
+      const followupIds: string[] = [];
+      const now = getWIBTime();
+
+      // Adjust followup timing based on reminder type and priority
+      const followupTimings = this.getFollowupTimings(request.reminderType, request.priority);
+
+      // Schedule 15-minute followup
+      const followup15Min = await this.createFollowup({
+        ...request,
+        followupType: 'REMINDER_15MIN',
+        scheduledAt: new Date(now.getTime() + followupTimings.first),
+        stage: 'FOLLOWUP_15MIN',
+        reminderType: request.reminderType,
+        reminderTitle: request.reminderTitle,
+        reminderMessage: request.reminderMessage,
+        priority: request.priority,
+        metadata: request.metadata,
+      });
+      followupIds.push(followup15Min);
+
+      // Schedule 2-hour followup
+      const followup2H = await this.createFollowup({
+        ...request,
+        followupType: 'REMINDER_2H',
+        scheduledAt: new Date(now.getTime() + followupTimings.second),
+        stage: 'FOLLOWUP_2H',
+        reminderType: request.reminderType,
+        reminderTitle: request.reminderTitle,
+        reminderMessage: request.reminderMessage,
+        priority: request.priority,
+        metadata: request.metadata,
+      });
+      followupIds.push(followup2H);
+
+      // Schedule 24-hour followup
+      const followup24H = await this.createFollowup({
+        ...request,
+        followupType: 'REMINDER_24H',
+        scheduledAt: new Date(now.getTime() + followupTimings.third),
+        stage: 'FOLLOWUP_24H',
+        reminderType: request.reminderType,
+        reminderTitle: request.reminderTitle,
+        reminderMessage: request.reminderMessage,
+        priority: request.priority,
+        metadata: request.metadata,
+      });
+      followupIds.push(followup24H);
+
+      logger.info("Type-aware followups scheduled", {
+        reminderId: request.reminderId,
+        patientId: request.patientId,
+        reminderType: request.reminderType,
+        followupIds,
+        timings: followupTimings,
+        operation: "schedule_type_aware_followups"
+      });
+
+      return followupIds;
+    } catch (error) {
+      logger.error("Failed to schedule type-aware followups", error instanceof Error ? error : new Error(String(error)), {
+        reminderId: request.reminderId,
+        patientId: request.patientId,
+        reminderType: request.reminderType,
+        operation: "schedule_type_aware_followups"
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy method for backward compatibility
    * Schedule followups for a medication reminder
    * Creates a series of followups: 15min, 2h, 24h
    */
@@ -97,6 +179,11 @@ export class FollowupService {
     followupType: FollowupType;
     scheduledAt: Date;
     stage: FollowupStage;
+    reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+    reminderTitle?: string;
+    reminderMessage?: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+    metadata?: Record<string, unknown>;
   }): Promise<string> {
     const followupId = this.generateFollowupId();
     const now = getWIBTime();
@@ -116,6 +203,11 @@ export class FollowupService {
       maxRetries: 3,
       createdAt: now,
       updatedAt: now,
+      reminderType: params.reminderType,
+      reminderTitle: params.reminderTitle,
+      reminderMessage: params.reminderMessage,
+      priority: params.priority,
+      metadata: params.metadata,
     };
 
     // Store followup data in Redis hash
@@ -483,6 +575,12 @@ export class FollowupService {
       updatedAt: followup.updatedAt.toISOString(),
       error: followup.error || '',
       messageId: followup.messageId || '',
+      // Enhanced fields for type-aware followups
+      reminderType: followup.reminderType || '',
+      reminderTitle: followup.reminderTitle || '',
+      reminderMessage: followup.reminderMessage || '',
+      priority: followup.priority || '',
+      metadata: JSON.stringify(followup.metadata || {}),
     };
 
     await redis.hset(key, data);
@@ -517,6 +615,12 @@ export class FollowupService {
       updatedAt: new Date(data.updatedAt),
       error: data.error || undefined,
       messageId: data.messageId || undefined,
+      // Enhanced fields for type-aware followups
+      reminderType: (data.reminderType as 'MEDICATION' | 'APPOINTMENT' | 'GENERAL') || undefined,
+      reminderTitle: data.reminderTitle || undefined,
+      reminderMessage: data.reminderMessage || undefined,
+      priority: (data.priority as 'LOW' | 'MEDIUM' | 'HIGH') || undefined,
+      metadata: data.metadata ? JSON.parse(data.metadata) : undefined,
     };
   }
 
@@ -533,44 +637,71 @@ export class FollowupService {
     return null;
   }
 
+  /**
+   * Get followup timings based on reminder type and priority
+   */
+  private getFollowupTimings(
+    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL',
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+  ): { first: number; second: number; third: number } {
+    // Base timings in milliseconds
+    const baseTimings = {
+      first: 15 * 60 * 1000,    // 15 minutes
+      second: 2 * 60 * 60 * 1000, // 2 hours
+      third: 24 * 60 * 60 * 1000, // 24 hours
+    };
+
+    // Adjust based on reminder type and priority
+    let multiplier = 1;
+    if (priority === 'HIGH') {
+      multiplier = 0.5; // Faster followups for high priority
+    } else if (priority === 'LOW') {
+      multiplier = 1.5; // Slower followups for low priority
+    }
+
+    switch (reminderType) {
+      case 'MEDICATION':
+        // Medication reminders are time-sensitive
+        return {
+          first: baseTimings.first * multiplier,
+          second: baseTimings.second * multiplier,
+          third: baseTimings.third * multiplier,
+        };
+      case 'APPOINTMENT':
+        // Appointments need earlier followups
+        return {
+          first: baseTimings.first,
+          second: baseTimings.second * 1.5, // 3 hours for appointments
+          third: baseTimings.third,
+        };
+      case 'GENERAL':
+        // General reminders can be more flexible
+        return {
+          first: baseTimings.first * 2,    // 30 minutes
+          second: baseTimings.second * 2,   // 4 hours
+          third: baseTimings.third * 1.5,   // 36 hours
+        };
+      default:
+        return baseTimings;
+    }
+  }
+
+  /**
+   * Build followup message
+   */
   private buildFollowupMessage(followup: FollowupData): string {
-    const medicationText = followup.reminderName
-      ? ` untuk mengonsumsi ${followup.reminderName}`
-      : '';
+    const reminderType = followup.reminderType || 'MEDICATION';
+    const reminderTitle = followup.reminderTitle || followup.reminderName || 'pengingat';
 
     switch (followup.followupType) {
       case 'REMINDER_15MIN':
-        return `⏰ *Follow-up: Pengingat Obat*
-
-Halo ${followup.patientName}!
-
-15 menit yang lalu kami mengirim pengingat${medicationText}.
-
-Apakah sudah diminum? Balas "SUDAH" atau "BELUM".
-
-💙 Tim PRIMA`;
+        return this.build15MinuteFollowup(reminderType, followup.patientName, reminderTitle);
 
       case 'REMINDER_2H':
-        return `⏰ *Follow-up: Pengingat Obat*
-
-Halo ${followup.patientName}!
-
-2 jam yang lalu kami mengirim pengingat${medicationText}.
-
-Bagaimana kondisinya? Apakah sudah diminum?
-
-💙 Tim PRIMA`;
+        return this.build2HourFollowup(reminderType, followup.patientName, reminderTitle);
 
       case 'REMINDER_24H':
-        return `⏰ *Follow-up: Pengingat Obat*
-
-Halo ${followup.patientName}!
-
-24 jam yang lalu kami mengirim pengingat${medicationText}.
-
-Mohon konfirmasi apakah sudah sesuai jadwal.
-
-💙 Tim PRIMA`;
+        return this.build24HourFollowup(reminderType, followup.patientName, reminderTitle);
 
       default:
         return `⏰ *Follow-up: Konfirmasi*
@@ -578,6 +709,138 @@ Mohon konfirmasi apakah sudah sesuai jadwal.
 Halo ${followup.patientName}!
 
 Apakah Anda menerima pengingat kesehatan kami?
+
+💙 Tim PRIMA`;
+    }
+  }
+
+  /**
+   * Build 15-minute followup message based on reminder type
+   */
+  private build15MinuteFollowup(
+    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL',
+    patientName: string,
+    reminderTitle: string
+  ): string {
+    switch (reminderType) {
+      case 'MEDICATION':
+        return `⏰ *Follow-up: Pengingat Obat*
+
+Halo ${patientName}!
+
+15 menit yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Apakah sudah diminum? Balas "SUDAH" atau "BELUM".
+
+💙 Tim PRIMA`;
+
+      case 'APPOINTMENT':
+        return `⏰ *Follow-up: Janji Temu*
+
+Halo ${patientName}!
+
+15 menit yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Apakah sudah hadir? Balas "HADIR" atau "TERLAMBAT".
+
+💙 Tim PRIMA`;
+
+      case 'GENERAL':
+        return `⏰ *Follow-up: Pengingat*
+
+Halo ${patientName}!
+
+15 menit yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Apakah sudah dilakukan? Balas "SELESAI" atau "BELUM".
+
+💙 Tim PRIMA`;
+    }
+  }
+
+  /**
+   * Build 2-hour followup message based on reminder type
+   */
+  private build2HourFollowup(
+    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL',
+    patientName: string,
+    reminderTitle: string
+  ): string {
+    switch (reminderType) {
+      case 'MEDICATION':
+        return `⏰ *Follow-up: Pengingat Obat*
+
+Halo ${patientName}!
+
+2 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Bagaimana kondisinya? Apakah sudah diminum?
+
+💙 Tim PRIMA`;
+
+      case 'APPOINTMENT':
+        return `⏰ *Follow-up: Janji Temu*
+
+Halo ${patientName}!
+
+2 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Bagaimana kondisinya? Apakah sudah hadir?
+
+💙 Tim PRIMA`;
+
+      case 'GENERAL':
+        return `⏰ *Follow-up: Pengingat*
+
+Halo ${patientName}!
+
+2 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Bagaimana kondisinya? Apakah sudah dilakukan?
+
+💙 Tim PRIMA`;
+    }
+  }
+
+  /**
+   * Build 24-hour followup message based on reminder type
+   */
+  private build24HourFollowup(
+    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL',
+    patientName: string,
+    reminderTitle: string
+  ): string {
+    switch (reminderType) {
+      case 'MEDICATION':
+        return `⏰ *Follow-up: Pengingat Obat*
+
+Halo ${patientName}!
+
+24 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Mohon konfirmasi apakah sudah sesuai jadwal.
+
+💙 Tim PRIMA`;
+
+      case 'APPOINTMENT':
+        return `⏰ *Follow-up: Janji Temu*
+
+Halo ${patientName}!
+
+24 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Mohon konfirmasi kehadiran Anda.
+
+💙 Tim PRIMA`;
+
+      case 'GENERAL':
+        return `⏰ *Follow-up: Pengingat*
+
+Halo ${patientName}!
+
+24 jam yang lalu kami mengirim pengingat untuk ${reminderTitle}.
+
+Mohon konfirmasi status kegiatan Anda.
 
 💙 Tim PRIMA`;
     }

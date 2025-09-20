@@ -21,6 +21,12 @@ export interface FollowupData {
   updatedAt: Date;
   error?: string;
   messageId?: string; // WhatsApp message ID
+  // Enhanced fields for type-aware followups
+  reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+  reminderTitle?: string;
+  reminderMessage?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  metadata?: Record<string, unknown>;
 }
 
 export type FollowupType =
@@ -53,6 +59,12 @@ export interface FollowupScheduleRequest {
   patientName: string;
   reminderName?: string;
   followupType?: FollowupType;
+  // Enhanced fields for type-aware followups
+  reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+  reminderTitle?: string;
+  reminderMessage?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH';
+  metadata?: Record<string, unknown>;
 }
 
 export interface FollowupResponse {

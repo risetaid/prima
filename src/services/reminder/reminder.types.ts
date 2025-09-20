@@ -24,12 +24,44 @@ export interface CreateReminderDTO {
   customRecurrence?: CustomRecurrence
   attachedContent?: AttachedContent[]
   createdById: string
+  // Enhanced properties for general reminders
+  reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL'
+  title?: string
+  description?: string
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+  recurrencePattern?: string
+  metadata?: Record<string, unknown>
+  // Type-specific properties
+  medicationName?: string
+  dosage?: string
+  form?: string
+  appointmentType?: string
+  doctorName?: string
+  location?: string
+  category?: string
+  customFields?: Record<string, unknown>
 }
 
 export interface UpdateReminderDTO {
   reminderTime: string
   customMessage: string
   attachedContent?: AttachedContent[]
+  // Enhanced properties for general reminders
+  reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL'
+  title?: string
+  description?: string
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH'
+  recurrencePattern?: string
+  metadata?: Record<string, unknown>
+  // Type-specific properties
+  medicationName?: string
+  dosage?: string
+  form?: string
+  appointmentType?: string
+  doctorName?: string
+  location?: string
+  category?: string
+  customFields?: Record<string, unknown>
 }
 
 export interface CustomRecurrence {

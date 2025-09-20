@@ -5,6 +5,7 @@ import {
   boolean,
   uuid,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 // Import clean enums
@@ -58,6 +59,12 @@ export const reminders = pgTable(
     confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
     confirmationResponseAt: timestamp("confirmation_response_at", { withTimezone: true }),
     confirmationResponse: text("confirmation_response"),
+    // Enhanced fields for general reminder support
+    title: text("title"),
+    description: text("description"),
+    priority: text("priority", { enum: ['low', 'medium', 'high', 'urgent'] }).default('medium'),
+    recurrencePattern: jsonb("recurrence_pattern"),
+    metadata: jsonb("metadata"),
   },
   (table) => ({
     patientIdIdx: index("reminders_patient_id_idx").on(table.patientId),
@@ -68,10 +75,14 @@ export const reminders = pgTable(
     sentAtIdx: index("reminders_sent_at_idx").on(table.sentAt),
     confirmationStatusIdx: index("reminders_confirmation_status_idx").on(table.confirmationStatus),
     deletedAtIdx: index("reminders_deleted_at_idx").on(table.deletedAt),
+    priorityIdx: index("reminders_priority_idx").on(table.priority),
     // Composite indexes for common queries
     patientActiveIdx: index("reminders_patient_active_idx").on(table.patientId, table.isActive),
     patientStatusIdx: index("reminders_patient_status_idx").on(table.patientId, table.status),
     todayRemindersIdx: index("reminders_today_idx").on(table.startDate, table.isActive, table.scheduledTime),
+    typeStatusIdx: index("reminders_type_status_idx").on(table.reminderType, table.status),
+    patientTypeIdx: index("reminders_patient_type_idx").on(table.patientId, table.reminderType),
+    activeTypeIdx: index("reminders_active_type_idx").on(table.isActive, table.reminderType),
   })
 );
 
@@ -82,23 +93,54 @@ export const manualConfirmations = pgTable(
     patientId: uuid("patient_id").notNull(),
     volunteerId: uuid("volunteer_id").notNull(),
     reminderId: uuid("reminder_id"),
-    visitDate: timestamp("visit_date", { withTimezone: true }).notNull(),
-    visitTime: text("visit_time").notNull(),
-    patientCondition: patientConditionEnum("patient_condition").notNull(),
-    symptomsReported: text("symptoms_reported").array().notNull().default([]),
+    reminderType: reminderTypeEnum("reminder_type"),
+    confirmationType: text("confirmation_type", { enum: ['VISIT', 'PHONE_CALL', 'MESSAGE', 'GENERAL'] }).notNull().default('GENERAL'),
+    visitDate: timestamp("visit_date", { withTimezone: true }),
+    visitTime: text("visit_time"),
+    patientCondition: patientConditionEnum("patient_condition"),
+    symptomsReported: text("symptoms_reported").array().default([]),
     notes: text("notes"),
     followUpNeeded: boolean("follow_up_needed").notNull().default(false),
     followUpNotes: text("follow_up_notes"),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     patientIdIdx: index("manual_confirmations_patient_id_idx").on(table.patientId),
     volunteerIdIdx: index("manual_confirmations_volunteer_id_idx").on(table.volunteerId),
     reminderIdIdx: index("manual_confirmations_reminder_id_idx").on(table.reminderId),
+    reminderTypeIdx: index("manual_confirmations_reminder_type_idx").on(table.reminderType),
+    confirmationTypeIdx: index("manual_confirmations_confirmation_type_idx").on(table.confirmationType),
     visitDateIdx: index("manual_confirmations_visit_date_idx").on(table.visitDate),
     confirmedAtIdx: index("manual_confirmations_confirmed_at_idx").on(table.confirmedAt),
+    patientVolunteerIdx: index("manual_confirmations_patient_volunteer_idx").on(table.patientId, table.volunteerId),
+    reminderConfirmationIdx: index("manual_confirmations_reminder_confirmation_idx").on(table.reminderType, table.confirmationType),
+  })
+);
+
+export const reminderLogs = pgTable(
+  "reminder_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reminderId: uuid("reminder_id").notNull().references(() => reminders.id, { onDelete: "cascade" }),
+    patientId: uuid("patient_id").notNull().references(() => patients.id, { onDelete: "cascade" }),
+    action: text("action").notNull(), // SENT, DELIVERED, FAILED, CONFIRMED, MISSED, FOLLOWUP_SENT
+    actionType: text("action_type"), // INITIAL, FOLLOWUP, MANUAL, AUTOMATIC
+    message: text("message"),
+    response: text("response"),
+    timestamp: timestamp("timestamp", { withTimezone: true }).notNull().defaultNow(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    reminderIdIdx: index("reminder_logs_reminder_id_idx").on(table.reminderId),
+    patientIdIdx: index("reminder_logs_patient_id_idx").on(table.patientId),
+    actionIdx: index("reminder_logs_action_idx").on(table.action),
+    timestampIdx: index("reminder_logs_timestamp_idx").on(table.timestamp),
+    reminderActionIdx: index("reminder_logs_reminder_action_idx").on(table.reminderId, table.action),
+    patientTimestampIdx: index("reminder_logs_patient_timestamp_idx").on(table.patientId, table.timestamp),
   })
 );
 
@@ -127,3 +169,13 @@ export const whatsappTemplates = pgTable(
     deletedAtIdx: index("whatsapp_templates_deleted_at_idx").on(table.deletedAt),
   })
 );
+
+// Export types for use in other files
+export type Reminder = typeof reminders.$inferSelect;
+export type ReminderInsert = typeof reminders.$inferInsert;
+export type ReminderLog = typeof reminderLogs.$inferSelect;
+export type ReminderLogInsert = typeof reminderLogs.$inferInsert;
+export type ManualConfirmation = typeof manualConfirmations.$inferSelect;
+export type ManualConfirmationInsert = typeof manualConfirmations.$inferInsert;
+export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
+export type WhatsappTemplateInsert = typeof whatsappTemplates.$inferInsert;

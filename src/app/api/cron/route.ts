@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 // Rate limiter temporarily disabled
 
+// Import reminder service for follow-up scheduling
+let reminderService: import('@/services/reminder/reminder.service').ReminderService | null = null;
+
 // GET endpoint for cron functions
 export async function GET(request: NextRequest) {
   // Verify this is called by cron with secret
@@ -50,8 +53,14 @@ async function processReminders() {
     // Import dependencies
     const { db, reminders, patients } = await import('@/db');
     const { eq, and, lte, isNull } = await import('drizzle-orm');
-    const { sendWhatsAppMessage, formatWhatsAppNumber } = await import('@/lib/fonnte');
+    // const { sendWhatsAppMessage, formatWhatsAppNumber } = await import('@/lib/fonnte');
     const { getWIBTime } = await import('@/lib/timezone');
+
+    // Import reminder service for follow-up scheduling
+    if (!reminderService) {
+      const { ReminderService } = await import('@/services/reminder/reminder.service');
+      reminderService = new ReminderService();
+    }
 
     const now = new Date();
     const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
@@ -69,7 +78,9 @@ async function processReminders() {
         message: reminders.message,
         scheduledTime: reminders.scheduledTime,
         startDate: reminders.startDate,
-        // medicationDetails removed - system now uses custom message field only
+        reminderType: reminders.reminderType,
+        title: reminders.title,
+        description: reminders.description,
         // Patient info
         patientName: patients.name,
         patientPhone: patients.phoneNumber,
@@ -100,43 +111,46 @@ async function processReminders() {
       try {
         processedCount++;
 
-        // Use simplified message system - medicationDetails removed
-        let enhancedMessage = reminder.message;
-        // Content attachment system simplified - no longer uses medicationDetails
-        enhancedMessage += '\n\n💙 Tim PRIMA';
-
-        // Send WhatsApp message
-        const result = await sendWhatsAppMessage({
-          to: formatWhatsAppNumber(reminder.patientPhone),
-          body: enhancedMessage,
+        // Use ReminderService to send message with type-specific formatting
+        const sendResult = await reminderService.sendReminder({
+          patientId: reminder.patientId,
+          phoneNumber: reminder.patientPhone,
+          message: reminder.message,
+          reminderId: reminder.id,
+          reminderName: reminder.title || 'Pengingat',
+          patientName: reminder.patientName,
+          reminderType: reminder.reminderType,
+          reminderTitle: reminder.title ? reminder.title : undefined,
+          reminderDescription: reminder.description ? reminder.description : undefined,
         });
 
-        // Update reminder status
-        const status = result.success ? 'SENT' : 'FAILED';
+        // Update reminder status based on sendResult
+        const status = sendResult.success ? 'SENT' : 'FAILED';
         await db.update(reminders)
           .set({
             sentAt: getWIBTime(),
             status: status,
-            fonnteMessageId: result.messageId,
+            fonnteMessageId: sendResult.messageId,
             updatedAt: getWIBTime(),
           })
           .where(eq(reminders.id, reminder.id));
 
-        if (result.success) {
+        if (sendResult.success) {
           successCount++;
           logger.info('Reminder sent successfully', {
             reminderId: reminder.id,
             patientId: reminder.patientId,
             patientName: reminder.patientName,
-            messageId: result.messageId
+            messageId: sendResult.messageId,
+            followupsScheduled: sendResult.followupsScheduled
           });
         } else {
           failedCount++;
-          errors.push(`Reminder ${reminder.id}: ${result.error || 'Unknown error'}`);
+          errors.push(`Reminder ${reminder.id}: ${sendResult.error || 'Unknown error'}`);
           logger.warn('Failed to send reminder', {
             reminderId: reminder.id,
             patientId: reminder.patientId,
-            error: result.error
+            error: sendResult.error
           });
         }
       } catch (error) {

@@ -10,6 +10,7 @@ import { safetyFilterService } from "./safety-filter";
 import { withRetry, DEFAULT_RETRY_CONFIGS, isRetryableError } from "@/lib/simple-retry";
 import { messageQueueService } from "@/services/message-queue.service";
 import { llmCostService } from "@/lib/llm-cost-service";
+import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
 import {
   LLMConfig,
   LLMRequest,
@@ -21,6 +22,7 @@ import {
 export class LLMService {
   private client: Anthropic;
   private config: LLMConfig;
+  private templateService: ReminderTemplatesService;
 
   constructor() {
     this.config = {
@@ -39,6 +41,8 @@ export class LLMService {
     this.client = new Anthropic({
       apiKey: this.config.apiKey,
     });
+
+    this.templateService = new ReminderTemplatesService();
 
     logger.info("LLM Service initialized", {
       model: this.config.model,
@@ -392,18 +396,20 @@ Patient Information:
     }${reminderContext}${todaysRemindersContext}${healthNotesContext}
 
 Your task is to analyze the patient's message and determine their intent. Respond with a JSON object containing:
-- intent: One of [verification_response, medication_confirmation, unsubscribe, reminder_inquiry, health_notes_inquiry, general_inquiry, emergency, unknown]
+- intent: One of [verification_response, reminder_confirmation, unsubscribe, reminder_inquiry, health_notes_inquiry, general_inquiry, emergency, unknown]
 - confidence: Number between 0-1 indicating confidence level
 - entities: Any extracted information (medication names, times, etc.)
 
 Guidelines:
 - For verification: Look for "YA" or "TIDAK" responses to verification questions
-- For medication_confirmation: Look for confirmations about taking medication, such as:
-  * "SUDAH minum", "sudah saya minum", "sudah ambil obat"
-  * "BELUM minum", "belum saya minum", "belum ambil obat"
-  * "sudah makan obat", "sudah telan obat", "sudah konsumsi obat"
-  * References to taking medication: "minum", "ambil obat", "makan obat", "telan", "konsumsi"
-  * Numbers like "keduanya sudah" (both already), "semuanya sudah" (all already)
+- For reminder_confirmation: Look for confirmations about reminders (MEDICATION, APPOINTMENT, GENERAL), such as:
+  * "SUDAH", "sudah", "SELESAI", "HADIR" - positive confirmations
+  * "BELUM", "belum", "TERLAMBAT" - pending/negative responses
+  * "BANTUAN", "tolong" - help requests
+  * Context-specific responses based on reminder type:
+    - MEDICATION: "minum", "makan obat", "telan obat", "konsumsi obat"
+    - APPOINTMENT: "hadir", "datang", "janji temu", "dokter"
+    - GENERAL: "selesai", "dilakukan", "selesai", "lakukan"
 - For reminder_inquiry: Look for questions about today's reminders, schedules, such as:
   * "remindernya hari ini apa saja", "pengingat hari ini apa saja"
   * "jadwal hari ini", "reminder untuk hari ini"
@@ -416,7 +422,7 @@ Guidelines:
 - For emergency: Look for urgent medical situations, pain, symptoms
 - For general_inquiry: Any other questions or statements
 
-IMPORTANT: Distinguish between FOOD reminders and MEDICATION reminders. Messages about "makan makanan" (eating food) are NOT medication confirmations.
+IMPORTANT: Detect reminder type from context and use appropriate confirmation keywords.
 
 Respond only with valid JSON.`;
   }
@@ -603,9 +609,16 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
 
     if (
       normalizedMessage.includes("sudah") ||
-      normalizedMessage.includes("belum")
+      normalizedMessage.includes("belum") ||
+      normalizedMessage.includes("selesai") ||
+      normalizedMessage.includes("hadir") ||
+      normalizedMessage.includes("datang") ||
+      normalizedMessage.includes("lakukan") ||
+      normalizedMessage.includes("minum") ||
+      normalizedMessage.includes("makan") ||
+      normalizedMessage.includes("telan")
     ) {
-      return { intent: "medication_confirmation", confidence: 0.8 };
+      return { intent: "reminder_confirmation", confidence: 0.8 };
     }
 
     if (
@@ -715,8 +728,167 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
   }
 
   /**
-   * Detect simple medication confirmation response
+   * Detect simple reminder confirmation response
    * This method detects "sudah"/"belum" patterns for status updates
+   */
+  async detectSimpleReminderResponse(
+    message: string,
+    context: ConversationContext
+  ): Promise<{
+    isReminderResponse: boolean;
+    responseType: "confirmed" | "pending" | "help" | "unknown";
+    confidence: number;
+    reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+  }> {
+    const normalizedMessage = message.toLowerCase().trim();
+
+    // Get reminder context to determine type-specific patterns
+    let reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL' = 'MEDICATION';
+    try {
+      if (context.patientId) {
+        const { ReminderService } = await import("@/services/reminder/reminder.service");
+        const reminderService = new ReminderService();
+        const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
+        const pendingReminder = todaysReminders.find(r => !r.isCompleted);
+        if (pendingReminder) {
+          reminderType = pendingReminder.reminderType as 'MEDICATION' | 'APPOINTMENT' | 'GENERAL' || 'MEDICATION';
+        }
+      }
+    } catch {
+      // Default to MEDICATION if context detection fails
+    }
+
+    // Type-specific confirmation patterns
+    const confirmedPatterns = {
+      MEDICATION: [
+        "sudah", "udh", "udah", "sdh", "dah",
+        "sudah minum", "udah minum", "sudah makan", "sudah telan",
+        "sudah konsumsi", "sudah ambil", "done", "selesai",
+        "sudah selesai", "sudah lakukan", "oke siap", "siap"
+      ],
+      APPOINTMENT: [
+        "sudah", "hadir", "datang", "selesai", "done",
+        "sudah hadir", "sudah datang", "sudah selesai"
+      ],
+      GENERAL: [
+        "sudah", "selesai", "done", "selesai",
+        "sudah selesai", "sudah lakukan", "sudah dilakukan"
+      ]
+    };
+
+    const pendingPatterns = {
+      MEDICATION: [
+        "belum", "blm", "blum", "lum", "belom",
+        "belum minum", "blm minum", "belum makan", "belum telan",
+        "belum konsumsi", "belum ambil", "lupa", "belum lakukan",
+        "nanti", "sebentar"
+      ],
+      APPOINTMENT: [
+        "belum", "terlambat", "nanti", "sebentar",
+        "belum hadir", "belum datang", "akan terlambat"
+      ],
+      GENERAL: [
+        "belum", "nanti", "sebentar", "belom",
+        "belum selesai", "belum lakukan", "belum dilakukan"
+      ]
+    };
+
+    const helpPatterns = [
+      "bantuan", "tolong", "help", "bantu",
+      "minta bantuan", "butuh bantuan"
+    ];
+
+    // Use type-specific patterns
+    const currentConfirmedPatterns = confirmedPatterns[reminderType];
+    const currentPendingPatterns = pendingPatterns[reminderType];
+
+    // Check for confirmation patterns
+    const confirmedMatch = currentConfirmedPatterns.some(pattern =>
+      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    );
+
+    // Check for pending patterns
+    const pendingMatch = currentPendingPatterns.some(pattern =>
+      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    );
+
+    // Check for help patterns
+    const helpMatch = helpPatterns.some(pattern =>
+      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    );
+
+    // Determine response type and confidence
+    if (helpMatch) {
+      return {
+        isReminderResponse: true,
+        responseType: "help",
+        confidence: 0.9,
+        reminderType
+      };
+    } else if (confirmedMatch && !pendingMatch) {
+      return {
+        isReminderResponse: true,
+        responseType: "confirmed",
+        confidence: 0.9,
+        reminderType
+      };
+    } else if (pendingMatch && !confirmedMatch) {
+      return {
+        isReminderResponse: true,
+        responseType: "pending",
+        confidence: 0.9,
+        reminderType
+      };
+    } else if (confirmedMatch && pendingMatch) {
+      // Both patterns present - need more sophisticated analysis
+      // Use LLM to determine the actual intent
+      try {
+        const llmResult = await this.detectIntent(message, context);
+        if (llmResult.intent === "reminder_confirmation") {
+          // Check entities for more specific information
+          const entities = llmResult.entities as Record<string, unknown> || {};
+          if (entities.confirmation_status === "confirmed") {
+            return {
+              isReminderResponse: true,
+              responseType: "confirmed",
+              confidence: 0.8,
+              reminderType
+            };
+          } else if (entities.confirmation_status === "pending") {
+            return {
+              isReminderResponse: true,
+              responseType: "pending",
+              confidence: 0.8,
+              reminderType
+            };
+          }
+        }
+      } catch (error) {
+        logger.warn("LLM analysis failed for ambiguous reminder response", {
+          message: normalizedMessage.substring(0, 50),
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+
+      // Default to confirmed if ambiguous (conservative approach)
+      return {
+        isReminderResponse: true,
+        responseType: "confirmed",
+        confidence: 0.6,
+        reminderType
+      };
+    }
+
+    return {
+      isReminderResponse: false,
+      responseType: "unknown",
+      confidence: 0,
+      reminderType
+    };
+  }
+
+  /**
+   * Legacy method for backward compatibility
    */
   async detectSimpleMedicationResponse(
     message: string,
@@ -726,87 +898,22 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
     responseType: "taken" | "not_taken" | "unknown";
     confidence: number;
   }> {
-    const normalizedMessage = message.toLowerCase().trim();
+    logger.warn("Using legacy medication response detection method", {
+      messageLength: message.length,
+      operation: "legacy_detect_simple_medication_response"
+    });
 
-    // Simple pattern matching for Indonesian medication responses
-    const takenPatterns = [
-      "sudah", "udh", "udah", "sdh", "dah",
-      "sudah minum", "udah minum", "sudah makan", "sudah telan",
-      "sudah konsumsi", "sudah ambil", "done", "selesai",
-      "sudah selesai", "sudah lakukan", "oke siap", "siap"
-    ];
+    const result = await this.detectSimpleReminderResponse(message, context);
 
-    const notTakenPatterns = [
-      "belum", "blm", "blum", "lum", "belom",
-      "belum minum", "blm minum", "belum makan", "belum telan",
-      "belum konsumsi", "belum ambil", "lupa", "belum lakukan",
-      "nanti", "sebentar"
-    ];
-
-    // Check for taken patterns
-    const takenMatch = takenPatterns.some(pattern =>
-      normalizedMessage.includes(pattern) || normalizedMessage === pattern
-    );
-
-    // Check for not taken patterns
-    const notTakenMatch = notTakenPatterns.some(pattern =>
-      normalizedMessage.includes(pattern) || normalizedMessage === pattern
-    );
-
-    // Determine response type and confidence
-    if (takenMatch && !notTakenMatch) {
-      return {
-        isMedicationResponse: true,
-        responseType: "taken",
-        confidence: 0.9
-      };
-    } else if (notTakenMatch && !takenMatch) {
-      return {
-        isMedicationResponse: true,
-        responseType: "not_taken",
-        confidence: 0.9
-      };
-    } else if (takenMatch && notTakenMatch) {
-      // Both patterns present - need more sophisticated analysis
-      // Use LLM to determine the actual intent
-      try {
-        const llmResult = await this.detectIntent(message, context);
-        if (llmResult.intent === "medication_confirmation") {
-          // Check entities for more specific information
-          const entities = llmResult.entities as Record<string, unknown> || {};
-          if (entities.confirmation_status === "taken") {
-            return {
-              isMedicationResponse: true,
-              responseType: "taken",
-              confidence: 0.8
-            };
-          } else if (entities.confirmation_status === "not_taken") {
-            return {
-              isMedicationResponse: true,
-              responseType: "not_taken",
-              confidence: 0.8
-            };
-          }
-        }
-      } catch (error) {
-        logger.warn("LLM analysis failed for ambiguous medication response", {
-          message: normalizedMessage.substring(0, 50),
-          error: error instanceof Error ? error.message : String(error)
-        });
-      }
-
-      // Default to taken if ambiguous (conservative approach)
-      return {
-        isMedicationResponse: true,
-        responseType: "taken",
-        confidence: 0.6
-      };
-    }
+    // Map new response types to legacy types
+    let responseType: "taken" | "not_taken" | "unknown" = "unknown";
+    if (result.responseType === "confirmed") responseType = "taken";
+    else if (result.responseType === "pending") responseType = "not_taken";
 
     return {
-      isMedicationResponse: false,
-      responseType: "unknown",
-      confidence: 0
+      isMedicationResponse: result.isReminderResponse,
+      responseType,
+      confidence: result.confidence
     };
   }
 
@@ -815,7 +922,7 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
    */
   async updateReminderStatusFromResponse(
     patientId: string,
-    responseType: "taken" | "not_taken",
+    responseType: "confirmed" | "pending" | "help" | "taken" | "not_taken",
     message: string
   ): Promise<{ success: boolean; updatedReminderId?: string; reminderType?: string; error?: string }> {
     try {
@@ -847,13 +954,19 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
 
       // Map response types to database status
       const statusMapping = {
-        "taken": "DELIVERED",     // DIPATUHI -> DELIVERED
-        "not_taken": "SENT"       // TIDAK_DIPATUHI -> keep as SENT (or could use a different status)
+        "confirmed": "DELIVERED",
+        "taken": "DELIVERED",
+        "pending": "SENT",
+        "not_taken": "SENT",
+        "help": "SENT"
       };
 
       const confirmationStatusMapping = {
-        "taken": "CONFIRMED",     // DIPATUHI -> CONFIRMED
-        "not_taken": "MISSED"     // TIDAK_DIPATUHI -> MISSED
+        "confirmed": "CONFIRMED",
+        "taken": "CONFIRMED",
+        "pending": "MISSED",
+        "not_taken": "MISSED",
+        "help": "PENDING"
       };
 
       // Update the reminder status

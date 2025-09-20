@@ -91,8 +91,8 @@ interface IntentResult {
     | "accept"
     | "decline"
     | "unsubscribe"
-    | "medication_taken"
-    | "medication_pending"
+    | "confirmation_taken"
+    | "confirmation_pending"
     | "need_help"
     | "other";
   confidence: number;
@@ -101,7 +101,7 @@ interface IntentResult {
 
 function detectIntentEnhanced(
   rawMessage: string,
-  context?: "verification" | "medication"
+  context?: "verification" | "reminder"
 ): IntentResult {
   const msg = (rawMessage || "").toLowerCase().trim();
   const words = msg.split(/\s+/);
@@ -113,9 +113,9 @@ function detectIntentEnhanced(
     'bantuan', 'help', 'tolong', 'tanya', 'pertanyaan', 'kamu', 'nama'
   ];
 
-  // If message contains general inquiry patterns and is in verification context, 
+  // If message contains general inquiry patterns and is in verification/reminder context,
   // reduce confidence significantly to avoid false classification
-  const hasGeneralInquiry = generalInquiryPatterns.some(pattern => 
+  const hasGeneralInquiry = generalInquiryPatterns.some(pattern =>
     msg.includes(pattern)
   );
 
@@ -221,14 +221,14 @@ function detectIntentEnhanced(
     if (context === "verification" && ["accept", "decline"].includes(intent)) {
       confidence *= 1.2;
     } else if (
-      context === "medication" &&
-      ["medication_taken", "medication_pending", "need_help"].includes(intent)
+      context === "reminder" &&
+      ["confirmation_taken", "confirmation_pending", "need_help"].includes(intent)
     ) {
       confidence *= 1.2;
     }
 
     // General inquiry penalty - significantly reduce confidence for general chat
-    if (hasGeneralInquiry && (context === "verification" || context === "medication")) {
+    if (hasGeneralInquiry && (context === "verification" || context === "reminder")) {
       confidence *= 0.1; // Massive penalty to prevent misclassification
     }
 
@@ -282,7 +282,7 @@ async function handleVerificationAccept(message: string, patient: Patient) {
 
   await sendAck(
     patient.phoneNumber,
-    `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat obat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
+    `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
   );
 
   return {
@@ -342,7 +342,7 @@ async function handleVerificationUnsubscribe(
 
   await sendAck(
     patient.phoneNumber,
-    `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat obat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
+    `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
   );
 
   return {
@@ -639,30 +639,36 @@ async function getPatientReminderInfo(
 }
 
 /**
- * Build personalized medication message
+ * Build personalized reminder message
  */
-function buildMedicationMessage(
-  medication: Record<string, unknown> | null,
+function buildPersonalizedMessage(
+  reminderInfo: Record<string, unknown> | null,
   template: string
 ): string {
-  if (!medication) {
-    return template.replace(/obat/gi, "medikasi");
+  if (!reminderInfo) {
+    return template.replace(/obat/gi, "pengingat");
   }
 
+  const recentReminder = (reminderInfo.recentReminder as Record<string, unknown>) || {};
+  const reminderType = recentReminder.reminderType || "GENERAL";
+
+  let personalization = "pengingat";
+  if (reminderType === "MEDICATION") personalization = "obat";
+  else if (reminderType === "APPOINTMENT") personalization = "janji temu";
+
   return template
-    .replace(/obat/gi, String(medication.name || "medikasi"))
-    .replace(/\{name\}/gi, String(medication.name || "medikasi"))
-    .replace(/\{dosage\}/gi, String(medication.dosage || ""))
-    .replace(/\{form\}/gi, String(medication.form || "tablet"));
+    .replace(/obat/gi, personalization)
+    .replace(/\{name\}/gi, String((recentReminder as Record<string, unknown>).title || "pengingat"))
+    .replace(/\{type\}/gi, personalization);
 }
 
-async function handleMedicationLowConfidence(patient: Patient) {
+async function handleReminderLowConfidence(patient: Patient) {
   // Get patient medication details for personalization
   const reminderInfo = await getPatientReminderInfo(patient.id);
 
-  const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+  const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah selesai\n⏰ *BELUM* jika belum selesai\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(
+  const personalizedMessage = buildPersonalizedMessage(
     reminderInfo,
     baseMessage
   );
@@ -682,19 +688,19 @@ async function handleMedicationLowConfidence(patient: Patient) {
   };
 }
 
-async function handleMedicationNoPendingReminder(
+async function handleReminderNoPendingReminder(
   message: string,
   patient: Patient
 ) {
-  const intentResult = detectIntentEnhanced(message, "medication");
+  const intentResult = detectIntentEnhanced(message, "reminder");
 
   if (intentResult.intent !== "other" && intentResult.confidence > 0.5) {
     // Get patient medication details for personalization
     const reminderInfo = await getPatientReminderInfo(patient.id);
 
-    const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat obat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
+    const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
 
-    const personalizedMessage = buildMedicationMessage(
+    const personalizedMessage = buildPersonalizedMessage(
       reminderInfo,
       baseMessage
     );
@@ -716,7 +722,7 @@ async function handleMedicationNoPendingReminder(
   return { processed: false, message: "No pending reminder found" };
 }
 
-async function handleMedicationTaken(
+async function handleReminderConfirmed(
   message: string,
   reminder: Reminder,
   patient: Patient
@@ -734,21 +740,21 @@ async function handleMedicationTaken(
     .where(eq(reminders.id, reminder.id));
 
   // Get reminder type to customize the confirmation message
-  const reminderType = reminderInfo?.reminderType || "GENERAL";
+  const reminderType = reminder.reminderType || reminderInfo?.reminderType || "GENERAL";
   const baseMessage = `Terima kasih ${
     patient.name
   }! ✅\n\n${
-    reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
+    reminderType === "MEDICATION"
       ? "Obat sudah dikonfirmasi diminum"
       : reminderType === "APPOINTMENT"
-        ? "Janji temu sudah dikonfirmasi"
+        ? "Janji temu sudah dikonfirmasi hadir"
         : "Pengingat sudah dikonfirmasi selesai"
   } pada ${new Date().toLocaleTimeString(
     "id-ID",
     { timeZone: "Asia/Jakarta" }
   )}\n\n💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(
+  const personalizedMessage = buildPersonalizedMessage(
     reminderInfo,
     baseMessage
   );
@@ -769,7 +775,7 @@ async function handleMedicationTaken(
   };
 }
 
-async function handleMedicationPending(
+async function handleReminderPending(
   message: string,
   reminder: Reminder,
   patient: Patient
@@ -785,9 +791,9 @@ async function handleMedicationPending(
     })
     .where(eq(reminders.id, reminder.id));
 
-  const baseMessage = `Baik ${patient.name}, jangan lupa minum obatnya ya! 💊\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+  const baseMessage = `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
 
-  const personalizedMessage = buildMedicationMessage(
+  const personalizedMessage = buildPersonalizedMessage(
     reminderInfo,
     baseMessage
   );
@@ -808,7 +814,7 @@ async function handleMedicationPending(
   };
 }
 
-async function handleMedicationHelp(
+async function handleReminderHelp(
   message: string,
   reminder: Reminder,
   patient: Patient
@@ -839,20 +845,20 @@ async function handleMedicationHelp(
 }
 
 /**
- * Handle medication text responses using enhanced intent detection
+ * Handle reminder text responses using enhanced intent detection
  */
-async function handleMedicationResponse(
+async function handleReminderResponse(
   message: string,
   patient: Patient
 ): Promise<{ processed: boolean; action?: string; message?: string }> {
   const pendingReminder = await findPendingReminder(patient.id);
 
   if (!pendingReminder.length) {
-    return handleMedicationNoPendingReminder(message, patient);
+    return handleReminderNoPendingReminder(message, patient);
   }
 
   const reminder = pendingReminder[0];
-  const intentResult = detectIntentEnhanced(message, "medication");
+  const intentResult = detectIntentEnhanced(message, "reminder");
 
   logger.info("Processing medication text response", {
     originalMessage: message,
@@ -864,16 +870,16 @@ async function handleMedicationResponse(
   });
 
   if (intentResult.confidence < 0.4) {
-    return handleMedicationLowConfidence(patient);
+    return handleReminderLowConfidence(patient);
   }
 
   switch (intentResult.intent) {
-    case "medication_taken":
-      return handleMedicationTaken(message, reminder, patient);
-    case "medication_pending":
-      return handleMedicationPending(message, reminder, patient);
+    case "confirmation_taken":
+      return handleReminderConfirmed(message, reminder, patient);
+    case "confirmation_pending":
+      return handleReminderPending(message, reminder, patient);
     case "need_help":
-      return handleMedicationHelp(message, reminder, patient);
+      return handleReminderHelp(message, reminder, patient);
     default:
       return { processed: false };
   }
@@ -1062,11 +1068,11 @@ async function processVerificationResponse(
   return null;
 }
 
-async function processMedicationResponse(
+async function processReminderResponse(
   message: string | undefined,
   patient: Patient
 ) {
-  logger.info("Processing potential medication response", {
+  logger.info("Processing potential reminder response", {
     patientId: patient.id,
     hasMessage: Boolean(message),
     message:
@@ -1075,32 +1081,32 @@ async function processMedicationResponse(
   });
 
   try {
-    const medicationResult = await handleMedicationResponse(
+    const reminderResult = await handleReminderResponse(
       message || "",
       patient
     );
 
-    if (medicationResult.processed) {
-      logger.info("Medication response processed successfully", {
+    if (reminderResult.processed) {
+      logger.info("Reminder response processed successfully", {
         patientId: patient.id,
-        action: medicationResult.action,
-        message: medicationResult.message,
+        action: reminderResult.action,
+        message: reminderResult.message,
       });
 
       return NextResponse.json({
         ok: true,
         processed: true,
-        action: medicationResult.action,
-        source: "text_medication",
+        action: reminderResult.action,
+        source: "text_reminder",
       });
     }
   } catch (error) {
-    logger.error("Failed to process medication response", error as Error, {
+    logger.error("Failed to process reminder response", error as Error, {
       patientId: patient.id,
       message: message?.substring(0, 100),
     });
     return NextResponse.json(
-      { error: "Internal error processing medication response" },
+      { error: "Internal error processing reminder response" },
       { status: 500 }
     );
   }
@@ -1133,7 +1139,7 @@ async function handleUnrecognizedMessage(
     if (intentResult.confidence > 0.3) {
       const baseMessage = `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
 
-      const personalizedMessage = buildMedicationMessage(
+      const personalizedMessage = buildPersonalizedMessage(
         reminderInfo,
         baseMessage
       );
@@ -1653,7 +1659,7 @@ export async function POST(request: NextRequest) {
 
   // PRIORITY 3: Legacy medication responses (keyword-based fallback)
   if (patient.verificationStatus === "VERIFIED") {
-    const result = await processMedicationResponse(message || "", patient);
+    const result = await processReminderResponse(message || "", patient);
     if (result) return result;
   }
 

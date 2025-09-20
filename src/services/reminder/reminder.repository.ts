@@ -3,7 +3,7 @@ import { db, reminders, patients } from '@/db'
 import { eq, desc } from 'drizzle-orm'
 import { validateContentAttachments } from '@/lib/content-validation'
 
-// Basic types for backwards compatibility
+// Enhanced types for reminder system
 type ReminderInsert = {
   patientId: string
   scheduledTime: string
@@ -11,6 +11,12 @@ type ReminderInsert = {
   startDate: Date
   endDate?: Date
   createdById: string
+  reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL'
+  title?: string
+  description?: string
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  recurrencePattern?: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }
 
 type ValidatedContent = {

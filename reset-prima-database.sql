@@ -898,7 +898,7 @@ CREATE TRIGGER update_cohort_analysis_updated_at BEFORE UPDATE ON cohort_analysi
 INSERT INTO whatsapp_templates (template_name, template_text, variables, category, is_active, created_at, updated_at) VALUES
 ('verification_reminder', 'Halo {nama}, ini adalah pengingat verifikasi dari PRIMA. Silakan balas dengan "YA" untuk mengkonfirmasi bahwa Anda adalah pasien kami.', ARRAY['nama'], 'REMINDER', true, NOW(), NOW()),
 ('medication_reminder', 'Halo {nama}, sudah waktunya minum obat {obat}. Jangan lupa minum sesuai dosis yang dianjurkan dokter ya!', ARRAY['nama', 'obat'], 'REMINDER', true, NOW(), NOW()),
-('follow_up_reminder', 'Halo {nama}, apakah sudah diminum obatnya?', ARRAY['nama'], 'REMINDER', true, NOW(), NOW()),
+('follow_up_reminder', 'Halo {nama}, apakah reminder sebelumnya sudah dipatuhi?', ARRAY['nama'], 'REMINDER', true, NOW(), NOW()),
 ('emergency_contact', 'Halo {nama}, kami mendeteksi adanya keadaan darurat. Tim relawan kami akan segera menghubungi Anda.', ARRAY['nama'], 'APPOINTMENT', true, NOW(), NOW());
 
 -- Script completed successfully!

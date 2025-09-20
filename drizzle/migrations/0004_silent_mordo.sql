@@ -1,0 +1,1 @@
+DROP TABLE "llm_response_cache";

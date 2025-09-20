@@ -16,7 +16,10 @@
       "Bash(cat:*)",
       "Bash(wc:*)",
       "Bash(ls:*)",
-      "Bash(bun test:*)"
+      "Bash(bun test:*)",
+      "Bash(bunx:*)",
+      "Bash(psql:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
