@@ -3,10 +3,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import dynamic from "next/dynamic";
 
-const TinyMCEEditor = dynamic(
+const QuillEditor = dynamic(
   () =>
-    import("@/components/cms/TinyMCEEditor").then((mod) => ({
-      default: mod.TinyMCEEditor,
+    import("@/components/cms/QuillEditor").then((mod) => ({
+      default: mod.QuillEditor,
     })),
   {
     loading: () => (
@@ -76,9 +76,9 @@ export function ArticleFormFields({
       <div>
         <Label htmlFor="content">Konten Artikel *</Label>
         <div className="mt-2">
-          <TinyMCEEditor
+          <QuillEditor
             value={formData.content}
-            onEditorChange={(content) => onChange("content", content)}
+            onEditorChange={(content: string) => onChange("content", content)}
             placeholder="Edit konten artikel lengkap di sini..."
           />
         </div>

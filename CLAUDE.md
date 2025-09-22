@@ -42,7 +42,7 @@ PRIMA (Palliative Remote Integrated Monitoring and Assistance) is a production-r
 - **UI**: Tailwind CSS 4 + shadcn/ui components + Lucide React icons
 - **WhatsApp**: Fonnte WhatsApp Business API for messaging
 - **File Storage**: Cloud storage for patient photos and content
-- **Rich Text**: TinyMCE with image upload support
+- **Rich Text**: QuillJS with image upload support
 
 ### Key Service Layer Architecture
 

@@ -23,7 +23,9 @@
       "Bash(curl:*)",
       "Bash(bun build:*)",
       "Bash(pkill:*)",
-      "Bash(bun:*)"
+      "Bash(bun:*)",
+      "WebFetch(domain:quilljs.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

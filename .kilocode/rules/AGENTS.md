@@ -23,7 +23,7 @@
 - ✅ Health notes and medical records tracking
 - ✅ Custom patient variables for personalized care
 - ✅ Admin panel with user management and system monitoring
-- ✅ Content Management System (CMS) with TinyMCE editor
+- ✅ Content Management System (CMS) with QuillJS editor
 - ✅ Redis caching (3min sessions, 15min patient data)
 - ✅ ISR optimization for public content
 - ✅ Medical-grade error handling and soft deletes
@@ -46,7 +46,7 @@ Authentication: Clerk with role-based access control
 WhatsApp: Fonnte Business API
 Caching: Redis (ioredis) with TTL management
 UI: Tailwind CSS 4 + shadcn/ui + Lucide icons
-Rich Text: TinyMCE with image upload
+Rich Text: QuillJS with image upload
 File Storage: Vercel Blob
 Deployment: Vercel with optimized serverless config
 Package Manager: Bun

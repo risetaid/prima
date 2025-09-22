@@ -1,11 +1,13 @@
 # WhatsApp LLM Integration Implementation Plan
 
 ## Executive Summary
-This document outlines the systematic implementation plan for integrating Z.AI LLM into the PRIMA WhatsApp messaging system. The integration will replace the current keyword-based message processing with intelligent natural language understanding, providing better patient communication and reducing volunteer workload.
+
+This document outlines the systematic implementation plan for integrating Anthropic Claude LLM into the PRIMA WhatsApp messaging system. The integration will replace the current keyword-based message processing with intelligent natural language understanding, providing better patient communication and reducing volunteer workload.
 
 ## Current State Analysis
 
 ### Problems Identified
+
 1. **Missing Production Webhook**: No main production webhook route for WhatsApp messages
 2. **Dual Verification Systems**: Conflicting enhanced and simple verification systems
 3. **Poor Message Handling**: General messages from patients are ignored (no response)
@@ -15,6 +17,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 7. **No Human Handoff**: Missing volunteer notification system
 
 ### Existing Assets
+
 - ✅ Business rule: No reminders until patient is verified (natural phase separation)
 - ✅ Database schema for conversation states and message logging
 - ✅ WhatsApp service for sending messages via Fonnte
@@ -25,22 +28,26 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 ## Implementation Phases
 
 ## Phase 1: Foundation Setup (Week 1)
+
 **Goal**: Establish core infrastructure and remove conflicts
 
 ### Step 1.1: Remove Conflicting Systems
+
 - [ ] Archive `enhanced-verification.service.ts` (move to `_archive` folder)
 - [ ] Archive `verification-flow.service.ts`
 - [ ] Keep only `verification-webhook.service.ts` as the single verification system
 - [ ] Clean up unused imports and references
 
 ### Step 1.2: Create LLM Service
-- [ ] Install OpenAI SDK: `bun add openai`
+
+- [ ] Install Anthropic SDK: `bun add @anthropic-ai/sdk`
 - [ ] Create `/src/services/llm/llm.service.ts`
-- [ ] Implement basic LLM client with Z.AI configuration
-- [ ] Add environment variables for Z.AI API key
+- [ ] Implement basic LLM client with Anthropic Claude configuration
+- [ ] Add environment variables for Anthropic API key
 - [ ] Create type definitions for LLM responses
 
 ### Step 1.3: Create Production Webhook Route
+
 - [ ] Create `/src/app/api/webhook/whatsapp/route.ts`
 - [ ] Implement basic webhook handler
 - [ ] Add request validation and error handling
@@ -48,6 +55,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Add logging for all incoming messages
 
 ### Step 1.4: Patient Context Service
+
 - [ ] Create `/src/services/patient/patient-context.service.ts`
 - [ ] Implement patient lookup by phone number
 - [ ] Add active reminder checking
@@ -55,9 +63,11 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Cache patient context for performance
 
 ## Phase 2: LLM Integration (Week 2)
+
 **Goal**: Replace keyword matching with intelligent message processing
 
 ### Step 2.1: System Prompt Engineering
+
 - [ ] Create healthcare-specific system prompts
 - [ ] Define response format (JSON structure)
 - [ ] Include patient context in prompts
@@ -65,6 +75,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Implement safety guidelines (no diagnoses, prescriptions)
 
 ### Step 2.2: Intent Detection
+
 - [ ] Replace keyword-based detection with LLM
 - [ ] Map LLM intents to existing handlers:
   - Verification responses (YA/TIDAK)
@@ -76,6 +87,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Implement fallback for low-confidence responses
 
 ### Step 2.3: Response Generation
+
 - [ ] Create natural language responses for each intent
 - [ ] Implement personalized messages using patient context
 - [ ] Add conversation continuity
@@ -83,6 +95,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Implement response caching for common queries
 
 ### Step 2.4: Conversation State Management
+
 - [ ] Integrate with existing `conversation-state.service.ts`
 - [ ] Store LLM conversation history
 - [ ] Implement conversation timeout handling
@@ -90,9 +103,11 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Clean up expired conversations
 
 ## Phase 3: Safety & Reliability (Week 3)
+
 **Goal**: Ensure system safety and production readiness
 
 ### Step 3.1: Human Handoff System
+
 - [ ] Create volunteer notification service
 - [ ] Implement escalation rules:
   - Emergency detection → Immediate notification
@@ -102,6 +117,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Create volunteer dashboard for message review
 
 ### Step 3.2: Safety Filters
+
 - [ ] Implement content filtering for LLM responses
 - [ ] Block medical advice and diagnoses
 - [ ] Detect and escalate emergencies
@@ -109,6 +125,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Log all filtered responses for review
 
 ### Step 3.3: Fallback Mechanisms
+
 - [ ] Handle LLM API failures gracefully
 - [ ] Implement circuit breaker pattern
 - [ ] Create fallback to keyword-based system
@@ -116,6 +133,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Queue messages during outages
 
 ### Step 3.4: Cost Management
+
 - [ ] Implement response caching
 - [ ] Add token usage tracking
 - [ ] Create cost analytics dashboard
@@ -123,9 +141,11 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Optimize prompt length
 
 ## Phase 4: Testing & Monitoring (Week 4)
+
 **Goal**: Ensure system quality and observability
 
 ### Step 4.1: Comprehensive Testing
+
 - [ ] Unit tests for LLM service
 - [ ] Integration tests for webhook
 - [ ] Test all intent scenarios
@@ -133,6 +153,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Load testing for concurrent messages
 
 ### Step 4.2: Monitoring & Analytics
+
 - [ ] Implement performance monitoring
 - [ ] Track response times
 - [ ] Monitor LLM accuracy
@@ -145,6 +166,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Set up alerting for anomalies
 
 ### Step 4.3: Documentation
+
 - [ ] Update API documentation
 - [ ] Create volunteer training materials
 - [ ] Document prompt engineering decisions
@@ -152,9 +174,11 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Write deployment procedures
 
 ## Phase 5: Deployment & Optimization (Week 5)
+
 **Goal**: Deploy to production and optimize performance
 
 ### Step 5.1: Staged Rollout
+
 - [ ] Deploy to staging environment
 - [ ] Test with volunteer accounts
 - [ ] Gradual rollout to patients:
@@ -163,6 +187,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Implement feature flags for quick rollback
 
 ### Step 5.2: Performance Optimization
+
 - [ ] Optimize database queries
 - [ ] Implement connection pooling
 - [ ] Add Redis caching for patient context
@@ -170,6 +195,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 - [ ] Implement batch processing where possible
 
 ### Step 5.3: Feedback Loop
+
 - [ ] Collect patient feedback
 - [ ] Analyze conversation logs
 - [ ] Refine prompts based on real usage
@@ -179,6 +205,7 @@ This document outlines the systematic implementation plan for integrating Z.AI L
 ## Technical Implementation Details
 
 ### File Structure
+
 ```
 src/
 ├── services/
@@ -206,11 +233,11 @@ src/
 ```
 
 ### Environment Variables
+
 ```env
-# Z.AI Configuration
-Z_AI_API_KEY=your-api-key
-Z_AI_MODEL=glm-4.5
-Z_AI_BASE_URL=https://api.z.ai/api/paas/v4/
+# Anthropic Claude Configuration
+ANTHROPIC_API_KEY=your-api-key
+ANTHROPIC_MODEL=claude-3.5-haiku
 
 # LLM Settings
 LLM_MAX_TOKENS=500
@@ -228,9 +255,10 @@ COST_ALERT_THRESHOLD=100
 ```
 
 ### Database Schema Updates
+
 ```sql
 -- Add LLM-specific fields to conversation_messages
-ALTER TABLE conversation_messages 
+ALTER TABLE conversation_messages
 ADD COLUMN llm_response_id VARCHAR(255),
 ADD COLUMN llm_model VARCHAR(50),
 ADD COLUMN llm_tokens_used INTEGER,
@@ -265,31 +293,35 @@ CREATE TABLE llm_response_cache (
 ## Risk Mitigation
 
 ### Technical Risks
-| Risk | Mitigation |
-|------|------------|
-| LLM API downtime | Fallback to keyword-based system |
-| High costs | Response caching, token limits, monitoring |
-| Slow response times | Async processing, timeout handling |
-| Incorrect medical advice | Content filtering, clear disclaimers |
-| Data privacy | No PII in prompts, secure API calls |
+
+| Risk                     | Mitigation                                 |
+| ------------------------ | ------------------------------------------ |
+| LLM API downtime         | Fallback to keyword-based system           |
+| High costs               | Response caching, token limits, monitoring |
+| Slow response times      | Async processing, timeout handling         |
+| Incorrect medical advice | Content filtering, clear disclaimers       |
+| Data privacy             | No PII in prompts, secure API calls        |
 
 ### Operational Risks
-| Risk | Mitigation |
-|------|------------|
-| Volunteer overload | Smart escalation rules, priority queues |
-| Patient confusion | Clear onboarding, help commands |
-| System abuse | Rate limiting, spam detection |
-| Regulatory compliance | Medical disclaimer, audit logs |
+
+| Risk                  | Mitigation                              |
+| --------------------- | --------------------------------------- |
+| Volunteer overload    | Smart escalation rules, priority queues |
+| Patient confusion     | Clear onboarding, help commands         |
+| System abuse          | Rate limiting, spam detection           |
+| Regulatory compliance | Medical disclaimer, audit logs          |
 
 ## Success Metrics
 
 ### Technical Metrics
+
 - Response time < 3 seconds (p95)
 - System uptime > 99.9%
 - LLM accuracy > 85% for intent detection
 - Cost per conversation < $0.02
 
 ### Business Metrics
+
 - Patient satisfaction score > 4.5/5
 - Volunteer workload reduction > 60%
 - Message response rate > 95%
@@ -298,12 +330,14 @@ CREATE TABLE llm_response_cache (
 ## Rollback Plan
 
 ### Quick Rollback (< 5 minutes)
+
 1. Disable feature flag for LLM processing
 2. Route all messages to keyword-based system
 3. Notify volunteers of increased workload
 4. Investigate and fix issues
 
 ### Full Rollback (< 30 minutes)
+
 1. Restore previous webhook handler
 2. Disable LLM service
 3. Clear response cache
@@ -312,22 +346,24 @@ CREATE TABLE llm_response_cache (
 
 ## Timeline Summary
 
-| Week | Phase | Key Deliverables |
-|------|-------|------------------|
-| 1 | Foundation | Remove conflicts, setup LLM service, create webhook |
-| 2 | Integration | Implement LLM processing, intent detection |
-| 3 | Safety | Human handoff, safety filters, fallbacks |
-| 4 | Testing | Comprehensive testing, monitoring, documentation |
-| 5 | Deployment | Staged rollout, optimization, feedback loop |
+| Week | Phase       | Key Deliverables                                    |
+| ---- | ----------- | --------------------------------------------------- |
+| 1    | Foundation  | Remove conflicts, setup LLM service, create webhook |
+| 2    | Integration | Implement LLM processing, intent detection          |
+| 3    | Safety      | Human handoff, safety filters, fallbacks            |
+| 4    | Testing     | Comprehensive testing, monitoring, documentation    |
+| 5    | Deployment  | Staged rollout, optimization, feedback loop         |
 
 ## Next Steps
 
 1. **Immediate Actions**:
-   - Get Z.AI API credentials
+
+   - Get Anthropic API credentials
    - Set up development environment
    - Create project branch for LLM integration
 
 2. **Team Preparation**:
+
    - Brief volunteers on upcoming changes
    - Prepare training materials
    - Set up monitoring dashboards
@@ -340,6 +376,7 @@ CREATE TABLE llm_response_cache (
 ## Appendix
 
 ### A. Sample LLM Prompts
+
 ```
 [System Prompt for Verification]
 You are helping a patient verify their WhatsApp number for PRIMA healthcare reminders.
@@ -355,6 +392,7 @@ Expected Response: SUDAH/BELUM for confirmation
 ```
 
 ### B. Sample Conversations
+
 ```
 Patient: "Halo dok"
 LLM: "Halo! Saya asisten PRIMA. Ada yang bisa saya bantu hari ini?"
@@ -367,6 +405,7 @@ LLM: "Baik, kami akan menghentikan semua pengingat. Terima kasih telah menggunak
 ```
 
 ### C. Cost Estimation
+
 ```
 Assumptions:
 - 1000 patients
@@ -381,6 +420,6 @@ Annual cost: $365.00
 
 ---
 
-*Document Version: 1.0*
-*Last Updated: [Current Date]*
-*Author: OpenCode Assistant*
+_Document Version: 1.0_
+_Last Updated: [Current Date]_
+_Author: OpenCode Assistant_

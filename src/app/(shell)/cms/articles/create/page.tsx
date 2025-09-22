@@ -21,10 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import dynamic from "next/dynamic";
-const TinyMCEEditor = dynamic(
+const QuillEditor = dynamic(
   () =>
-    import("@/components/cms/TinyMCEEditor").then((mod) => ({
-      default: mod.TinyMCEEditor,
+    import("@/components/cms/QuillEditor").then((mod) => ({
+      default: mod.QuillEditor,
     })),
   {
     loading: () => (
@@ -133,13 +133,13 @@ export default function CreateArticlePage() {
         );
         router.push("/cms");
       } else {
-          if (result.details) {
-            // Handle validation errors from API
-            const apiErrors: Record<string, string> = {};
-            result.details.forEach((error: ValidationError) => {
-              apiErrors[error.path[0]] = error.message;
-            });
-            setErrors(apiErrors);
+        if (result.details) {
+          // Handle validation errors from API
+          const apiErrors: Record<string, string> = {};
+          result.details.forEach((error: ValidationError) => {
+            apiErrors[error.path[0]] = error.message;
+          });
+          setErrors(apiErrors);
         } else {
           toast.error(result.error || "Terjadi kesalahan");
         }
@@ -239,30 +239,30 @@ export default function CreateArticlePage() {
                 )}
               </div>
 
-               <div>
-                 <Label htmlFor="slug">Slug URL *</Label>
-                 <div className="flex gap-2 mt-2">
-                   <Input
-                     id="slug"
-                     value={formData.slug}
-                     onChange={(e) => handleInputChange("slug", e.target.value)}
-                     placeholder="Random slug"
-                     className={errors.slug ? "border-red-500" : ""}
-                     readOnly
-                   />
-                   <Button
-                     type="button"
-                     variant="outline"
-                     onClick={() =>
-                       setFormData((prev) => ({
-                         ...prev,
-                         slug: generateNewSlug(),
-                       }))
-                     }
-                   >
-                     Generate
-                   </Button>
-                 </div>
+              <div>
+                <Label htmlFor="slug">Slug URL *</Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => handleInputChange("slug", e.target.value)}
+                    placeholder="Random slug"
+                    className={errors.slug ? "border-red-500" : ""}
+                    readOnly
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        slug: generateNewSlug(),
+                      }))
+                    }
+                  >
+                    Generate
+                  </Button>
+                </div>
                 {errors.slug && (
                   <p className="text-sm text-red-600 mt-1">{errors.slug}</p>
                 )}
@@ -291,9 +291,9 @@ export default function CreateArticlePage() {
               <div>
                 <Label htmlFor="content">Konten Artikel *</Label>
                 <div className="mt-2">
-                  <TinyMCEEditor
+                  <QuillEditor
                     value={formData.content}
-                    onEditorChange={(content) =>
+                    onEditorChange={(content: string) =>
                       handleInputChange("content", content)
                     }
                     placeholder="Tulis konten artikel lengkap di sini..."
@@ -507,4 +507,3 @@ export default function CreateArticlePage() {
     </div>
   );
 }
-

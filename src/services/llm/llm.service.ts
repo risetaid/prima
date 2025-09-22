@@ -99,7 +99,7 @@ export class LLMService {
       const responseTime = Date.now() - startTime;
       const content =
         response.content[0]?.type === "text" ? response.content[0].text : "";
-      const tokensUsed = response.usage?.output_tokens || 0;
+      const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
       const finishReason = response.stop_reason || "stop";
 
       logger.info("Anthropic Claude LLM response generated successfully", {
@@ -208,7 +208,74 @@ export class LLMService {
   }
 
   /**
-   * Generate a natural language response for the patient
+   * Validate if response is in proper Indonesian
+   */
+  private validateLanguage(response: string): {
+    isValid: boolean;
+    issues: string[];
+    confidence: number;
+  } {
+    const issues: string[] = [];
+    const lowerResponse = response.toLowerCase();
+
+    // Common English words that should not appear in Indonesian responses
+    const englishWords = [
+      ' the ', ' and ', ' is ', ' are ', ' you ', ' your ', ' we ', ' our ',
+      ' have ', ' has ', ' been ', ' were ', ' will ', ' would ', ' could ',
+      ' should ', ' this ', ' that ', ' these ', ' those ', ' please ',
+      ' thank ', ' thanks ', ' hello ', ' hi ', ' yes ', ' no ', ' not '
+    ];
+
+    // Common Indonesian phrases that should be present
+    const indonesianIndicators = [
+      'anda', 'saya', 'kami', 'mereka', 'ini', 'itu', 'terima kasih',
+      'maaf', 'tolong', 'bantuan', 'kesehatan', 'pasien', 'obat'
+    ];
+
+    let englishScore = 0;
+    let indonesianScore = 0;
+
+    // Check for English words
+    englishWords.forEach(word => {
+      if (lowerResponse.includes(word)) {
+        englishScore++;
+        issues.push(`Bahasa Inggris terdeteksi: "${word.trim()}"`);
+      }
+    });
+
+    // Check for Indonesian indicators
+    indonesianIndicators.forEach(word => {
+      if (lowerResponse.includes(word)) {
+        indonesianScore++;
+      }
+    });
+
+    // Calculate confidence score
+    const totalWords = response.split(/\s+/).length;
+    const englishRatio = englishScore / totalWords;
+    const indonesianRatio = indonesianScore / totalWords;
+
+    const isValid = englishScore === 0 && indonesianScore > 0;
+    const confidence = Math.max(0, Math.min(1, (indonesianRatio - englishRatio) + 0.3));
+
+    if (englishScore > 0) {
+      issues.push(`Terdeteksi ${englishScore} kata bahasa Inggris`);
+    }
+
+    if (indonesianScore === 0) {
+      issues.push('Tidak ada indikator bahasa Indonesia yang terdeteksi');
+    }
+
+    return {
+      isValid,
+      issues,
+      confidence
+    };
+  }
+
+  
+  /**
+   * Generate a natural language response for the patient with language validation
    */
   async generatePatientResponse(
     intent: string,
@@ -276,15 +343,15 @@ export class LLMService {
       temperature: this.config.temperature,
     };
 
-    const response = await this.generateResponse(request);
+    // Generate response with language validation
+    let finalResponse = await this.generateResponseWithLanguageValidation(request, intent, context);
 
     // Apply safety filtering to LLM response
     const safetyResult = await safetyFilterService.filterLLMResponse(
-      response,
+      finalResponse,
       context
     );
 
-    let finalResponse = response;
     if (!safetyResult.isSafe) {
       logger.warn(
         "LLM response failed safety filter, using sanitized version",
@@ -297,15 +364,15 @@ export class LLMService {
 
       // Sanitize the response
       finalResponse = {
-        ...response,
+        ...finalResponse,
         content: safetyFilterService.sanitizeContent(
-          response.content,
+          finalResponse.content,
           safetyResult.violations
         ),
       };
     }
 
-    // Cache the response if appropriate (only safe responses)
+    // Cache the response if appropriate (only safe and valid responses)
     if (responseCache.shouldCache(intent, 0.8) && safetyResult.isSafe) {
       const patientContext = {
         patientName: context.patientInfo?.name,
@@ -434,30 +501,37 @@ Respond only with valid JSON.`;
     context: ConversationContext,
     additionalContext?: string
   ): string {
-    return `You are a helpful healthcare assistant for PRIMA (Palliative Remote Integrated Monitoring and Assistance) system communicating with cancer patients via WhatsApp.
+    return `Anda adalah asisten kesehatan PRIMA yang berkomunikasi dengan pasien kanker melalui WhatsApp.
 
-Patient Information:
-- Name: ${context.patientInfo?.name || "Unknown"}
-- Phone: ${context.phoneNumber}
+INFORMASI PASIEN:
+- Nama: ${context.patientInfo?.name || "Pasien"}
+- Nomor: ${context.phoneNumber}
 
-Guidelines for responses:
-- Always respond in Indonesian (Bahasa Indonesia)
-- Be friendly, empathetic, supportive, and professional
-- Provide comprehensive, informative responses that satisfy user questions
-- Share general educational information about palliative care, cancer support, and wellness
-- Explain concepts clearly with examples when helpful
-- Include practical tips and resources when appropriate
-- Never give personalized medical advice, diagnoses, or treatment recommendations
-- For medical concerns, always direct to consult healthcare professionals
-- For emergencies, immediately direct to appropriate help and alert volunteers
-- Include PRIMA branding and offer further assistance
-- Use simple, clear language that cancer patients can easily understand
-- Acknowledge emotions and provide emotional support
-- End responses by offering to connect with PRIMA volunteers for more personalized support
+PERINTAH WAJIB BAHASA:
+- HARUS MERESPON DALAM BAHASA INDONESIA
+- TIDAK BOLEH menggunakan bahasa Inggris
+- Gunakan Bahasa Indonesia yang sopan dan mudah dipahami
+- Pastikan semua respons menggunakan Bahasa Indonesia yang benar
 
-${additionalContext ? `Additional Context: ${additionalContext}` : ""}
+PEDOMAN RESPON:
+- Ramah, empati, dan profesional
+- Berikan respons yang informatif dan membantu
+- Gunakan format WhatsApp (*bold*, _italic_)
+- Sertakan branding PRIMA
+- Akhiri dengan penawaran bantuan
+- Gunakan bahasa sehari-hari yang mudah dimengerti pasien
+- Berikan dukungan emosional
 
-Generate a comprehensive, helpful response that fully addresses the user's question or concern while maintaining safety and professionalism.`;
+BATASAN KEAMANAN:
+- JANGAN berikan diagnosis medis atau saran pengobatan
+- Untuk masalah medis, arahkan ke tenaga kesehatan profesional
+- Untuk darurat, segera arahkan ke layanan darurat
+
+${additionalContext ? `KONTEKS TAMBAHAN: ${additionalContext}` : ""}
+
+HASILKAN RESPONS DALAM BAHASA INDONESIA YANG JELAS, RAMAH, DAN MEMBANTU.
+
+INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAKAN BAHASA INGGRIS.`;
   }
 
   /**
@@ -884,6 +958,133 @@ Generate a comprehensive, helpful response that fully addresses the user's quest
       responseType: "unknown",
       confidence: 0,
       reminderType
+    };
+  }
+
+  /**
+   * Fallback Indonesian response templates for when LLM fails to generate proper Indonesian
+   */
+  private getIndonesianFallbackResponse(intent: string, context: ConversationContext): string {
+    const patientName = context.patientInfo?.name || "Pasien";
+
+    const templates = {
+      reminder_confirmation: {
+        confirmed: [
+          `Baik ${patientName}, terima kasih sudah mengonfirmasi! Semoga obatnya bermanfaat ya.`,
+          `Oke ${patientName}, sudah dicatat. Terima kasih konfirmasinya!`,
+          `Terima kasih ${patientName}! Jangan lupa untuk istirahat yang cukup.`
+        ],
+        pending: [
+          `Baik ${patientName}, nanti diingatkan kembali ya. Jangan lupa minum obatnya!`,
+          `Oke ${patientName}, semoga segera selesai. Tolong diingat kembali ya!`,
+          `${patientName}, jangan khawatir. Nanti akan diingatkan kembali.`
+        ],
+        help: [
+          `${patientName}, butuh bantuan? Relawan PRIMA siap membantu Anda.`,
+          `Baik ${patientName}, tim kami akan segera menghubungi Anda untuk bantuan.`
+        ]
+      },
+      health_notes_inquiry: [
+        `Halo ${patientName}, berikut informasi kesehatan terakhir yang kami catat:`,
+        `${patientName}, sesuai catatan kesehatan Anda, kami memiliki informasi berikut:`,
+        `Terima kasih pertanyaannya, ${patientName}. Berikut catatan kesehatan terakhir:`
+      ],
+      reminder_inquiry: [
+        `Halo ${patientName}, berikut jadwal pengingat Anda untuk hari ini:`,
+        `${patientName}, berikut pengingat yang terjadwal untuk Anda hari ini:`,
+        `Baik ${patientName}, ini adalah pengingat Anda yang aktif saat ini:`
+      ],
+      general_inquiry: [
+        `Halo ${patientName}, terima kasih telah menghubungi PRIMA. Ada yang bisa dibantu?`,
+        `${patientName}, kami siap membantu pertanyaan Anda. Silakan jelaskan lebih detail.`,
+        `Terima kasih ${patientName}. Tim PRIMA akan membantu menjawab pertanyaan Anda.`
+      ],
+      emergency: [
+        `${patientName}, segera hubungi layanan darurat (112) atau rumah sakit terdekat! Tim kami juga akan menghubungi Anda.`,
+        `Darurat! ${patientName}, segera cari bantuan medis. Tim PRIMA segera menghubungi Anda.`
+      ]
+    };
+
+    const intentTemplates = templates[intent as keyof typeof templates] || templates.general_inquiry;
+    const responseArray = Array.isArray(intentTemplates) ? intentTemplates : intentTemplates.confirmed;
+
+    return responseArray[Math.floor(Math.random() * responseArray.length)];
+  }
+
+  /**
+   * Generate response with language validation and retry mechanism
+   */
+  private async generateResponseWithLanguageValidation(
+    request: LLMRequest,
+    intent: string,
+    context: ConversationContext,
+    maxRetries: number = 2
+  ): Promise<ProcessedLLMResponse> {
+    const response = await this.generateResponse(request);
+
+    // Validate language
+    const validation = this.validateLanguage(response.content);
+
+    logger.debug("Language validation result", {
+      intent,
+      patientId: context.patientId,
+      isValid: validation.isValid,
+      confidence: validation.confidence,
+      issues: validation.issues,
+      responseLength: response.content.length
+    });
+
+    // If response is valid, return it
+    if (validation.isValid && validation.confidence > 0.7) {
+      return response;
+    }
+
+    // If invalid, retry with stronger language instruction
+    if (maxRetries > 0) {
+      logger.warn("Language validation failed, retrying with stronger instruction", {
+        patientId: context.patientId,
+        intent,
+        issues: validation.issues,
+        retriesLeft: maxRetries
+      });
+
+      // Create strengthened request with stronger language instruction
+      const strengthenedRequest: LLMRequest = {
+        ...request,
+        messages: [
+          {
+            role: "system",
+            content: `PERINGATAN BAHASA: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK BOLEH SATU PUN KATA BAHASA INGGRIS. SEMUA RESPON HARUS MENGGUNAKAN BAHASA INDONESIA YANG BAIK DAN BENAR.`
+          },
+          ...request.messages
+        ]
+      };
+
+      return this.generateResponseWithLanguageValidation(
+        strengthenedRequest,
+        intent,
+        context,
+        maxRetries - 1
+      );
+    }
+
+    // If all retries failed, use fallback Indonesian template
+    logger.error("Language validation failed after all retries, using fallback template", new Error(`Language validation failed for intent: ${intent}`), {
+      intent,
+      issues: validation.issues,
+      confidence: validation.confidence,
+      finalResponse: response.content.substring(0, 200),
+      patientId: context.patientId
+    });
+
+    const fallbackResponse = this.getIndonesianFallbackResponse(intent, context);
+
+    return {
+      content: fallbackResponse,
+      tokensUsed: response.tokensUsed,
+      model: response.model,
+      responseTime: response.responseTime,
+      finishReason: "fallback_indonesian_template"
     };
   }
 

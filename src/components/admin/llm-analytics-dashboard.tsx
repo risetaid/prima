@@ -82,8 +82,8 @@ export function LLMAnalyticsDashboard({
     loadData();
   }, []);
 
-  const formatCurrency = (amount: number) => `$${amount.toFixed(4)}`;
-  const formatNumber = (num: number) => num.toLocaleString();
+  const formatCurrency = (amount: number) => `$${(amount || 0).toFixed(4)}`;
+  const formatNumber = (num: number) => (num || 0).toLocaleString();
 
   if (loading) {
     return (
@@ -185,7 +185,7 @@ export function LLMAnalyticsDashboard({
               {formatNumber(stats.totalTokens)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {((stats.totalTokens / 1000000) * 100).toFixed(1)}% of monthly
+              {(((stats.totalTokens || 0) / 1000000) * 100).toFixed(1)}% of monthly
               limit
             </p>
           </CardContent>
@@ -201,7 +201,7 @@ export function LLMAnalyticsDashboard({
               {formatCurrency(stats.totalCost)}
             </div>
             <p className="text-xs text-muted-foreground">
-              ${(stats.totalCost / 30).toFixed(4)} per day
+              ${((stats.totalCost || 0) / 30).toFixed(4)} per day
             </p>
           </CardContent>
         </Card>
@@ -215,7 +215,7 @@ export function LLMAnalyticsDashboard({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.averageResponseTime.toFixed(0)}ms
+              {(stats.averageResponseTime || 0).toFixed(0)}ms
             </div>
             <p className="text-xs text-muted-foreground">Target: under 3s</p>
           </CardContent>
@@ -240,7 +240,7 @@ export function LLMAnalyticsDashboard({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(stats.requestsByModel).map(
+                {Object.entries(stats.requestsByModel || {}).map(
                   ([model, requests]) => (
                     <div
                       key={model}
@@ -249,15 +249,15 @@ export function LLMAnalyticsDashboard({
                       <div className="flex items-center space-x-2">
                         <Badge variant="outline">{model}</Badge>
                         <span className="text-sm text-muted-foreground">
-                          {requests} requests
+                          {formatNumber(requests)} requests
                         </span>
                       </div>
                        <div className="text-right">
                          <div className="font-medium">
-                           {formatCurrency(stats.costByModel[model] || 0)}
+                           {formatCurrency((stats.costByModel || {})[model] || 0)}
                          </div>
                          <div className="text-xs text-muted-foreground">
-                           {stats.totalRequests > 0 ? ((requests / stats.totalRequests) * 100).toFixed(1) : '0.0'}%
+                           {(stats.totalRequests || 0) > 0 ? ((requests / (stats.totalRequests || 1)) * 100).toFixed(1) : '0.0'}%
                            of total
                          </div>
                        </div>
@@ -279,7 +279,7 @@ export function LLMAnalyticsDashboard({
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(stats.requestsByIntent)
+                {Object.entries(stats.requestsByIntent || {})
                   .sort(([, a], [, b]) => b - a)
                   .map(([intent, requests]) => (
                     <div
@@ -289,12 +289,12 @@ export function LLMAnalyticsDashboard({
                       <div className="flex items-center space-x-2">
                         <Badge variant="secondary">{intent}</Badge>
                         <span className="text-sm text-muted-foreground">
-                          {requests} requests
+                          {formatNumber(requests)} requests
                         </span>
                       </div>
                        <div className="text-right">
                          <div className="text-xs text-muted-foreground">
-                           {stats.totalRequests > 0 ? ((requests / stats.totalRequests) * 100).toFixed(1) : '0.0'}%
+                           {(stats.totalRequests || 0) > 0 ? ((requests / (stats.totalRequests || 1)) * 100).toFixed(1) : '0.0'}%
                            of total
                          </div>
                        </div>
@@ -315,14 +315,14 @@ export function LLMAnalyticsDashboard({
             </CardHeader>
             <CardContent>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {stats.dailyUsage.map((day) => (
+                {(stats.dailyUsage || []).map((day) => (
                   <div
                     key={day.date}
                     className="flex items-center justify-between py-2 border-b"
                   >
                     <div className="font-medium">{day.date}</div>
                     <div className="flex space-x-4 text-sm">
-                      <span>{day.requests} req</span>
+                      <span>{formatNumber(day.requests)} req</span>
                       <span>{formatNumber(day.tokens)} tokens</span>
                       <span>{formatCurrency(day.cost)}</span>
                     </div>

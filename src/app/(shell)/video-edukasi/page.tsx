@@ -23,12 +23,15 @@ import {
   Grid,
   List,
   Clock,
+  ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { CMSContentListSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
 import Image from "next/image";
 import { logger } from "@/lib/logger";
+import { useRouter } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 
 interface VideoContent {
   id: string;
@@ -60,6 +63,7 @@ interface ApiContentItem {
 }
 
 export default function VideoPage() {
+  const router = useRouter();
   const [videos, setVideos] = useState<VideoContent[]>([]);
   const [filteredVideos, setFilteredVideos] = useState<VideoContent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -412,8 +416,128 @@ export default function VideoPage() {
   const Layout = ({ children }: { children: React.ReactNode }) => (
     <div className="min-h-screen bg-gray-50 relative">
       <Background />
-      <Header showNavigation={true} className="relative z-10" />
-      <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+
+      {/* Desktop: Header */}
+      <div className="hidden lg:block relative z-10">
+        <Header showNavigation={true} />
+      </div>
+
+      {/* Mobile: Header */}
+      <div className="lg:hidden relative z-10">
+        <header className="bg-white shadow-sm">
+          <div className="flex justify-between items-center px-4 py-5">
+            <button
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
+            >
+              <ArrowLeft className="w-6 h-6 text-blue-600" />
+            </button>
+            <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+            <UserButton />
+          </div>
+        </header>
+      </div>
+
+      {/* Desktop: Main Content */}
+      <div className="hidden lg:block relative z-10">
+        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      </div>
+
+      {/* Mobile: Card Layout */}
+      <div className="lg:hidden relative z-10">
+        <main className="px-4 py-8">
+          {/* Mobile: Controls */}
+          <div className="mb-6">
+            {/* Search Bar - Full Width */}
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Cari..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Mobile: Filter Buttons */}
+            <div className="flex space-x-3 mb-6">
+              {getUniqueCategories().map((category) => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                    selectedCategory === category
+                      ? "bg-red-500 text-white"
+                      : "bg-gray-200 text-gray-700"
+                  }`}
+                >
+                  {getCategoryLabel(category)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {filteredVideos.map((video) => {
+              const categoryLabel = getCategoryLabel(video.category);
+              const categoryColor = getCategoryColor(video.category);
+
+              return (
+                <div
+                  key={video.id}
+                  onClick={() => window.open(`/content/videos/${video.slug}`, "_blank")}
+                  className="bg-white rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-gray-900 text-base line-clamp-2">{video.title}</h3>
+                        <span className={`${categoryColor} px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0`}>
+                          {categoryLabel}
+                        </span>
+                      </div>
+
+                      {video.description && (
+                        <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                          {video.description}
+                        </p>
+                      )}
+
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatDate(video.publishedAt)}</span>
+                        </div>
+                        {video.durationMinutes && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatDuration(video.durationMinutes)}</span>
+                          </div>
+                        )}
+                        {video.author && (
+                          <div className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            <span className="truncate max-w-20">{video.author}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {filteredVideos.length === 0 && !loading && (
+              <div className="text-center py-8">
+                <p className="text-gray-500">
+                  {videos.length === 0 ? 'Belum ada video' : 'Tidak ada video yang sesuai dengan pencarian'}
+                </p>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 

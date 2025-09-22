@@ -25,21 +25,23 @@ export interface LLMRequest {
 
 export interface LLMResponse {
   id: string
-  object: string
-  created: number
-  model: string
-  choices: Array<{
-    index: number
-    message: {
-      role: string
-      content: string
+  type: string
+  role: string
+  content: Array<{
+    type: string
+    text?: string
+    tool_use?: {
+      id: string
+      name: string
+      input: Record<string, unknown>
     }
-    finish_reason: string
   }>
+  model: string
+  stop_reason: string | null
+  stop_sequence: string | null
   usage: {
-    prompt_tokens: number
-    completion_tokens: number
-    total_tokens: number
+    input_tokens: number
+    output_tokens: number
   }
 }
 

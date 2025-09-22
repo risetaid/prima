@@ -35,7 +35,7 @@ PRIMA is a full-stack healthcare application designed to support palliative care
 
 ### Content Management System (CMS)
 
-- **Article management** with rich text editing (TinyMCE)
+- **Article management** with rich text editing (QuillJS)
 - **Educational video library** with YouTube/Vimeo integration
 - **Category-based organization** (general, nutrition, emotional, exercise, medication, spiritual, palliative care)
 - **SEO optimization** with meta tags and slugs
@@ -57,7 +57,7 @@ PRIMA is a full-stack healthcare application designed to support palliative care
 - **Styling:** Tailwind CSS 4 + shadcn/ui components
 - **Icons:** Lucide React
 - **Forms:** React Hook Form with Zod validation
-- **Rich Text:** TinyMCE editor
+- **Rich Text:** QuillJS editor
 - **Notifications:** Sonner toast library
 
 ### Backend
