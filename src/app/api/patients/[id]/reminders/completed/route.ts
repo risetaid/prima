@@ -7,7 +7,7 @@ import { CompletionCalculationService } from "@/services/reminder/completion-cal
 interface CompletedReminder {
   id: string;
   scheduledTime: string;
-  completedDate: string;
+  reminderDate: string;
   customMessage?: string;
   confirmationStatus?: string;
   confirmedAt: string;
@@ -48,8 +48,8 @@ export async function GET(
       (reminder) => ({
         id: reminder.reminderId,
         scheduledTime: reminder.scheduledTime,
-        completedDate: reminder.status.confirmedAt?.toISOString() || new Date().toISOString(),
-        customMessage: reminder.patientResponse || undefined,
+        reminderDate: reminder.sentAt?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        customMessage: reminder.message || undefined,
         confirmationStatus: reminder.status.confirmationStatus,
         confirmedAt: reminder.status.confirmedAt?.toISOString() || new Date().toISOString(),
         sentAt: reminder.sentAt?.toISOString() || null,

@@ -19,6 +19,7 @@ export interface ReminderCompletionResult {
   status: CompletionStatus;
   reminderType: string;
   scheduledTime: string;
+  message?: string;
   sentAt?: Date;
   patientResponse?: string;
   manualConfirmation?: {
@@ -431,6 +432,7 @@ export class CompletionCalculationService {
           confirmationResponseAt: reminders.confirmationResponseAt,
           sentAt: reminders.sentAt,
           startDate: reminders.startDate,
+          endDate: reminders.endDate,
         })
         .from(reminders)
         .where(
@@ -473,6 +475,7 @@ export class CompletionCalculationService {
             status: completionStatus,
             reminderType: reminder.reminderType || 'GENERAL',
             scheduledTime: reminder.scheduledTime,
+            message: reminder.message || undefined,
             sentAt: reminder.sentAt || undefined,
             patientResponse: reminder.confirmationResponse || undefined,
             manualConfirmation: manualConfirmation ? {

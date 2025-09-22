@@ -91,6 +91,18 @@ export default function PatientPage() {
     router.push(`/pasien/${patientId}`)
   }
 
+  const handlePengingatClick = () => {
+    router.push('/pengingat')
+  }
+
+  const handleBeritaClick = () => {
+    router.push('/berita')
+  }
+
+  const handleVideoClick = () => {
+    router.push('/video-edukasi')
+  }
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -144,6 +156,69 @@ export default function PatientPage() {
       {/* Mobile: Header */}
       <div className="lg:hidden relative z-10">
         <MobileHeader showNavigation={true} />
+      </div>
+
+      {/* Mobile: Navigation Buttons */}
+      <div className="lg:hidden bg-blue-500 px-6 py-8">
+        <div className="flex space-x-6 justify-center pb-4">
+          {/* Pengingat */}
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
+              onClick={handlePengingatClick}
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+            >
+              <Image
+                src="/btn_pengingat.png"
+                alt="Pengingat"
+                width={80}
+                height={80}
+                className="mx-auto"
+              />
+            </div>
+            <h3 className="font-semibold text-sm text-white">Pengingat</h3>
+          </div>
+
+          {/* Berita */}
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
+              onClick={handleBeritaClick}
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+            >
+              <Image
+                src="/btn_berita.png"
+                alt="Berita"
+                width={80}
+                height={80}
+                className="mx-auto"
+              />
+            </div>
+            <h3 className="font-semibold text-sm text-white">Berita</h3>
+          </div>
+
+          {/* Video Edukasi */}
+          <div className="text-center flex-shrink-0 min-w-[80px]">
+            <div
+              onClick={handleVideoClick}
+              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+            >
+              <Image
+                src="/btn_videoEdukasi.png"
+                alt="Video Edukasi"
+                width={80}
+                height={80}
+                className="mx-auto"
+              />
+            </div>
+            <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile: Status Badge */}
+      <div className="lg:hidden mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4">
+        <span className="font-medium">
+          {loading ? "Loading..." : `${filteredPatients.length} Pasien dalam Pengawasan`}
+        </span>
       </div>
 
       {/* Desktop: Header Section with Dashboard Style */}
@@ -313,33 +388,36 @@ export default function PatientPage() {
 
       {/* Mobile: Card Layout */}
       <div className="lg:hidden relative z-10">
-        <main className="px-4 py-8">
-          {/* Mobile: Title and Controls */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Pasien Dalam Pengawasan</h2>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setShowAddPatientModal(true)}
-                className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors cursor-pointer"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="cari"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+        <div className="px-4 lg:px-8 pb-6">
+          {/* Mobile: Title Row */}
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-900 text-center">Daftar Pasien</h2>
+          </div>
+
+          {/* Mobile: Controls Row */}
+          <div className="flex items-center space-x-4 mb-6">
+            {/* Search Bar - Flexible Width */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Cari Pasien..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            {/* Add Patient Button */}
+            <div
+              onClick={() => setShowAddPatientModal(true)}
+              className="bg-blue-500 rounded-full p-2 cursor-pointer hover:bg-blue-600 transition-colors flex-shrink-0"
+            >
+              <Plus className="w-6 h-6 text-white" />
             </div>
           </div>
 
           {/* Mobile: Filter Buttons */}
-          <div className="flex space-x-3 mb-6">
+          <div className="flex space-x-4 mb-6">
             <button
               onClick={() => toggleFilter('active')}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors cursor-pointer ${
@@ -418,7 +496,7 @@ export default function PatientPage() {
               </div>
             )}
           </div>
-        </main>
+        </div>
       </div>
 
       <AddPatientDialog

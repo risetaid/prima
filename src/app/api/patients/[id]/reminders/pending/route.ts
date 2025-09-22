@@ -109,7 +109,7 @@ export async function GET(
     const formattedReminders = pendingReminders.map((reminder) => ({
       id: reminder.id,
       scheduledTime: reminder.scheduledTime || "12:00",
-      sentDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      reminderDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
       customMessage: reminder.customMessage,
       status: "PENDING_UPDATE",
       // Include automated confirmation fields for UI to handle properly

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 interface PendingReminder {
   id: string;
   scheduledTime: string;
-  sentDate: string;
+  reminderDate: string;
   customMessage?: string;
   status: "SENT" | "PENDING_UPDATE";
   // Automated confirmation fields
@@ -100,7 +100,15 @@ export default function PendingUpdatePage() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString || dateString === "null" || dateString === "undefined") {
+      return "Tanggal tidak tersedia";
+    }
+
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "Tanggal tidak valid";
+    }
+
     const days = [
       "Minggu",
       "Senin",
@@ -197,9 +205,9 @@ export default function PendingUpdatePage() {
                         {reminder.customMessage ||
                           `Minum obat`}
                       </h3>
-                      <p className="text-gray-600 text-sm">
-                        {formatDate(reminder.sentDate)}
-                      </p>
+                       <p className="text-gray-600 text-sm">
+                         {formatDate(reminder.reminderDate)}
+                       </p>
                       {/* Automated Confirmation Status */}
                       {hasAutomatedConfirmation && (
                         <div className="mt-2 flex items-center space-x-2">

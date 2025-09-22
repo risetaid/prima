@@ -45,16 +45,14 @@ export default function PatientReminderPage() {
 
   const fetchReminderStats = useCallback(async () => {
     if (!patientId) return;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    try {
       const response = await fetch(
         `/api/patients/${patientId}/reminders/stats`,
         { signal: controller.signal }
       );
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const statsData = await response.json();
@@ -76,6 +74,8 @@ export default function PatientReminderPage() {
         selesai: 0,
         semua: 0,
       });
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [patientId]);
 
@@ -108,15 +108,13 @@ export default function PatientReminderPage() {
 
   const fetchCompletedReminders = useCallback(async () => {
     if (!patientId) return;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    try {
       const response = await fetch(`/api/patients/${patientId}/reminders/completed`, {
         signal: controller.signal
       });
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -127,6 +125,8 @@ export default function PatientReminderPage() {
     } catch (error) {
       console.error("Error fetching completed reminders:", error);
       setCompletedReminders([]);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [patientId]);
 

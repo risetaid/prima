@@ -12,7 +12,7 @@ import type { Reminder, ReminderStats, ContentItem } from "@/components/penginga
 interface ScheduledReminderApi {
   id: string;
   scheduledTime?: string;
-  nextReminderDate?: string;
+  reminderDate?: string;
   customMessage?: string;
   attachedContent?: ContentItem[];
 }
@@ -20,14 +20,14 @@ interface ScheduledReminderApi {
 interface PendingReminderApi {
   id: string;
   scheduledTime?: string;
-  sentDate?: string;
+  reminderDate?: string;
   customMessage?: string;
 }
 
 interface CompletedReminderApi {
   id: string;
   scheduledTime?: string;
-  completedDate?: string;
+  reminderDate?: string;
   customMessage?: string;
   confirmationStatus?: string;
   confirmedAt?: string;
@@ -92,16 +92,14 @@ export function PatientReminderDashboard({
 
   const fetchScheduledReminders = useCallback(async () => {
     if (!patientId) return;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    try {
       const response = await fetch(
         `/api/patients/${patientId}/reminders/scheduled`,
         { signal: controller.signal }
       );
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -110,7 +108,7 @@ export function PatientReminderDashboard({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
-            item.nextReminderDate || new Date().toISOString().split("T")[0],
+            item.reminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "scheduled",
           attachedContent: item.attachedContent || [],
@@ -123,21 +121,21 @@ export function PatientReminderDashboard({
     } catch (error) {
       console.error("Error fetching scheduled reminders:", error);
       toast.error("Gagal memuat pengingat terjadwal");
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [patientId]);
 
   const fetchPendingReminders = useCallback(async () => {
     if (!patientId) return;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    try {
       const response = await fetch(
         `/api/patients/${patientId}/reminders/pending`,
         { signal: controller.signal }
       );
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -145,7 +143,7 @@ export function PatientReminderDashboard({
         const mappedData = data.map((item: PendingReminderApi) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
-          reminderDate: item.sentDate || new Date().toISOString().split("T")[0],
+          reminderDate: item.reminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "pending",
         }));
@@ -157,21 +155,21 @@ export function PatientReminderDashboard({
     } catch (error) {
       console.error("Error fetching pending reminders:", error);
       toast.error("Gagal memuat pengingat perlu diperbarui");
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [patientId]);
 
   const fetchCompletedReminders = useCallback(async () => {
     if (!patientId) return;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    try {
       const response = await fetch(
         `/api/patients/${patientId}/reminders/completed`,
         { signal: controller.signal }
       );
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
@@ -180,7 +178,7 @@ export function PatientReminderDashboard({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
-            item.completedDate || new Date().toISOString().split("T")[0],
+            item.reminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "completed",
           confirmationStatus: item.confirmationStatus,
@@ -194,6 +192,8 @@ export function PatientReminderDashboard({
     } catch (error) {
       console.error("Error fetching completed reminders:", error);
       toast.error("Gagal memuat pengingat selesai");
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, [patientId]);
 

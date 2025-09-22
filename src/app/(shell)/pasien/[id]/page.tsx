@@ -48,7 +48,7 @@ interface ApiHealthNote {
 interface CompletedReminder {
   id: string;
   scheduledTime: string;
-  completedDate: string;
+  reminderDate: string;
   customMessage?: string;
   confirmedAt: string;
   sentAt: string | null;

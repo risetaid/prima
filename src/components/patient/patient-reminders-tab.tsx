@@ -3,6 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Eye, Clock, Calendar } from "lucide-react";
 
+const formatDate = (dateString: string) => {
+  if (!dateString || dateString === "null" || dateString === "undefined") {
+    return "Tanggal tidak tersedia";
+  }
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return "Tanggal tidak valid";
+  }
+
+  return date.toLocaleDateString('id-ID');
+};
+
 interface Patient {
   name: string;
   complianceRate: number;
@@ -13,7 +26,7 @@ interface Patient {
 interface CompletedReminder {
   id: string;
   scheduledTime: string;
-  completedDate: string;
+  reminderDate: string;
   customMessage?: string;
   confirmedAt: string;
   sentAt: string | null;
@@ -108,7 +121,7 @@ export function PatientRemindersTab({
                       <div className="flex items-center space-x-4 text-sm text-gray-500 mt-1">
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{new Date(reminder.completedDate).toLocaleDateString('id-ID')}</span>
+                           <span>{formatDate(reminder.reminderDate)}</span>
                         </div>
                         <div className="flex items-center space-x-1">
                           <Clock className="w-4 h-4" />

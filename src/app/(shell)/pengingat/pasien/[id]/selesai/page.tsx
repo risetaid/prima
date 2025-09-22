@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, CheckSquare, Clock } from 'lucide-react'
+import { ArrowLeft, CheckSquare } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 
 interface CompletedReminder {
   id: string
   scheduledTime: string
-  completedDate: string
+  reminderDate: string
   customMessage?: string
   confirmationStatus?: string
   confirmedAt: string
@@ -45,37 +45,26 @@ export default function CompletedRemindersPage() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']
-    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 
-                   'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
-    
-    const dayName = days[date.getDay()]
-    const day = date.getDate()
-    const month = months[date.getMonth()]
-    const year = date.getFullYear()
-    
-    return `${dayName}, ${day} ${month} ${year}`
-  }
 
-  const formatConfirmationTime = (isoString: string) => {
+
+  const formatShortDateTime = (isoString: string) => {
+    if (!isoString || isoString === "null" || isoString === "undefined") {
+      return "Tanggal tidak tersedia";
+    }
+
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      return "Tanggal tidak valid";
+    }
+
     // isoString already converted to WIB in API
-    const date = new Date(isoString)
-    const hours = String(date.getUTCHours()).padStart(2, '0')
-    const minutes = String(date.getUTCMinutes()).padStart(2, '0')
     const day = String(date.getUTCDate()).padStart(2, '0')
     const month = String(date.getUTCMonth() + 1).padStart(2, '0')
     const year = date.getUTCFullYear()
-    return `${day}/${month}/${year} ${hours}:${minutes} WIB`
-  }
-
-  const formatSentTime = (isoString: string) => {
-    // isoString already converted to WIB in API
-    const date = new Date(isoString)
     const hours = String(date.getUTCHours()).padStart(2, '0')
     const minutes = String(date.getUTCMinutes()).padStart(2, '0')
-    return `${hours}:${minutes}`
+
+    return `${day}/${month}/${year} - ${hours}.${minutes}`
   }
 
   if (loading) {
@@ -116,28 +105,20 @@ export default function CompletedRemindersPage() {
         <div className="space-y-4">
           {reminders.map((reminder) => (
             <div key={reminder.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-200">
-              {/* Main Card */}
-              <div className="bg-gray-50 p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">
-                      {reminder.customMessage || `Minum obat`}
-                    </h3>
-                    <p className="text-gray-500 text-sm">
-                      {formatDate(reminder.completedDate)}
-                    </p>
-                    <p className="text-gray-400 text-xs mt-1">
-                      Dikonfirmasi: {formatConfirmationTime(reminder.confirmedAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-1 text-gray-600">
-                    <Clock className="w-4 h-4" />
-                    <span className="font-semibold">
-                      {reminder.sentAt ? formatSentTime(reminder.sentAt) : reminder.scheduledTime}
-                    </span>
-                  </div>
-                </div>
-              </div>
+               {/* Main Card */}
+               <div className="bg-gray-50 p-4">
+                 <div className="flex-1">
+                   <h3 className="font-semibold text-gray-900 mb-2">
+                     {reminder.customMessage || `Minum obat`}
+                   </h3>
+                   <p className="text-gray-600 text-sm mb-1">
+                     Dikirim pada: {formatShortDateTime(reminder.sentAt || reminder.reminderDate)}
+                   </p>
+                   <p className="text-gray-600 text-sm">
+                     Diperbarui pada: {formatShortDateTime(reminder.confirmedAt)}
+                   </p>
+                 </div>
+               </div>
 
               {/* Status Button */}
               <div className="p-0">
