@@ -10,7 +10,7 @@
     "build:analyze": "ANALYZE=true next build",
     "build:profile": "next build --profile",
     "analyze-bundle": "webpack-bundle-analyzer bundle-stats.json",
-    "start": "next start",
+    "start": "bun run --production .next/standalone/server.js",
     "lint": "next lint",
     "postinstall": "drizzle-kit generate",
     "db:generate": "drizzle-kit generate",
