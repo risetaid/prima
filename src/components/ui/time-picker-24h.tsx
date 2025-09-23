@@ -57,8 +57,8 @@ export function TimePicker24h({
   const hours = Array.from({ length: 24 }, (_, i) =>
     i.toString().padStart(2, "0")
   );
-  const minutes = Array.from({ length: 60 }, (_, i) =>
-    i.toString().padStart(2, "0")
+  const minutes = Array.from({ length: 6 }, (_, i) =>
+    (i * 10).toString().padStart(2, "0")
   );
 
   // Check if a time is in the past
@@ -88,29 +88,8 @@ export function TimePicker24h({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Display Value */}
-      <div
-        className={`
-        w-full px-4 py-3 border-2 border-blue-200 rounded-xl
-        bg-white text-left flex items-center
-        ${disabled ? "bg-gray-100 cursor-not-allowed opacity-50" : ""}
-        ${required && !value ? "border-red-300" : ""}
-      `}
-      >
-        <div className="flex items-center space-x-2 flex-1">
-          <Clock className="w-5 h-5 text-blue-500" />
-          <span
-            className={
-              displayValue === placeholder ? "text-gray-400" : "text-gray-900"
-            }
-          >
-            {displayValue}
-          </span>
-        </div>
-      </div>
-
-      {/* Time Selectors - Always Visible */}
-      <div className="mt-2 flex items-center space-x-4">
+      {/* Time Selectors */}
+      <div className="flex items-center space-x-4">
         {/* Hour Selector */}
         <div className="flex-1">
           <label className="block text-xs font-medium text-gray-500 mb-1">
