@@ -25,7 +25,8 @@
       "Bash(pkill:*)",
       "Bash(bun:*)",
       "WebFetch(domain:quilljs.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(dir /s E:PortfolioWebprimasrcservices)"
     ],
     "deny": [],
     "ask": []
