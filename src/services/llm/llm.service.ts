@@ -7,7 +7,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
 import { responseCache } from "@/lib/response-cache";
 import { safetyFilterService } from "./safety-filter";
-import { withRetry, DEFAULT_RETRY_CONFIGS, isRetryableError } from "@/lib/simple-retry";
+import {
+  withRetry,
+  DEFAULT_RETRY_CONFIGS,
+  isRetryableError,
+} from "@/lib/simple-retry";
 import { messageQueueService } from "@/services/message-queue.service";
 import { llmCostService } from "@/lib/llm-cost-service";
 import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
@@ -99,7 +103,9 @@ export class LLMService {
       const responseTime = Date.now() - startTime;
       const content =
         response.content[0]?.type === "text" ? response.content[0].text : "";
-      const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+      const tokensUsed =
+        (response.usage?.input_tokens || 0) +
+        (response.usage?.output_tokens || 0);
       const finishReason = response.stop_reason || "stop";
 
       logger.info("Anthropic Claude LLM response generated successfully", {
@@ -125,7 +131,7 @@ export class LLMService {
         {
           responseTime,
           model: this.config.model,
-              messageCount: request.messages.length,
+          messageCount: request.messages.length,
           maxTokens: request.maxTokens || this.config.maxTokens,
           temperature: request.temperature || this.config.temperature,
           errorType: err.constructor.name,
@@ -150,12 +156,23 @@ export class LLMService {
   }
 
   /**
-   * Detect intent from patient message using LLM with fallback
+   * Detect intent from patient message using hierarchical approach
    */
   async detectIntent(
     message: string,
     context: ConversationContext
   ): Promise<IntentDetectionResult> {
+    // Use hierarchical intent detection for better accuracy
+    const hierarchicalResult = await this.detectIntentWithHierarchy(
+      message,
+      context
+    );
+
+    if (hierarchicalResult) {
+      return hierarchicalResult;
+    }
+
+    // Fallback to original LLM-based detection if hierarchical fails
     const systemPrompt = await this.buildIntentDetectionPrompt(context);
 
     const request: LLMRequest = {
@@ -208,6 +225,308 @@ export class LLMService {
   }
 
   /**
+   * Hierarchical intent detection with priority system
+   */
+  private async detectIntentWithHierarchy(
+    message: string,
+    context: ConversationContext
+  ): Promise<IntentDetectionResult | null> {
+    const normalizedMessage = message.toLowerCase().trim();
+
+    // Level 1: Question pattern recognition (5W1H) - High priority
+    const questionResult = this.detectQuestionPatterns(normalizedMessage);
+    if (questionResult) {
+      logger.debug(
+        "Detected question pattern, classifying as general_inquiry",
+        {
+          patientId: context.patientId,
+          questionType: questionResult.questionType,
+          confidence: questionResult.confidence,
+        }
+      );
+      return {
+        intent: "general_inquiry",
+        confidence: questionResult.confidence,
+        entities: { questionType: questionResult.questionType },
+        rawResponse: {
+          content: JSON.stringify(questionResult),
+          tokensUsed: 0,
+          model: "hierarchical-pattern",
+          responseTime: 0,
+          finishReason: "pattern_match",
+        },
+      };
+    }
+
+    // Level 2: Emergency detection
+    const emergencyResult = this.detectEmergencyPatterns(normalizedMessage);
+    if (emergencyResult.isEmergency) {
+      return {
+        intent: "emergency",
+        confidence: emergencyResult.confidence,
+        entities: { emergencyType: emergencyResult.type },
+        rawResponse: {
+          content: JSON.stringify(emergencyResult),
+          tokensUsed: 0,
+          model: "hierarchical-emergency",
+          responseTime: 0,
+          finishReason: "emergency_match",
+        },
+      };
+    }
+
+    // Level 3: Context-aware reminder confirmation (only if pending reminders exist)
+    const reminderResult = await this.detectContextAwareReminderConfirmation(
+      message,
+      context
+    );
+    if (reminderResult) {
+      return reminderResult;
+    }
+
+    // Level 4: Unsubscribe detection
+    const unsubscribeResult = this.detectUnsubscribePatterns(normalizedMessage);
+    if (unsubscribeResult) {
+      return {
+        intent: "unsubscribe",
+        confidence: unsubscribeResult.confidence,
+        entities: {},
+        rawResponse: {
+          content: JSON.stringify(unsubscribeResult),
+          tokensUsed: 0,
+          model: "hierarchical-unsubscribe",
+          responseTime: 0,
+          finishReason: "unsubscribe_match",
+        },
+      };
+    }
+
+    // Level 5: Verification response detection
+    const verificationResult =
+      this.detectVerificationPatterns(normalizedMessage);
+    if (verificationResult) {
+      return {
+        intent: "verification_response",
+        confidence: verificationResult.confidence,
+        entities: { response: verificationResult.response },
+        rawResponse: {
+          content: JSON.stringify(verificationResult),
+          tokensUsed: 0,
+          model: "hierarchical-verification",
+          responseTime: 0,
+          finishReason: "verification_match",
+        },
+      };
+    }
+
+    // If no hierarchical match found, return null to fall back to LLM
+    return null;
+  }
+
+  /**
+   * Detect 5W1H question patterns
+   */
+  private detectQuestionPatterns(
+    normalizedMessage: string
+  ): { questionType: string; confidence: number } | null {
+    const questionWords = {
+      apa: ["apa", "apakah", "apa saja"],
+      mengapa: ["mengapa", "kenapa", "kok", "kok bisa"],
+      kapan: ["kapan", "kapan waktu", "jam berapa"],
+      di_mana: ["di mana", "dimana", "lokasi", "tempat"],
+      siapa: ["siapa", "siapakah"],
+      bagaimana: ["bagaimana", "gimana", "cara"],
+    };
+
+    // Check if message starts with question words or contains question marks
+    const hasQuestionMark = normalizedMessage.includes("?");
+
+    for (const [type, patterns] of Object.entries(questionWords)) {
+      for (const pattern of patterns) {
+        if (
+          normalizedMessage.startsWith(pattern) ||
+          normalizedMessage.includes(` ${pattern}`)
+        ) {
+          return {
+            questionType: type,
+            confidence: hasQuestionMark ? 0.95 : 0.85,
+          };
+        }
+      }
+    }
+
+    // Additional check for question-like patterns
+    if (
+      hasQuestionMark &&
+      (normalizedMessage.includes("bisa") ||
+        normalizedMessage.includes("boleh") ||
+        normalizedMessage.includes("minta") ||
+        normalizedMessage.includes("tolong jelaskan"))
+    ) {
+      return {
+        questionType: "general_question",
+        confidence: 0.9,
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Detect emergency patterns
+   */
+  private detectEmergencyPatterns(normalizedMessage: string): {
+    isEmergency: boolean;
+    type: string;
+    confidence: number;
+  } {
+    const emergencyKeywords = [
+      "darurat",
+      "emergency",
+      "sakit parah",
+      "nyeri dada",
+      "sesak napas",
+      "pingsan",
+      "pingsan",
+      "muntah darah",
+      "alergi parah",
+      "demam tinggi",
+      "gawat",
+      "tolong segera",
+      "butuh bantuan segera",
+    ];
+
+    const hasEmergencyKeyword = emergencyKeywords.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
+
+    if (hasEmergencyKeyword) {
+      return {
+        isEmergency: true,
+        type: "medical_emergency",
+        confidence: 0.95,
+      };
+    }
+
+    return { isEmergency: false, type: "", confidence: 0 };
+  }
+
+  /**
+   * Context-aware reminder confirmation detection
+   */
+  private async detectContextAwareReminderConfirmation(
+    message: string,
+    context: ConversationContext
+  ): Promise<IntentDetectionResult | null> {
+    try {
+      // Check if there are pending reminders in the last 24 hours
+      if (context.patientId) {
+        const { ReminderService } = await import(
+          "@/services/reminder/reminder.service"
+        );
+        const reminderService = new ReminderService();
+        const todaysReminders = await reminderService.getTodaysReminders(
+          context.patientId
+        );
+
+        // Check for reminders sent in the last 24 hours that are still pending
+        const recentPendingReminders = todaysReminders.filter(
+          (r) =>
+            !r.isCompleted &&
+            new Date(r.sentAt || 0) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+        );
+
+        if (recentPendingReminders.length === 0) {
+          // No pending reminders, don't classify as reminder confirmation
+          return null;
+        }
+
+        // Use existing reminder response detection but with higher confidence threshold
+        const reminderResponse = await this.detectSimpleReminderResponse(
+          message,
+          context
+        );
+        if (
+          reminderResponse.isReminderResponse &&
+          reminderResponse.confidence > 0.7
+        ) {
+          return {
+            intent: "reminder_confirmation",
+            confidence: reminderResponse.confidence,
+            entities: {
+              responseType: reminderResponse.responseType,
+              reminderType: reminderResponse.reminderType,
+            },
+            rawResponse: {
+              content: JSON.stringify(reminderResponse),
+              tokensUsed: 0,
+              model: "hierarchical-reminder-context",
+              responseTime: 0,
+              finishReason: "context_aware_reminder",
+            },
+          };
+        }
+      }
+    } catch (error) {
+      logger.warn("Failed to check reminder context", {
+        patientId: context.patientId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    return null;
+  }
+
+  /**
+   * Detect unsubscribe patterns
+   */
+  private detectUnsubscribePatterns(
+    normalizedMessage: string
+  ): { confidence: number } | null {
+    const unsubscribeKeywords = [
+      "berhenti",
+      "stop",
+      "cancel",
+      "batal",
+      "tidak mau lagi",
+      "unsubscribe",
+      "keluar",
+      "sudah cukup",
+    ];
+
+    const hasUnsubscribeKeyword = unsubscribeKeywords.some((keyword) =>
+      normalizedMessage.includes(keyword)
+    );
+
+    if (hasUnsubscribeKeyword) {
+      return { confidence: 0.9 };
+    }
+
+    return null;
+  }
+
+  /**
+   * Detect verification response patterns
+   */
+  private detectVerificationPatterns(
+    normalizedMessage: string
+  ): { response: string; confidence: number } | null {
+    if (
+      normalizedMessage === "ya" ||
+      normalizedMessage === "iya" ||
+      normalizedMessage === "yes"
+    ) {
+      return { response: "YA", confidence: 0.95 };
+    }
+
+    if (normalizedMessage === "tidak" || normalizedMessage === "no") {
+      return { response: "TIDAK", confidence: 0.95 };
+    }
+
+    return null;
+  }
+
+  /**
    * Validate if response is in proper Indonesian
    */
   private validateLanguage(response: string): {
@@ -220,23 +539,58 @@ export class LLMService {
 
     // Common English words that should not appear in Indonesian responses
     const englishWords = [
-      ' the ', ' and ', ' is ', ' are ', ' you ', ' your ', ' we ', ' our ',
-      ' have ', ' has ', ' been ', ' were ', ' will ', ' would ', ' could ',
-      ' should ', ' this ', ' that ', ' these ', ' those ', ' please ',
-      ' thank ', ' thanks ', ' hello ', ' hi ', ' yes ', ' no ', ' not '
+      " the ",
+      " and ",
+      " is ",
+      " are ",
+      " you ",
+      " your ",
+      " we ",
+      " our ",
+      " have ",
+      " has ",
+      " been ",
+      " were ",
+      " will ",
+      " would ",
+      " could ",
+      " should ",
+      " this ",
+      " that ",
+      " these ",
+      " those ",
+      " please ",
+      " thank ",
+      " thanks ",
+      " hello ",
+      " hi ",
+      " yes ",
+      " no ",
+      " not ",
     ];
 
     // Common Indonesian phrases that should be present
     const indonesianIndicators = [
-      'anda', 'saya', 'kami', 'mereka', 'ini', 'itu', 'terima kasih',
-      'maaf', 'tolong', 'bantuan', 'kesehatan', 'pasien', 'obat'
+      "anda",
+      "saya",
+      "kami",
+      "mereka",
+      "ini",
+      "itu",
+      "terima kasih",
+      "maaf",
+      "tolong",
+      "bantuan",
+      "kesehatan",
+      "pasien",
+      "obat",
     ];
 
     let englishScore = 0;
     let indonesianScore = 0;
 
     // Check for English words
-    englishWords.forEach(word => {
+    englishWords.forEach((word) => {
       if (lowerResponse.includes(word)) {
         englishScore++;
         issues.push(`Bahasa Inggris terdeteksi: "${word.trim()}"`);
@@ -244,7 +598,7 @@ export class LLMService {
     });
 
     // Check for Indonesian indicators
-    indonesianIndicators.forEach(word => {
+    indonesianIndicators.forEach((word) => {
       if (lowerResponse.includes(word)) {
         indonesianScore++;
       }
@@ -256,24 +610,26 @@ export class LLMService {
     const indonesianRatio = indonesianScore / totalWords;
 
     const isValid = englishScore === 0 && indonesianScore > 0;
-    const confidence = Math.max(0, Math.min(1, (indonesianRatio - englishRatio) + 0.3));
+    const confidence = Math.max(
+      0,
+      Math.min(1, indonesianRatio - englishRatio + 0.3)
+    );
 
     if (englishScore > 0) {
       issues.push(`Terdeteksi ${englishScore} kata bahasa Inggris`);
     }
 
     if (indonesianScore === 0) {
-      issues.push('Tidak ada indikator bahasa Indonesia yang terdeteksi');
+      issues.push("Tidak ada indikator bahasa Indonesia yang terdeteksi");
     }
 
     return {
       isValid,
       issues,
-      confidence
+      confidence,
     };
   }
 
-  
   /**
    * Generate a natural language response for the patient with language validation
    */
@@ -300,7 +656,9 @@ export class LLMService {
         });
 
         // Parse the cached response from JSON string
-        const parsedResponse = JSON.parse(cachedResponse.response) as ProcessedLLMResponse;
+        const parsedResponse = JSON.parse(
+          cachedResponse.response
+        ) as ProcessedLLMResponse;
 
         const cachedResponseObj = {
           content: parsedResponse.content,
@@ -344,7 +702,11 @@ export class LLMService {
     };
 
     // Generate response with language validation
-    let finalResponse = await this.generateResponseWithLanguageValidation(request, intent, context);
+    let finalResponse = await this.generateResponseWithLanguageValidation(
+      request,
+      intent,
+      context
+    );
 
     // Apply safety filtering to LLM response
     const safetyResult = await safetyFilterService.filterLLMResponse(
@@ -400,7 +762,9 @@ export class LLMService {
   /**
    * Build system prompt for intent detection
    */
-  private async buildIntentDetectionPrompt(context: ConversationContext): Promise<string> {
+  private async buildIntentDetectionPrompt(
+    context: ConversationContext
+  ): Promise<string> {
     const activeReminders = context.patientInfo?.activeReminders || [];
     const reminderContext =
       activeReminders.length > 0
@@ -421,14 +785,23 @@ export class LLMService {
     let todaysRemindersContext = "";
     try {
       if (context.patientId) {
-        const { ReminderService } = await import("@/services/reminder/reminder.service");
+        const { ReminderService } = await import(
+          "@/services/reminder/reminder.service"
+        );
         const reminderService = new ReminderService();
-        const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
+        const todaysReminders = await reminderService.getTodaysReminders(
+          context.patientId
+        );
 
         if (todaysReminders.length > 0) {
-          todaysRemindersContext = `\nToday's Reminders: ${todaysReminders.map(r =>
-            `${r.scheduledTime}: ${r.message || "pengingat"} (${r.isCompleted ? 'completed' : 'pending'})`
-          ).join(", ")}`;
+          todaysRemindersContext = `\nToday's Reminders: ${todaysReminders
+            .map(
+              (r) =>
+                `${r.scheduledTime}: ${r.message || "pengingat"} (${
+                  r.isCompleted ? "completed" : "pending"
+                })`
+            )
+            .join(", ")}`;
         }
       }
     } catch {
@@ -439,11 +812,16 @@ export class LLMService {
     let healthNotesContext = "";
     try {
       if (context.patientId) {
-        const { healthNotesQueryService } = await import("@/services/patient/health-notes-query.service");
-        const recentNotes = await healthNotesQueryService.queryHealthNotes(context.patientId, {
-          timeRange: "hari_ini",
-          limit: 3
-        });
+        const { healthNotesQueryService } = await import(
+          "@/services/patient/health-notes-query.service"
+        );
+        const recentNotes = await healthNotesQueryService.queryHealthNotes(
+          context.patientId,
+          {
+            timeRange: "hari_ini",
+            limit: 3,
+          }
+        );
 
         if (recentNotes.notes.length > 0) {
           healthNotesContext = `\nRecent Health Notes: ${recentNotes.notes.length} notes recorded today`;
@@ -585,7 +963,6 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     };
   }
 
-  
   /**
    * Queue message for later retry when LLM is unavailable
    */
@@ -812,20 +1189,28 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     isReminderResponse: boolean;
     responseType: "confirmed" | "pending" | "help" | "unknown";
     confidence: number;
-    reminderType?: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
+    reminderType?: "MEDICATION" | "APPOINTMENT" | "GENERAL";
   }> {
     const normalizedMessage = message.toLowerCase().trim();
 
     // Get reminder context to determine type-specific patterns
-    let reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL' = 'MEDICATION';
+    let reminderType: "MEDICATION" | "APPOINTMENT" | "GENERAL" = "MEDICATION";
     try {
       if (context.patientId) {
-        const { ReminderService } = await import("@/services/reminder/reminder.service");
+        const { ReminderService } = await import(
+          "@/services/reminder/reminder.service"
+        );
         const reminderService = new ReminderService();
-        const todaysReminders = await reminderService.getTodaysReminders(context.patientId);
-        const pendingReminder = todaysReminders.find(r => !r.isCompleted);
+        const todaysReminders = await reminderService.getTodaysReminders(
+          context.patientId
+        );
+        const pendingReminder = todaysReminders.find((r) => !r.isCompleted);
         if (pendingReminder) {
-          reminderType = pendingReminder.reminderType as 'MEDICATION' | 'APPOINTMENT' | 'GENERAL' || 'MEDICATION';
+          reminderType =
+            (pendingReminder.reminderType as
+              | "MEDICATION"
+              | "APPOINTMENT"
+              | "GENERAL") || "MEDICATION";
         }
       }
     } catch {
@@ -835,41 +1220,90 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     // Type-specific confirmation patterns
     const confirmedPatterns = {
       MEDICATION: [
-        "sudah", "udh", "udah", "sdh", "dah",
-        "sudah minum", "udah minum", "sudah makan", "sudah telan",
-        "sudah konsumsi", "sudah ambil", "done", "selesai",
-        "sudah selesai", "sudah lakukan", "oke siap", "siap"
+        "sudah",
+        "udh",
+        "udah",
+        "sdh",
+        "dah",
+        "sudah minum",
+        "udah minum",
+        "sudah makan",
+        "sudah telan",
+        "sudah konsumsi",
+        "sudah ambil",
+        "done",
+        "selesai",
+        "sudah selesai",
+        "sudah lakukan",
+        "oke siap",
+        "siap",
       ],
       APPOINTMENT: [
-        "sudah", "hadir", "datang", "selesai", "done",
-        "sudah hadir", "sudah datang", "sudah selesai"
+        "sudah",
+        "hadir",
+        "datang",
+        "selesai",
+        "done",
+        "sudah hadir",
+        "sudah datang",
+        "sudah selesai",
       ],
       GENERAL: [
-        "sudah", "selesai", "done", "selesai",
-        "sudah selesai", "sudah lakukan", "sudah dilakukan"
-      ]
+        "sudah",
+        "selesai",
+        "done",
+        "selesai",
+        "sudah selesai",
+        "sudah lakukan",
+        "sudah dilakukan",
+      ],
     };
 
     const pendingPatterns = {
       MEDICATION: [
-        "belum", "blm", "blum", "lum", "belom",
-        "belum minum", "blm minum", "belum makan", "belum telan",
-        "belum konsumsi", "belum ambil", "lupa", "belum lakukan",
-        "nanti", "sebentar"
+        "belum",
+        "blm",
+        "blum",
+        "lum",
+        "belom",
+        "belum minum",
+        "blm minum",
+        "belum makan",
+        "belum telan",
+        "belum konsumsi",
+        "belum ambil",
+        "lupa",
+        "belum lakukan",
+        "nanti",
+        "sebentar",
       ],
       APPOINTMENT: [
-        "belum", "terlambat", "nanti", "sebentar",
-        "belum hadir", "belum datang", "akan terlambat"
+        "belum",
+        "terlambat",
+        "nanti",
+        "sebentar",
+        "belum hadir",
+        "belum datang",
+        "akan terlambat",
       ],
       GENERAL: [
-        "belum", "nanti", "sebentar", "belom",
-        "belum selesai", "belum lakukan", "belum dilakukan"
-      ]
+        "belum",
+        "nanti",
+        "sebentar",
+        "belom",
+        "belum selesai",
+        "belum lakukan",
+        "belum dilakukan",
+      ],
     };
 
     const helpPatterns = [
-      "bantuan", "tolong", "help", "bantu",
-      "minta bantuan", "butuh bantuan"
+      "bantuan",
+      "tolong",
+      "help",
+      "bantu",
+      "minta bantuan",
+      "butuh bantuan",
     ];
 
     // Use type-specific patterns
@@ -877,18 +1311,21 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     const currentPendingPatterns = pendingPatterns[reminderType];
 
     // Check for confirmation patterns
-    const confirmedMatch = currentConfirmedPatterns.some(pattern =>
-      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    const confirmedMatch = currentConfirmedPatterns.some(
+      (pattern) =>
+        normalizedMessage.includes(pattern) || normalizedMessage === pattern
     );
 
     // Check for pending patterns
-    const pendingMatch = currentPendingPatterns.some(pattern =>
-      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    const pendingMatch = currentPendingPatterns.some(
+      (pattern) =>
+        normalizedMessage.includes(pattern) || normalizedMessage === pattern
     );
 
     // Check for help patterns
-    const helpMatch = helpPatterns.some(pattern =>
-      normalizedMessage.includes(pattern) || normalizedMessage === pattern
+    const helpMatch = helpPatterns.some(
+      (pattern) =>
+        normalizedMessage.includes(pattern) || normalizedMessage === pattern
     );
 
     // Determine response type and confidence
@@ -897,21 +1334,21 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         isReminderResponse: true,
         responseType: "help",
         confidence: 0.9,
-        reminderType
+        reminderType,
       };
     } else if (confirmedMatch && !pendingMatch) {
       return {
         isReminderResponse: true,
         responseType: "confirmed",
         confidence: 0.9,
-        reminderType
+        reminderType,
       };
     } else if (pendingMatch && !confirmedMatch) {
       return {
         isReminderResponse: true,
         responseType: "pending",
         confidence: 0.9,
-        reminderType
+        reminderType,
       };
     } else if (confirmedMatch && pendingMatch) {
       // Both patterns present - need more sophisticated analysis
@@ -920,27 +1357,28 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         const llmResult = await this.detectIntent(message, context);
         if (llmResult.intent === "reminder_confirmation") {
           // Check entities for more specific information
-          const entities = llmResult.entities as Record<string, unknown> || {};
+          const entities =
+            (llmResult.entities as Record<string, unknown>) || {};
           if (entities.confirmation_status === "confirmed") {
             return {
               isReminderResponse: true,
               responseType: "confirmed",
               confidence: 0.8,
-              reminderType
+              reminderType,
             };
           } else if (entities.confirmation_status === "pending") {
             return {
               isReminderResponse: true,
               responseType: "pending",
               confidence: 0.8,
-              reminderType
+              reminderType,
             };
           }
         }
       } catch (error) {
         logger.warn("LLM analysis failed for ambiguous reminder response", {
           message: normalizedMessage.substring(0, 50),
-          error: error instanceof Error ? error.message : String(error)
+          error: error instanceof Error ? error.message : String(error),
         });
       }
 
@@ -949,7 +1387,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         isReminderResponse: true,
         responseType: "confirmed",
         confidence: 0.6,
-        reminderType
+        reminderType,
       };
     }
 
@@ -957,14 +1395,17 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
       isReminderResponse: false,
       responseType: "unknown",
       confidence: 0,
-      reminderType
+      reminderType,
     };
   }
 
   /**
    * Fallback Indonesian response templates for when LLM fails to generate proper Indonesian
    */
-  private getIndonesianFallbackResponse(intent: string, context: ConversationContext): string {
+  private getIndonesianFallbackResponse(
+    intent: string,
+    context: ConversationContext
+  ): string {
     const patientName = context.patientInfo?.name || "Pasien";
 
     const templates = {
@@ -972,41 +1413,44 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         confirmed: [
           `Baik ${patientName}, terima kasih sudah mengonfirmasi! Semoga obatnya bermanfaat ya.`,
           `Oke ${patientName}, sudah dicatat. Terima kasih konfirmasinya!`,
-          `Terima kasih ${patientName}! Jangan lupa untuk istirahat yang cukup.`
+          `Terima kasih ${patientName}! Jangan lupa untuk istirahat yang cukup.`,
         ],
         pending: [
           `Baik ${patientName}, nanti diingatkan kembali ya. Jangan lupa minum obatnya!`,
           `Oke ${patientName}, semoga segera selesai. Tolong diingat kembali ya!`,
-          `${patientName}, jangan khawatir. Nanti akan diingatkan kembali.`
+          `${patientName}, jangan khawatir. Nanti akan diingatkan kembali.`,
         ],
         help: [
           `${patientName}, butuh bantuan? Relawan PRIMA siap membantu Anda.`,
-          `Baik ${patientName}, tim kami akan segera menghubungi Anda untuk bantuan.`
-        ]
+          `Baik ${patientName}, tim kami akan segera menghubungi Anda untuk bantuan.`,
+        ],
       },
       health_notes_inquiry: [
         `Halo ${patientName}, berikut informasi kesehatan terakhir yang kami catat:`,
         `${patientName}, sesuai catatan kesehatan Anda, kami memiliki informasi berikut:`,
-        `Terima kasih pertanyaannya, ${patientName}. Berikut catatan kesehatan terakhir:`
+        `Terima kasih pertanyaannya, ${patientName}. Berikut catatan kesehatan terakhir:`,
       ],
       reminder_inquiry: [
         `Halo ${patientName}, berikut jadwal pengingat Anda untuk hari ini:`,
         `${patientName}, berikut pengingat yang terjadwal untuk Anda hari ini:`,
-        `Baik ${patientName}, ini adalah pengingat Anda yang aktif saat ini:`
+        `Baik ${patientName}, ini adalah pengingat Anda yang aktif saat ini:`,
       ],
       general_inquiry: [
         `Halo ${patientName}, terima kasih telah menghubungi PRIMA. Ada yang bisa dibantu?`,
         `${patientName}, kami siap membantu pertanyaan Anda. Silakan jelaskan lebih detail.`,
-        `Terima kasih ${patientName}. Tim PRIMA akan membantu menjawab pertanyaan Anda.`
+        `Terima kasih ${patientName}. Tim PRIMA akan membantu menjawab pertanyaan Anda.`,
       ],
       emergency: [
         `${patientName}, segera hubungi layanan darurat (112) atau rumah sakit terdekat! Tim kami juga akan menghubungi Anda.`,
-        `Darurat! ${patientName}, segera cari bantuan medis. Tim PRIMA segera menghubungi Anda.`
-      ]
+        `Darurat! ${patientName}, segera cari bantuan medis. Tim PRIMA segera menghubungi Anda.`,
+      ],
     };
 
-    const intentTemplates = templates[intent as keyof typeof templates] || templates.general_inquiry;
-    const responseArray = Array.isArray(intentTemplates) ? intentTemplates : intentTemplates.confirmed;
+    const intentTemplates =
+      templates[intent as keyof typeof templates] || templates.general_inquiry;
+    const responseArray = Array.isArray(intentTemplates)
+      ? intentTemplates
+      : intentTemplates.confirmed;
 
     return responseArray[Math.floor(Math.random() * responseArray.length)];
   }
@@ -1031,7 +1475,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
       isValid: validation.isValid,
       confidence: validation.confidence,
       issues: validation.issues,
-      responseLength: response.content.length
+      responseLength: response.content.length,
     });
 
     // If response is valid, return it
@@ -1041,12 +1485,15 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
 
     // If invalid, retry with stronger language instruction
     if (maxRetries > 0) {
-      logger.warn("Language validation failed, retrying with stronger instruction", {
-        patientId: context.patientId,
-        intent,
-        issues: validation.issues,
-        retriesLeft: maxRetries
-      });
+      logger.warn(
+        "Language validation failed, retrying with stronger instruction",
+        {
+          patientId: context.patientId,
+          intent,
+          issues: validation.issues,
+          retriesLeft: maxRetries,
+        }
+      );
 
       // Create strengthened request with stronger language instruction
       const strengthenedRequest: LLMRequest = {
@@ -1054,10 +1501,10 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         messages: [
           {
             role: "system",
-            content: `PERINGATAN BAHASA: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK BOLEH SATU PUN KATA BAHASA INGGRIS. SEMUA RESPON HARUS MENGGUNAKAN BAHASA INDONESIA YANG BAIK DAN BENAR.`
+            content: `PERINGATAN BAHASA: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK BOLEH SATU PUN KATA BAHASA INGGRIS. SEMUA RESPON HARUS MENGGUNAKAN BAHASA INDONESIA YANG BAIK DAN BENAR.`,
           },
-          ...request.messages
-        ]
+          ...request.messages,
+        ],
       };
 
       return this.generateResponseWithLanguageValidation(
@@ -1069,22 +1516,29 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     }
 
     // If all retries failed, use fallback Indonesian template
-    logger.error("Language validation failed after all retries, using fallback template", new Error(`Language validation failed for intent: ${intent}`), {
-      intent,
-      issues: validation.issues,
-      confidence: validation.confidence,
-      finalResponse: response.content.substring(0, 200),
-      patientId: context.patientId
-    });
+    logger.error(
+      "Language validation failed after all retries, using fallback template",
+      new Error(`Language validation failed for intent: ${intent}`),
+      {
+        intent,
+        issues: validation.issues,
+        confidence: validation.confidence,
+        finalResponse: response.content.substring(0, 200),
+        patientId: context.patientId,
+      }
+    );
 
-    const fallbackResponse = this.getIndonesianFallbackResponse(intent, context);
+    const fallbackResponse = this.getIndonesianFallbackResponse(
+      intent,
+      context
+    );
 
     return {
       content: fallbackResponse,
       tokensUsed: response.tokensUsed,
       model: response.model,
       responseTime: response.responseTime,
-      finishReason: "fallback_indonesian_template"
+      finishReason: "fallback_indonesian_template",
     };
   }
 
@@ -1101,7 +1555,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
   }> {
     logger.warn("Using legacy medication response detection method", {
       messageLength: message.length,
-      operation: "legacy_detect_simple_medication_response"
+      operation: "legacy_detect_simple_medication_response",
     });
 
     const result = await this.detectSimpleReminderResponse(message, context);
@@ -1114,7 +1568,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     return {
       isMedicationResponse: result.isReminderResponse,
       responseType,
-      confidence: result.confidence
+      confidence: result.confidence,
     };
   }
 
@@ -1125,7 +1579,12 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
     patientId: string,
     responseType: "confirmed" | "pending" | "help" | "taken" | "not_taken",
     message: string
-  ): Promise<{ success: boolean; updatedReminderId?: string; reminderType?: string; error?: string }> {
+  ): Promise<{
+    success: boolean;
+    updatedReminderId?: string;
+    reminderType?: string;
+    error?: string;
+  }> {
     try {
       // Import dynamically to avoid circular dependencies
       const { db, reminders } = await import("@/db");
@@ -1136,10 +1595,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         .select()
         .from(reminders)
         .where(
-          and(
-            eq(reminders.patientId, patientId),
-            eq(reminders.status, "SENT")
-          )
+          and(eq(reminders.patientId, patientId), eq(reminders.status, "SENT"))
         )
         .orderBy(desc(reminders.sentAt))
         .limit(1);
@@ -1147,7 +1603,7 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
       if (pendingReminders.length === 0) {
         return {
           success: false,
-          error: "No pending reminder found for this patient"
+          error: "No pending reminder found for this patient",
         };
       }
 
@@ -1155,30 +1611,36 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
 
       // Map response types to database status
       const statusMapping = {
-        "confirmed": "DELIVERED",
-        "taken": "DELIVERED",
-        "pending": "SENT",
-        "not_taken": "SENT",
-        "help": "SENT"
+        confirmed: "DELIVERED",
+        taken: "DELIVERED",
+        pending: "SENT",
+        not_taken: "SENT",
+        help: "SENT",
       };
 
       const confirmationStatusMapping = {
-        "confirmed": "CONFIRMED",
-        "taken": "CONFIRMED",
-        "pending": "MISSED",
-        "not_taken": "MISSED",
-        "help": "PENDING"
+        confirmed: "CONFIRMED",
+        taken: "CONFIRMED",
+        pending: "MISSED",
+        not_taken: "MISSED",
+        help: "PENDING",
       };
 
       // Update the reminder status
       await db
         .update(reminders)
         .set({
-          status: statusMapping[responseType] as "SENT" | "DELIVERED" | "FAILED",
-          confirmationStatus: confirmationStatusMapping[responseType] as "PENDING" | "CONFIRMED" | "MISSED",
+          status: statusMapping[responseType] as
+            | "SENT"
+            | "DELIVERED"
+            | "FAILED",
+          confirmationStatus: confirmationStatusMapping[responseType] as
+            | "PENDING"
+            | "CONFIRMED"
+            | "MISSED",
           confirmationResponse: message,
           confirmationResponseAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         })
         .where(eq(reminders.id, reminder.id));
 
@@ -1187,25 +1649,28 @@ INGAT: ANDA HARUS MERESPON DALAM BAHASA INDONESIA. TIDAK DIPERBOLEHKAN MENGGUNAK
         reminderId: reminder.id,
         responseType,
         newStatus: statusMapping[responseType],
-        confirmationStatus: confirmationStatusMapping[responseType]
+        confirmationStatus: confirmationStatusMapping[responseType],
       });
 
       return {
         success: true,
         updatedReminderId: reminder.id,
-        reminderType: reminder.reminderType
+        reminderType: reminder.reminderType,
       };
-
     } catch (error) {
-      logger.error("Failed to update reminder status from response", error as Error, {
-        patientId,
-        responseType,
-        message: message.substring(0, 50)
-      });
+      logger.error(
+        "Failed to update reminder status from response",
+        error as Error,
+        {
+          patientId,
+          responseType,
+          message: message.substring(0, 50),
+        }
+      );
 
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   }
