@@ -34,7 +34,6 @@ export class CacheInvalidationService {
     const keysToInvalidate = [
       CACHE_KEYS.patient(patientId),
       CACHE_KEYS.reminderStats(patientId),
-      CACHE_KEYS.autoFill(patientId),
       CACHE_KEYS.remindersAll(patientId),
       CACHE_KEYS.healthNotes(patientId),
     ];

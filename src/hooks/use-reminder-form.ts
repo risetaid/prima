@@ -17,21 +17,6 @@ interface WhatsAppTemplate {
   category: "REMINDER" | "APPOINTMENT" | "EDUCATIONAL";
 }
 
-interface AutoFillData {
-  nama: string;
-  dokter?: string;
-  rumahSakit?: string;
-  waktu?: string;
-  tanggal?: string;
-  dataContext?: {
-    hasActiveReminders: boolean;
-    hasRecentReminders: boolean;
-    hasMedicalRecords: boolean;
-    assignedVolunteerName?: string;
-    currentUserName?: string;
-  };
-}
-
 interface ContentItem {
   id: string;
   title: string;
@@ -69,7 +54,6 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
   const [isCustomRecurrenceOpen, setIsCustomRecurrenceOpen] = useState(false);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [autoFillData, setAutoFillData] = useState<AutoFillData | null>(null);
 
   const [formData, setFormData] = useState({
     message: "",
@@ -92,7 +76,6 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     if (params.id) {
       fetchPatient(params.id as string);
       fetchTemplates();
-      fetchAutoFillData(params.id as string);
       // Reset form when opened
       setFormData({
         message: "",
@@ -137,23 +120,11 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
       const response = await fetch("/api/templates");
       if (response.ok) {
         const data = await response.json();
-         setTemplates(data.templates || []);
-       }
-     } catch {
-       // Silent error handling
-     }
-  };
-
-  const fetchAutoFillData = async (patientId: string) => {
-    try {
-      const response = await fetch(`/api/patients/${patientId}/autofill`);
-      if (response.ok) {
-        const data = await response.json();
-         setAutoFillData(data.autoFillData);
-       }
-     } catch {
-       // Silent error handling
-     }
+        setTemplates(data.templates || []);
+      }
+    } catch {
+      // Silent error handling
+    }
   };
 
   const convertNumbersToDayNames = (numbers: number[]): string[] => {
@@ -165,7 +136,9 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     setSelectedDates(dates);
     if (dates.length > 0 && customRecurrence.enabled) {
       setCustomRecurrence((prev) => ({ ...prev, enabled: false }));
-      toast.info("Mode pengulangan kustom dinonaktifkan karena tanggal dipilih");
+      toast.info(
+        "Mode pengulangan kustom dinonaktifkan karena tanggal dipilih"
+      );
     }
   };
 
@@ -179,7 +152,9 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     }
 
     if (!customRecurrence.enabled && selectedDates.length === 0) {
-      toast.error("Pilih minimal satu tanggal atau aktifkan pengulangan kustom");
+      toast.error(
+        "Pilih minimal satu tanggal atau aktifkan pengulangan kustom"
+      );
       return;
     }
 
@@ -222,7 +197,9 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
               customRecurrence: {
                 frequency: customRecurrence.frequency,
                 interval: customRecurrence.interval,
-                daysOfWeek: convertNumbersToDayNames(customRecurrence.daysOfWeek),
+                daysOfWeek: convertNumbersToDayNames(
+                  customRecurrence.daysOfWeek
+                ),
                 daysOfMonth: customRecurrence.daysOfMonth,
                 endType: customRecurrence.endType,
                 endDate: customRecurrence.endDate || null,
@@ -273,7 +250,6 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     templates,
     selectedTemplate,
     setSelectedTemplate,
-    autoFillData,
     formData,
     setFormData,
     selectedContent,

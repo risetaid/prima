@@ -28,7 +28,6 @@ export const CACHE_TTL = {
   PATIENT: 900, // 15 minutes (appropriate for medical data that doesn't change frequently)
   REMINDER_STATS: 300, // 5 minutes
   TEMPLATES: 600, // 10 minutes
-  AUTOFILL: 300, // 5 minutes
   USER_PROFILE: 300, // 5 minutes
   USER_SESSION: 300, // 5 minutes - reduce database hits during multi-tab usage
   REMINDERS_ALL: 300, // 5 minutes
@@ -39,7 +38,6 @@ export const CACHE_KEYS = {
   patient: (id: string) => `patient:${id}`,
   reminderStats: (patientId: string) => `stats:${patientId}`,
   templates: "templates:all",
-  autoFill: (patientId: string) => `autofill:${patientId}`,
   userProfile: (userId: string) => `user:${userId}`,
   userSession: (clerkId: string) => `session:${clerkId}`,
   remindersAll: (patientId: string) => `reminders:${patientId}:all`,
@@ -135,7 +133,6 @@ export async function safeInvalidatePatientCache(
   const keysToInvalidate = [
     CACHE_KEYS.patient(patientId),
     CACHE_KEYS.reminderStats(patientId),
-    CACHE_KEYS.autoFill(patientId),
     CACHE_KEYS.remindersAll(patientId),
     CACHE_KEYS.healthNotes(patientId),
   ];

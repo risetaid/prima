@@ -26,22 +26,6 @@ interface WhatsAppTemplate {
   category: "REMINDER" | "APPOINTMENT" | "EDUCATIONAL";
 }
 
-interface AutoFillData {
-  nama: string;
-  nomor: string;
-  dokter?: string;
-  rumahSakit?: string;
-  volunteer: string;
-  waktu?: string;
-  tanggal?: string;
-  dataContext?: {
-    hasRecentReminders: boolean;
-    hasMedicalRecords: boolean;
-    assignedVolunteerName?: string;
-    currentUserName?: string;
-  };
-}
-
 interface ContentItem {
   id: string;
   title: string;
@@ -81,7 +65,6 @@ export default function AddReminderPage() {
 
   // Data State
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [autoFillData, setAutoFillData] = useState<AutoFillData | null>(null);
   const [templates, setTemplates] = useState<WhatsAppTemplate[]>([]);
 
   // Form State
@@ -106,12 +89,9 @@ export default function AddReminderPage() {
   useEffect(() => {
     if (params.id) {
       fetchPatient(params.id as string);
-      fetchAutoFillData(params.id as string);
     }
     fetchTemplates();
   }, [params.id]);
-
-
 
   const fetchPatient = async (patientId: string) => {
     try {
@@ -123,16 +103,6 @@ export default function AddReminderPage() {
           name: data.name,
           phoneNumber: data.phoneNumber,
         });
-      }
-    } catch {}
-  };
-
-  const fetchAutoFillData = async (patientId: string) => {
-    try {
-      const response = await fetch(`/api/patients/${patientId}/autofill`);
-      if (response.ok) {
-        const data = await response.json();
-        setAutoFillData(data.autoFillData);
       }
     } catch {
     } finally {
@@ -147,10 +117,11 @@ export default function AddReminderPage() {
         const data = await response.json();
         setTemplates(data.templates || []);
       }
-    } catch {}
+    } catch {
+    } finally {
+      setLoading(false);
+    }
   };
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,13 +129,17 @@ export default function AddReminderPage() {
     // Validation
     if (!customRecurrence.enabled && selectedDates.length === 0) {
       toast.error("Pilih minimal satu tanggal", {
-        description: "Anda harus memilih setidaknya satu tanggal untuk pengingat",
+        description:
+          "Anda harus memilih setidaknya satu tanggal untuk pengingat",
       });
       return;
     }
 
     if (customRecurrence.enabled) {
-      if (customRecurrence.frequency === "week" && customRecurrence.daysOfWeek.length === 0) {
+      if (
+        customRecurrence.frequency === "week" &&
+        customRecurrence.daysOfWeek.length === 0
+      ) {
         toast.error("Pilih minimal satu hari", {
           description: "Untuk pengulangan mingguan, pilih setidaknya satu hari",
         });
@@ -274,7 +249,6 @@ export default function AddReminderPage() {
             message={formData.message}
             onMessageChange={(message) => setFormData({ ...formData, message })}
             templates={templates}
-            autoFillData={autoFillData}
             selectedTemplate={selectedTemplate}
             onTemplateSelect={setSelectedTemplate}
             time={formData.time}
@@ -344,17 +318,17 @@ export default function AddReminderPage() {
         )}
       </main>
 
-        {/* Custom Recurrence Modal */}
-        <CustomRecurrenceModal
-          isOpen={isCustomRecurrenceOpen}
-          onClose={() => setIsCustomRecurrenceOpen(false)}
-          customRecurrence={customRecurrence}
-          onRecurrenceChange={setCustomRecurrence}
-          onApply={() => {
-            setCustomRecurrence((prev) => ({ ...prev, enabled: true }));
-            setIsCustomRecurrenceOpen(false);
-          }}
-        />
+      {/* Custom Recurrence Modal */}
+      <CustomRecurrenceModal
+        isOpen={isCustomRecurrenceOpen}
+        onClose={() => setIsCustomRecurrenceOpen(false)}
+        customRecurrence={customRecurrence}
+        onRecurrenceChange={setCustomRecurrence}
+        onApply={() => {
+          setCustomRecurrence((prev) => ({ ...prev, enabled: true }));
+          setIsCustomRecurrenceOpen(false);
+        }}
+      />
     </div>
   );
 }

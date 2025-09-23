@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Clock } from "lucide-react";
 
 interface TimePicker24hProps {
   value: string; // HH:MM format
@@ -17,9 +16,7 @@ export function TimePicker24h({
   value,
   onChange,
   className = "",
-  placeholder = "Pilih waktu",
   disabled = false,
-  required = false,
   selectedDate,
 }: TimePicker24hProps) {
   const [selectedHour, setSelectedHour] = useState<string>("");
@@ -80,11 +77,6 @@ export function TimePicker24h({
 
     return false; // Current hour with current/later minute, or future hour
   };
-
-  const displayValue =
-    selectedHour && selectedMinute
-      ? `${selectedHour}:${selectedMinute}`
-      : placeholder;
 
   return (
     <div className={`relative ${className}`}>

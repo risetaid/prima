@@ -35,11 +35,11 @@ export function QuillEditor({
     if (editorRef.current && !quillRef.current && !isMountedRef.current) {
       timeoutRef.current = window.setTimeout(() => {
         if (editorRef.current && !quillRef.current && !isMountedRef.current) {
-          console.log('[QuillEditor] Initializing editor');
+          console.log("[QuillEditor] Initializing editor");
 
           // Clear any existing content to prevent double initialization
           if (editorRef.current) {
-            editorRef.current.innerHTML = '';
+            editorRef.current.innerHTML = "";
           }
 
           // Quill options
@@ -87,10 +87,13 @@ export function QuillEditor({
                 const formData = new FormData();
                 formData.append("image", file);
                 try {
-                  const response = await fetch("/api/upload?type=article-image", {
-                    method: "POST",
-                    body: formData,
-                  });
+                  const response = await fetch(
+                    "/api/upload?type=article-image",
+                    {
+                      method: "POST",
+                      body: formData,
+                    }
+                  );
                   const result = await response.json();
                   if (result.success && result.url) {
                     const range = quill.getSelection(true);
@@ -129,7 +132,7 @@ export function QuillEditor({
         isMountedRef.current = false;
       }
     };
-  }, []);
+  }, [placeholder, value]);
 
   // Update content when value prop changes
   useEffect(() => {

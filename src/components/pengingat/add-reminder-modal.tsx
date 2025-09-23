@@ -37,7 +37,6 @@ export function AddReminderModal({
     templates,
     selectedTemplate,
     setSelectedTemplate,
-    autoFillData,
     formData,
     setFormData,
     selectedContent,
@@ -75,7 +74,6 @@ export function AddReminderModal({
                       setFormData({ ...formData, message })
                     }
                     templates={templates}
-                    autoFillData={autoFillData}
                     selectedTemplate={selectedTemplate}
                     onTemplateSelect={setSelectedTemplate}
                     time={formData.time}

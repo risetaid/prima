@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Zap, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface WhatsAppTemplate {
   id: string;
@@ -9,25 +9,10 @@ interface WhatsAppTemplate {
   category: "REMINDER" | "APPOINTMENT" | "EDUCATIONAL";
 }
 
-interface AutoFillData {
-  nama: string;
-  dokter?: string;
-  rumahSakit?: string;
-  waktu?: string;
-  tanggal?: string;
-  dataContext?: {
-    hasRecentReminders: boolean;
-    hasMedicalRecords: boolean;
-    assignedVolunteerName?: string;
-    currentUserName?: string;
-  };
-}
-
 interface MessageInputProps {
   message: string;
   onMessageChange: (message: string) => void;
   templates: WhatsAppTemplate[];
-  autoFillData: AutoFillData | null;
   selectedTemplate: string;
   onTemplateSelect: (templateId: string) => void;
   time: string;
@@ -38,7 +23,6 @@ export function MessageInput({
   message,
   onMessageChange,
   templates,
-  autoFillData,
   selectedTemplate,
   onTemplateSelect,
   time,
@@ -60,41 +44,16 @@ export function MessageInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isTemplateDropdownOpen]);
 
-  const handleAutoFillMessage = () => {
-    if (!autoFillData || !message) return;
-
-    let updatedMessage = message;
-
-    const autoFillMap = {
-      "{dokter}": autoFillData.dokter,
-      "{rumahSakit}": autoFillData.rumahSakit,
-      "{nama}": autoFillData.nama,
-      "{waktu}": time,
-      "{tanggal}": selectedDates.length > 0 ? selectedDates[0] : "{tanggal}",
-    };
-
-    Object.entries(autoFillMap).forEach(([placeholder, value]) => {
-      if (value) {
-        updatedMessage = updatedMessage.replace(
-          new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"),
-          value
-        );
-      }
-    });
-
-    onMessageChange(updatedMessage);
-  };
-
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find((t) => t.id === templateId);
-    if (template && autoFillData) {
+    if (template) {
       onTemplateSelect(templateId);
       const messageWithData = applyTemplateVariables(template.templateText, {
-        nama: autoFillData.nama,
+        nama: "{nama}",
         waktu: time,
         tanggal: selectedDates.length > 0 ? selectedDates[0] : "{tanggal}",
-        dokter: autoFillData.dokter || "",
-        rumahSakit: autoFillData.rumahSakit || "",
+        dokter: "{dokter}",
+        rumahSakit: "{rumahSakit}",
       });
       onMessageChange(messageWithData);
     }
@@ -122,17 +81,6 @@ export function MessageInput({
         <label className="block text-gray-500 text-sm">Isi Pesan</label>
 
         <div className="flex items-center space-x-2">
-          {autoFillData && message && (
-            <button
-              type="button"
-              onClick={handleAutoFillMessage}
-              className="flex items-center space-x-1 px-2 py-1 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors cursor-pointer text-xs"
-            >
-              <Zap className="w-3 h-3" />
-              <span>Auto-isi</span>
-            </button>
-          )}
-
           {templates.length > 0 && (
             <div className="relative template-dropdown">
               <button
@@ -233,102 +181,12 @@ export function MessageInput({
         required
       />
 
-      {autoFillData && (
-        <div className="mt-3 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl border border-green-200">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold text-gray-700 flex items-center space-x-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-              <span>Data Tersedia untuk Auto-isi</span>
-            </h4>
-            {!message && (
-              <span className="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">
-                Tulis pesan dulu
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
-            {/* Patient Basic Info */}
-            {autoFillData.nama && (
-              <div className="bg-white p-3 rounded-lg">
-                <div className="text-xs text-gray-500">
-                  Nama Lengkap Pasien
-                </div>
-                <div className="text-sm font-medium text-gray-800">
-                  {autoFillData.nama}
-                </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  {"{nama}"}
-                </div>
-              </div>
-            )}
-
-            {autoFillData.dokter && (
-              <div className="bg-white p-3 rounded-lg">
-                <div className="text-xs text-gray-500">
-                  Nama Dokter
-                </div>
-                <div className="text-sm font-medium text-gray-800">
-                  {autoFillData.dokter}
-                </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  {"{dokter}"}
-                </div>
-              </div>
-            )}
-
-            {autoFillData.rumahSakit && (
-              <div className="bg-white p-3 rounded-lg">
-                <div className="text-xs text-gray-500">
-                  Rumah Sakit
-                </div>
-                <div className="text-sm font-medium text-gray-800">
-                  {autoFillData.rumahSakit}
-                </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  {"{rumahSakit}"}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-3 pt-3 border-t border-green-200">
-            <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-600">
-                  💡 <strong>Tips:</strong> Ketik variabel seperti{" "}
-                  <span className="bg-blue-100 text-blue-800 px-1 rounded">
-                    {"{nama}"}
-                  </span>{" "}
-                  di pesan, lalu klik
-                  <span className="ml-1 inline-flex items-center bg-green-100 text-green-700 px-1 rounded text-xs">
-                    <Zap className="w-3 h-3 mr-1" />
-                    Auto-isi
-                  </span>
-                </div>
-              {message && (
-                <button
-                  type="button"
-                  onClick={handleAutoFillMessage}
-                  className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-xs font-medium"
-                >
-                  <Zap className="w-3 h-3" />
-                  <span>Auto-isi Sekarang</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {selectedTemplate && (
         <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
           <div className="flex items-center justify-between">
             <span className="text-xs text-blue-700 font-medium">
               📝 Template:{" "}
-              {
-                templates.find((t) => t.id === selectedTemplate)
-                  ?.templateName
-              }
+              {templates.find((t) => t.id === selectedTemplate)?.templateName}
             </span>
             <button
               type="button"
