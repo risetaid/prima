@@ -7,6 +7,7 @@ import { Header } from '@/components/ui/header'
 import { MobileHeader } from '@/components/ui/mobile-header'
 import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
 import Image from 'next/image'
+import { Calendar, Newspaper, Video } from 'lucide-react'
 import { logger } from '@/lib/logger'
 import AddPatientDialog from '@/components/dashboard/add-patient-dialog'
 
@@ -160,56 +161,38 @@ export default function PatientPage() {
 
       {/* Mobile: Navigation Buttons */}
       <div className="lg:hidden bg-blue-500 px-6 py-8">
-        <div className="flex space-x-6 justify-center pb-4">
+        <div className="flex items-center justify-center space-x-8 pb-4">
           {/* Pengingat */}
-          <div className="text-center flex-shrink-0 min-w-[80px]">
+          <div className="flex flex-col items-center">
             <div
               onClick={handlePengingatClick}
-              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+              className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 mb-3 border-2 border-blue-200 shadow-md"
             >
-              <Image
-                src="/btn_pengingat.png"
-                alt="Pengingat"
-                width={80}
-                height={80}
-                className="mx-auto"
-              />
+              <Calendar className="w-8 h-8 text-blue-600" />
             </div>
-            <h3 className="font-semibold text-sm text-white">Pengingat</h3>
+            <h3 className="font-semibold text-sm text-white text-center leading-tight">Pengingat</h3>
           </div>
 
           {/* Berita */}
-          <div className="text-center flex-shrink-0 min-w-[80px]">
+          <div className="flex flex-col items-center">
             <div
               onClick={handleBeritaClick}
-              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+              className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 mb-3 border-2 border-emerald-200 shadow-md"
             >
-              <Image
-                src="/btn_berita.png"
-                alt="Berita"
-                width={80}
-                height={80}
-                className="mx-auto"
-              />
+              <Newspaper className="w-8 h-8 text-emerald-600" />
             </div>
-            <h3 className="font-semibold text-sm text-white">Berita</h3>
+            <h3 className="font-semibold text-sm text-white text-center leading-tight">Berita</h3>
           </div>
 
           {/* Video Edukasi */}
-          <div className="text-center flex-shrink-0 min-w-[80px]">
+          <div className="flex flex-col items-center">
             <div
               onClick={handleVideoClick}
-              className="cursor-pointer hover:scale-105 transition-transform mb-3"
+              className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-300 mb-3 border-2 border-red-200 shadow-md"
             >
-              <Image
-                src="/btn_videoEdukasi.png"
-                alt="Video Edukasi"
-                width={80}
-                height={80}
-                className="mx-auto"
-              />
+              <Video className="w-8 h-8 text-red-600" />
             </div>
-            <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
+            <h3 className="font-semibold text-sm text-white text-center leading-tight">Video Edukasi</h3>
           </div>
         </div>
       </div>

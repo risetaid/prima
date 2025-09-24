@@ -26,7 +26,8 @@
       "Bash(bun:*)",
       "WebFetch(domain:quilljs.com)",
       "WebFetch(domain:github.com)",
-      "Bash(dir /s E:PortfolioWebprimasrcservices)"
+      "Bash(dir /s E:PortfolioWebprimasrcservices)",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []

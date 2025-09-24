@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { Calendar, Newspaper, Video } from "lucide-react";
 
 interface MobileNavigationButtonsProps {
   onPengingatClick: () => void;
@@ -22,13 +22,7 @@ export function MobileNavigationButtons({
             onClick={onPengingatClick}
             className="cursor-pointer hover:scale-105 transition-transform mb-3"
           >
-            <Image
-              src="/btn_pengingat.png"
-              alt="Pengingat"
-              width={80}
-              height={80}
-              className="mx-auto"
-            />
+            <Calendar className="w-8 h-8 mx-auto text-white" />
           </div>
           <h3 className="font-semibold text-sm text-white">Pengingat</h3>
         </div>
@@ -39,13 +33,7 @@ export function MobileNavigationButtons({
             onClick={onBeritaClick}
             className="cursor-pointer hover:scale-105 transition-transform mb-3"
           >
-            <Image
-              src="/btn_berita.png"
-              alt="Berita"
-              width={80}
-              height={80}
-              className="mx-auto"
-            />
+            <Newspaper className="w-8 h-8 mx-auto text-white" />
           </div>
           <h3 className="font-semibold text-sm text-white">Berita</h3>
         </div>
@@ -56,13 +44,7 @@ export function MobileNavigationButtons({
             onClick={onVideoClick}
             className="cursor-pointer hover:scale-105 transition-transform mb-3"
           >
-            <Image
-              src="/btn_videoEdukasi.png"
-              alt="Video Edukasi"
-              width={80}
-              height={80}
-              className="mx-auto"
-            />
+            <Video className="w-8 h-8 mx-auto text-white" />
           </div>
           <h3 className="font-semibold text-sm text-white">Video Edukasi</h3>
         </div>

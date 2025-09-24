@@ -106,9 +106,7 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
           className="flex items-center space-x-2 cursor-pointer"
           onClick={() => router.push("/")}
         >
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-sm">P</span>
-          </div>
+          <img src="/icon-512x512.png" alt="PRIMA Logo" className="w-6 h-6" />
           <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
         </div>
 
