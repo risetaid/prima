@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import {
   MobileAdminActions,
@@ -107,13 +106,7 @@ export function MobileHeader({ showNavigation = true }: MobileHeaderProps) {
           className="flex items-center space-x-2 cursor-pointer"
           onClick={() => router.push("/")}
         >
-          <Image
-            src="/icon-512x512.png"
-            alt="PRIMA Logo"
-            width={24}
-            height={24}
-            className="w-6 h-6"
-          />
+          <img src="/icon-512x512.png" alt="PRIMA Logo" className="w-6 h-6" />
           <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
         </div>
 

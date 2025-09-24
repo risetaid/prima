@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
 import { Shield } from "lucide-react";
@@ -96,11 +95,12 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
       {
         label: "Pasien",
         href: "/pasien",
-        active: pathname === "/pasien" || pathname.startsWith("/pasien"),
+        active:
+          pathname === "/pasien" || pathname.startsWith("/pasien"),
       },
       {
         label: "Berita",
-        href: "/berita",
+          href: "/berita",
         active: pathname.startsWith("/berita"),
       },
       {
@@ -129,15 +129,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
 
   const handleNavigation = (href: string) => {
     // If user not authenticated and trying to access protected routes, redirect to signin
-    if (
-      !user &&
-      (href.startsWith("/pasien") ||
-        href.startsWith("/pengingat") ||
-        href.startsWith("/berita") ||
-        href.startsWith("/video-edukasi") ||
-        href.startsWith("/cms") ||
-        href.startsWith("/admin"))
-    ) {
+    if (!user && (href.startsWith("/pasien") || href.startsWith("/pengingat") || href.startsWith("/berita") || href.startsWith("/video-edukasi") || href.startsWith("/cms") || href.startsWith("/admin"))) {
       router.push("/sign-in");
       return;
     }
@@ -154,13 +146,7 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
             className="flex items-center space-x-2 cursor-pointer"
             onClick={() => router.push("/")}
           >
-            <Image
-              src="/icon-512x512.png"
-              alt="PRIMA Logo"
-              width={24}
-              height={24}
-              className="w-6 h-6"
-            />
+            <img src="/icon-512x512.png" alt="PRIMA Logo" className="w-6 h-6" />
             <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
           </div>
 

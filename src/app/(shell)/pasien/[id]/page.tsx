@@ -96,16 +96,13 @@ export default function PatientDetailPage() {
 
   const fetchPatient = useCallback(async (id: string, isPolling = false) => {
     try {
-      logger.info(`Fetching patient ${id}`, {
-        isPolling,
-        timestamp: new Date().toISOString(),
-      });
+      logger.info(`Fetching patient ${id}`, { isPolling, timestamp: new Date().toISOString() });
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/patients/${id}`, {
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -155,7 +152,7 @@ export default function PatientDetailPage() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/patients/${patientId}/health-notes`, {
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -182,11 +179,7 @@ export default function PatientDetailPage() {
         toast.error("Gagal memuat catatan kesehatan");
       }
     } catch (error) {
-      logger.error(
-        "Health notes fetch error",
-        error instanceof Error ? error : new Error(String(error)),
-        { patientId }
-      );
+      logger.error("Health notes fetch error", error instanceof Error ? error : new Error(String(error)), { patientId });
       toast.error("Gagal memuat catatan kesehatan");
     }
   }, []);
@@ -208,10 +201,7 @@ export default function PatientDetailPage() {
 
         // Check if the endpoint is disabled
         if (data.disabled) {
-          logger.warn("Completed reminders endpoint disabled", {
-            patientId,
-            reason: data.reason,
-          });
+          logger.warn("Completed reminders endpoint disabled", { patientId, reason: data.reason });
           setCompletedReminders([]);
           return;
         }
@@ -220,31 +210,23 @@ export default function PatientDetailPage() {
         if (Array.isArray(data)) {
           setCompletedReminders(data);
         } else {
-          logger.error(
-            "Invalid response format for completed reminders",
-            undefined,
-            {
-              patientId,
-              dataType: typeof data,
-              dataKeys: Object.keys(data || {}),
-            }
-          );
+          logger.error("Invalid response format for completed reminders", undefined, {
+            patientId,
+            dataType: typeof data,
+            dataKeys: Object.keys(data || {})
+          });
           setCompletedReminders([]);
         }
       } else {
         logger.error("Failed to fetch completed reminders", undefined, {
           patientId,
           status: response.status,
-          statusText: response.statusText,
+          statusText: response.statusText
         });
         setCompletedReminders([]);
       }
     } catch (error) {
-      logger.error(
-        "Error fetching completed reminders",
-        error instanceof Error ? error : new Error(String(error)),
-        { patientId }
-      );
+      logger.error("Error fetching completed reminders", error instanceof Error ? error : new Error(String(error)), { patientId });
       setCompletedReminders([]);
     }
   }, []);
@@ -281,7 +263,7 @@ export default function PatientDetailPage() {
       ) {
         isPolling = true;
         fetchPatient(params.id as string, true)
-          .catch((error) => {
+          .catch(error => {
             console.error("Polling failed:", error);
             // Stop polling on errors to prevent infinite retries
             if (pollCount >= 2) {
@@ -321,11 +303,7 @@ export default function PatientDetailPage() {
         toast.error(error.error || "Gagal menambahkan catatan");
       }
     } catch (error) {
-      logger.error(
-        "Error adding health note",
-        error instanceof Error ? error : new Error(String(error)),
-        { patientId: params.id as string }
-      );
+      logger.error("Error adding health note", error instanceof Error ? error : new Error(String(error)), { patientId: params.id as string });
       toast.error("Gagal menambahkan catatan");
     }
   };
@@ -523,7 +501,10 @@ export default function PatientDetailPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-5 md:bg-[url('/bg_desktop.png')]" />
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+          />
         </div>
 
         <Header showNavigation={true} />
@@ -658,7 +639,10 @@ export default function PatientDetailPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-          <div className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-5 md:bg-[url('/bg_desktop.png')]" />
+          <div
+            className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+          />
         </div>
         <Header showNavigation={true} />
         <main className="relative z-10 py-12">
@@ -690,7 +674,10 @@ export default function PatientDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-5 md:bg-[url('/bg_desktop.png')]" />
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
+          style={{ backgroundImage: "url(/bg_desktop.png)" }}
+        />
       </div>
 
       <Header showNavigation={true} />

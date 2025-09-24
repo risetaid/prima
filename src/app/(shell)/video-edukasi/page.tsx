@@ -108,6 +108,7 @@ export default function VideoPage() {
     filterVideos();
   }, [videos, searchTerm, selectedCategory, filterVideos]);
 
+
   const getUniqueCategories = () => {
     const categories = videos.map((video) => video.category);
     return Array.from(new Set(categories));
@@ -139,10 +140,7 @@ export default function VideoPage() {
         throw new Error(data.error || "Invalid response format");
       }
     } catch (error) {
-      logger.error(
-        "Failed to load videos",
-        error instanceof Error ? error : new Error(String(error))
-      );
+      logger.error("Failed to load videos", error instanceof Error ? error : new Error(String(error)));
       setError(
         error instanceof Error ? error.message : "Gagal memuat video edukasi"
       );
@@ -204,48 +202,35 @@ export default function VideoPage() {
 
   const Background = () => (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-      <div className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-90 md:bg-[url('/bg_desktop.png')]" />
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+        style={{
+          backgroundImage: "url(/bg_desktop.png)",
+        }}
+      />
     </div>
   );
 
-  const VideoCard = ({
-    video,
-    viewMode,
-  }: {
-    video: VideoContent;
-    viewMode: "grid" | "list";
-  }) => {
+  const VideoCard = ({ video, viewMode }: { video: VideoContent; viewMode: "grid" | "list" }) => {
     const isValidThumbnail =
       video.thumbnailUrl &&
       typeof video.thumbnailUrl === "string" &&
       video.thumbnailUrl.trim() !== "";
 
     const Thumbnail = () => (
-      <div
-        className={`relative ${
-          viewMode === "grid" ? "aspect-video" : "w-full sm:w-48 aspect-video"
-        } bg-gray-100 ${
-          viewMode === "list" ? "rounded-lg overflow-hidden flex-shrink-0" : ""
-        } ${viewMode === "grid" ? "" : "flex items-center justify-center"}`}
-      >
+      <div className={`relative ${viewMode === "grid" ? "aspect-video" : "w-full sm:w-48 aspect-video"} bg-gray-100 ${viewMode === "list" ? "rounded-lg overflow-hidden flex-shrink-0" : ""} ${viewMode === "grid" ? "" : "flex items-center justify-center"}`}>
         {isValidThumbnail ? (
           <Image
             src={video.thumbnailUrl!}
             alt={video.title}
             fill
-            className={`object-cover ${
-              viewMode === "grid" ? "group-hover:scale-105" : "hover:scale-105"
-            } transition-transform duration-200`}
+            className={`object-cover ${viewMode === "grid" ? "group-hover:scale-105" : "hover:scale-105"} transition-transform duration-200`}
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
           />
         ) : (
-          <Video
-            className={`h-${viewMode === "grid" ? "12" : "8"} w-${
-              viewMode === "grid" ? "12" : "8"
-            } text-gray-400`}
-          />
+          <Video className={`h-${viewMode === "grid" ? "12" : "8"} w-${viewMode === "grid" ? "12" : "8"} text-gray-400`} />
         )}
         {video.durationMinutes && (
           <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
@@ -262,11 +247,7 @@ export default function VideoPage() {
           <Thumbnail />
           <CardHeader className="pb-3">
             <div className="flex items-start justify-between mb-3">
-              <Badge
-                className={`${getCategoryColor(
-                  video.category
-                )} text-xs font-medium border`}
-              >
+              <Badge className={`${getCategoryColor(video.category)} text-xs font-medium border`}>
                 {getCategoryLabel(video.category)}
               </Badge>
               <Video className="h-5 w-5 text-red-500 group-hover:text-red-600 transition-colors" />
@@ -277,9 +258,7 @@ export default function VideoPage() {
           </CardHeader>
           <CardContent className="pt-0">
             {video.description && (
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                {video.description}
-              </p>
+              <p className="text-gray-600 text-sm mb-4 line-clamp-3">{video.description}</p>
             )}
             <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
               <div className="flex items-center gap-1">
@@ -293,15 +272,8 @@ export default function VideoPage() {
                 </div>
               )}
             </div>
-            <Button
-              asChild
-              className="w-full bg-red-600 hover:bg-red-700 text-white"
-            >
-              <Link
-                href={`/content/videos/${video.slug}`}
-                target="_blank"
-                className="flex items-center justify-center gap-2"
-              >
+            <Button asChild className="w-full bg-red-600 hover:bg-red-700 text-white">
+              <Link href={`/content/videos/${video.slug}`} target="_blank" className="flex items-center justify-center gap-2">
                 <Play className="h-4 w-4" />
                 <span>Tonton Video</span>
                 <ExternalLink className="h-3 w-3" />
@@ -322,21 +294,13 @@ export default function VideoPage() {
                 <Video className="h-5 w-5 text-red-500 mt-1 flex-shrink-0" />
                 <div className="flex-1">
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-2">
-                      {video.title}
-                    </h3>
-                    <Badge
-                      className={`${getCategoryColor(
-                        video.category
-                      )} text-xs ml-3 flex-shrink-0`}
-                    >
+                    <h3 className="font-semibold text-lg text-gray-900 line-clamp-2">{video.title}</h3>
+                    <Badge className={`${getCategoryColor(video.category)} text-xs ml-3 flex-shrink-0`}>
                       {getCategoryLabel(video.category)}
                     </Badge>
                   </div>
                   {video.description && (
-                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                      {video.description}
-                    </p>
+                    <p className="text-gray-600 text-sm line-clamp-2 mb-3">{video.description}</p>
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <div className="flex items-center gap-1">
@@ -360,16 +324,8 @@ export default function VideoPage() {
               </div>
             </div>
             <div className="flex-shrink-0 self-start">
-              <Button
-                asChild
-                size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white"
-              >
-                <Link
-                  href={`/content/videos/${video.slug}`}
-                  target="_blank"
-                  className="flex items-center gap-2"
-                >
+              <Button asChild size="sm" className="bg-red-600 hover:bg-red-700 text-white">
+                <Link href={`/content/videos/${video.slug}`} target="_blank" className="flex items-center gap-2">
                   <Play className="h-4 w-4" />
                   <span>Tonton</span>
                   <ExternalLink className="h-3 w-3" />
@@ -382,16 +338,7 @@ export default function VideoPage() {
     );
   };
 
-  const Controls = ({
-    searchTerm,
-    setSearchTerm,
-    selectedCategory,
-    setSelectedCategory,
-    viewMode,
-    setViewMode,
-    isMounted,
-    getUniqueCategories,
-  }: {
+  const Controls = ({ searchTerm, setSearchTerm, selectedCategory, setSelectedCategory, viewMode, setViewMode, isMounted, getUniqueCategories }: {
     searchTerm: string;
     setSearchTerm: (value: string) => void;
     selectedCategory: string;
@@ -430,9 +377,7 @@ export default function VideoPage() {
           <button
             onClick={() => setViewMode("grid")}
             className={`p-2 rounded-l-lg transition-colors ${
-              viewMode === "grid"
-                ? "bg-red-100 text-red-600"
-                : "text-gray-400 hover:text-gray-600"
+              viewMode === "grid" ? "bg-red-100 text-red-600" : "text-gray-400 hover:text-gray-600"
             }`}
           >
             <Grid className="h-4 w-4" />
@@ -440,9 +385,7 @@ export default function VideoPage() {
           <button
             onClick={() => setViewMode("list")}
             className={`p-2 rounded-r-lg transition-colors ${
-              viewMode === "list"
-                ? "bg-red-100 text-red-600"
-                : "text-gray-400 hover:text-gray-600"
+              viewMode === "list" ? "bg-red-100 text-red-600" : "text-gray-400 hover:text-gray-600"
             }`}
           >
             <List className="h-4 w-4" />
@@ -456,26 +399,15 @@ export default function VideoPage() {
     <div className="mt-12 bg-gradient-to-r from-red-50 to-pink-50 rounded-xl p-8 border border-red-100">
       <div className="text-center max-w-3xl mx-auto">
         <div className="text-4xl mb-4">🎯</div>
-        <h3 className="text-xl font-semibold text-gray-900 mb-3">
-          Tips Menonton Video Edukasi
-        </h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-3">Tips Menonton Video Edukasi</h3>
         <p className="text-gray-700 leading-relaxed">
-          Video-video ini telah dirancang khusus oleh tim medis berpengalaman
-          untuk memberikan motivasi dan edukasi praktis dalam perawatan
-          kesehatan.
-          <strong className="text-red-700"> Tonton dengan tenang</strong> dan
-          terapkan tips yang sesuai dengan kondisi kesehatan Anda.
+          Video-video ini telah dirancang khusus oleh tim medis berpengalaman untuk memberikan motivasi dan edukasi praktis dalam perawatan kesehatan.
+          <strong className="text-red-700"> Tonton dengan tenang</strong> dan terapkan tips yang sesuai dengan kondisi kesehatan Anda.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-            ✓ Konten Profesional
-          </span>
-          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-            ✓ Motivasi Positif
-          </span>
-          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">
-            ✓ Mudah Dipraktikkan
-          </span>
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Konten Profesional</span>
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Motivasi Positif</span>
+          <span className="px-3 py-1 bg-white rounded-full text-sm text-red-700 border border-red-200">✓ Mudah Dipraktikkan</span>
         </div>
       </div>
     </div>
@@ -508,9 +440,7 @@ export default function VideoPage() {
 
       {/* Desktop: Main Content */}
       <div className="hidden lg:block relative z-10">
-        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
+        <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">{children}</main>
       </div>
 
       {/* Mobile: Card Layout */}
@@ -556,20 +486,14 @@ export default function VideoPage() {
               return (
                 <div
                   key={video.id}
-                  onClick={() =>
-                    window.open(`/content/videos/${video.slug}`, "_blank")
-                  }
+                  onClick={() => window.open(`/content/videos/${video.slug}`, "_blank")}
                   className="bg-white rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start space-x-3">
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-gray-900 text-base line-clamp-2">
-                          {video.title}
-                        </h3>
-                        <span
-                          className={`${categoryColor} px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0`}
-                        >
+                        <h3 className="font-semibold text-gray-900 text-base line-clamp-2">{video.title}</h3>
+                        <span className={`${categoryColor} px-2 py-1 rounded-full text-xs font-medium ml-2 flex-shrink-0`}>
                           {categoryLabel}
                         </span>
                       </div>
@@ -594,9 +518,7 @@ export default function VideoPage() {
                         {video.author && (
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            <span className="truncate max-w-20">
-                              {video.author}
-                            </span>
+                            <span className="truncate max-w-20">{video.author}</span>
                           </div>
                         )}
                       </div>
@@ -609,9 +531,7 @@ export default function VideoPage() {
             {filteredVideos.length === 0 && !loading && (
               <div className="text-center py-8">
                 <p className="text-gray-500">
-                  {videos.length === 0
-                    ? "Belum ada video"
-                    : "Tidak ada video yang sesuai dengan pencarian"}
+                  {videos.length === 0 ? 'Belum ada video' : 'Tidak ada video yang sesuai dengan pencarian'}
                 </p>
               </div>
             )}
@@ -634,13 +554,9 @@ export default function VideoPage() {
       <Layout>
         <div className="text-center bg-white p-8 rounded-lg shadow-sm max-w-md mx-auto">
           <Video className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">
-            Gagal Memuat Video
-          </h1>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">Gagal Memuat Video</h1>
           <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => fetchPublishedVideos()} className="mt-4">
-            Coba Lagi
-          </Button>
+          <Button onClick={() => fetchPublishedVideos()} className="mt-4">Coba Lagi</Button>
         </div>
       </Layout>
     );
@@ -651,12 +567,9 @@ export default function VideoPage() {
       {videos.length === 0 && !loading ? (
         <div className="text-center py-16">
           <div className="text-6xl mb-6">🎥</div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Belum Ada Video
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Belum Ada Video</h2>
           <p className="text-gray-600 max-w-md mx-auto">
-            Video edukasi kesehatan akan ditampilkan di sini ketika tersedia.
-            Silakan cek kembali nanti.
+            Video edukasi kesehatan akan ditampilkan di sini ketika tersedia. Silakan cek kembali nanti.
           </p>
         </div>
       ) : (
@@ -694,21 +607,11 @@ export default function VideoPage() {
           {filteredVideos.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border">
               <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Tidak ada video ditemukan
-              </h3>
-              <p className="text-gray-600">
-                Coba ubah kata kunci pencarian atau filter kategori
-              </p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada video ditemukan</h3>
+              <p className="text-gray-600">Coba ubah kata kunci pencarian atau filter kategori</p>
             </div>
           ) : (
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                  : "space-y-4"
-              }
-            >
+            <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
               {filteredVideos.map((video) => (
                 <VideoCard key={video.id} video={video} viewMode={viewMode} />
               ))}
@@ -721,3 +624,4 @@ export default function VideoPage() {
     </Layout>
   );
 }
+

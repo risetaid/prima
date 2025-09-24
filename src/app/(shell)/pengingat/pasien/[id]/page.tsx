@@ -39,9 +39,7 @@ export default function PatientReminderPage() {
   const [patientName, setPatientName] = useState("");
   const [canAddReminders, setCanAddReminders] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [completedReminders, setCompletedReminders] = useState<
-    CompletedReminder[]
-  >([]);
+  const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
 
   const patientId = params.id as string;
 
@@ -88,7 +86,7 @@ export default function PatientReminderPage() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/patients/${patientId}`, {
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -114,12 +112,9 @@ export default function PatientReminderPage() {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
-      const response = await fetch(
-        `/api/patients/${patientId}/reminders/completed`,
-        {
-          signal: controller.signal,
-        }
-      );
+      const response = await fetch(`/api/patients/${patientId}/reminders/completed`, {
+        signal: controller.signal
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -150,12 +145,7 @@ export default function PatientReminderPage() {
 
       fetchData();
     }
-  }, [
-    patientId,
-    fetchReminderStats,
-    fetchPatientName,
-    fetchCompletedReminders,
-  ]);
+  }, [patientId, fetchReminderStats, fetchPatientName, fetchCompletedReminders]);
 
   const handleAddReminder = () => {
     if (!canAddReminders) return;
@@ -186,7 +176,12 @@ export default function PatientReminderPage() {
     <div className="min-h-screen bg-gray-50 relative">
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-90 md:bg-[url('/bg_desktop.png')]" />
+        <div
+          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
+          style={{
+            backgroundImage: "url(/bg_desktop.png)",
+          }}
+        />
       </div>
 
       {/* Desktop: Header */}
@@ -244,10 +239,10 @@ export default function PatientReminderPage() {
             <span>Tambah Pengingat Baru</span>
           </button>
           {!canAddReminders && (
-            <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
-              Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
-              &quot;YA&quot;.
-            </p>
+             <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
+               Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
+               &quot;YA&quot;.
+             </p>
           )}
 
           {/* Add Reminder Modal */}
@@ -323,10 +318,10 @@ export default function PatientReminderPage() {
           {(() => {
             // Calculate compliance stats from completed reminders
             const taken = completedReminders.filter(
-              (r: CompletedReminder) => r.confirmationStatus === "CONFIRMED"
+              (r: CompletedReminder) => r.confirmationStatus === 'CONFIRMED'
             ).length;
             const notTaken = completedReminders.filter(
-              (r: CompletedReminder) => r.confirmationStatus !== "CONFIRMED"
+              (r: CompletedReminder) => r.confirmationStatus !== 'CONFIRMED'
             ).length;
             const total = taken + notTaken;
             const complianceRate =
