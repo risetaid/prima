@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Shield } from "lucide-react";
 import { useAuthContext } from "@/lib/auth-context";
 // Role cache temporarily disabled
@@ -146,7 +147,14 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
             className="flex items-center space-x-2 cursor-pointer"
             onClick={() => router.push("/")}
           >
-            <img src="/icon-512x512.png" alt="PRIMA Logo" className="w-6 h-6" />
+            <Image 
+              src="/icon-512x512.png" 
+              alt="PRIMA Logo" 
+              width={24} 
+              height={24} 
+              className="w-6 h-6" 
+              priority={true}
+            />
             <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
           </div>
 

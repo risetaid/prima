@@ -1,51 +1,54 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, memo, useState, useEffect } from "react";
+import { useCallback, memo, useEffect } from "react";
 import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import { MobileNavigationButtons } from "@/components/dashboard/mobile-navigation-buttons";
 import { DesktopHeader } from "@/components/dashboard/desktop-header";
 import { MobileStatusBadge } from "@/components/dashboard/mobile-status-badge";
 import { InstantSendSection } from "@/components/dashboard/instant-send-section";
 import { PatientListSection } from "@/components/dashboard/patient-list-section";
-import { InstantSendDialog, type InstantSendResult } from "@/components/dashboard/instant-send-dialog";
-
-interface Patient {
-  id: string;
-  name: string;
-  complianceRate: number;
-  isActive: boolean;
-  photoUrl?: string;
-  phoneNumber?: string;
-}
+import { InstantSendDialog } from "@/components/dashboard/instant-send-dialog";
+import { useDashboardState } from "@/hooks/use-dashboard-state";
 
 function DashboardClient() {
   const router = useRouter();
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  const [showAddPatientModal, setShowAddPatientModal] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [, setDashboardStats] = useState({
-    totalPatients: 0,
-    activePatients: 0,
-    inactivePatients: 0,
-  });
-  const [showInstantSendDialog, setShowInstantSendDialog] = useState(false);
-  const [isInstantSending, setIsInstantSending] = useState(false);
-  const [instantSendResult, setInstantSendResult] = useState<InstantSendResult | null>(null);
+  const { state, actions, filterPatients } = useDashboardState();
+
+  const fetchUserRoleLegacy = useCallback(async () => {
+    try {
+      const response = await fetch("/api/user/profile");
+      if (response.ok) {
+        const data = await response.json();
+        actions.setUserRole(data.role);
+      }
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+    }
+  }, [actions]);
+
+  const fetchPatientsLegacy = useCallback(async () => {
+    try {
+      const response = await fetch("/api/patients");
+      if (response.ok) {
+        const data = await response.json();
+        actions.setPatients(data);
+      }
+    } catch (error) {
+      console.error("Error fetching patients:", error);
+    }
+  }, [actions]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
+      actions.setLoading(true);
       // Single optimized API call for all dashboard data
       const response = await fetch("/api/dashboard/overview");
       if (response.ok) {
         const data = await response.json();
-        setPatients(data.patients);
-        setUserRole(data.user.role);
-        setDashboardStats(data.stats);
+        actions.setPatients(data.patients);
+        actions.setUserRole(data.user.role);
+        actions.setDashboardStats(data.stats);
       } else {
         // Fallback to separate calls if needed
         console.warn(
@@ -58,56 +61,14 @@ function DashboardClient() {
       // Try legacy methods as fallback
       await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
     } finally {
-      setLoading(false);
+      actions.setLoading(false);
     }
-  }, []);
+  }, [actions, fetchPatientsLegacy, fetchUserRoleLegacy]);
 
-  const fetchUserRoleLegacy = async () => {
-    try {
-      const response = await fetch("/api/user/profile");
-      if (response.ok) {
-        const data = await response.json();
-        setUserRole(data.role);
-      }
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-    }
-  };
-
-  const fetchPatientsLegacy = async () => {
-    try {
-      const response = await fetch("/api/patients");
-      if (response.ok) {
-        const data = await response.json();
-        setPatients(data);
-      }
-    } catch (error) {
-      console.error("Error fetching patients:", error);
-    }
-  };
-
-  const filterPatients = useCallback(() => {
-    let filtered = patients;
-
-    if (searchQuery.trim()) {
-      filtered = filtered.filter((patient) =>
-        patient.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Apply multiple status filters
-    if (activeFilters.length > 0) {
-      filtered = filtered.filter((patient) => {
-        const isActive = patient.isActive;
-        return (
-          (activeFilters.includes("active") && isActive) ||
-          (activeFilters.includes("inactive") && !isActive)
-        );
-      });
-    }
-
-    setFilteredPatients(filtered);
-  }, [patients, searchQuery, activeFilters]);
+  // Filter patients when state changes
+  useEffect(() => {
+    filterPatients();
+  }, [filterPatients]);
 
   const handlePengingatClick = useCallback(() => {
     router.push("/pengingat");
@@ -122,16 +83,16 @@ function DashboardClient() {
   }, [router]);
 
   const handleAddPatientClick = useCallback(() => {
-    setShowAddPatientModal(true);
-  }, []);
+    actions.setShowAddPatientModal(true);
+  }, [actions]);
 
   const handleAddPatientSuccess = useCallback(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   const handleInstantSendAll = useCallback(async () => {
-    setIsInstantSending(true);
-    setInstantSendResult(null);
+    actions.setIsInstantSending(true);
+    actions.setInstantSendResult(null);
     
     try {
       const response = await fetch('/api/reminders/instant-send-all', {
@@ -142,7 +103,7 @@ function DashboardClient() {
       });
       
        const result = await response.json();
-       setInstantSendResult(result);
+       actions.setInstantSendResult(result);
 
        if (!response.ok) {
          // Handle specific error types
@@ -157,7 +118,7 @@ function DashboardClient() {
 
        // Handle successful response but no reminders sent
        if (result.success && result.results && result.results.messagesSent === 0) {
-         setInstantSendResult({
+         actions.setInstantSendResult({
            success: true,
            message: result.message || 'No active reminders found to send',
            results: result.results
@@ -166,31 +127,22 @@ function DashboardClient() {
        }
     } catch (error) {
       console.error('Error sending instant reminders:', error);
-      setInstantSendResult({
+      actions.setInstantSendResult({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       });
     } finally {
-      setIsInstantSending(false);
+      actions.setIsInstantSending(false);
     }
-  }, []);
+  }, [actions]);
 
   const handleInstantSendClose = useCallback(() => {
-    setShowInstantSendDialog(false);
-    setInstantSendResult(null);
-  }, []);
+    actions.resetInstantSend();
+  }, [actions]);
 
   const toggleFilter = useCallback((filterType: string) => {
-    setActiveFilters((prev) => {
-      if (prev.includes(filterType)) {
-        // Remove filter if already active
-        return prev.filter((f) => f !== filterType);
-      } else {
-        // Add filter if not active
-        return [...prev, filterType];
-      }
-    });
-  }, []);
+    actions.toggleFilter(filterType);
+  }, [actions]);
 
   const handlePatientClick = useCallback(
     (patientId: string) => {
@@ -203,10 +155,6 @@ function DashboardClient() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  useEffect(() => {
-    filterPatients();
-  }, [filterPatients, patients, searchQuery, activeFilters]);
-
   return (
     <>
       <MobileNavigationButtons
@@ -216,48 +164,48 @@ function DashboardClient() {
       />
 
       <DesktopHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        filteredPatientsCount={filteredPatients.length}
-        loading={loading}
+        searchQuery={state.searchQuery}
+        onSearchChange={actions.setSearchQuery}
+        filteredPatientsCount={state.filteredPatients.length}
+        loading={state.loading}
         onAddPatientClick={handleAddPatientClick}
-        activeFilters={activeFilters}
+        activeFilters={state.activeFilters}
         onToggleFilter={toggleFilter}
       />
 
       <MobileStatusBadge
-        filteredPatientsCount={filteredPatients.length}
-        loading={loading}
+        filteredPatientsCount={state.filteredPatients.length}
+        loading={state.loading}
       />
 
       <InstantSendSection
-        userRole={userRole}
-        onOpenDialog={() => setShowInstantSendDialog(true)}
+        userRole={state.userRole}
+        onOpenDialog={() => actions.setShowInstantSendDialog(true)}
       />
 
       <PatientListSection
-        patients={patients}
-        filteredPatients={filteredPatients}
-        loading={loading}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        patients={state.patients}
+        filteredPatients={state.filteredPatients}
+        loading={state.loading}
+        searchQuery={state.searchQuery}
+        onSearchChange={actions.setSearchQuery}
         onAddPatientClick={handleAddPatientClick}
-        activeFilters={activeFilters}
+        activeFilters={state.activeFilters}
         onToggleFilter={toggleFilter}
         onPatientClick={handlePatientClick}
       />
 
       <AddPatientDialog
-        isOpen={showAddPatientModal}
-        onClose={() => setShowAddPatientModal(false)}
+        isOpen={state.showAddPatientModal}
+        onClose={() => actions.setShowAddPatientModal(false)}
         onSuccess={handleAddPatientSuccess}
       />
 
       <InstantSendDialog
-        isOpen={showInstantSendDialog}
-        onOpenChange={setShowInstantSendDialog}
-        isSending={isInstantSending}
-        result={instantSendResult}
+        isOpen={state.showInstantSendDialog}
+        onOpenChange={actions.setShowInstantSendDialog}
+        isSending={state.isInstantSending}
+        result={state.instantSendResult}
         onSendAll={handleInstantSendAll}
         onClose={handleInstantSendClose}
       />

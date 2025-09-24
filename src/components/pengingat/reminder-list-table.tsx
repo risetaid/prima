@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { ProfileImage } from "@/components/ui/optimized-image";
 import { memo, useCallback } from "react";
 import {
   generateAvatar,
@@ -49,13 +49,10 @@ const PatientRow = memo(
         <div className="flex items-center space-x-3">
           <div className="flex-shrink-0">
             {patient.photoUrl ? (
-              <Image
+              <ProfileImage
                 src={patient.photoUrl}
                 alt={patient.name}
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full object-cover"
-                loading="lazy"
+                size={48}
               />
             ) : (
               <div
@@ -162,14 +159,11 @@ export const ReminderListTable = memo(
                   {/* Profile Photo */}
                   <div className="flex justify-center">
                     {patient.photoUrl ? (
-                      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
-                        <Image
+                      <div className="border-2 border-gray-200 rounded-full">
+                        <ProfileImage
                           src={patient.photoUrl}
                           alt={patient.name}
-                          width={48}
-                          height={48}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
+                          size={48}
                         />
                       </div>
                     ) : (

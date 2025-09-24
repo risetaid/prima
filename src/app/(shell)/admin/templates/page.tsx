@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import TemplateManagement from "@/components/admin/template-management";
+import { LazyTemplateManagement } from "@/components/admin/lazy-components";
 import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
@@ -47,6 +47,7 @@ export default function AdminTemplatesPage() {
     checkAdminAccess();
   }, [checkAdminAccess]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleSeedTemplates = async () => {
     setIsSeedModalOpen(true);
   };
@@ -185,10 +186,7 @@ export default function AdminTemplatesPage() {
       {/* Main Content */}
       <main className="relative z-10 px-4 sm:px-6 lg:px-10 py-6 lg:py-10">
         <div className="w-full">
-          <TemplateManagement
-            onSeedTemplates={handleSeedTemplates}
-            seeding={seeding}
-          />
+          <LazyTemplateManagement />
         </div>
       </main>
 

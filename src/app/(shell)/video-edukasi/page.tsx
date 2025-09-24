@@ -28,7 +28,7 @@ import {
 import Link from "next/link";
 import { CMSContentListSkeleton } from "@/components/ui/dashboard-skeleton";
 import { Header } from "@/components/ui/header";
-import Image from "next/image";
+import { ThumbnailImage } from "@/components/ui/optimized-image";
 import { logger } from "@/lib/logger";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
@@ -220,15 +220,13 @@ export default function VideoPage() {
     const Thumbnail = () => (
       <div className={`relative ${viewMode === "grid" ? "aspect-video" : "w-full sm:w-48 aspect-video"} bg-gray-100 ${viewMode === "list" ? "rounded-lg overflow-hidden flex-shrink-0" : ""} ${viewMode === "grid" ? "" : "flex items-center justify-center"}`}>
         {isValidThumbnail ? (
-          <Image
-            src={video.thumbnailUrl!}
-            alt={video.title}
-            fill
-            className={`object-cover ${viewMode === "grid" ? "group-hover:scale-105" : "hover:scale-105"} transition-transform duration-200`}
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
+          <div className={`${viewMode === "grid" ? "group-hover:scale-105" : "hover:scale-105"} transition-transform duration-200`}>
+            <ThumbnailImage
+              src={video.thumbnailUrl!}
+              alt={video.title}
+              aspectRatio="video"
+            />
+          </div>
         ) : (
           <Video className={`h-${viewMode === "grid" ? "12" : "8"} w-${viewMode === "grid" ? "12" : "8"} text-gray-400`} />
         )}

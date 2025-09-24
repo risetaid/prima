@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
+import { VirtualPatientList } from '@/components/ui/virtual-list'
+import { PatientListSkeleton } from '@/components/ui/skeleton'
 
 interface Patient {
   id: string
@@ -19,14 +21,75 @@ interface PatientListProps {
   showFilters?: boolean
   showSearch?: boolean
   onPatientClick?: (patient: Patient) => void
+  enableVirtualScrolling?: boolean
+  virtualScrollHeight?: number
 }
 
-export function PatientList({
+// Memoized PatientCard component to prevent unnecessary re-renders
+interface PatientCardProps {
+  patient: Patient
+  onPatientClick: (patient: Patient) => void
+  getInitials: (name: string) => string
+  getComplianceColor: (rate: number) => string
+  getComplianceLabel: (rate: number) => { text: string; bg: string; color: string }
+  getStatusLabel: (isActive: boolean) => { text: string; bg: string; color: string }
+}
+
+const PatientCard = memo<PatientCardProps>(({ 
+  patient, 
+  onPatientClick, 
+  getInitials, 
+  getComplianceColor, 
+  getComplianceLabel, 
+  getStatusLabel 
+}) => {
+  const handleClick = useCallback(() => {
+    onPatientClick(patient)
+  }, [patient, onPatientClick])
+
+  const complianceLabel = useMemo(() => getComplianceLabel(patient.complianceRate), [patient.complianceRate, getComplianceLabel])
+  const statusLabel = useMemo(() => getStatusLabel(patient.isActive), [patient.isActive, getStatusLabel])
+  const initials = useMemo(() => getInitials(patient.name), [patient.name, getInitials])
+  const complianceColor = useMemo(() => getComplianceColor(patient.complianceRate), [patient.complianceRate, getComplianceColor])
+
+  return (
+    <div
+      onClick={handleClick}
+      className="bg-white rounded-lg p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-center space-x-3">
+        <div className={`w-12 h-12 ${complianceColor} rounded-full flex items-center justify-center`}>
+          <span className="text-white font-bold text-lg">
+            {initials}
+          </span>
+        </div>
+        <div>
+          <h3 className="font-semibold text-gray-900">{patient.name}</h3>
+          <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
+        </div>
+      </div>
+      <div className="flex flex-col items-end space-y-1">
+        <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-sm font-medium`}>
+          {statusLabel.text}
+        </span>
+        <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-sm font-medium`}>
+          {complianceLabel.text}
+        </span>
+      </div>
+    </div>
+  )
+})
+
+PatientCard.displayName = 'PatientCard'
+
+function PatientList({
   patients: externalPatients,
   loading: externalLoading,
   showFilters = true,
   showSearch = true,
-  onPatientClick
+  onPatientClick,
+  enableVirtualScrolling = false,
+  virtualScrollHeight = 500
 }: PatientListProps) {
   const router = useRouter()
   const [internalPatients, setInternalPatients] = useState<Patient[]>([])
@@ -79,56 +142,39 @@ export function PatientList({
     })
   }, [patients, searchTerm, statusFilter, complianceFilter])
 
-  const getInitials = (name: string) => {
+  // Memoized utility functions to prevent recreating on every render
+  const getInitials = useCallback((name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase()
-  }
+  }, [])
 
-  const getComplianceColor = (rate: number) => {
+  const getComplianceColor = useCallback((rate: number) => {
     if (rate >= 80) return 'bg-green-500'
     if (rate >= 50) return 'bg-yellow-500'
     return 'bg-red-500'
-  }
+  }, [])
 
-  const getComplianceLabel = (rate: number) => {
+  const getComplianceLabel = useCallback((rate: number) => {
     if (rate >= 80) return { text: 'Tinggi', bg: 'bg-green-100', color: 'text-green-800' }
     if (rate >= 50) return { text: 'Sedang', bg: 'bg-yellow-100', color: 'text-yellow-800' }
     return { text: 'Rendah', bg: 'bg-red-100', color: 'text-red-800' }
-  }
+  }, [])
 
-  const getStatusLabel = (isActive: boolean) => {
+  const getStatusLabel = useCallback((isActive: boolean) => {
     return isActive
       ? { text: 'Aktif', bg: 'bg-blue-100', color: 'text-blue-800' }
       : { text: 'Nonaktif', bg: 'bg-gray-100', color: 'text-gray-800' }
-  }
+  }, [])
 
-  const handlePatientClick = (patient: Patient) => {
+  const handlePatientClick = useCallback((patient: Patient) => {
     if (onPatientClick) {
       onPatientClick(patient)
     } else {
       router.push(`/pasien/${patient.id}`)
     }
-  }
+  }, [onPatientClick, router])
 
   if (loading) {
-    return (
-      <div className="space-y-3">
-        {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-white rounded-lg p-4 shadow-sm animate-pulse">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-gray-300 rounded w-1/2"></div>
-              </div>
-              <div className="flex flex-col space-y-1">
-                <div className="h-6 bg-gray-300 rounded-full w-16"></div>
-                <div className="h-6 bg-gray-300 rounded-full w-20"></div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+    return <PatientListSkeleton count={5} />
   }
 
   return (
@@ -179,40 +225,41 @@ export function PatientList({
       </p>
 
       {/* Patient List */}
-      <div className="space-y-3">
-        {filteredPatients.map((patient) => {
-          const complianceLabel = getComplianceLabel(patient.complianceRate)
-          const statusLabel = getStatusLabel(patient.isActive)
-
-          return (
-            <div
-              key={patient.id}
-              onClick={() => handlePatientClick(patient)}
-              className="bg-white rounded-lg p-4 flex items-center justify-between shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center space-x-3">
-                <div className={`w-12 h-12 ${getComplianceColor(patient.complianceRate)} rounded-full flex items-center justify-center`}>
-                  <span className="text-white font-bold text-lg">
-                    {getInitials(patient.name)}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{patient.name}</h3>
-                  <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
-                </div>
-              </div>
-              <div className="flex flex-col items-end space-y-1">
-                <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-sm font-medium`}>
-                  {statusLabel.text}
-                </span>
-                <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-sm font-medium`}>
-                  {complianceLabel.text}
-                </span>
-              </div>
+      {enableVirtualScrolling && filteredPatients.length > 20 ? (
+        <VirtualPatientList
+          patients={filteredPatients}
+          containerHeight={virtualScrollHeight}
+          itemHeight={100} // Height of PatientCard
+          loading={loading}
+          keyExtractor={(patient) => patient.id}
+          renderPatient={(patient) => (
+            <div className="px-1 pb-3">
+              <PatientCard
+                patient={patient}
+                onPatientClick={handlePatientClick}
+                getInitials={getInitials}
+                getComplianceColor={getComplianceColor}
+                getComplianceLabel={getComplianceLabel}
+                getStatusLabel={getStatusLabel}
+              />
             </div>
-          )
-        })}
-      </div>
+          )}
+        />
+      ) : (
+        <div className="space-y-3">
+          {filteredPatients.map((patient) => (
+            <PatientCard
+              key={patient.id}
+              patient={patient}
+              onPatientClick={handlePatientClick}
+              getInitials={getInitials}
+              getComplianceColor={getComplianceColor}
+              getComplianceLabel={getComplianceLabel}
+              getStatusLabel={getStatusLabel}
+            />
+          ))}
+        </div>
+      )}
 
       {filteredPatients.length === 0 && (
         <div className="text-center py-12">
@@ -222,4 +269,10 @@ export function PatientList({
     </div>
   )
 }
+
+// Export memoized PatientList to prevent unnecessary re-renders
+export default memo(PatientList)
+
+// Also export named export for backward compatibility
+export { PatientList }
 

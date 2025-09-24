@@ -1,6 +1,6 @@
 "use client";
 
-import UserManagement from "@/components/admin/user-management";
+import { LazyUserManagement } from "@/components/admin/lazy-components";
 import { Header } from "@/components/ui/header";
 import { RoleGuard } from "@/components/auth/role-guard";
 
@@ -56,7 +56,7 @@ export default function AdminUsersPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl my-4 lg:my-8 mx-auto relative z-10 px-4 sm:px-6 lg:px-8">
-        <UserManagement />
+        <LazyUserManagement />
       </main>
       </div>
     </RoleGuard>
