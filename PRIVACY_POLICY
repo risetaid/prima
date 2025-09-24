@@ -1,0 +1,140 @@
+# Kebijakan Privasi PRIMA (Palliative Remote Integrated Monitoring and Assistance)
+
+**Terakhir diperbarui: 24 September 2025**
+
+## 1. Pendahuluan
+
+Selamat datang di PRIMA, sistem manajemen pasien paliatif berbasis WhatsApp yang dirancang untuk membantu relawan kesehatan Indonesia dalam memberikan perawatan kanker dan pemantauan kepatuhan pengobatan. Kami berkomitmen untuk melindungi privasi dan data pribadi Anda sesuai dengan Undang-Undang No. 27 Tahun 2022 tentang Pelindungan Data Pribadi (UU PDP) dan standar internasional untuk data kesehatan.
+
+Kebijakan privasi ini menjelaskan bagaimana kami mengumpulkan, menggunakan, menyimpan, dan melindungi informasi Anda saat menggunakan layanan PRIMA.
+
+## 2. Informasi yang Kami Kumpulkan
+
+### 2.1 Data Pasien
+Kami mengumpulkan informasi kesehatan sensitif berikut dari pasien kanker:
+- Nama lengkap
+- Nomor telepon WhatsApp
+- Alamat
+- Tanggal lahir dan tanggal diagnosis
+- Tahap kanker
+- Nama dokter dan rumah sakit
+- Kontak darurat (nama dan nomor telepon)
+- Catatan kesehatan dan riwayat medis
+- Foto pasien (opsional)
+- Data verifikasi WhatsApp (status, percobaan, respons)
+
+### 2.2 Data Relawan (Pengguna Sistem)
+- Email dan nama lengkap
+- Nama rumah sakit
+- Peran (SUPERADMIN, ADMIN, MEMBER)
+- ID Clerk untuk autentikasi
+- Riwayat login
+
+### 2.3 Data Pengingat dan Komunikasi
+- Jadwal pengingat obat
+- Pesan pengingat dan respons pasien
+- Log pengiriman WhatsApp
+- Konfirmasi manual kunjungan relawan
+- Data kepatuhan pengobatan
+
+### 2.4 Data CMS dan Edukasi
+- Artikel kesehatan dan video YouTube
+- Data penggunaan konten edukasi
+
+### 2.5 Data Teknis
+- Log aktivitas untuk keamanan
+- Data performa aplikasi
+- Analitik penggunaan LLM (dengan pembatasan biaya)
+
+## 3. Bagaimana Kami Menggunakan Informasi
+
+Kami menggunakan data Anda untuk:
+- **Perawatan Pasien**: Mengirim pengingat obat, memantau kepatuhan, dan melacak kondisi kesehatan
+- **Verifikasi Pasien**: Memverifikasi identitas melalui WhatsApp untuk memastikan keamanan
+- **Manajemen Relawan**: Mengelola akses sistem dan melacak aktivitas relawan
+- **Komunikasi**: Mengirim pesan edukasi kesehatan melalui WhatsApp
+- **Analitik**: Memantau efektivitas program dan kepatuhan pengobatan
+- **Keamanan**: Mencegah penyalahgunaan dan memastikan integritas data
+- **Kepatuhan Hukum**: Memenuhi persyaratan UU PDP dan regulasi kesehatan
+
+## 4. Dasar Hukum Pengolahan Data
+
+Sesuai UU PDP, kami mengolah data berdasarkan:
+- **Persetujuan**: Anda memberikan persetujuan eksplisit untuk pengumpulan data kesehatan
+- **Kepentingan Sah**: Untuk memberikan perawatan kesehatan dan menyelamatkan nyawa
+- **Kewajiban Hukum**: Mematuhi regulasi kesehatan Indonesia
+
+## 5. Berbagi dan Pengungkapan Informasi
+
+Kami tidak menjual data Anda. Kami hanya berbagi informasi dalam situasi berikut:
+- **Dengan Relawan Terautentikasi**: Data pasien dibagikan dengan relawan yang ditugaskan untuk perawatan
+- **Penyedia Layanan**: Dengan mitra teknis (Clerk untuk autentikasi, Supabase untuk database, Fonnte untuk WhatsApp)
+- **Kewajiban Hukum**: Jika diwajibkan oleh pengadilan atau untuk mencegah bahaya kesehatan
+- **Dengan Persetujuan**: Hanya dengan persetujuan eksplisit Anda
+
+## 6. Keamanan Data
+
+Kami menerapkan langkah-langkah keamanan komprehensif:
+- **Enkripsi**: Data dienkripsi saat transit dan penyimpanan
+- **Akses Terbatas**: Hanya personel terautentikasi yang dapat mengakses data
+- **Audit Trail**: Semua akses data dicatat untuk audit
+- **Pembaruan Keamanan**: Sistem diperbarui secara berkala
+- **Cadangan Aman**: Data dicadangkan dengan enkripsi
+
+## 7. Retensi Data
+
+- **Data Pasien**: Disimpan selama pasien aktif dan 5 tahun setelah tidak aktif, sesuai regulasi medis
+- **Data Relawan**: Disimpan selama akun aktif
+- **Log Sistem**: Disimpan selama 2 tahun untuk audit keamanan
+- **Data Dihapus**: Data dihapus secara permanen menggunakan soft delete untuk audit
+
+## 8. Hak Anda atas Data
+
+Sesuai UU PDP, Anda memiliki hak:
+- **Akses**: Meminta salinan data Anda
+- **Perbaikan**: Mengoreksi data yang tidak akurat
+- **Penghapusan**: Meminta penghapusan data (dengan pertimbangan medis)
+- **Portabilitas**: Menerima data dalam format yang dapat dibaca mesin
+- **Penarikan Persetujuan**: Menarik persetujuan untuk pengolahan data
+- **Pengaduan**: Mengajukan keluhan ke otoritas pengawas
+
+## 9. Transfer Data Internasional
+
+Data Anda mungkin diproses di server internasional (Vercel, Supabase) yang mematuhi standar keamanan tinggi. Kami memastikan transfer data memenuhi persyaratan UU PDP.
+
+## 10. Layanan Pihak Ketiga
+
+PRIMA menggunakan layanan berikut:
+- **Clerk**: Autentikasi pengguna
+- **Supabase**: Database PostgreSQL
+- **Fonnte**: API WhatsApp Business
+- **Vercel**: Hosting dan deployment
+- **Redis**: Caching sementara
+
+Setiap mitra terikat oleh perjanjian pemrosesan data yang memastikan kepatuhan privasi.
+
+## 11. Cookies dan Teknologi Pelacakan
+
+Kami menggunakan cookies untuk:
+- Sesi autentikasi (3 menit)
+- Cache data pasien (15 menit)
+- Analitik penggunaan (anonim)
+
+## 12. Perubahan Kebijakan
+
+Kami akan memberitahu Anda tentang perubahan signifikan melalui email atau aplikasi. Penggunaan berkelanjutan berarti Anda menyetujui kebijakan baru.
+
+## 13. Kontak Kami
+
+Untuk pertanyaan privasi:
+- Email: privacy@prima-health.id
+- WhatsApp: +62 XXX XXX XXXX
+- Alamat: [Alamat Organisasi]
+
+## 14. Pengaduan
+
+Jika Anda yakin privasi Anda dilanggar, hubungi:
+- Komisi Informasi Pusat (KIP) Indonesia
+- Email: pengaduan@kip.go.id
+
+Kami berkomitmen untuk merespons semua pertanyaan privasi dalam 30 hari kerja.
