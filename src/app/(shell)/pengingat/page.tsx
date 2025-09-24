@@ -124,10 +124,7 @@ export default function ReminderPage() {
       {/* Background Pattern */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
-          className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-          style={{
-            backgroundImage: "url(/bg_desktop.png)",
-          }}
+          className="fixed inset-0 bg-white md:bg-cover md:bg-center md:bg-no-repeat md:opacity-90 md:bg-[url('/bg_desktop.png')]"
         />
       </div>
 
