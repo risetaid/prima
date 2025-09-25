@@ -29,25 +29,36 @@ export const metadata: Metadata = {
   icons: {
     apple: "/apple-touch-icon.png",
     icon: [
-      { url: "/icon-192x192.png", sizes: "192x192" },
-      { url: "/icon-512x512.png", sizes: "512x512" },
+      { url: "/icons/ios/32.png", sizes: "32x32" },
+      { url: "/icons/ios/192.png", sizes: "192x192" },
+      { url: "/icons/ios/512.png", sizes: "512x512" },
+      { url: "/icons/ios/1024.png", sizes: "1024x1024" },
     ],
   },
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'apple-mobile-web-app-title': 'PRIMA',
     'application-name': 'PRIMA',
     'msapplication-TileColor': '#3b82f6',
     'msapplication-config': '/browserconfig.xml',
-    'format-detection': 'telephone=no'
+    'format-detection': 'telephone=no',
+    'theme-color': '#3b82f6'
   }
 };
 
 export function generateViewport() {
   return {
-    themeColor: "#3b82f6",
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+    themeColor: [
+      { media: "(prefers-color-scheme: light)", color: "#3b82f6" },
+      { media: "(prefers-color-scheme: dark)", color: "#1d4ed8" }
+    ],
+    viewportFit: "cover"
   };
 }
 
@@ -59,13 +70,11 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=5"
-        />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-touch-fullscreen" content="yes" />
+        <meta name="format-detection" content="telephone=no" />
       </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}

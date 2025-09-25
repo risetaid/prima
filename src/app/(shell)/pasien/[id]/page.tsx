@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { Header } from "@/components/ui/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -507,7 +509,26 @@ export default function PatientDetailPage() {
           />
         </div>
 
-        <Header showNavigation={true} />
+        {/* Desktop: Header */}
+        <div className="hidden lg:block relative z-10">
+          <Header showNavigation={true} />
+        </div>
+
+        {/* Mobile: Header */}
+        <div className="lg:hidden relative z-10">
+          <header className="bg-white">
+            <div className="flex justify-between items-center px-4 py-4">
+              <button
+                onClick={() => router.push('/pasien')}
+                className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+              >
+                <ArrowLeft className="w-6 h-6 text-blue-600" />
+              </button>
+              <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+              <UserButton afterSignOutUrl="/sign-in" />
+            </div>
+          </header>
+        </div>
 
         <main className="relative z-10 pt-4 pb-12">
           <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
@@ -644,7 +665,27 @@ export default function PatientDetailPage() {
             style={{ backgroundImage: "url(/bg_desktop.png)" }}
           />
         </div>
-        <Header showNavigation={true} />
+
+        {/* Desktop: Header */}
+        <div className="hidden lg:block relative z-10">
+          <Header showNavigation={true} />
+        </div>
+
+        {/* Mobile: Header */}
+        <div className="lg:hidden relative z-10">
+          <header className="bg-white">
+            <div className="flex justify-between items-center px-4 py-4">
+              <button
+                onClick={() => router.push('/pasien')}
+                className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+              >
+                <ArrowLeft className="w-6 h-6 text-blue-600" />
+              </button>
+              <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+              <UserButton afterSignOutUrl="/sign-in" />
+            </div>
+          </header>
+        </div>
         <main className="relative z-10 py-12">
           <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="text-center">
@@ -680,7 +721,26 @@ export default function PatientDetailPage() {
         />
       </div>
 
-      <Header showNavigation={true} />
+      {/* Desktop: Header */}
+      <div className="hidden lg:block relative z-10">
+        <Header showNavigation={true} />
+      </div>
+
+      {/* Mobile: Header */}
+      <div className="lg:hidden relative z-10">
+        <header className="bg-white">
+          <div className="flex justify-between items-center px-4 py-4">
+            <button
+              onClick={() => router.push('/pasien')}
+              className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
+            >
+              <ArrowLeft className="w-6 h-6 text-blue-600" />
+            </button>
+            <h1 className="text-xl font-bold text-blue-600">PRIMA</h1>
+            <UserButton afterSignOutUrl="/sign-in" />
+          </div>
+        </header>
+      </div>
 
       <main className="relative z-10 pt-4 pb-12">
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">

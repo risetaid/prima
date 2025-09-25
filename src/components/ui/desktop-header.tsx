@@ -147,12 +147,12 @@ export function DesktopHeader({ showNavigation = true }: DesktopHeaderProps) {
             className="flex items-center space-x-2 cursor-pointer"
             onClick={() => router.push("/")}
           >
-            <Image 
-              src="/icon-512x512.png" 
-              alt="PRIMA Logo" 
-              width={24} 
-              height={24} 
-              className="w-6 h-6" 
+            <Image
+              src="/icons/ios/1024.png"
+              alt="PRIMA Logo"
+              width={24}
+              height={24}
+              className="w-6 h-6"
               priority={true}
             />
             <h1 className="text-2xl font-bold text-blue-600">PRIMA</h1>
