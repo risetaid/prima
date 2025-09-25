@@ -6,7 +6,10 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
+  "theme_color_dark": "#1d4ed8",
   "orientation": "portrait-primary",
+  "display_override": ["standalone", "fullscreen"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/windows11/SmallTile.scale-100.png",
