@@ -16,7 +16,7 @@ export default function PendingApprovalPage() {
     role?: string;
     canAccessDashboard?: boolean;
   } | null>(null);
-  const [superadminContact, setSuperadminContact] = useState<{
+  const [developerContact, setDeveloperContact] = useState<{
     name?: string;
     email?: string;
     hospitalName?: string;
@@ -29,14 +29,14 @@ export default function PendingApprovalPage() {
       return;
     }
 
-    // Fetch user status and superadmin contact info
+    // Fetch user status and developer contact info
     Promise.all([
       fetch("/api/user/status").then((res) => res.json()),
       fetch("/api/admin/developer-contact").then((res) => res.json()),
     ])
-      .then(([userData, superadminData]) => {
+      .then(([userData, developerData]) => {
         setUserData(userData);
-        setSuperadminContact(superadminData);
+        setDeveloperContact(developerData);
         setLoading(false);
       })
       .catch((err) => {
@@ -115,7 +115,7 @@ export default function PendingApprovalPage() {
                 </p>
                 <p>
                   Untuk mempercepat proses persetujuan, silakan hubungi
-                  administrator melalui email di bawah ini.
+                  developer sistem melalui email di bawah ini.
                 </p>
               </div>
 
@@ -135,22 +135,22 @@ export default function PendingApprovalPage() {
                 </p>
               </div>
 
-              {/* Superadmin Contact Card */}
-              {superadminContact && (
+              {/* Developer Contact Card */}
+              {developerContact && (
                 <div className="mt-4 p-4 bg-green-50 rounded-xl border border-green-100">
                   <h3 className="font-medium text-green-800 mb-3 flex items-center justify-center gap-2">
-                    <span>📧</span> Hubungi Administrator
+                    <span>👨‍💻</span> Hubungi Developer
                   </h3>
                   <div className="text-center space-y-2">
                     <p className="text-sm text-green-700">
-                      <strong>{superadminContact.name}</strong>
+                      <strong>{developerContact.name}</strong>
                     </p>
                     <p className="text-sm text-green-600">
-                      {superadminContact.hospitalName}
+                      {developerContact.hospitalName}
                     </p>
                     <div className="mt-3">
                       <a
-                        href={`mailto:${superadminContact.email}?subject=PRIMA - Permintaan Persetujuan Akun&body=Halo ${superadminContact.name},%0D%0A%0D%0ASaya ${userData.firstName} ${userData.lastName} (${userData.email}) memerlukan persetujuan untuk mengakses sistem PRIMA.%0D%0A%0D%0AMohon bantuannya untuk memproses persetujuan akun saya.%0D%0A%0D%0ATerima kasih,%0D%0A${userData.firstName} ${userData.lastName}`}
+                        href={`mailto:${developerContact.email}?subject=PRIMA - Permintaan Persetujuan Akun&body=Halo ${developerContact.name},%0D%0A%0D%0ASaya ${userData.firstName} ${userData.lastName} (${userData.email}) memerlukan persetujuan untuk mengakses sistem PRIMA.%0D%0A%0D%0AMohon bantuannya untuk memproses persetujuan akun saya.%0D%0A%0D%0ATerima kasih,%0D%0A${userData.firstName} ${userData.lastName}`}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
                       >
                         <span>✉️</span>
@@ -158,7 +158,7 @@ export default function PendingApprovalPage() {
                       </a>
                     </div>
                     <p className="text-xs text-green-600 mt-2">
-                      Email: {superadminContact.email}
+                      Email: {developerContact.email}
                     </p>
                   </div>
                 </div>
@@ -174,7 +174,7 @@ export default function PendingApprovalPage() {
                     Subject: PRIMA - Permintaan Persetujuan Akun
                   </p>
                   <p className="mb-2">
-                    Halo {superadminContact?.name || "Administrator"},
+                    Halo {developerContact?.name || "Developer"},
                   </p>
                   <p className="mb-2">
                     Saya{" "}

@@ -188,7 +188,7 @@ export async function GET(
     const formattedReminders = filteredReminders.map((reminder) => ({
       id: reminder.id,
       scheduledTime: reminder.scheduledTime,
-      reminderDate: reminder.startDate.toISOString().split("T")[0],
+      nextReminderDate: reminder.startDate.toISOString().split("T")[0],
       customMessage: reminder.customMessage,
       patient: patientMap.get(reminder.patientId) || null,
       reminderLogs: logsMap.get(reminder.id) || [],
