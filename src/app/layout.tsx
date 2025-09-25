@@ -29,8 +29,10 @@ export const metadata: Metadata = {
   icons: {
     apple: "/apple-touch-icon.png",
     icon: [
-      { url: "/icon-192x192.png", sizes: "192x192" },
-      { url: "/icon-512x512.png", sizes: "512x512" },
+      { url: "/icons/ios/32.png", sizes: "32x32" },
+      { url: "/icons/ios/192.png", sizes: "192x192" },
+      { url: "/icons/ios/512.png", sizes: "512x512" },
+      { url: "/icons/ios/1024.png", sizes: "1024x1024" },
     ],
   },
   other: {
