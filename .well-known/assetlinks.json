@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.railway.up.prima_production.twa",
+        "sha256_cert_fingerprints": ["3A:66:D2:C4:DC:56:10:A0:31:0F:B7:ED:26:7B:3B:C8:48:FF:DD:87:58:55:CB:17:00:D0:85:69:55:07:B3:77"]
+      }
+    }]
