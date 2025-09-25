@@ -1,8 +1,12 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "app.railway.up.prima_production.twa",
-        "sha256_cert_fingerprints": ["3A:66:D2:C4:DC:56:10:A0:31:0F:B7:ED:26:7B:3B:C8:48:FF:DD:87:58:55:CB:17:00:D0:85:69:55:07:B3:77"]
-      }
-    }]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.railway.up.prima_production.twa",
+      "sha256_cert_fingerprints": [
+        "D7:55:23:B3:0B:C6:EA:10:AA:D8:E5:9E:9A:26:9B:68:7A:38:FF:BC:7A:D5:5C:BC:FC:0E:69:73:01:00:5D:DD"
+      ]
+    }
+  }
+]
