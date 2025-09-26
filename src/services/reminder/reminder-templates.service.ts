@@ -107,7 +107,7 @@ export class ReminderTemplatesService {
     scheduledTime: string;
     message?: string;
   }): string {
-    const { patientName, medicationName, dosage, scheduledTime, message } = params;
+    const { patientName, medicationName, dosage, message } = params;
     const icon = this.getReminderIcon('MEDICATION');
 
     let reminderText = `${icon} *Pengingat Obat*\n\n`;
@@ -119,7 +119,7 @@ export class ReminderTemplatesService {
     }
 
     reminderText += `.\n\n`;
-    reminderText += `⏰ *Waktu:* ${scheduledTime}\n\n`;
+    // Waktu dihilangkan sesuai permintaan
 
     if (message) {
       reminderText += `${message}\n\n`;
@@ -145,7 +145,7 @@ export class ReminderTemplatesService {
     scheduledTime: string;
     message?: string;
   }): string {
-    const { patientName, appointmentType, doctorName, location, scheduledTime, message } = params;
+    const { patientName, appointmentType, doctorName, location, message } = params;
 
     let reminderText = `📅 *Pengingat Janji Temu*\n\n`;
     reminderText += `Halo ${patientName}!\n\n`;
@@ -159,7 +159,7 @@ export class ReminderTemplatesService {
       reminderText += `Lokasi: ${location}\n`;
     }
 
-    reminderText += `\n⏰ *Waktu:* ${scheduledTime}\n\n`;
+    // Waktu dihilangkan sesuai permintaan
 
     if (message) {
       reminderText += `${message}\n\n`;
@@ -186,12 +186,12 @@ export class ReminderTemplatesService {
     message?: string;
     metadata?: Record<string, unknown>;
   }): string {
-    const { patientName, title, description, scheduledTime, message } = params;
+    const { patientName, title, description, message } = params;
 
     let reminderText = `📝 *${title}*\n\n`;
     reminderText += `Halo ${patientName}!\n\n`;
     reminderText += `${description}\n\n`;
-    reminderText += `⏰ *Waktu:* ${scheduledTime}\n\n`;
+    // Waktu dihilangkan sesuai permintaan
 
     if (message) {
       reminderText += `${message}\n\n`;
@@ -215,13 +215,15 @@ export class ReminderTemplatesService {
     message: string;
     scheduledTime: string;
   }): string {
-    const { patientName, title, message, scheduledTime } = params;
+    const { patientName, title, message } = params;
 
     return `📝 *${title}*\n\n` +
            `Halo ${patientName}!\n\n` +
            `${message}\n\n` +
-           `⏰ *Waktu:* ${scheduledTime}\n\n` +
-           `Silakan konfirmasi dengan membalas pesan ini.\n\n` +
+           `Silakan konfirmasi dengan membalas:\n` +
+           `✅ *SELESAI* jika sudah dilakukan\n` +
+           `⏰ *BELUM* jika belum dilakukan\n` +
+           `🆘 *BANTUAN* jika butuh bantuan\n\n` +
            `💙 Tim PRIMA`;
   }
 
