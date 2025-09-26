@@ -130,7 +130,7 @@ async function processRemindersWithLock() {
     // Import dependencies
     const { db, reminders, patients } = await import("@/db");
     const { eq, and, lte, isNull } = await import("drizzle-orm");
-    const { getWIBTime, getWIBDateString } = await import("@/lib/timezone");
+    const { getWIBTime, getWIBTimeString } = await import("@/lib/timezone");
 
     // Import reminder service for follow-up scheduling
     if (!reminderService) {
@@ -140,9 +140,7 @@ async function processRemindersWithLock() {
       reminderService = new ReminderService();
     }
 
-    const now = getWIBTime();
     const currentTime = getWIBTimeString();
-    const todayWIB = getWIBDateString();
 
     // Find reminders that should be sent now:
     // 1. Active reminders
@@ -171,7 +169,7 @@ async function processRemindersWithLock() {
       .where(
         and(
           eq(reminders.isActive, true),
-          lte(reminders.startDate, todayWIB),
+          lte(reminders.startDate, getWIBTime()),
           lte(reminders.scheduledTime, currentTime),
           isNull(reminders.sentAt),
           eq(reminders.status, "PENDING"),
