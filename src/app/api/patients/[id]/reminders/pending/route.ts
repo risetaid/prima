@@ -50,8 +50,13 @@ export async function GET(
           .where(eq(manualConfirmations.reminderId, reminders.id))
       ),
       // Must not be confirmed (manually or automatically)
+      // Include reminders that need manual confirmation even if automated response was MISSED
       and(
-        isNull(reminders.confirmationStatus),
+        or(
+          isNull(reminders.confirmationStatus),
+          eq(reminders.confirmationStatus, 'PENDING'),
+          eq(reminders.confirmationStatus, 'MISSED')
+        ),
         isNull(reminders.confirmationResponse)
       ),
     ];
