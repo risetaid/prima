@@ -425,61 +425,64 @@ export default function PatientPage() {
               </button>
             </div>
 
-            <div className="space-y-3">
-              {filteredPatients.map((patient) => {
-                const complianceLabel = getComplianceLabel(patient.complianceRate)
-                const statusLabel = patient.isActive
-                  ? { text: 'Aktif', bg: 'bg-blue-500', color: 'text-white' }
-                  : { text: 'Nonaktif', bg: 'bg-gray-500', color: 'text-white' }
+            {/* Mobile: Patient Cards - Scrollable */}
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 420px)' }}>
+              <div className="space-y-3">
+                {filteredPatients.map((patient) => {
+                  const complianceLabel = getComplianceLabel(patient.complianceRate)
+                  const statusLabel = patient.isActive
+                    ? { text: 'Aktif', bg: 'bg-blue-500', color: 'text-white' }
+                    : { text: 'Nonaktif', bg: 'bg-gray-500', color: 'text-white' }
 
-                return (
-                  <div
-                    key={patient.id}
-                    onClick={() => handlePatientClick(patient.id)}
-                    className="bg-white rounded-xl p-4 flex items-center justify-between shadow-md cursor-pointer hover:shadow-lg transition-shadow"
-                  >
-                    <div className="flex items-center space-x-3">
-                      {patient.photoUrl ? (
-                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 shadow-sm">
-                          <Image
-                            src={patient.photoUrl}
-                            alt={patient.name}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-cover"
-                          />
+                  return (
+                    <div
+                      key={patient.id}
+                      onClick={() => handlePatientClick(patient.id)}
+                      className="bg-white rounded-xl p-4 flex items-center justify-between shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                    >
+                      <div className="flex items-center space-x-3">
+                        {patient.photoUrl ? (
+                          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 shadow-sm">
+                            <Image
+                              src={patient.photoUrl}
+                              alt={patient.name}
+                              width={48}
+                              height={48}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center shadow-sm`}>
+                            <span className="text-white font-bold text-sm">
+                              {getInitials(patient.name)}
+                            </span>
+                          </div>
+                        )}
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-base">{patient.name}</h3>
+                          <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
                         </div>
-                      ) : (
-                        <div className={`w-12 h-12 ${getRandomAvatarColor(patient.name)} rounded-full flex items-center justify-center shadow-sm`}>
-                          <span className="text-white font-bold text-sm">
-                            {getInitials(patient.name)}
-                          </span>
-                        </div>
-                      )}
-                      <div>
-                        <h3 className="font-semibold text-gray-900 text-base">{patient.name}</h3>
-                        <p className="text-sm text-gray-500">Kepatuhan: {patient.complianceRate}%</p>
+                      </div>
+                      <div className="flex flex-col items-end space-y-1">
+                        <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center shadow-sm`}>
+                          {statusLabel.text}
+                        </span>
+                        <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center shadow-sm`}>
+                          {complianceLabel.text}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end space-y-1">
-                      <span className={`${statusLabel.bg} ${statusLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center shadow-sm`}>
-                        {statusLabel.text}
-                      </span>
-                      <span className={`${complianceLabel.bg} ${complianceLabel.color} px-3 py-1 rounded-full text-xs font-medium min-w-[60px] text-center shadow-sm`}>
-                        {complianceLabel.text}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
 
-              {filteredPatients.length === 0 && !loading && (
-                <div className="text-center py-8 bg-white rounded-lg shadow-md">
-                  <p className="text-gray-500">
-                    {patients.length === 0 ? 'Belum ada pasien' : 'Tidak ada pasien yang sesuai dengan filter'}
-                  </p>
-                </div>
-              )}
+                {filteredPatients.length === 0 && !loading && (
+                  <div className="text-center py-8 bg-white rounded-lg shadow-md">
+                    <p className="text-gray-500">
+                      {patients.length === 0 ? 'Belum ada pasien' : 'Tidak ada pasien yang sesuai dengan filter'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
