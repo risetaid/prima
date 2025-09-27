@@ -431,6 +431,14 @@ export default function PatientDetailPage() {
   // Edit mode handlers
 
   const handleCancelBasicInfo = () => {
+    // Reset form data to original patient data
+    setBasicInfoForm({
+      name: patient?.name || "",
+      phoneNumber: patient?.phoneNumber || "",
+      address: patient?.address || "",
+      birthDate: patient?.birthDate ? new Date(patient.birthDate).toISOString().split('T')[0] : "",
+      diagnosisDate: patient?.diagnosisDate ? new Date(patient.diagnosisDate).toISOString().split('T')[0] : "",
+    });
     setIsEditingBasicInfo(false);
   };
 
@@ -438,14 +446,39 @@ export default function PatientDetailPage() {
     setIsEditingMedicalInfo(false);
   };
 
-  const handleSaveBasicInfo = async () => {
+  const handleSaveBasicInfo = async (photoData?: { file: File | null; shouldRemove: boolean }) => {
     try {
+      let photoUrl = patient?.photoUrl || null;
+
+      // Handle photo operations
+      if (photoData?.shouldRemove && patient?.photoUrl) {
+        photoUrl = null; // Remove existing photo
+      } else if (photoData?.file) {
+        // Upload new photo
+        const photoFormData = new FormData();
+        photoFormData.append('photo', photoData.file);
+
+        const photoResponse = await fetch('/api/upload?type=patient-photo', {
+          method: 'POST',
+          body: photoFormData,
+        });
+
+        if (photoResponse.ok) {
+          const photoDataResponse = await photoResponse.json();
+          photoUrl = photoDataResponse.url;
+        } else {
+          toast.error('Gagal mengunggah foto profil');
+          return;
+        }
+      }
+
       const updateData = {
         name: basicInfoForm.name,
         phoneNumber: basicInfoForm.phoneNumber,
         address: basicInfoForm.address || null,
         birthDate: basicInfoForm.birthDate || null,
         diagnosisDate: basicInfoForm.diagnosisDate || null,
+        photoUrl: photoUrl,
       };
 
       const response = await fetch(`/api/patients/${params.id}`, {

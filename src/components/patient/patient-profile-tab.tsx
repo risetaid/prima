@@ -6,7 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IndonesianDateInput } from "@/components/ui/indonesian-date-input";
 import { Separator } from "@/components/ui/separator";
 import { PatientVariablesManager } from "@/components/patient/patient-variables-manager";
-import { User, Stethoscope, Edit, Save, X, MapPin, FileText } from "lucide-react";
+import { User, Stethoscope, Edit, Save, X, MapPin, FileText, Camera, Trash2 } from "lucide-react";
+import Image from "next/image";
+import { useState, useRef, useEffect } from "react";
+import { toast } from "sonner";
 
 interface Patient {
   name: string;
@@ -20,6 +23,7 @@ interface Patient {
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
   notes: string | null;
+  photoUrl?: string | null;
 }
 
 interface BasicInfoForm {
@@ -45,7 +49,7 @@ interface PatientProfileTabProps {
   setIsEditingBasicInfo: (editing: boolean) => void;
   basicInfoForm: BasicInfoForm;
   setBasicInfoForm: (form: BasicInfoForm) => void;
-  handleSaveBasicInfo: () => void;
+  handleSaveBasicInfo: (photoData?: { file: File | null; shouldRemove: boolean }) => void;
   handleCancelBasicInfo: () => void;
   isEditingMedicalInfo: boolean;
   setIsEditingMedicalInfo: (editing: boolean) => void;
@@ -72,6 +76,102 @@ export function PatientProfileTab({
   handleCancelMedicalInfo,
   patientId,
 }: PatientProfileTabProps) {
+  // Profile image states
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [shouldRemovePhoto, setShouldRemovePhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast.error('File Terlalu Besar', {
+          description: 'Ukuran file maksimal 5MB. Silakan pilih file yang lebih kecil.'
+        });
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Format File Tidak Valid', {
+          description: 'File harus berupa gambar (JPG, PNG, GIF, dll).'
+        });
+        return;
+      }
+
+      setPhotoFile(file);
+      setIsUploading(true);
+
+      // Create preview URL
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        setPhotoPreview(e.target?.result as string);
+
+        // Upload photo immediately
+        const photoFormData = new FormData();
+        photoFormData.append('photo', file);
+
+        try {
+          const photoResponse = await fetch('/api/upload?type=patient-photo', {
+            method: 'POST',
+            body: photoFormData,
+          });
+
+          if (photoResponse.ok) {
+            // We'll handle the photoUrl update in the handleSaveBasicInfo
+            toast.success('Foto profil berhasil diunggah');
+          } else {
+            toast.error('Gagal mengunggah foto profil');
+            setPhotoPreview(null);
+            setPhotoFile(null);
+          }
+        } catch {
+          toast.error('Kesalahan jaringan saat mengunggah foto');
+          setPhotoPreview(null);
+          setPhotoFile(null);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const removePhoto = () => {
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveExistingPhoto = () => {
+    if (patient.photoUrl) {
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      setShouldRemovePhoto(true);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Reset photo states when exiting edit mode
+  useEffect(() => {
+    if (!isEditingBasicInfo) {
+      setPhotoPreview(null);
+      setPhotoFile(null);
+      setShouldRemovePhoto(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [isEditingBasicInfo]);
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -106,7 +206,7 @@ export function PatientProfileTab({
                   </Button>
                   <Button
                     size="sm"
-                    onClick={handleSaveBasicInfo}
+                    onClick={() => handleSaveBasicInfo({ file: photoFile, shouldRemove: shouldRemovePhoto })}
                     className="h-8 px-2"
                   >
                     <Save className="w-4 h-4 mr-1" />
@@ -117,6 +217,58 @@ export function PatientProfileTab({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Profile Photo Upload/Edit */}
+            {isEditingBasicInfo && (
+              <div className="flex justify-center">
+                <div>
+                  <label className="block text-gray-600 text-sm mb-2 text-center">
+                    Foto Profil
+                  </label>
+                  <div className="flex items-center justify-center">
+                    {photoPreview || (patient.photoUrl && !shouldRemovePhoto) ? (
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-blue-200">
+                          <Image
+                            src={photoPreview || patient.photoUrl || ''}
+                            alt="Preview"
+                            width={80}
+                            height={80}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={patient.photoUrl && !photoPreview ? handleRemoveExistingPhoto : removePhoto}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-600 transition-colors"
+                        >
+                          <Trash2 className="w-2 h-2" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={handlePhotoClick}
+                        className="w-20 h-20 border-4 border-dashed border-blue-300 rounded-full flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                      >
+                        <Camera className="w-5 h-5 text-blue-400 mb-1" />
+                        <span className="text-xs text-blue-400">Foto</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoSelect}
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                  {isUploading && (
+                    <p className="text-xs text-blue-600 text-center mt-1">Mengunggah...</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {isEditingBasicInfo ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
