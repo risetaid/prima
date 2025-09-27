@@ -381,3 +381,51 @@ export const initialize24HourFormat = () => {
     });
   }
 };
+
+/**
+ * Check if selected time is valid for selected dates
+ * If today is selected, time must be greater than current time
+ * If today is not selected, any time is valid
+ */
+export const isTimeValidForSelectedDates = (
+  selectedDates: string[],
+  selectedTime: string
+): { isValid: boolean; errorMessage?: string } => {
+  if (!selectedTime || !isValid24HourTime(selectedTime)) {
+    return { isValid: false, errorMessage: "Format waktu tidak valid" };
+  }
+
+  // If custom recurrence is enabled or no dates selected, any time is valid
+  if (selectedDates.length === 0) {
+    return { isValid: true };
+  }
+
+  // Get today's date in YYYY-MM-DD format (WIB)
+  const today = getCurrentDateWIB();
+
+  // Check if today is in selected dates
+  const isTodaySelected = selectedDates.includes(today);
+
+  if (!isTodaySelected) {
+    // Today is not selected, any time is valid
+    return { isValid: true };
+  }
+
+  // Today is selected, validate that time is greater than current time
+  const currentTime = getCurrentTimeWIB();
+  const [currentHours, currentMinutes] = currentTime.split(":").map(Number);
+  const [selectedHours, selectedMinutes] = selectedTime.split(":").map(Number);
+
+  // Compare times
+  const currentTotalMinutes = currentHours * 60 + currentMinutes;
+  const selectedTotalMinutes = selectedHours * 60 + selectedMinutes;
+
+  if (selectedTotalMinutes <= currentTotalMinutes) {
+    return {
+      isValid: false,
+      errorMessage: `Untuk pengingat hari ini, jam harus lebih besar dari jam saat ini (${currentTime})`,
+    };
+  }
+
+  return { isValid: true };
+};

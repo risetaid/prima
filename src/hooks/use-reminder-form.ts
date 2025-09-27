@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { getCurrentTimeWIB } from "@/lib/datetime";
+import { getCurrentTimeWIB, isTimeValidForSelectedDates } from "@/lib/datetime";
 
 interface Patient {
   id: string;
@@ -156,6 +156,15 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
         "Pilih minimal satu tanggal atau aktifkan pengulangan kustom"
       );
       return;
+    }
+
+    // Validate time if specific dates are selected (not custom recurrence)
+    if (!customRecurrence.enabled && selectedDates.length > 0) {
+      const timeValidation = isTimeValidForSelectedDates(selectedDates, formData.time);
+      if (!timeValidation.isValid) {
+        toast.error(timeValidation.errorMessage || "Waktu pengingat tidak valid");
+        return;
+      }
     }
 
     if (customRecurrence.enabled) {

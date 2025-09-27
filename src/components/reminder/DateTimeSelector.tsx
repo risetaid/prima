@@ -1,6 +1,8 @@
 import { Repeat } from "lucide-react";
 import { DatePickerCalendar } from "@/components/ui/date-picker-calendar";
 import { TimePicker24h } from "@/components/ui/time-picker-24h";
+import { isTimeValidForSelectedDates, getCurrentDateWIB } from "@/lib/datetime";
+import { useState, useEffect } from "react";
 
 interface CustomRecurrence {
   enabled: boolean;
@@ -32,6 +34,18 @@ export function DateTimeSelector({
   onCustomRecurrenceChange,
   onOpenCustomRecurrence,
 }: DateTimeSelectorProps) {
+  const [timeError, setTimeError] = useState<string>("");
+
+  // Validate time whenever dates or time changes
+  useEffect(() => {
+    if (time && selectedDates.length > 0 && !customRecurrence.enabled) {
+      const validation = isTimeValidForSelectedDates(selectedDates, time);
+      setTimeError(validation.isValid ? "" : validation.errorMessage || "");
+    } else {
+      setTimeError("");
+    }
+  }, [time, selectedDates, customRecurrence.enabled]);
+
   const handleDateChange = (dates: string[]) => {
     onDateChange(dates);
     if (dates.length > 0 && customRecurrence.enabled) {
@@ -40,6 +54,23 @@ export function DateTimeSelector({
         enabled: false,
       });
     }
+  };
+
+  const handleTimeChange = (newTime: string) => {
+    // Only validate if we have selected dates and custom recurrence is disabled
+    if (selectedDates.length > 0 && !customRecurrence.enabled) {
+      const validation = isTimeValidForSelectedDates(selectedDates, newTime);
+      if (!validation.isValid) {
+        setTimeError(validation.errorMessage || "");
+        return; // Don't update the time if it's invalid
+      } else {
+        setTimeError("");
+      }
+    } else {
+      setTimeError("");
+    }
+
+    onTimeChange(newTime);
   };
 
   const handleCustomRecurrenceClick = () => {
@@ -69,10 +100,20 @@ export function DateTimeSelector({
       </label>
       <TimePicker24h
         value={time}
-        onChange={onTimeChange}
+        onChange={handleTimeChange}
         placeholder="Pilih jam pengingat"
         required
       />
+      {timeError && (
+        <p className="mt-1 text-xs text-red-600 bg-red-50 p-2 rounded">
+          ⚠️ {timeError}
+        </p>
+      )}
+      {selectedDates.length > 0 && !customRecurrence.enabled && selectedDates.includes(getCurrentDateWIB()) && (
+        <p className="mt-1 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+          ℹ️ Hari ini dipilih, jam harus lebih besar dari jam saat ini
+        </p>
+      )}
 
       <div className="mt-4">
         <label className="block text-gray-500 text-sm mb-2">
