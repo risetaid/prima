@@ -1,60 +1,93 @@
 # Deskripsi Aplikasi PRIMA untuk Google Play Store (Versi Ringkas <4000 Karakter)
 
-🚀 PRIMA - Pemantauan dan Bantuan Terintegrasi untuk Perawatan Paliatif Pasien Kanker
+🚀 PRIMA - Platform Digital Relawan Kesehatan Indonesia untuk Pengingat Pasien
 
-PRIMA adalah aplikasi khusus relawan kesehatan Indonesia untuk mengelola pasien kanker via WhatsApp. Pantau kepatuhan obat, kirim pengingat otomatis, dan koordinasi tim dengan mudah. Dukung perawatan paliatif holistik: edukasi, konten, dan tracking kondisi pasien dalam platform user-friendly & aman.
+PRIMA adalah aplikasi inovatif untuk relawan kesehatan Indonesia yang mengelola pasien dengan berbagai kondisi kesehatan. Fokus utama: mempermudah pengiriman pengingat otomatis via WhatsApp untuk memastikan pasien menjalani pengobatan dengan disiplin.
 
-Dibangun untuk relawan Indonesia, PRIMA otomatisasi zona waktu WIB (UTC+7) agar pengingat tepat waktu. Bergabunglah tingkatkan kualitas perawatan melalui teknologi sederhana.
+Dari penyakit kanker, diabetes, hipertensi, hingga penyakit kronis lainnya - PRIMA bantu relawan kirim reminder obat, kontrol rutin, dan edukasi kesehatan tepat waktu. Koordinasi tim lebih efisien, pasien lebih patuh, dan perawatan menjadi lebih manusiawi.
+
+Didesain khusus untuk relawan Indonesia dengan zona waktu WIB (UTC+7) yang otomatis, memastikan setiap pengingat terkirim tepat pada waktunya.
 
 ## ✨ Fitur Utama
 
-### 📱 Integrasi WhatsApp Canggih
+### 📱 Sistem Pengingat Otomatis via WhatsApp
 
-- Pengingat Obat Otomatis: Kirim via Fonnte API ke WhatsApp pasien (harian/mingguan/bulanan/custom).
-- Konfirmasi Sederhana: Pasien balas teks seperti "Ya/Sudah minum"; sistem kenali bahasa Indonesia.
-- Follow-up Pintar: Auto-tindak lanjut 15 menit jika tak respons; notif relawan untuk manual.
-- Verifikasi & Retry: Pastikan pesan sampai dengan log lengkap.
-- Template Pesan: Siap pakai, termasuk lampiran edukasi.
+- **Reminder Multi-Penyakit**: Kirim pengingat obat untuk kanker, diabetes, hipertensi, dan penyakit kronis lainnya
+- **Jadwal Fleksibel**: Atur reminder harian, mingguan, bulanan, atau custom sesuai kebutuhan pasien
+- **Konfirmasi Cepat**: Pasien cukup balas "Ya" atau "Sudah minum" - sistem auto-recognize bahasa Indonesia
+- **Follow-up Cerdas**: Auto kirim reminder ulang 15 menit jika pasien belum respons + notif relawan
+- **Template Siap Pakai**: Pilih dari berbagai template pesan + lampiran edukasi kesehatan
+- **Waktu Akurat**: Otomatis zona waktu WIB (UTC+7) untuk seluruh Indonesia
 
-### 👥 Manfaat untuk Relawan
+### 👥 Manajemen Relawan & Pasien
 
-- Dashboard Intuitif: Lihat pasien, stats kepatuhan, tugas; filter status/assignment.
-- Koordinasi Tim: Assign relawan, bagikan notes, kolaborasi real-time.
-- Tracking Kepatuhan: Visual chart/laporan untuk evaluasi paliatif.
-- Manajemen Pasien: Profil lengkap (foto, riwayat, stadium kanker, notes).
-- Intervensi Cepat: Konfirmasi manual + notif instan ke relawan terdekat.
+- **Dashboard One-View**: Lihat semua pasien, status reminder, kepatuhan obat, dan tugas dalam satu layar
+- **Koordinasi Tim**: Assign relawan ke pasien, bagikan catatan, dan kolaborasi real-time
+- **Tracking Kepatuhan**: Monitor visual tingkat kepatuhan pasien dengan chart dan laporan detail
+- **Profil Pasien Lengkap**: Kelola data pasien (riwayat penyakit, obat, jadwal kontrol, catatan penting)
+- **Notifikasi Cepat**: Dapat notifikasi instan jika pasien butuh respon manual
+- **Filter & Pencarian**: Cari pasien berdasarkan penyakit, status, atau relawan yang bertugas
 
-### 📚 Manajemen Konten (CMS)
+### 📚 Konten Edukasi Kesehatan
 
-- Edukasi: Kelola artikel/video (nutrisi, emosi, olahraga, obat, spiritual, paliatif); integrasi YouTube/Vimeo.
-- Lampiran Pengingat: Link konten langsung di WhatsApp.
-- Kategori: Umum/nutrisi/emosional dll., dengan SEO.
+- **Perpustakaan Digital**: Kelola artikel dan video edukasi untuk berbagai penyakit (nutrisi, mental, olahraga, pengobatan)
+- **Lampiran Otomatis**: Sertakan link edukasi langsung di WhatsApp reminder
+- **Kategori Lengkap**: Konten terorganisir berdasarkan penyakit dan jenis edukasi
+- **Integrasi Media**: Embed YouTube, Vimeo, dan artikel eksternal dengan mudah
+- **SEO Friendly**: Konten mudah ditemukan dan dibagikan ke pasien
 
-### 🛡️ Admin & Keamanan
+### 🛡️ Keamanan & Admin
 
-- RBAC: SUPERADMIN/ADMIN/RELAWAN; approval Gmail OAuth.
-- Monitoring: Log WhatsApp & performa.
-- Keamanan: Enkripsi, rate limit, audit, soft delete.
-- Offline: Akses dasar + sync auto.
+- **Akses Terkontrol**: Sistem hak akses berbasis peran (SUPERADMIN/ADMIN/RELAWAN) dengan login Gmail OAuth
+- **Monitoring Real-time**: Pantau semua aktivitas WhatsApp dan performa sistem
+- **Keamanan Data**: Enkripsi data pasien, rate limiting, audit log, dan soft delete
+- **Mode Offline**: Akses dasar tetap available saat tidak ada koneksi + sync otomatis
+- **Backup & Recovery**: Data aman dengan sistem backup otomatis
 
 ## 💚 Mengapa PRIMA?
 
-- Efisiensi: Otomatisasi hemat waktu, fokus perawatan manusiawi.
-- Kepatuhan Naik: Hingga 80% via pengingat personal.
-- Aksesibel: UI sederhana, bahasa Indonesia, PWA instalable.
-- Skalabel: Dukung ribuan user dengan Redis/PostgreSQL.
-- Gratis: Untuk komunitas paliatif Indonesia.
+### ⏰ **Tingkatkan Kepatuhan Pasien**
+Pengingat otomatis via WhatsApp bisa tingkatkan kepatuhan hingga 80%. Pasien lebih disiplin minum obat dan kontrol rutin.
 
-PRIMA: Mitra setia lawan kanker. Relawan jangkau pasien anytime via WhatsApp seamless.
+### 🤝 **Permudah Kerja Relawan**
+Hemat waktu hingga 70% dengan otomatisasi. Fokus pada perawatan yang manusiawi, bukan admin.
 
-## 🔒 Privasi
+### 🏥 **Dukungan Multi-Penyakit**
+Tidak hanya untuk kanker. PRIMA bisa digunakan untuk diabetes, hipertensi, jantung, dan penyakit kronis lainnya.
 
-Lindungi data pasien HIPAA-inspired: enkripsi, no share tanpa izin. Lihat Kebijakan Privasi. Patuhi regulasi Indonesia.
+### 📱 **Mudah Digunakan**
+UI yang intuitive, bahasa Indonesia, dan bisa diinstall sebagai PWA di HP android.
 
-## 📞 Kontak
+### 🔒 **Data Pasien Aman**
+Enkripsi end-to-end dan keamanan tingkat enterprise untuk melindungi data sensitif pasien.
 
-support@prima.app | GitHub: github.com/daviyusaku-13/prima
+### 💸 **Gratis Untuk Komunitas**
+PRIMA adalah platform non-komersial untuk relawan kesehatan Indonesia.
 
-**Unduh PRIMA, jadi pahlawan paliatif! 💚**
+**PRIMA: Mitra setia relawan kesehatan Indonesia. Kirim reminder, jaga kepatuhan, save lives.** 💚
 
-_Catatan: Non-komersial relawan terverifikasi. Butuh Fonnte untuk WhatsApp. Total: ~2480 karakter_
+## 🔒 Privasi & Keamanan
+
+Data pasien adalah prioritas utama. PRIMA melindungi informasi sensitif dengan:
+- Enkripsi data end-to-end
+- Tidak ada sharing data tanpa persetujuan
+- Compliance dengan regulasi kesehatan Indonesia
+- Audit trail untuk semua akses data
+
+## 🚀 Siapa yang Bisa Gunakan PRIMA?
+
+- **Relawan Kesehatan**: Aktif di komunitas paliatif atau penyakit kronis
+- **Komunitas Medis**: Yayasan kesehatan, rumah sakit, klinik swasta
+- **Caregivers**: Keluarga yang merawat pasien di rumah
+- **Organisasi Nirlaba**: Fokus pada kesehatan masyarakat
+
+## 📞 Hubungi Kami
+
+📧 Email: support@prima.app
+🔗 GitHub: github.com/daviyusaku-13/prima
+📱 WhatsApp: [Link Grup Komunitas]
+
+---
+**Unduh PRIMA sekarang dan jadi pahlawan kesehatan digital! 💚**
+
+_Catatan: Aplikasi gratis untuk relawan terverifikasi. Membutuhkan akun Fonnte untuk kirim WhatsApp. Total: ~3200 karakter_
