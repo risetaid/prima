@@ -28,6 +28,7 @@
 - **Patient Communication**: Address patients by first name only (e.g., "David" not "Bapak David")
 - **Medical Advice**: Never give medical advice, direct to professionals
 - **Emergency Handling**: For emergencies, alert volunteers immediately but PRIMA is not emergency service
+- **Patient Variables**: Removed patient variables override feature for UI simplification - templates now use default patient data only
 
 ## Quality Checks
 Always run `bunx tsc --noEmit` and `bun run lint` after changes. Fix all errors before concluding work.

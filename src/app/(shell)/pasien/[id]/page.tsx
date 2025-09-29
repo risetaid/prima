@@ -813,9 +813,8 @@ export default function PatientDetailPage() {
                 medicalInfoForm={medicalInfoForm}
                 setMedicalInfoForm={setMedicalInfoForm}
                 handleSaveMedicalInfo={handleSaveMedicalInfo}
-                handleCancelMedicalInfo={handleCancelMedicalInfo}
-                patientId={params.id as string}
-              />
+                 handleCancelMedicalInfo={handleCancelMedicalInfo}
+               />
             </TabsContent>
 
             {/* Health Notes Tab */}

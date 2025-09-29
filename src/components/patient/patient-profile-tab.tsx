@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { IndonesianDateInput } from "@/components/ui/indonesian-date-input";
 import { Separator } from "@/components/ui/separator";
-import { PatientVariablesManager } from "@/components/patient/patient-variables-manager";
+
 import { User, Stethoscope, Edit, Save, X, MapPin, FileText, Camera, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
@@ -57,7 +57,7 @@ interface PatientProfileTabProps {
   setMedicalInfoForm: (form: MedicalInfoForm) => void;
   handleSaveMedicalInfo: () => void;
   handleCancelMedicalInfo: () => void;
-  patientId: string;
+
 }
 
 export function PatientProfileTab({
@@ -74,7 +74,7 @@ export function PatientProfileTab({
   setMedicalInfoForm,
   handleSaveMedicalInfo,
   handleCancelMedicalInfo,
-  patientId,
+
 }: PatientProfileTabProps) {
   // Profile image states
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -511,11 +511,7 @@ export function PatientProfileTab({
         </Card>
       </div>
 
-      {/* Patient Variables */}
-      <PatientVariablesManager
-        patientId={patientId}
-        patientName={patient.name}
-      />
+
     </div>
   );
 }

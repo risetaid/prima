@@ -108,26 +108,7 @@ export const LazyQuillEditor = dynamic(
 }>;
 
 // Patient Components
-export const LazyPatientVariablesManager = dynamic(
-  () => import("../patient/patient-variables-manager").then((mod) => ({
-    default: mod.PatientVariablesManager,
-  })),
-  {
-    loading: () => (
-      <div className="bg-white p-6 rounded-lg border animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-12 bg-gray-200 rounded"></div>
-          ))}
-        </div>
-      </div>
-    ),
-  }
-) as ComponentType<{
-  patientId: string;
-  patientName: string;
-}>;
+
 
 // Reminder Components
 export const LazyPatientReminderDashboard = dynamic(
