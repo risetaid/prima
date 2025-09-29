@@ -36,7 +36,9 @@
       "mcp__git__git_diff_unstaged",
       "mcp__git__git_log",
       "mcp__git__git_add",
-      "mcp__git__git_commit"
+      "mcp__git__git_commit",
+      "Read(//home/davidyusaku/**)",
+      "Bash(git log:*)"
     ],
     "deny": [],
     "ask": []
