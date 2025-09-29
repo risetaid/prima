@@ -15,7 +15,7 @@ export interface ReminderMessageTemplate {
 
 export interface ReminderResponseTemplate {
   reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL';
-  responseType: 'CONFIRMED' | 'MISSED' | 'PENDING' | 'HELP';
+  responseType: 'CONFIRMED' | 'MISSED' | 'PENDING';
   patientName: string;
   reminderTitle?: string;
   timestamp?: string;
@@ -27,7 +27,7 @@ export class ReminderTemplatesService {
    * Format reminder message based on type and context
    */
   formatReminderMessage(template: ReminderMessageTemplate): string {
-    const { reminderType, patientName, title, description, message, scheduledTime, metadata } = template;
+    const { reminderType, patientName, title, message, scheduledTime, metadata } = template;
 
     const formattedTime = this.formatTime(scheduledTime);
 
@@ -56,7 +56,6 @@ export class ReminderTemplatesService {
         return this.formatGeneralReminder({
           patientName,
           title: title || 'Pengingat',
-          description: description || message,
           scheduledTime: formattedTime,
           message,
           metadata,
@@ -89,8 +88,6 @@ export class ReminderTemplatesService {
         return this.formatMissedResponse(reminderType, patientName, reminderTitle);
       case 'PENDING':
         return this.formatPendingResponse(reminderType, patientName, reminderTitle);
-      case 'HELP':
-        return this.formatHelpResponse(reminderType, patientName);
       default:
         return this.formatDefaultResponse(reminderType, patientName);
     }
@@ -127,8 +124,7 @@ export class ReminderTemplatesService {
 
     reminderText += `Silakan konfirmasi setelah minum obat dengan membalas:\n`;
     reminderText += `✅ *SUDAH* jika sudah diminum\n`;
-    reminderText += `⏰ *BELUM* jika belum diminum\n`;
-    reminderText += `🆘 *BANTUAN* jika butuh bantuan\n\n`;
+    reminderText += `⏰ *BELUM* jika belum diminum\n\n`;
     reminderText += `💙 Tim PRIMA`;
 
     return reminderText;
@@ -168,8 +164,7 @@ export class ReminderTemplatesService {
     reminderText += `Silakan konfirmasi kehadiran Anda dengan membalas:\n`;
     reminderText += `✅ *HADIR* jika akan datang\n`;
     reminderText += `⏰ *TERLAMBAT* jika akan terlambat\n`;
-    reminderText += `❌ *BATAL* jika tidak bisa hadir\n`;
-    reminderText += `🆘 *BANTUAN* jika butuh bantuan\n\n`;
+    reminderText += `❌ *BATAL* jika tidak bisa hadir\n\n`;
     reminderText += `💙 Tim PRIMA`;
 
     return reminderText;
@@ -181,16 +176,14 @@ export class ReminderTemplatesService {
   private formatGeneralReminder(params: {
     patientName: string;
     title: string;
-    description: string;
     scheduledTime: string;
     message?: string;
     metadata?: Record<string, unknown>;
   }): string {
-    const { patientName, title, description, message } = params;
+    const { patientName, title, message } = params;
 
     let reminderText = `📝 *${title}*\n\n`;
     reminderText += `Halo ${patientName}!\n\n`;
-    reminderText += `${description}\n\n`;
     // Waktu dihilangkan sesuai permintaan
 
     if (message) {
@@ -199,8 +192,7 @@ export class ReminderTemplatesService {
 
     reminderText += `Silakan konfirmasi dengan membalas:\n`;
     reminderText += `✅ *SELESAI* jika sudah dilakukan\n`;
-    reminderText += `⏰ *BELUM* jika belum dilakukan\n`;
-    reminderText += `🆘 *BANTUAN* jika butuh bantuan\n\n`;
+    reminderText += `⏰ *BELUM* jika belum dilakukan\n\n`;
     reminderText += `💙 Tim PRIMA`;
 
     return reminderText;
@@ -222,8 +214,7 @@ export class ReminderTemplatesService {
            `${message}\n\n` +
            `Silakan konfirmasi dengan membalas:\n` +
            `✅ *SELESAI* jika sudah dilakukan\n` +
-           `⏰ *BELUM* jika belum dilakukan\n` +
-           `🆘 *BANTUAN* jika butuh bantuan\n\n` +
+           `⏰ *BELUM* jika belum dilakukan\n\n` +
            `💙 Tim PRIMA`;
   }
 
@@ -304,17 +295,7 @@ export class ReminderTemplatesService {
     return this.formatMissedResponse(reminderType, patientName, reminderTitle);
   }
 
-  /**
-   * Format help response message
-   */
-  private formatHelpResponse(
-    reminderType: 'MEDICATION' | 'APPOINTMENT' | 'GENERAL',
-    patientName: string
-  ): string {
-    return `Baik ${patientName}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\n` +
-           `Tunggu sebentar ya!\n\n` +
-           `💙 Tim PRIMA`;
-  }
+
 
   /**
    * Format default response message
@@ -391,11 +372,11 @@ export class ReminderTemplatesService {
 
     switch (type) {
       case 'MEDICATION':
-        return baseMessage + `✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+        return baseMessage + `✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n\nTerima kasih! 💙 Tim PRIMA`;
       case 'APPOINTMENT':
-        return baseMessage + `✅ *HADIR* jika akan datang\n⏰ *TERLAMBAT* jika akan terlambat\n❌ *BATAL* jika tidak bisa hadir\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+        return baseMessage + `✅ *HADIR* jika akan datang\n⏰ *TERLAMBAT* jika akan terlambat\n❌ *BATAL* jika tidak bisa hadir\n\nTerima kasih! 💙 Tim PRIMA`;
       case 'GENERAL':
-        return baseMessage + `✅ *SELESAI* jika sudah dilakukan\n⏰ *BELUM* jika belum dilakukan\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
+        return baseMessage + `✅ *SELESAI* jika sudah dilakukan\n⏰ *BELUM* jika belum dilakukan\n\nTerima kasih! 💙 Tim PRIMA`;
       default:
         return baseMessage + `✅ *YA* atau *SETUJU* untuk konfirmasi\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`;
     }
