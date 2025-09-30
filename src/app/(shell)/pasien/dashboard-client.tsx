@@ -11,6 +11,7 @@ import { PatientListSection } from "@/components/dashboard/patient-list-section"
 import { InstantSendDialog } from "@/components/dashboard/instant-send-dialog";
 import { useDashboardState } from "@/hooks/use-dashboard-state";
 
+import { logger } from '@/lib/logger';
 function DashboardClient() {
   const router = useRouter();
   const { state, actions, filterPatients } = useDashboardState();
@@ -22,8 +23,8 @@ function DashboardClient() {
         const data = await response.json();
         actions.setUserRole(data.role);
       }
-    } catch (error) {
-      console.error("Error fetching user role:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching user role:", error instanceof Error ? error : new Error(String(error)));
     }
   }, [actions]);
 
@@ -34,8 +35,8 @@ function DashboardClient() {
         const data = await response.json();
         actions.setPatients(data);
       }
-    } catch (error) {
-      console.error("Error fetching patients:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching patients:", error instanceof Error ? error : new Error(String(error)));
     }
   }, [actions]);
 
@@ -51,13 +52,13 @@ function DashboardClient() {
         actions.setDashboardStats(data.stats);
       } else {
         // Fallback to separate calls if needed
-        console.warn(
+        logger.warn(
           "Failed to fetch dashboard overview, falling back to separate endpoints"
         );
         await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
       }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching dashboard data:", error instanceof Error ? error : new Error(String(error)));
       // Try legacy methods as fallback
       await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
     } finally {
@@ -125,8 +126,8 @@ function DashboardClient() {
          });
          return;
        }
-    } catch (error) {
-      console.error('Error sending instant reminders:', error);
+    } catch (error: unknown) {
+      logger.error('Error sending instant reminders:', error instanceof Error ? error : new Error(String(error)));
       actions.setInstantSendResult({
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'

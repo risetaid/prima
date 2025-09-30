@@ -4,7 +4,7 @@
  */
 
 import { NextWebVitalsMetric } from "next/app";
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 /**
  * Report Web Vitals to analytics service

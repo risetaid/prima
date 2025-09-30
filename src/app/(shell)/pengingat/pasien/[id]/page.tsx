@@ -15,6 +15,7 @@ import { Header } from "@/components/ui/header";
 import { PatientReminderDashboard } from "@/components/pengingat/patient-reminder-dashboard";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 
+import { logger } from '@/lib/logger';
 interface ReminderStats {
   terjadwal: number;
   perluDiperbarui: number;
@@ -66,8 +67,8 @@ export default function PatientReminderPage() {
           semua: 0,
         });
       }
-    } catch (error) {
-      console.error("Error fetching reminder stats:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching reminder stats:", error instanceof Error ? error : new Error(String(error)));
       setStats({
         terjadwal: 0,
         perluDiperbarui: 0,
@@ -99,8 +100,8 @@ export default function PatientReminderPage() {
           patient.isActive === true;
         setCanAddReminders(allowed);
       }
-    } catch (error) {
-      console.error("Error fetching patient:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching patient:", error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -122,8 +123,8 @@ export default function PatientReminderPage() {
       } else {
         setCompletedReminders([]);
       }
-    } catch (error) {
-      console.error("Error fetching completed reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching completed reminders:", error instanceof Error ? error : new Error(String(error)));
       setCompletedReminders([]);
     } finally {
       clearTimeout(timeoutId);
@@ -138,8 +139,8 @@ export default function PatientReminderPage() {
           await fetchPatientName();
           await fetchReminderStats();
           await fetchCompletedReminders();
-        } catch (error) {
-          console.error("Error fetching reminder page data:", error);
+        } catch (error: unknown) {
+          logger.error("Error fetching reminder page data:", error instanceof Error ? error : new Error(String(error)));
         }
       };
 

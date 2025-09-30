@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import * as schema from './schema'
+import * as schema from '@/db/schema'
 
 // Railway PostgreSQL - Single Direct Connection (No Pooling Issues)
 // Unlike Supabase, Railway provides direct PostgreSQL access
@@ -18,5 +18,5 @@ export const db = drizzle(client, { schema })
 
 // Export types for convenience
 export type DB = typeof db
-export * from './schema'
+export * from '@/db/schema'
 

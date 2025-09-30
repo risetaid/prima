@@ -6,7 +6,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "@/lib/logger";
 import { responseCache } from "@/lib/response-cache";
-import { safetyFilterService } from "./safety-filter";
+import { safetyFilterService } from "@/services/llm/safety-filter";
 import {
   withRetry,
   DEFAULT_RETRY_CONFIGS,
@@ -21,7 +21,7 @@ import {
   ProcessedLLMResponse,
   IntentDetectionResult,
   ConversationContext,
-} from "./llm.types";
+} from "@/services/llm/llm.types";
 
 export class LLMService {
   private client: Anthropic;

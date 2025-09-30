@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VolunteerNotificationService } from '@/services/notification/volunteer-notification.service';
 
+import { logger } from '@/lib/logger';
 const notificationService = new VolunteerNotificationService();
 
 export async function POST(
@@ -22,8 +23,8 @@ export async function POST(
       success: true,
       notification,
     });
-  } catch (error) {
-    console.error('Failed to assign notification:', error);
+  } catch (error: unknown) {
+    logger.error('Failed to assign notification:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { success: false, error: 'Failed to assign notification' },
       { status: 500 }

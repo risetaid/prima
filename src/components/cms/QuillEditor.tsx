@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 // Import Quill and CSS
 import Quill from "quill";
 import "quill/dist/quill.snow.css";
+import { logger } from '@/lib/logger';
 
 interface QuillEditorProps {
   value: string;
@@ -35,7 +36,7 @@ export function QuillEditor({
     if (editorRef.current && !quillRef.current && !isMountedRef.current) {
       timeoutRef.current = window.setTimeout(() => {
         if (editorRef.current && !quillRef.current && !isMountedRef.current) {
-          console.log("[QuillEditor] Initializing editor");
+          logger.info("[QuillEditor] Initializing editor");
 
           // Clear any existing content to prevent double initialization
           if (editorRef.current) {

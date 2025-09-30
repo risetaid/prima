@@ -30,6 +30,7 @@ import {
 } from "@/lib/youtube-utils";
 import Image from "next/image";
 
+import { logger } from '@/lib/logger';
 const categories = [
   { value: "general", label: "Umum", color: "bg-blue-100 text-blue-800" },
   { value: "nutrisi", label: "Nutrisi", color: "bg-green-100 text-green-800" },
@@ -127,8 +128,8 @@ export default function CreateVideoPage() {
       }));
 
       toast.success("Data video berhasil diambil!");
-    } catch (error) {
-      console.error("Error fetching video data:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching video data:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal mengambil data video. Pastikan URL valid.");
     } finally {
       setFetchingVideoData(false);
@@ -188,8 +189,8 @@ export default function CreateVideoPage() {
           toast.error(result.error || "Terjadi kesalahan");
         }
       }
-    } catch (error) {
-      console.error("Error saving video:", error);
+    } catch (error: unknown) {
+      logger.error("Error saving video:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Terjadi kesalahan saat menyimpan video");
     } finally {
       setLoading(false);

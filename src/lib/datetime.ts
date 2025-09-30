@@ -1,7 +1,7 @@
 // DateTime utilities with UTC+7 timezone support for Indonesian users
 // Enhanced with explicit 24-hour format enforcement
 
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 export const TIMEZONE_WIB = "Asia/Jakarta";
 

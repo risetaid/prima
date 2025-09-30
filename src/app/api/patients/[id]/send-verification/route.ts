@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
 
+import { logger } from '@/lib/logger';
 // Send verification message to patient
 export async function POST(
   request: NextRequest,
@@ -72,8 +73,8 @@ export async function POST(
         patient.phoneNumber,
         "verification"
       );
-    } catch (conversationError) {
-      console.warn("Failed to set conversation state for verification:", conversationError);
+    } catch (conversationError: unknown) {
+      logger.warn("Failed to set conversation state for verification", { error: conversationError instanceof Error ? conversationError.message : String(conversationError) });
       // Don't fail the entire request if conversation state update fails
     }
 
@@ -85,8 +86,8 @@ export async function POST(
       attempt: currentAttempts + 1,
       method: "text_verification",
     });
-  } catch (error) {
-    console.error("Send verification error:", error);
+  } catch (error: unknown) {
+    logger.error("Send verification error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -2,12 +2,12 @@
  * Central response processor for standardized handling across all interaction types
  */
 
-import { ResponseContext, StandardResponse, responseHandlerRegistry, ResponseHandler } from "./response-handler";
-import { VerificationResponseHandler } from "./response-handlers/verification-response.handler";
-import { FollowupResponseHandler } from "./response-handlers/followup-response.handler";
-import { UnsubscribeResponseHandler } from "./response-handlers/unsubscribe-response.handler";
-import { GeneralInquiryResponseHandler } from "./response-handlers/general-inquiry-response.handler";
-import { KnowledgeResponseHandler } from "./response-handlers/knowledge-response.handler";
+import { ResponseContext, StandardResponse, responseHandlerRegistry, ResponseHandler } from "@/services/response-handler";
+import { VerificationResponseHandler } from "@/services/response-handlers/verification-response.handler";
+import { FollowupResponseHandler } from "@/services/response-handlers/followup-response.handler";
+import { UnsubscribeResponseHandler } from "@/services/response-handlers/unsubscribe-response.handler";
+import { GeneralInquiryResponseHandler } from "@/services/response-handlers/general-inquiry-response.handler";
+import { KnowledgeResponseHandler } from "@/services/response-handlers/knowledge-response.handler";
 import { logger } from "@/lib/logger";
 
 export class ResponseProcessorService {

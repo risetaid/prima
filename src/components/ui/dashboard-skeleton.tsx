@@ -1,9 +1,9 @@
-import { Skeleton } from "./skeleton"
-import { Card, CardContent, CardHeader } from "./card"
-import { DashboardHeaderSkeleton } from "./dashboard-header-skeleton"
-import { PatientListSkeleton } from "./patient-list-skeleton"
-import { PatientCardSkeleton } from "./patient-card-skeleton"
-import { ReminderListSkeleton } from "./reminder-list-skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { DashboardHeaderSkeleton } from "@/components/ui/dashboard-header-skeleton"
+import { PatientListSkeleton } from "@/components/ui/patient-list-skeleton"
+import { PatientCardSkeleton } from "@/components/ui/patient-card-skeleton"
+import { ReminderListSkeleton } from "@/components/ui/reminder-list-skeleton"
 
 // Re-export for backward compatibility
 export { DashboardHeaderSkeleton, PatientListSkeleton, PatientCardSkeleton, ReminderListSkeleton }

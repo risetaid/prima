@@ -15,10 +15,10 @@ import {
   reminderTypeEnum,
   patientConditionEnum,
   templateCategoryEnum,
-} from "./enums";
+} from "@/db/enums";
 
 // Import patient table for foreign key reference
-import { patients } from "./patient-schema";
+import { patients } from "@/db/patient-schema";
 
 // Re-export enums for convenience
 export {

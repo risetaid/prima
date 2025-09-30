@@ -5,6 +5,7 @@ import {
 } from "@/services/analytics/analytics.service";
 import { apiError } from "@/lib/api-response";
 
+import { logger } from '@/lib/logger';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -53,8 +54,8 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers,
     });
-  } catch (error) {
-    console.error("Failed to export analytics data:", error);
+  } catch (error: unknown) {
+    logger.error("Failed to export analytics data:", error instanceof Error ? error : new Error(String(error)));
     return apiError(
       "Failed to export analytics data",
       {

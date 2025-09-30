@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCacheHealthStatus, getRedisHealthStatus } from '@/lib/cache'
 
+import { logger } from '@/lib/logger';
 export async function GET() {
   try {
     const cacheHealth = await getCacheHealthStatus()
@@ -23,8 +24,8 @@ export async function GET() {
       },
       recommendations: getHealthRecommendations(cacheHealth, redisHealth)
     })
-  } catch (error) {
-    console.error('Health check error:', error)
+  } catch (error: unknown) {
+    logger.error('Health check error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({
       status: 'error',
       timestamp: new Date().toISOString(),

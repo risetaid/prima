@@ -1,5 +1,5 @@
-import { Skeleton } from "./skeleton"
-import { Card, CardContent, CardHeader } from "./card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 // Helper Components
 export function SkeletonCard({ children, className = "bg-white" }: { children: React.ReactNode; className?: string }) {

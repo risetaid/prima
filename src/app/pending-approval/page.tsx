@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { AuthLoading } from "@/components/auth/auth-loading";
 
+import { logger } from '@/lib/logger';
 export default function PendingApprovalPage() {
   const { user } = useAuthContext();
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function PendingApprovalPage() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Error fetching user data:", err);
+        logger.error("Error fetching user data:", err);
         setLoading(false);
       });
   }, [user, router]);

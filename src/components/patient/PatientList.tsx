@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { VirtualPatientList } from '@/components/ui/virtual-list'
 import { PatientListSkeleton } from '@/components/ui/skeleton'
+import { logger } from '@/lib/logger';
 
 interface Patient {
   id: string
@@ -117,8 +118,8 @@ function PatientList({
         const data = await response.json()
         setInternalPatients(data)
       }
-    } catch (error) {
-      console.error('Error fetching patients:', error)
+    } catch (error: unknown) {
+      logger.error('Error fetching patients:', error instanceof Error ? error : new Error(String(error)))
     } finally {
       setInternalLoading(false)
     }

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
-import UserList from "./UserList";
+import UserList from "@/components/admin/UserList";
 
 interface User {
   id: string;

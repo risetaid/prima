@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, Trash2, Eye, MessageSquare } from 'lucide-react'
-import { WhatsAppTemplate, categoryIcons, categoryLabels, categoryColors } from './types'
+import { WhatsAppTemplate, categoryIcons, categoryLabels, categoryColors } from '@/components/admin/types'
 
 interface TemplateListProps {
   templates: WhatsAppTemplate[]

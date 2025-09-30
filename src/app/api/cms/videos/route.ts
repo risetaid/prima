@@ -4,6 +4,7 @@ import { db, cmsVideos } from "@/db";
 import { eq, desc, and, or, ilike, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { logger } from '@/lib/logger';
 // Validation schemas
 const createVideoSchema = z.object({
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
@@ -155,8 +156,8 @@ export async function GET(request: NextRequest) {
         hasPrev: page > 1,
       },
     });
-  } catch (error) {
-    console.error("Error fetching videos:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching videos:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("Error creating video:", error);
+    logger.error("Error creating video:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

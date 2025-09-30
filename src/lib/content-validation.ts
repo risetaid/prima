@@ -7,7 +7,7 @@
 
 import { db, cmsArticles, cmsVideos } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 export interface ContentAttachment {
   id: string;

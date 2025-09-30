@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { invalidateAfterPatientOperation } from '@/lib/cache-invalidation'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 
+import { logger } from '@/lib/logger';
 // Deactivate patient (BERHENTI): set inactive, decline verification, deactivate reminders, send ACK
 export async function POST(
   request: NextRequest,
@@ -57,8 +58,8 @@ export async function POST(
       newStatus: 'declined',
       isActive: false
     })
-  } catch (error) {
-    console.error('Deactivate patient error:', error)
+  } catch (error: unknown) {
+    logger.error('Deactivate patient error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

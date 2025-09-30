@@ -8,6 +8,7 @@ import { Calendar, Tag, Clock, Play, Share } from 'lucide-react'
 import { ContentHeader } from '@/components/content/ContentHeader'
 import { ShareButton } from '@/components/content/ShareButton'
 
+import { logger } from '@/lib/logger';
 interface VideoPageProps {
   params: Promise<{ slug: string }>
 }
@@ -27,8 +28,8 @@ export async function generateStaticParams() {
     return videos.map((video) => ({
       slug: video.slug,
     }))
-  } catch (error) {
-    console.error('Error generating static params for videos:', error)
+  } catch (error: unknown) {
+    logger.error('Error generating static params for videos:', error instanceof Error ? error : new Error(String(error)))
     return []
   }
 }

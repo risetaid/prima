@@ -1,7 +1,7 @@
 import { db } from '@/db'
 import { patients } from '@/db/schema'
 import { and, gte, lte, count, sql } from 'drizzle-orm'
-import { logger } from './logger'
+import { logger } from '@/lib/logger'
 
 export interface VerificationAnalyticsData {
   totalSent: number

@@ -138,8 +138,8 @@ export default function PatientDetailPage() {
       } else {
         setError("Gagal memuat data pasien");
       }
-    } catch (error) {
-      console.error("Error fetching patient:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching patient:", error instanceof Error ? error : new Error(String(error)));
       setError("Terjadi kesalahan saat memuat data pasien");
     } finally {
       if (!isPolling) {
@@ -180,7 +180,7 @@ export default function PatientDetailPage() {
         });
         toast.error("Gagal memuat catatan kesehatan");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Health notes fetch error", error instanceof Error ? error : new Error(String(error)), { patientId });
       toast.error("Gagal memuat catatan kesehatan");
     }
@@ -227,7 +227,7 @@ export default function PatientDetailPage() {
         });
         setCompletedReminders([]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error fetching completed reminders", error instanceof Error ? error : new Error(String(error)), { patientId });
       setCompletedReminders([]);
     }
@@ -266,7 +266,7 @@ export default function PatientDetailPage() {
         isPolling = true;
         fetchPatient(params.id as string, true)
           .catch(error => {
-            console.error("Polling failed:", error);
+            logger.error("Polling failed:", error instanceof Error ? error : new Error(String(error)));
             // Stop polling on errors to prevent infinite retries
             if (pollCount >= 2) {
               clearInterval(pollInterval);
@@ -304,7 +304,7 @@ export default function PatientDetailPage() {
         const error = await response.json();
         toast.error(error.error || "Gagal menambahkan catatan");
       }
-    } catch (error) {
+    } catch (error: unknown) {
       logger.error("Error adding health note", error instanceof Error ? error : new Error(String(error)), { patientId: params.id as string });
       toast.error("Gagal menambahkan catatan");
     }

@@ -5,9 +5,10 @@
 
 import { llmService } from "@/services/llm/llm.service";
 import { ConversationContext } from "@/services/llm/llm.types";
+import { logger } from "@/lib/logger";
 
 async function testIntentRecognition() {
-  console.log("🧪 Testing Intent Recognition Improvements\n");
+  logger.info("🧪 Testing Intent Recognition Improvements\n");
 
   const mockContext: ConversationContext = {
     patientId: "test-patient-123",
@@ -55,47 +56,47 @@ async function testIntentRecognition() {
     { message: "Pesan yang tidak jelas", expected: "fallback to LLM" },
   ];
 
-  console.log("📋 Testing 5W1H Question Recognition:");
-  console.log("=====================================");
+  logger.info("📋 Testing 5W1H Question Recognition:");
+  logger.info("=====================================");
 
   for (const test of questionTests) {
     try {
-      console.log(`\n❓ Testing: "${test.message}"`);
+      logger.info(`\n❓ Testing: "${test.message}"`);
       const result = await llmService.detectIntent(test.message, mockContext);
 
-      console.log(`   Intent: ${result.intent}`);
-      console.log(`   Confidence: ${result.confidence.toFixed(2)}`);
-      console.log(`   Model: ${result.rawResponse?.model || "unknown"}`);
-      console.log(
+      logger.info(`   Intent: ${result.intent}`);
+      logger.info(`   Confidence: ${result.confidence.toFixed(2)}`);
+      logger.info(`   Model: ${result.rawResponse?.model || "unknown"}`);
+      logger.info(
         `   Question Type: ${result.entities?.questionType || "N/A"}`
       );
-      console.log(`   Expected: ${test.expected}`);
+      logger.info(`   Expected: ${test.expected}`);
 
       const success =
         result.intent === "general_inquiry" &&
         result.entities?.questionType &&
         result.confidence >= 0.8;
 
-      console.log(`   ✅ Result: ${success ? "PASS" : "FAIL"}`);
+      logger.info(`   ✅ Result: ${success ? "PASS" : "FAIL"}`);
     } catch (error) {
-      console.log(
+      logger.error(
         `   ❌ Error: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
-  console.log("\n📋 Testing Other Intent Recognition:");
-  console.log("====================================");
+  logger.info("\n📋 Testing Other Intent Recognition:");
+  logger.info("====================================");
 
   for (const test of otherTests) {
     try {
-      console.log(`\n🔍 Testing: "${test.message}"`);
+      logger.info(`\n🔍 Testing: "${test.message}"`);
       const result = await llmService.detectIntent(test.message, mockContext);
 
-      console.log(`   Intent: ${result.intent}`);
-      console.log(`   Confidence: ${result.confidence.toFixed(2)}`);
-      console.log(`   Model: ${result.rawResponse?.model || "unknown"}`);
-      console.log(`   Expected: ${test.expected}`);
+      logger.info(`   Intent: ${result.intent}`);
+      logger.info(`   Confidence: ${result.confidence.toFixed(2)}`);
+      logger.info(`   Model: ${result.rawResponse?.model || "unknown"}`);
+      logger.info(`   Expected: ${test.expected}`);
 
       let success = false;
       if (test.message === "Ya") {
@@ -110,34 +111,34 @@ async function testIntentRecognition() {
         success = result.intent !== "unknown" && result.confidence > 0;
       }
 
-      console.log(`   ✅ Result: ${success ? "PASS" : "FAIL"}`);
+      logger.info(`   ✅ Result: ${success ? "PASS" : "FAIL"}`);
     } catch (error) {
-      console.log(
+      logger.error(
         `   ❌ Error: ${error instanceof Error ? error.message : String(error)}`
       );
     }
   }
 
-  console.log("\n🎯 Test Summary:");
-  console.log("================");
-  console.log("✅ Hierarchical intent detection implemented");
-  console.log("✅ 5W1H question pattern recognition added");
-  console.log("✅ Context-aware reminder confirmation");
-  console.log("✅ Emergency and unsubscribe detection");
-  console.log("✅ Verification response detection");
-  console.log("✅ Fallback to LLM for unknown patterns");
+  logger.info("\n🎯 Test Summary:");
+  logger.info("================");
+  logger.info("✅ Hierarchical intent detection implemented");
+  logger.info("✅ 5W1H question pattern recognition added");
+  logger.info("✅ Context-aware reminder confirmation");
+  logger.info("✅ Emergency and unsubscribe detection");
+  logger.info("✅ Verification response detection");
+  logger.info("✅ Fallback to LLM for unknown patterns");
 
-  console.log("\n📊 Expected Improvements:");
-  console.log(
+  logger.info("\n📊 Expected Improvements:");
+  logger.info(
     "- Questions like 'Apa yang sudah dilakukan?' will be classified as general_inquiry instead of reminder_confirmation"
   );
-  console.log(
+  logger.info(
     "- Reminder confirmations only detected when pending reminders exist"
   );
-  console.log("- Better accuracy for emergency and unsubscribe intents");
-  console.log("- Reduced false positives for reminder confirmations");
+  logger.info("- Better accuracy for emergency and unsubscribe intents");
+  logger.info("- Reduced false positives for reminder confirmations");
 }
 
 if (require.main === module) {
-  testIntentRecognition().catch(console.error);
+  testIntentRecognition().catch(logger.error);
 }

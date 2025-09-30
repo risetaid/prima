@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { db, whatsappTemplates, users } from "@/db";
 import { eq } from "drizzle-orm";
 
+import { logger } from '@/lib/logger';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -68,8 +69,8 @@ export async function GET(
     };
 
     return NextResponse.json({ template });
-  } catch (error) {
-    console.error("Template fetch error:", error);
+  } catch (error: unknown) {
+    logger.error("Template fetch error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Failed to fetch template" },
       { status: 500 }
@@ -192,8 +193,8 @@ export async function PUT(
     };
 
     return NextResponse.json({ template });
-  } catch (error) {
-    console.error("Template update error:", error);
+  } catch (error: unknown) {
+    logger.error("Template update error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Failed to update template" },
       { status: 500 }
@@ -248,8 +249,8 @@ export async function DELETE(
       message: "Template deactivated successfully",
       template,
     });
-  } catch (error) {
-    console.error("Template deletion error:", error);
+  } catch (error: unknown) {
+    logger.error("Template deletion error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Failed to delete template" },
       { status: 500 }

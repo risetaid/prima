@@ -1,5 +1,5 @@
-import { Skeleton } from "./skeleton"
-import { SkeletonCard, SkeletonCardContent, SkeletonAvatar, SkeletonButton } from "./skeleton-factory"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SkeletonCard, SkeletonCardContent, SkeletonAvatar, SkeletonButton } from "@/components/ui/skeleton-factory"
 
 export function ReminderListSkeleton() {
   return (

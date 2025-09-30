@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
 import { eq, count } from "drizzle-orm";
+import { logger } from '@/lib/logger';
 // DB utils temporarily inlined
 
 export async function POST() {
@@ -45,8 +46,8 @@ export async function POST() {
           success: true,
           message: "User synced and login updated",
         });
-      } catch (syncError) {
-        console.error("Auto-sync failed:", syncError);
+      } catch (syncError: unknown) {
+        logger.error("Auto-sync failed:", syncError instanceof Error ? syncError : new Error(String(syncError)));
 
         // Return success even if sync fails to prevent blocking user flow
         return NextResponse.json({

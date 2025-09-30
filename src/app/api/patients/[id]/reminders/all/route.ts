@@ -5,6 +5,7 @@ import { db, reminders, patients } from '@/db'
 import { eq, desc, isNull, and } from 'drizzle-orm'
 import { handleApiError } from '@/lib/api-utils'
 
+import { logger } from '@/lib/logger';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -117,8 +118,8 @@ export async function GET(
     }
 
     return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error fetching all reminders:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching all reminders:', error instanceof Error ? error : new Error(String(error)))
     return handleApiError(error, "fetching all patient reminders")
   }
 }

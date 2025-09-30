@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VolunteerNotificationService } from '@/services/notification/volunteer-notification.service';
 
+import { logger } from '@/lib/logger';
 const notificationService = new VolunteerNotificationService();
 
 export async function GET(request: NextRequest) {
@@ -24,8 +25,8 @@ export async function GET(request: NextRequest) {
       success: true,
       notifications,
     });
-  } catch (error) {
-    console.error('Failed to fetch notifications:', error);
+  } catch (error: unknown) {
+    logger.error('Failed to fetch notifications:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { success: false, error: 'Failed to fetch notifications' },
       { status: 500 }
@@ -58,8 +59,8 @@ export async function POST(request: NextRequest) {
       success: true,
       notification,
     });
-  } catch (error) {
-    console.error('Failed to create notification:', error);
+  } catch (error: unknown) {
+    logger.error('Failed to create notification:', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { success: false, error: 'Failed to create notification' },
       { status: 500 }

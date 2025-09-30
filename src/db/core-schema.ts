@@ -11,7 +11,7 @@ import {
 // Import clean enums
 import {
   userRoleEnum,
-} from "./enums";
+} from "@/db/enums";
 
 // Re-export enums for convenience
 export {

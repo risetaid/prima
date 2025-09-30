@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/auth-utils'
 import { db, cmsArticles, cmsVideos } from '@/db'
 import { eq, and, isNull } from 'drizzle-orm'
 
+import { logger } from '@/lib/logger';
 // GET - Fetch unique categories from published content
 export async function GET() {
   try {
@@ -54,8 +55,8 @@ export async function GET() {
       categories: categoriesWithLabels
     })
 
-  } catch (error) {
-    console.error('Categories API error:', error)
+  } catch (error: unknown) {
+    logger.error('Categories API error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch categories' },
       { status: 500 }

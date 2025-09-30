@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, CheckSquare } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 
+import { logger } from '@/lib/logger';
 interface CompletedReminder {
   id: string
   scheduledTime: string
@@ -34,11 +35,11 @@ export default function CompletedRemindersPage() {
         const data = await response.json()
         setReminders(data)
       } else {
-        console.error('Failed to fetch completed reminders')
+        logger.error('Failed to fetch completed reminders')
         setReminders([])
       }
-    } catch (error) {
-      console.error('Error fetching completed reminders:', error)
+    } catch (error: unknown) {
+      logger.error('Error fetching completed reminders:', error instanceof Error ? error : new Error(String(error)))
       setReminders([])
     } finally {
       setLoading(false)

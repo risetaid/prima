@@ -8,6 +8,7 @@ import { PatientReminderHeader } from "@/components/pengingat/PatientReminderHea
 import { ReminderColumn } from "@/components/pengingat/ReminderColumn";
 import { EditReminderModal } from "@/components/pengingat/EditReminderModal";
 import type { Reminder, ReminderStats, ContentItem } from "@/components/pengingat/types";
+import { logger } from '@/lib/logger';
 
 interface ScheduledReminderApi {
   id: string;
@@ -81,11 +82,14 @@ export function PatientReminderDashboard({
         const statsData = await response.json();
         setStats(statsData);
       } else {
-        console.error("Stats API error:", response.status, response.statusText);
+        logger.error("Stats API error", undefined, {
+          statusCode: response.status,
+          statusText: response.statusText
+        });
         toast.error("Gagal memuat statistik pengingat");
       }
-    } catch (error) {
-      console.error("Error fetching stats:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching stats:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memuat statistik pengingat");
     }
   }, [patientId]);
@@ -103,7 +107,7 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Scheduled reminders data:", data);
+        logger.info("Scheduled reminders data:", data);
         const mappedData = data.map((item: ScheduledReminderApi) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
@@ -115,11 +119,14 @@ export function PatientReminderDashboard({
         }));
         setTerjadwalReminders(mappedData);
       } else {
-        console.error("Scheduled reminders API error:", response.status, response.statusText);
+        logger.error("Scheduled reminders API error", undefined, {
+          statusCode: response.status,
+          statusText: response.statusText
+        });
         toast.error("Gagal memuat pengingat terjadwal");
       }
-    } catch (error) {
-      console.error("Error fetching scheduled reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching scheduled reminders:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memuat pengingat terjadwal");
     } finally {
       clearTimeout(timeoutId);
@@ -139,7 +146,7 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Pending reminders data:", data);
+        logger.info("Pending reminders data:", data);
         const mappedData = data.map((item: PendingReminderApi) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
@@ -149,11 +156,14 @@ export function PatientReminderDashboard({
         }));
         setPerluDiperbaruiReminders(mappedData);
       } else {
-        console.error("Pending reminders API error:", response.status, response.statusText);
+        logger.error("Pending reminders API error", undefined, {
+          statusCode: response.status,
+          statusText: response.statusText
+        });
         toast.error("Gagal memuat pengingat perlu diperbarui");
       }
-    } catch (error) {
-      console.error("Error fetching pending reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching pending reminders:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memuat pengingat perlu diperbarui");
     } finally {
       clearTimeout(timeoutId);
@@ -173,7 +183,7 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const data = await response.json();
-        console.log("Completed reminders data:", data);
+        logger.info("Completed reminders data:", data);
         const mappedData = data.map((item: CompletedReminderApi) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
@@ -186,11 +196,14 @@ export function PatientReminderDashboard({
         }));
         setSelesaiReminders(mappedData);
       } else {
-        console.error("Completed reminders API error:", response.status, response.statusText);
+        logger.error("Completed reminders API error", undefined, {
+          statusCode: response.status,
+          statusText: response.statusText
+        });
         toast.error("Gagal memuat pengingat selesai");
       }
-    } catch (error) {
-      console.error("Error fetching completed reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching completed reminders:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memuat pengingat selesai");
     } finally {
       clearTimeout(timeoutId);
@@ -199,19 +212,19 @@ export function PatientReminderDashboard({
 
   const fetchAllReminders = useCallback(async (retryCount = 0) => {
     try {
-      console.log("Fetching all reminders for patient:", patientId);
+      logger.info("Fetching all reminders for patient", { patientId });
       await Promise.all([
         fetchScheduledReminders(),
         fetchPendingReminders(),
         fetchCompletedReminders(),
       ]);
-      console.log("All reminders fetched successfully");
-    } catch (error) {
-      console.error("Error fetching all reminders:", error);
+      logger.info("All reminders fetched successfully");
+    } catch (error: unknown) {
+      logger.error("Error fetching all reminders:", error instanceof Error ? error : new Error(String(error)));
 
       // Only retry once for network errors, then fail gracefully
       if (retryCount === 0) {
-        console.log("Retrying fetch once...");
+        logger.info("Retrying fetch once...");
         setTimeout(() => {
           fetchAllReminders(1);
         }, 1000);
@@ -243,14 +256,14 @@ export function PatientReminderDashboard({
       selesai: selesaiReminders.length,
     };
 
-    console.log("Data consistency check:", { stats, actualCounts });
+    logger.info("Data consistency check", { stats, actualCounts });
 
     // Warn if counts don't match (within tolerance of 1 for timing issues)
     const tolerance = 1;
     if (Math.abs(stats.terjadwal - actualCounts.terjadwal) > tolerance ||
         Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > tolerance ||
         Math.abs(stats.selesai - actualCounts.selesai) > tolerance) {
-      console.warn("Reminder counts don't match stats:", { stats, actualCounts });
+      logger.warn("Reminder counts don't match stats", { stats, actualCounts });
 
       // Only show toast for significant discrepancies
       if (Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > 2) {
@@ -282,8 +295,8 @@ export function PatientReminderDashboard({
         fetchAllReminders(),
       ]);
       toast.success("Data berhasil diperbarui");
-    } catch (error) {
-      console.error("Error refreshing data:", error);
+    } catch (error: unknown) {
+      logger.error("Error refreshing data:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memperbarui data");
     } finally {
       setIsRefreshing(false);
@@ -405,10 +418,10 @@ export function PatientReminderDashboard({
       setSelectedReminders([]);
       setDeleteMode(false);
 
-      fetchStats().catch(console.error);
-      fetchAllReminders().catch(console.error);
-    } catch (error) {
-      console.error("Error deleting reminders:", error);
+      fetchStats().catch(logger.error);
+      fetchAllReminders().catch(logger.error);
+    } catch (error: unknown) {
+      logger.error("Error deleting reminders:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal menghapus pengingat");
     }
   };

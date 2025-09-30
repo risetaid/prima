@@ -3,7 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
-import { Button } from './button'
+import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logger'
 
 interface ErrorBoundaryState {

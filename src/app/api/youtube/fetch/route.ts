@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractYouTubeVideoId } from '@/lib/youtube-utils'
 
+import { logger } from '@/lib/logger';
 export async function POST(request: NextRequest) {
   try {
     const { url } = await request.json()
@@ -106,15 +107,15 @@ export async function POST(request: NextRequest) {
       videoId
     }
 
-    console.log('YouTube data extracted:', videoData)
+    logger.info('YouTube data extracted:', { value: videoData })
 
     return NextResponse.json({
       success: true,
       data: videoData
     })
 
-  } catch (error) {
-    console.error('Error fetching YouTube data:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching YouTube data:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { 
         success: false, 

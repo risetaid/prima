@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Share } from 'lucide-react'
+import { logger } from '@/lib/logger';
 
 interface ShareButtonProps {
   title: string
@@ -26,17 +27,17 @@ export function ShareButton({
           text: text || 'Konten edukasi kesehatan dari PRIMA',
           url: window.location.href,
         })
-      } catch (error) {
+      } catch (error: unknown) {
         // User cancelled sharing or error occurred
-        console.log('Share cancelled or failed:', error)
+        logger.info('Share cancelled or failed', { error: error instanceof Error ? error.message : String(error) })
       }
     } else {
       // Fallback: copy URL to clipboard
       try {
         await navigator.clipboard.writeText(window.location.href)
         alert('Link telah disalin ke clipboard!')
-      } catch (error) {
-        console.error('Failed to copy to clipboard:', error)
+      } catch (error: unknown) {
+        logger.error('Failed to copy to clipboard:', error instanceof Error ? error : new Error(String(error)))
         alert('Gagal menyalin link. Silakan salin manual dari address bar.')
       }
     }

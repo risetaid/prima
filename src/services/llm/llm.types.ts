@@ -68,6 +68,12 @@ export interface IntentDetectionResult {
   rawResponse: ProcessedLLMResponse
 }
 
+export interface ReminderInfo {
+  reminderMessage?: string
+  customMessage?: string
+  scheduledTime?: string
+}
+
 export interface ConversationContext {
   patientId: string
   phoneNumber: string
@@ -76,6 +82,6 @@ export interface ConversationContext {
   patientInfo?: {
     name?: string
     verificationStatus?: string
-    activeReminders?: unknown[]
+    activeReminders?: ReminderInfo[]
   }
 }

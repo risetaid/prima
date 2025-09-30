@@ -1,5 +1,5 @@
-import { redis } from "./redis";
-import { logger } from "./logger";
+import { redis } from "@/lib/redis";
+import { logger } from "@/lib/logger";
 
 // Redis operation result types
 export interface CacheOperationResult {

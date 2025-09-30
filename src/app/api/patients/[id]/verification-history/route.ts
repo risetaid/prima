@@ -4,6 +4,7 @@ import { db, patients } from '@/db'
 import { eq, and } from 'drizzle-orm'
 import { PatientService } from '@/services/patient/patient.service'
 
+import { logger } from '@/lib/logger';
 // Get patient response history for a patient
 export async function GET(
   request: NextRequest,
@@ -48,8 +49,8 @@ export async function GET(
       total: history.length
     })
 
-  } catch (error) {
-    console.error('Verification history error:', error)
+  } catch (error: unknown) {
+    logger.error('Verification history error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

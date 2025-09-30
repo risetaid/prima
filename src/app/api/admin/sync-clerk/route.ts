@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { clerkClient } from "@clerk/nextjs/server";
 
+import { logger } from '@/lib/logger';
 export async function POST() {
   try {
     const currentUser = await getCurrentUser();
@@ -130,8 +131,8 @@ export async function POST() {
 
           syncResults.created++;
         }
-      } catch (error) {
-        console.error(`❌ Error syncing user ${clerkUser.id}:`, error);
+      } catch (error: unknown) {
+        logger.error(`❌ Error syncing user ${clerkUser.id}:`, error instanceof Error ? error : new Error(String(error)));
         syncResults.errors.push(
           `User ${clerkUser.id}: ${
             error instanceof Error ? error.message : "Unknown error"
@@ -158,8 +159,8 @@ export async function POST() {
           .where(eq(users.clerkId, user.clerkId));
 
         syncResults.deactivated++;
-      } catch (error) {
-        console.error(`❌ Error deactivating user ${user.email}:`, error);
+      } catch (error: unknown) {
+        logger.error(`❌ Error deactivating user ${user.email}:`, error instanceof Error ? error : new Error(String(error)));
         syncResults.errors.push(
           `Deactivate ${user.email}: ${
             error instanceof Error ? error.message : "Unknown error"

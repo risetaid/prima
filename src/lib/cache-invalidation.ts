@@ -9,8 +9,8 @@ import {
   invalidateMultipleCache,
   safeInvalidateCache,
   CACHE_KEYS,
-} from "./cache";
-import { logger } from "./logger";
+} from "@/lib/cache";
+import { logger } from "@/lib/logger";
 
 // Cache tags for grouping related cache entries
 export const CACHE_TAGS = {

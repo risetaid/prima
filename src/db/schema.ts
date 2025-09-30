@@ -1,24 +1,24 @@
 // Import all clean schemas
 
 // Re-export all enums
-export * from "./enums";
+export * from "@/db/enums";
 
 // Re-export all tables
-export * from "./core-schema";
-export * from "./patient-schema";
-export * from "./reminder-schema";
-export * from "./cms-schema";
-export * from "./llm-schema";
-export * from "./message-queue-schema";
-export * from "./distributed-locks-schema";
-export * from "./rate-limits-schema";
+export * from "@/db/core-schema";
+export * from "@/db/patient-schema";
+export * from "@/db/reminder-schema";
+export * from "@/db/cms-schema";
+export * from "@/db/llm-schema";
+export * from "@/db/message-queue-schema";
+export * from "@/db/distributed-locks-schema";
+export * from "@/db/rate-limits-schema";
 
 // Import tables for relations
-import { users } from "./core-schema";
-import { patients, medicalRecords, healthNotes } from "./patient-schema";
-import { reminders, manualConfirmations, whatsappTemplates } from "./reminder-schema";
-import { cmsArticles, cmsVideos } from "./cms-schema";
-import { conversationStates, conversationMessages, volunteerNotifications } from "./llm-schema";
+import { users } from "@/db/core-schema";
+import { patients, medicalRecords, healthNotes } from "@/db/patient-schema";
+import { reminders, manualConfirmations, whatsappTemplates } from "@/db/reminder-schema";
+import { cmsArticles, cmsVideos } from "@/db/cms-schema";
+import { conversationStates, conversationMessages, volunteerNotifications } from "@/db/llm-schema";
 
 // ===== RELATIONS =====
 

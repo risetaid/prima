@@ -5,7 +5,7 @@ import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 import { getWIBTime } from "@/lib/timezone";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { FollowupQueueService } from "./followup-queue.service";
+import { FollowupQueueService } from "@/services/reminder/followup-queue.service";
 import {
   FollowupData,
   FollowupType,
@@ -14,7 +14,7 @@ import {
   FollowupScheduleRequest,
   FollowupProcessingResult,
   FollowupStats,
-} from "./followup.types";
+} from "@/services/reminder/followup.types";
 
 export class FollowupService {
   private readonly FOLLOWUP_PREFIX = "followup:data:";

@@ -3,6 +3,7 @@ import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
 
+import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Debug endpoint disabled in production' }, { status: 403 })
@@ -69,8 +70,8 @@ async function debugEmail() {
       allUsersWithEmail,
       conflict: userByEmail && userByEmail.clerkId !== userId
     })
-  } catch (error) {
-    console.error('Debug email error:', error)
+  } catch (error: unknown) {
+    logger.error('Debug email error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
@@ -107,8 +108,8 @@ async function debugUser() {
       userDetails: dbUser,
       totalUsersInDb: totalUsers
     })
-  } catch (error) {
-    console.error('Debug user error:', error)
+  } catch (error: unknown) {
+    logger.error('Debug user error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

@@ -4,6 +4,7 @@ import { db, cmsArticles, cmsVideos } from '@/db'
 import { eq, desc, and, or, ilike, isNull } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_TTL } from '@/lib/cache'
 
+import { logger } from '@/lib/logger';
 // Interface for unified content response
 interface UnifiedContent {
   id: string
@@ -207,8 +208,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response)
 
-  } catch (error) {
-    console.error('Published content API error:', error)
+  } catch (error: unknown) {
+    logger.error('Published content API error:', error instanceof Error ? error : new Error(String(error)))
     
     return NextResponse.json(
       { 

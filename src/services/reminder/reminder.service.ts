@@ -1,7 +1,7 @@
 // Reminder Service - Core business logic for reminder management
-import { ReminderRepository } from "./reminder.repository";
+import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { FollowupService } from "./followup.service";
+import { FollowupService } from "@/services/reminder/followup.service";
 import {
   CreateReminderDTO,
   UpdateReminderDTO,
@@ -9,14 +9,14 @@ import {
   ValidationError,
   NotFoundError,
   ValidatedContent,
-} from "./reminder.types";
+} from "@/services/reminder/reminder.types";
 import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
-import { ReminderTemplatesService } from "./reminder-templates.service";
+import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
 
 import { db, patients, reminders } from "@/db";
-import { ReminderError } from "./reminder.types";
+import { ReminderError } from "@/services/reminder/reminder.types";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { eq, and, gte, lte, isNull } from "drizzle-orm";
 

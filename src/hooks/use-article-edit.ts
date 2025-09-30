@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ArticleStatus } from "@/lib/constants/articles";
 import { routes } from "@/lib/routes";
 
+import { logger } from '@/lib/logger';
 interface ArticleFormData {
   title: string;
   slug: string;
@@ -40,11 +41,11 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
         const resolvedParams = await params;
         setArticleId(resolvedParams.id);
 
-        console.log("🔍 Edit Article: Loading article", resolvedParams.id);
+        logger.info("🔍 Edit Article: Loading article", { articleId: resolvedParams.id });
         const response = await fetch(`/api/cms/articles/${resolvedParams.id}`);
 
         if (!response.ok) {
-          console.error("❌ Edit Article: API error:", response.status);
+          logger.error("❌ Edit Article: API error:", undefined, { statusCode: response.status });
           if (response.status === 404) {
             toast.error("Artikel tidak ditemukan");
           } else if (response.status === 401) {
@@ -57,7 +58,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
         }
 
         const data = await response.json();
-        console.log("✅ Edit Article: Loaded", data.data);
+        logger.info("✅ Edit Article: Loaded", data.data);
 
         if (data.success) {
           const article = data.data;
@@ -71,8 +72,8 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
             status: article.status || "draft",
           });
         }
-      } catch (error) {
-        console.error("❌ Edit Article: Network error:", error);
+      } catch (error: unknown) {
+        logger.error("❌ Edit Article: Network error:", error instanceof Error ? error : new Error(String(error)));
         toast.error("Terjadi kesalahan saat memuat artikel");
         router.push(routes.cms);
       } finally {
@@ -94,7 +95,7 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
     setSaving(true);
 
     try {
-      console.log("💾 Edit Article: Saving changes...");
+      logger.info("💾 Edit Article: Saving changes...");
       const response = await fetch(`/api/cms/articles/${articleId}`, {
         method: "PUT",
         headers: {
@@ -105,16 +106,16 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ Edit Article: API error:", errorData);
+        logger.error("❌ Edit Article: API error:", errorData);
         toast.error(errorData.error || "Gagal menyimpan artikel");
         return;
       }
 
-      console.log("✅ Edit Article: Saved successfully");
+      logger.info("✅ Edit Article: Saved successfully");
       toast.success("Artikel berhasil diperbarui!");
       router.push(routes.cms);
-    } catch (error) {
-      console.error("❌ Edit Article: Network error:", error);
+    } catch (error: unknown) {
+      logger.error("❌ Edit Article: Network error:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Terjadi kesalahan. Silakan coba lagi.");
     } finally {
       setSaving(false);
@@ -133,23 +134,23 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
     setDeleting(true);
 
     try {
-      console.log("🗑️ Edit Article: Deleting article...");
+      logger.info("🗑️ Edit Article: Deleting article...");
       const response = await fetch(`/api/cms/articles/${articleId}`, {
         method: "DELETE",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("❌ Edit Article: Delete error:", errorData);
+        logger.error("❌ Edit Article: Delete error:", errorData);
         toast.error(errorData.error || "Gagal menghapus artikel");
         return;
       }
 
-      console.log("✅ Edit Article: Deleted successfully");
+      logger.info("✅ Edit Article: Deleted successfully");
       toast.success("Artikel berhasil dihapus!");
       router.push(routes.cms);
-    } catch (error) {
-      console.error("❌ Edit Article: Delete network error:", error);
+    } catch (error: unknown) {
+      logger.error("❌ Edit Article: Delete network error:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Terjadi kesalahan saat menghapus artikel");
     } finally {
       setDeleting(false);

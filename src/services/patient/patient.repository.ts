@@ -12,8 +12,8 @@ import { and, eq, isNull, inArray, desc, sql, SQL } from "drizzle-orm";
 import type { InferInsertModel } from "drizzle-orm";
 import type {
   PatientFilters,
-} from "./patient.types";
-import { PatientQueryBuilder } from "./patient-query-builder";
+} from "@/services/patient/patient.types";
+import { PatientQueryBuilder } from "@/services/patient/patient-query-builder";
 
 export class PatientRepository {
   async patientExists(patientId: string): Promise<boolean> {

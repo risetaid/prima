@@ -1,6 +1,6 @@
 // Fonnte WhatsApp API integration for PRIMA
 import * as crypto from 'crypto'
-import { logger } from './logger'
+import { logger } from '@/lib/logger'
 
 // Primary WhatsApp provider for Indonesian healthcare system
 

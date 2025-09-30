@@ -5,11 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { toast } from 'sonner'
 import { logger } from '@/lib/logger'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
-import { TemplateActions } from './TemplateActions'
-import { TemplateList } from './TemplateList'
-import { TemplateForm } from './TemplateForm'
-import { TemplatePreviewModal } from './TemplatePreviewModal'
-import { WhatsAppTemplate, TemplateFormData } from './types'
+import { TemplateActions } from '@/components/admin/TemplateActions'
+import { TemplateList } from '@/components/admin/TemplateList'
+import { TemplateForm } from '@/components/admin/TemplateForm'
+import { TemplatePreviewModal } from '@/components/admin/TemplatePreviewModal'
+import { WhatsAppTemplate, TemplateFormData } from '@/components/admin/types'
 
 
 

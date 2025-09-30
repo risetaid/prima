@@ -1,7 +1,7 @@
 "use client";
 
-import { DesktopHeader } from "./desktop-header";
-import { MobileHeader } from "./mobile-header";
+import { DesktopHeader } from "@/components/ui/desktop-header";
+import { MobileHeader } from "@/components/ui/mobile-header";
 
 interface HeaderProps {
   showNavigation?: boolean;

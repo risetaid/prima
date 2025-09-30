@@ -3,7 +3,7 @@
  * Provides basic retry logic for handling transient failures
  */
 
-import { logger } from './logger'
+import { logger } from '@/lib/logger'
 
 export interface RetryConfig {
   maxAttempts: number;      // Maximum number of retry attempts

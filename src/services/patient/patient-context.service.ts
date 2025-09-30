@@ -10,7 +10,7 @@ import {
 } from "@/db";
 import { eq, and, gte, desc, isNull, or, inArray, lte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
-import { PatientLookupService } from "./patient-lookup.service";
+import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
 import {
   getCachedData,

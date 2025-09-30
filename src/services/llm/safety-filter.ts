@@ -5,7 +5,7 @@
 
 import { logger } from "@/lib/logger";
 import { VolunteerNotificationService } from "@/services/notification/volunteer-notification.service";
-import { ConversationContext, ProcessedLLMResponse } from "./llm.types";
+import { ConversationContext, ProcessedLLMResponse } from "@/services/llm/llm.types";
 
 export interface SafetyFilterResult {
   isSafe: boolean;

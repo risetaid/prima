@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, reminders, manualConfirmations } from "@/db";
+import { logger } from '@/lib/logger';
 import {
   eq,
   and,
@@ -84,8 +85,8 @@ export async function GET(
         const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
         whereConditions.push(gte(reminders.sentAt, startOfDay));
         whereConditions.push(lte(reminders.sentAt, endOfDay));
-      } catch (dateError) {
-        console.error("Error in date filtering:", dateError);
+      } catch (dateError: unknown) {
+        logger.error("Error in date filtering:", dateError instanceof Error ? dateError : new Error(String(dateError)));
         // Continue without date filter if there's an error
       }
     }
@@ -125,8 +126,8 @@ export async function GET(
     }));
 
     return NextResponse.json(formattedReminders);
-  } catch (error) {
-    console.error("Error fetching pending reminders:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching pending reminders:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

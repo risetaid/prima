@@ -16,6 +16,7 @@ import {
   Phone,
   Calendar
 } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface VolunteerNotification {
   id: string;
@@ -26,8 +27,7 @@ interface VolunteerNotification {
   escalationReason: string;
   confidence?: number;
   intent?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  patientContext?: any;
+  patientContext?: Record<string, unknown>;
   respondedAt?: string;
   response?: string;
   createdAt: string;
@@ -70,8 +70,8 @@ export function VolunteerDashboard() {
         const data = await response.json();
         setNotifications(data.notifications);
       }
-    } catch (error) {
-      console.error('Failed to load notifications:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to load notifications:', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -84,8 +84,8 @@ export function VolunteerDashboard() {
         const data = await response.json();
         setStats(data.stats);
       }
-    } catch (error) {
-      console.error('Failed to load stats:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to load stats:', error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -98,8 +98,8 @@ export function VolunteerDashboard() {
       if (response.ok) {
         await loadNotifications();
       }
-    } catch (error) {
-      console.error('Failed to assign notification:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to assign notification:', error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -122,8 +122,8 @@ export function VolunteerDashboard() {
         await loadNotifications();
         await loadStats();
       }
-    } catch (error) {
-      console.error('Failed to respond to notification:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to respond to notification:', error instanceof Error ? error : new Error(String(error)));
     } finally {
       setResponding(false);
     }
@@ -139,8 +139,8 @@ export function VolunteerDashboard() {
         await loadNotifications();
         await loadStats();
       }
-    } catch (error) {
-      console.error('Failed to resolve notification:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to resolve notification:', error instanceof Error ? error : new Error(String(error)));
     }
   };
 

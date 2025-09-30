@@ -9,6 +9,7 @@ import Image from 'next/image'
 import { ContentHeader } from '@/components/content/ContentHeader'
 import { ShareButton } from '@/components/content/ShareButton'
 
+import { logger } from '@/lib/logger';
 interface ArticlePageProps {
   params: Promise<{ slug: string }>
 }
@@ -28,8 +29,8 @@ export async function generateStaticParams() {
     return articles.map((article) => ({
       slug: article.slug,
     }))
-  } catch (error) {
-    console.error('Error generating static params for articles:', error)
+  } catch (error: unknown) {
+    logger.error('Error generating static params for articles:', error instanceof Error ? error : new Error(String(error)))
     return []
   }
 }
@@ -64,7 +65,7 @@ async function getArticle(slug: string) {
     return null
   }
 
-  console.log('🖼️ Article data:', {
+  logger.info('🖼️ Article data:', {
     slug,
     featuredImageUrl: article[0].featuredImageUrl,
     hasImage: !!article[0].featuredImageUrl

@@ -1,5 +1,5 @@
 import Redis, { Cluster } from 'ioredis'
-import { logger } from './logger'
+import { logger } from '@/lib/logger'
 
 class RedisClient {
   private client: Redis | Cluster | null = null

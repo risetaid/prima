@@ -1,5 +1,7 @@
 'use client'
 
+import { logger } from '@/lib/logger';
+
 // Patient status utilities temporarily inlined
 
 
@@ -96,7 +98,10 @@ function getPatientDisplayStatus(input: PatientStatusInput): PatientDisplayStatu
       }
     default:
       // Add debug info to help identify unmapped statuses
-      console.warn('Unmapped verification status:', input.verificationStatus, '(normalized:', normalizedStatus, ')')
+      logger.warn('Unmapped verification status', {
+        verificationStatus: input.verificationStatus,
+        normalized: normalizedStatus
+      })
       return {
         badgeColor: 'bg-purple-600 text-white border-purple-700',
         badgeIcon: '❓',

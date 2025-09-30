@@ -4,6 +4,7 @@ import { db, cmsArticles } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { logger } from '@/lib/logger';
 // Validation schema for updates
 const updateArticleSchema = z.object({
   title: z
@@ -63,8 +64,8 @@ export async function GET(
       success: true,
       data: article[0],
     });
-  } catch (error) {
-    console.error("Error fetching article:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching article:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -158,7 +159,7 @@ export async function PUT(
       );
     }
 
-    console.error("Error updating article:", error);
+    logger.error("Error updating article:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -204,8 +205,8 @@ export async function DELETE(
       success: true,
       message: "Article deleted successfully",
     });
-  } catch (error) {
-    console.error("Error deleting article:", error);
+  } catch (error: unknown) {
+    logger.error("Error deleting article:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

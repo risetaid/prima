@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 
+import { logger } from '@/lib/logger';
 export async function GET() {
   try {
     const user = await getCurrentUser()
@@ -24,8 +25,8 @@ export async function GET() {
       needsApproval: user.needsApproval,
       createdAt: user.createdAt
     })
-  } catch (error) {
-    console.error('Error fetching user status:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching user status:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch user status' },
       { status: 500 }

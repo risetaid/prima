@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Info } from "lucide-react";
-import { ContentSelector } from "./ContentSelector";
+import { ContentSelector } from "@/components/reminder/ContentSelector";
 import { TimePicker24h } from "@/components/ui/time-picker-24h";
 import { toast } from "@/components/ui/toast";
 

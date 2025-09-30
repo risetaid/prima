@@ -4,25 +4,26 @@ import { db, manualConfirmations, reminders } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
+import { logger } from '@/lib/logger';
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; reminderId: string }> }
 ) {
   try {
-    console.log("=== REMINDER CONFIRMATION API CALLED ===");
+    logger.info("=== REMINDER CONFIRMATION API CALLED ===");
 
     const user = await getCurrentUser();
     if (!user) {
-      console.error("❌ AUTH ERROR: User not authenticated");
+      logger.error("❌ AUTH ERROR: User not authenticated");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    console.log("✅ User authenticated:", user.id);
+    logger.info("✅ User authenticated:", { userId: user.id });
 
     let requestBody;
     try {
       requestBody = await request.json();
-    } catch (parseError) {
-      console.error("❌ JSON PARSE ERROR:", parseError);
+    } catch (parseError: unknown) {
+      logger.error("❌ JSON PARSE ERROR:", parseError instanceof Error ? parseError : new Error(String(parseError)));
       return NextResponse.json(
         { error: "Invalid JSON in request body" },
         { status: 400 }
@@ -32,15 +33,16 @@ export async function PUT(
     // Handle confirmed parameter
     const confirmed = requestBody.confirmed;
     const { reminderLogId } = requestBody;
-    console.log("📥 Request body:", {
+    logger.info("📥 Request body:", {
       confirmed,
       reminderLogId,
     });
 
     if (typeof confirmed !== "boolean") {
-      console.error(
+      logger.error(
         "❌ VALIDATION ERROR: confirmed is not boolean:",
-        typeof confirmed
+        undefined,
+        { confirmedType: typeof confirmed }
       );
       return NextResponse.json(
         { error: "confirmed must be boolean" },
@@ -49,7 +51,7 @@ export async function PUT(
     }
 
     const { id, reminderId: rawReminderId } = await params;
-    console.log("📋 URL params:", { patientId: id, rawReminderId });
+    logger.info("📋 URL params:", { patientId: id, rawReminderId });
 
     // The reminderId is already a clean UUID from the pending reminders API
     const reminderId = rawReminderId;
@@ -58,7 +60,7 @@ export async function PUT(
     const extractedLogId = reminderLogId || reminderId;
 
     const logId = extractedLogId;
-    console.log("🔍 Processed IDs:", {
+    logger.info("🔍 Processed IDs:", {
       patientId: id,
       rawReminderId,
       reminderId,
@@ -67,7 +69,7 @@ export async function PUT(
     });
 
     // Get the reminder using separate queries
-    console.log("🔍 Querying reminder:", { reminderId: logId, patientId: id });
+    logger.info("🔍 Querying reminder:", { reminderId: logId, patientId: id });
     const reminderData = await db
       .select({
         id: reminders.id,
@@ -79,13 +81,13 @@ export async function PUT(
       .where(and(eq(reminders.id, logId), eq(reminders.patientId, id)))
       .limit(1);
 
-    console.log("📊 Reminder query result:", {
+    logger.info("📊 Reminder query result:", {
       found: reminderData.length > 0,
       data: reminderData[0],
     });
 
     if (reminderData.length === 0) {
-      console.error("❌ REMINDER NOT FOUND:", { reminderId: logId, patientId: id });
+      logger.error("❌ REMINDER NOT FOUND:", undefined, { reminderId: logId, patientId: id });
       return NextResponse.json(
         { error: "Reminder not found" },
         { status: 404 }
@@ -93,13 +95,13 @@ export async function PUT(
     }
 
     const reminderInfo = reminderData[0];
-    console.log("✅ Reminder found:", reminderInfo);
+    logger.info("✅ Reminder found:", { value: reminderInfo });
 
     // Get reminder schedule details (if reminderScheduleId exists)
     // Reminder schedule details not needed for confirmation
 
     // Check if this Reminder is already manually confirmed
-    console.log("🔍 Checking for existing manual confirmation:", { reminderId: logId });
+    logger.info("🔍 Checking for existing manual confirmation:", { reminderId: logId });
     const existingManualConfirmation = await db
       .select({
         id: manualConfirmations.id,
@@ -108,13 +110,13 @@ export async function PUT(
       .where(eq(manualConfirmations.reminderId, logId))
       .limit(1);
 
-    console.log("📊 Existing manual confirmation check:", {
+    logger.info("📊 Existing manual confirmation check:", {
       exists: existingManualConfirmation.length > 0,
       id: existingManualConfirmation[0]?.id,
     });
 
     if (existingManualConfirmation.length > 0) {
-      console.error("❌ REMINDER ALREADY MANUALLY CONFIRMED:", {
+      logger.error("❌ REMINDER ALREADY MANUALLY CONFIRMED:", undefined, {
         logId,
         existingId: existingManualConfirmation[0].id,
       });
@@ -125,7 +127,7 @@ export async function PUT(
     }
 
     // Check for automated confirmation conflict
-    console.log("🔍 Checking for automated confirmation conflict:", { reminderId: logId });
+    logger.info("🔍 Checking for automated confirmation conflict:", { reminderId: logId });
     const confirmationData = await db
       .select({
         confirmationStatus: reminders.confirmationStatus,
@@ -137,7 +139,7 @@ export async function PUT(
       .limit(1);
 
     const automatedConfirmation = confirmationData[0];
-    console.log("📊 Automated confirmation check:", {
+    logger.info("📊 Automated confirmation check:", {
       status: automatedConfirmation?.confirmationStatus,
       hasResponse: !!automatedConfirmation?.confirmationResponse,
       responseTime: automatedConfirmation?.confirmationResponseAt,
@@ -147,7 +149,7 @@ export async function PUT(
       automatedConfirmation?.confirmationStatus &&
       automatedConfirmation.confirmationStatus !== "PENDING"
     ) {
-      console.error("❌ AUTOMATED CONFIRMATION CONFLICT:", {
+      logger.error("❌ AUTOMATED CONFIRMATION CONFLICT:", undefined, {
         logId,
         automatedStatus: automatedConfirmation.confirmationStatus,
         automatedResponse: automatedConfirmation.confirmationResponse,
@@ -163,12 +165,12 @@ export async function PUT(
       );
     }
 
-    console.log(
+    logger.info(
       "✅ No confirmation conflicts found, proceeding with manual confirmation"
     );
 
     // Create manual confirmation with proper relations
-    console.log("💾 Creating manual confirmation:", {
+    logger.info("💾 Creating manual confirmation:", {
       patientId: id,
       volunteerId: user.id,
       reminderLogId: logId,
@@ -206,23 +208,23 @@ export async function PUT(
           confirmedAt: manualConfirmations.confirmedAt,
         });
 
-      console.log(
+      logger.info(
         "✅ Manual confirmation created successfully:",
         newManualConfirmation[0]
       );
 
       // Invalidate cache after confirmation
       await invalidateCache(CACHE_KEYS.reminderStats(id));
-      console.log("🗑️ Cache invalidated for patient:", id);
+      logger.info("🗑️ Cache invalidated for patient:", { patientId: id });
 
-      console.log("🎉 REMINDER CONFIRMATION COMPLETED SUCCESSFULLY");
+      logger.info("🎉 REMINDER CONFIRMATION COMPLETED SUCCESSFULLY");
       return NextResponse.json(newManualConfirmation[0]);
-    } catch (dbError) {
-      console.error("❌ DATABASE INSERTION ERROR:", dbError);
+    } catch (dbError: unknown) {
+      logger.error("❌ DATABASE INSERTION ERROR:", dbError instanceof Error ? dbError : new Error(String(dbError)));
       throw dbError; // Re-throw to be caught by outer catch
     }
-  } catch (error) {
-    console.error("Error confirming reminder:", error);
+  } catch (error: unknown) {
+    logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

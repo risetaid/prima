@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Edit, Plus, Trash2, Calendar, Clock } from "lucide-react";
 import { formatDateTimeWIB } from "@/lib/datetime";
 import { Button } from "@/components/ui/button";
+import { logger } from '@/lib/logger';
 import {
   Dialog,
   DialogContent,
@@ -84,8 +85,8 @@ export function HealthNotesSection({
       setNewNoteText("");
       setSelectedDate(new Date().toISOString().split("T")[0]);
       setIsAddNoteModalOpen(false);
-    } catch (error) {
-      console.error("Error adding note:", error);
+    } catch (error: unknown) {
+      logger.error("Error adding note:", error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -105,8 +106,8 @@ export function HealthNotesSection({
       setEditingNote(null);
       setEditNoteText("");
       setEditSelectedDate("");
-    } catch (error) {
-      console.error("Error editing note:", error);
+    } catch (error: unknown) {
+      logger.error("Error editing note:", error instanceof Error ? error : new Error(String(error)));
     }
   };
 
@@ -117,8 +118,8 @@ export function HealthNotesSection({
       await onDeleteNotes(selectedNotes);
       setSelectedNotes([]);
       setIsDeleteMode(false);
-    } catch (error) {
-      console.error("Error deleting notes:", error);
+    } catch (error: unknown) {
+      logger.error("Error deleting notes:", error instanceof Error ? error : new Error(String(error)));
     }
   };
 

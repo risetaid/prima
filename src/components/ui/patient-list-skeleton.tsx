@@ -1,6 +1,6 @@
-import { Skeleton } from "./skeleton"
-import { SkeletonCard, SkeletonCardHeader, SkeletonCardContent, SkeletonTable, SkeletonAvatar, SkeletonButton, SkeletonText } from "./skeleton-factory"
-import { PatientCardSkeleton } from "./patient-card-skeleton"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SkeletonCard, SkeletonCardHeader, SkeletonCardContent, SkeletonTable, SkeletonAvatar, SkeletonButton, SkeletonText } from "@/components/ui/skeleton-factory"
+import { PatientCardSkeleton } from "@/components/ui/patient-card-skeleton"
 
 export function PatientListSkeleton() {
   return (

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
+import { logger } from '@/lib/logger';
 interface AllReminder {
   id: string;
   scheduledTime: string;
@@ -86,8 +87,8 @@ export default function AllRemindersPage() {
       ];
 
       setReminders(allReminders);
-    } catch (error) {
-      console.error("Error fetching all reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching all reminders:", error instanceof Error ? error : new Error(String(error)));
       setReminders([]);
     } finally {
       setLoading(false);

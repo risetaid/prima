@@ -4,6 +4,7 @@ import { db, cmsArticles, cmsVideos } from "@/db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { logger } from '@/lib/logger';
 // Enhanced reminder templates with CMS content integration
 export async function GET() {
   try {
@@ -105,8 +106,8 @@ export async function GET() {
         })),
       },
     });
-  } catch (error) {
-    console.error("Error fetching enhanced templates:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching enhanced templates:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -231,8 +232,8 @@ export async function POST(request: NextRequest) {
         template: selectedTemplate,
       },
     });
-  } catch (error) {
-    console.error("Error creating enhanced reminder:", error);
+  } catch (error: unknown) {
+    logger.error("Error creating enhanced reminder:", error instanceof Error ? error : new Error(String(error)));
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation error", details: error.issues },

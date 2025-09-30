@@ -10,20 +10,20 @@ import {
   createSuccessResponse,
   createErrorResponse,
   createEmergencyResponse,
-} from "../response-handler";
+} from "@/services/response-handler";
 import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
-import { llmService } from "../llm/llm.service";
-import { getPromptForContext } from "../llm/prompts";
-import { ConversationContext } from "../llm/llm.types";
-import { PatientContextService } from "../patient/patient-context.service";
-import { safetyFilterService } from "../llm/safety-filter";
-import { dataAccessValidationService } from "../security/data-access-validation.service";
-import { healthNotesQueryService } from "../patient/health-notes-query.service";
-import { HealthNoteService } from "../patient/health-note.service";
-import { VolunteerNotificationService } from "../notification/volunteer-notification.service";
-import { healthEducationService } from "../education/health-education.service";
+import { llmService } from "@/services/llm/llm.service";
+import { getPromptForContext } from "@/services/llm/prompts";
+import { ConversationContext } from "@/services/llm/llm.types";
+import { PatientContextService } from "@/services/patient/patient-context.service";
+import { safetyFilterService } from "@/services/llm/safety-filter";
+import { dataAccessValidationService } from "@/services/security/data-access-validation.service";
+import { healthNotesQueryService } from "@/services/patient/health-notes-query.service";
+import { HealthNoteService } from "@/services/patient/health-note.service";
+import { VolunteerNotificationService } from "@/services/notification/volunteer-notification.service";
+import { healthEducationService } from "@/services/education/health-education.service";
 
 interface HealthNotesQuery {
   time_range: string;

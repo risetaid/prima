@@ -2,7 +2,7 @@
  * Simplified followup response handler - stub since followup tables were removed
  */
 
-import { StandardResponseHandler, ResponseContext, StandardResponse, createErrorResponse } from "../response-handler";
+import { StandardResponseHandler, ResponseContext, StandardResponse, createErrorResponse } from "@/services/response-handler";
 
 export class FollowupResponseHandler extends StandardResponseHandler {
   constructor() {

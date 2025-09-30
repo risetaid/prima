@@ -7,6 +7,7 @@ import { UserButton } from '@clerk/nextjs'
 import { formatDateInputWIB } from '@/lib/datetime'
 import { toast } from 'sonner'
 
+import { logger } from '@/lib/logger';
 interface Patient {
   id: string
   name: string
@@ -61,11 +62,11 @@ export default function EditPatientPage() {
           isActive: data.isActive
         })
       } else {
-        console.error('Patient not found')
+        logger.error('Patient not found')
         router.push('/pasien')
       }
-    } catch (error) {
-      console.error('Error fetching patient:', error)
+    } catch (error: unknown) {
+      logger.error('Error fetching patient:', error instanceof Error ? error : new Error(String(error)))
       router.push('/pasien')
     } finally {
       setLoading(false)
@@ -107,8 +108,8 @@ export default function EditPatientPage() {
           description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
         })
       }
-    } catch (error) {
-      console.error('Error updating patient:', error)
+    } catch (error: unknown) {
+      logger.error('Error updating patient:', error instanceof Error ? error : new Error(String(error)))
       toast.error('Kesalahan Jaringan', {
         description: 'Tidak dapat memperbarui data pasien. Periksa koneksi internet Anda.'
       })

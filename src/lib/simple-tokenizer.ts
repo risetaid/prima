@@ -4,7 +4,7 @@
  * Uses character-based estimation (approximately 4 characters = 1 token)
  */
 
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 export interface TokenCount {
   tokens: number;

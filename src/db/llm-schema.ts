@@ -10,7 +10,7 @@ import {
   index,
   foreignKey,
 } from "drizzle-orm/pg-core";
-import { patients } from "./patient-schema";
+import { patients } from "@/db/patient-schema";
 
 // ===== LLM TABLES =====
 

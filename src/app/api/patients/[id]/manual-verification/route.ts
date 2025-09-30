@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
 
+import { logger } from '@/lib/logger';
 // Manual verification by volunteer
 export async function POST(
   request: NextRequest,
@@ -81,8 +82,8 @@ export async function POST(
       newStatus: status,
       processedBy: `${user.firstName} ${user.lastName}`.trim() || user.email,
     });
-  } catch (error) {
-    console.error("Manual verification error:", error);
+  } catch (error: unknown) {
+    logger.error("Manual verification error:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -123,7 +124,7 @@ async function sendConfirmationMessage(phoneNumber: string, message: string) {
 
     const fonnte_token = process.env.FONNTE_TOKEN;
     if (!fonnte_token) {
-      console.warn(
+      logger.warn(
         "FONNTE_TOKEN not configured, skipping confirmation message"
       );
       return;
@@ -144,10 +145,10 @@ async function sendConfirmationMessage(phoneNumber: string, message: string) {
 
     const result = await response.json();
     if (!response.ok) {
-      console.warn("Failed to send confirmation message:", result);
+      logger.warn("Failed to send confirmation message", { result });
     }
-  } catch (error) {
-    console.warn("Error sending confirmation message:", error);
+  } catch (error: unknown) {
+    logger.warn("Error sending confirmation message", { error: error instanceof Error ? error.message : String(error) });
     // Don't throw error, just log it as confirmation message is optional
   }
 }

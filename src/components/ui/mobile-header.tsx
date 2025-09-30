@@ -7,7 +7,7 @@ import {
   MobileAdminActions,
   MobileCMSActions,
   MobilePasienActions,
-} from "./mobile-admin-actions";
+} from "@/components/ui/mobile-admin-actions";
 import { useAuthContext } from "@/lib/auth-context";
 // Role cache temporarily disabled
 import { UserCheck } from "lucide-react";

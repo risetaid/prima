@@ -2,7 +2,7 @@
  * Verification response handler for standardized response processing
  */
 
-import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "../response-handler";
+import { StandardResponseHandler, ResponseContext, StandardResponse, createSuccessResponse, createErrorResponse, createEmergencyResponse } from "@/services/response-handler";
 import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";

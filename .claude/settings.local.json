@@ -38,7 +38,8 @@
       "mcp__git__git_add",
       "mcp__git__git_commit",
       "Read(//home/davidyusaku/**)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "mcp__filesystem__read_text_file"
     ],
     "deny": [],
     "ask": []

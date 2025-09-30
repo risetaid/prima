@@ -12,7 +12,7 @@ import {
   cancerStageEnum,
   medicalRecordTypeEnum,
   verificationStatusEnum,
-} from "./enums";
+} from "@/db/enums";
 
 // Re-export enums for convenience
 export {

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FileText, Video, Link, MessageCircle, Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { logger } from '@/lib/logger';
 
 interface ContentItem {
   id: string
@@ -64,8 +65,8 @@ export default function ContentSelector({
       } else {
         toast.error('Gagal memuat template')
       }
-    } catch (error) {
-      console.error('Error fetching templates:', error)
+    } catch (error: unknown) {
+      logger.error('Error fetching templates:', error instanceof Error ? error : new Error(String(error)))
       toast.error('Terjadi kesalahan saat memuat template')
     } finally {
       setLoading(false)
@@ -105,8 +106,8 @@ export default function ContentSelector({
       } else {
         toast.error('Gagal membuat pesan')
       }
-    } catch (error) {
-      console.error('Error generating message:', error)
+    } catch (error: unknown) {
+      logger.error('Error generating message:', error instanceof Error ? error : new Error(String(error)))
       toast.error('Terjadi kesalahan saat membuat pesan')
     }
   }
@@ -115,8 +116,8 @@ export default function ContentSelector({
     try {
       await navigator.clipboard.writeText(generatedMessage)
       toast.success('Pesan disalin ke clipboard!')
-    } catch (error) {
-      console.error('Failed to copy:', error)
+    } catch (error: unknown) {
+      logger.error('Failed to copy:', error instanceof Error ? error : new Error(String(error)))
       toast.error('Gagal menyalin pesan')
     }
   }

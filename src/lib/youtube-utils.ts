@@ -2,7 +2,7 @@
  * Extracts YouTube video ID from various YouTube URL formats
  */
 
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 export function extractYouTubeVideoId(url: string): string | null {
   const regex =
     /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;

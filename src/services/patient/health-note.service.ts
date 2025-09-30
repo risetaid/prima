@@ -1,6 +1,6 @@
 // HealthNoteService centralizes Catatan Kesehatan CRUD with permissions and transforms
-import { PatientRepository } from './patient.repository'
-import { CreateHealthNoteDTO, UpdateHealthNoteDTO, HealthNoteDTO, ValidationError, NotFoundError, UnauthorizedError } from './patient.types'
+import { PatientRepository } from '@/services/patient/patient.repository'
+import { CreateHealthNoteDTO, UpdateHealthNoteDTO, HealthNoteDTO, ValidationError, NotFoundError, UnauthorizedError } from '@/services/patient/patient.types'
 
 export class HealthNoteService {
   private repo: PatientRepository

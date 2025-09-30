@@ -3,8 +3,8 @@
  * Lightweight caching for common LLM responses to reduce API costs
  */
 
-import { redis } from './redis'
-import { logger } from './logger'
+import { redis } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 
 export interface CachedResponse {
   response: string

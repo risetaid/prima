@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 import { Patient } from '@/db/schema'
+import { logger } from '@/lib/logger';
 
 interface VerificationActionsPanelProps {
   patient: Patient
@@ -34,8 +35,8 @@ export default function VerificationActionsPanel({
       } else {
         toast.error(`❌ Gagal mengirim pesan verifikasi: ${data.error}`)
       }
-    } catch (error) {
-      console.error('Send verification error:', error)
+    } catch (error: unknown) {
+      logger.error('Send verification error:', error instanceof Error ? error : new Error(String(error)))
       toast.error('❌ Terjadi kesalahan saat mengirim verifikasi')
     }
     setSending(false)
@@ -61,8 +62,8 @@ export default function VerificationActionsPanel({
       } else {
         toast.error(`❌ Gagal mengubah status: ${data.error}`)
       }
-    } catch (error) {
-      console.error('Manual verification error:', error)
+    } catch (error: unknown) {
+      logger.error('Manual verification error:', error instanceof Error ? error : new Error(String(error)))
       toast.error('❌ Gagal mengubah status')
     }
   }
@@ -87,8 +88,8 @@ export default function VerificationActionsPanel({
       } else {
         toast.error(`❌ Gagal mengaktifkan kembali: ${data.error}`)
       }
-    } catch (error) {
-      console.error('Error reactivating patient:', error)
+    } catch (error: unknown) {
+      logger.error('Error reactivating patient:', error instanceof Error ? error : new Error(String(error)))
       toast.error('❌ Terjadi kesalahan saat mengaktifkan kembali pasien')
     } finally {
       setReactivating(false)

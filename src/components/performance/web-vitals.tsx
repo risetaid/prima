@@ -30,7 +30,7 @@ export function WebVitalsReporter() {
       
       // Log to console in development
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[${metric.name}] ${metric.value}ms (${metric.rating})`)
+        logger.info(`[${metric.name}] ${metric.value}ms (${metric.rating})`)
       }
 
       // Log to our logger system
@@ -58,7 +58,7 @@ export function WebVitalsReporter() {
 
       // Alert on poor metrics in development
       if (process.env.NODE_ENV === 'development' && metric.rating === 'poor') {
-        console.warn(`⚠️ Poor ${metric.name} score: ${metric.value}ms`, {
+        logger.warn(`⚠️ Poor ${metric.name} score: ${metric.value}ms`, {
           metric,
           suggestions: getMetricSuggestions(metric.name)
         })
@@ -92,7 +92,7 @@ export function WebVitalsReporter() {
         logger.info('Navigation Timing', { timings, pathname })
 
         if (process.env.NODE_ENV === 'development') {
-          console.table(timings)
+          logger.info('Navigation Timing Table', timings)
         }
       }
 

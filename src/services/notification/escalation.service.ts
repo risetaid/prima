@@ -1,4 +1,4 @@
-import { VolunteerNotificationService, EscalationData } from './volunteer-notification.service';
+import { VolunteerNotificationService, EscalationData } from '@/services/notification/volunteer-notification.service';
 import { logger } from '@/lib/logger';
 
 export interface MessageAnalysis {

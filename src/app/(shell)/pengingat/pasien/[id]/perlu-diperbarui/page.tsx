@@ -6,6 +6,7 @@ import { ArrowLeft, Download, Clock } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
+import { logger } from '@/lib/logger';
 interface PendingReminder {
   id: string;
   scheduledTime: string;
@@ -40,11 +41,11 @@ export default function PendingUpdatePage() {
         const data = await response.json();
         setReminders(data);
       } else {
-        console.error("Failed to fetch pending reminders");
+        logger.error("Failed to fetch pending reminders");
         setReminders([]);
       }
-    } catch (error) {
-      console.error("Error fetching pending reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching pending reminders:", error instanceof Error ? error : new Error(String(error)));
       setReminders([]);
     } finally {
       setLoading(false);
@@ -83,14 +84,14 @@ export default function PendingUpdatePage() {
           });
         }
       } else {
-        console.error("Failed to confirm reminder");
+        logger.error("Failed to confirm reminder");
         toast.error("❌ Gagal Mengupdate", {
           description: "Tidak dapat menyimpan status pengingat. Coba lagi.",
           duration: 5000,
         });
       }
-    } catch (error) {
-      console.error("Error confirming reminder:", error);
+    } catch (error: unknown) {
+      logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
       toast.error("❌ Kesalahan Jaringan", {
         description:
           "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",

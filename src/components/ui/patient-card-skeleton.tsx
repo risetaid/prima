@@ -1,5 +1,5 @@
-import { Skeleton } from "./skeleton"
-import { SkeletonAvatar } from "./skeleton-factory"
+import { Skeleton } from "@/components/ui/skeleton"
+import { SkeletonAvatar } from "@/components/ui/skeleton-factory"
 
 export function PatientCardSkeleton() {
   return (

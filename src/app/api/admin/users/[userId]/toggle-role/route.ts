@@ -4,6 +4,7 @@ import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 
+import { logger } from '@/lib/logger';
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -85,8 +86,8 @@ export async function POST(
         newRole: role,
       },
     });
-  } catch (error) {
-    console.error("Error toggling user role:", error);
+  } catch (error: unknown) {
+    logger.error("Error toggling user role:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       {
         error: "Internal server error",

@@ -3,7 +3,7 @@
 import React, { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, RefreshCw, Home, AlertCircle, X } from 'lucide-react'
-import { Button } from './button'
+import { Button } from '@/components/ui/button'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 

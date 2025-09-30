@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
         message: `Cleaned up ${expiredStatesCount + inactiveStatesCount} conversation states and ${deletedMessagesCount} messages`
       }
       
-      logger.info('Conversation cleanup completed successfully', result)
+      logger.info('Conversation cleanup completed successfully', { value: result })
       return NextResponse.json(result)
       
     } catch (error) {

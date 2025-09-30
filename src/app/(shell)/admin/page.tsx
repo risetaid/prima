@@ -15,6 +15,7 @@ import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
 import { Patient } from "@/db/schema";
 
+import { logger } from '@/lib/logger';
 export default function AdminPanelPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -66,8 +67,8 @@ export default function AdminPanelPage() {
           activePatients,
         }));
       }
-    } catch (error) {
-      console.error("Failed to fetch admin stats:", error);
+    } catch (error: unknown) {
+      logger.error("Failed to fetch admin stats:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memuat statistik admin");
     } finally {
       setLoading(false);

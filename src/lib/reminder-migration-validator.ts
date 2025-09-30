@@ -3,6 +3,7 @@
 
 import { db } from '@/db';
 import { sql } from 'drizzle-orm';
+import { logger } from '@/lib/logger';
 
 // Database query result interfaces
 interface TimeQueryResult {
@@ -275,24 +276,24 @@ export class MigrationValidator {
 
   // Comprehensive migration validation
   static async validateFullMigration(): Promise<FullMigrationResult> {
-    console.log('🔍 Validating migration readiness...');
+    logger.info('🔍 Validating migration readiness...');
 
     const allIssues: string[] = [];
     const allRecommendations: string[] = [];
 
     // Validate database connection
-    console.log('📡 Testing database connection...');
+    logger.info('📡 Testing database connection...');
     const connectionResult = await this.validateDatabaseConnection();
     allIssues.push(...connectionResult.issues);
 
     // Validate migration safety
-    console.log('🛡️ Checking migration safety...');
+    logger.info('🛡️ Checking migration safety...');
     const safetyResult = await this.validateMigrationSafety();
     allIssues.push(...safetyResult.issues);
     allRecommendations.push(...safetyResult.recommendations);
 
     // Validate rollback capability
-    console.log('🔄 Checking rollback capability...');
+    logger.info('🔄 Checking rollback capability...');
     const rollbackResult = await this.validateRollbackCapability();
     allIssues.push(...rollbackResult.issues);
 

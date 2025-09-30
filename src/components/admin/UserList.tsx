@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, User } from "lucide-react";
-import UserCard from "./UserCard";
+import UserCard from "@/components/admin/UserCard";
 
 interface User {
   id: string;

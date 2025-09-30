@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 
+import { logger } from '@/lib/logger';
 export async function GET() {
   try {
     // Get first developer user for contact info
@@ -33,8 +34,8 @@ export async function GET() {
       email: developer.email || "davidyusaku13@gmail.com",
       hospitalName: developer.hospitalName || "PRIMA System",
     });
-  } catch (error) {
-    console.error("Error fetching developer contact:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching developer contact:", error instanceof Error ? error : new Error(String(error)));
 
     // Return fallback contact info
     return NextResponse.json({

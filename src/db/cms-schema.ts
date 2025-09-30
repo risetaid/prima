@@ -10,7 +10,7 @@ import {
 import {
   contentCategoryEnum,
   contentStatusEnum,
-} from "./enums";
+} from "@/db/enums";
 
 // Re-export enums for convenience
 export {

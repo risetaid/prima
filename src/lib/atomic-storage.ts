@@ -3,7 +3,7 @@
  * between multiple tabs/windows accessing the same keys
  */
 
-import { logger } from "./logger";
+import { logger } from "@/lib/logger";
 
 interface StorageLock {
   key: string;

@@ -10,6 +10,7 @@ import { eq, and, desc, asc, gte, lte, inArray, isNull } from "drizzle-orm";
 import { getWIBTime } from "@/lib/timezone";
 import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
 
+import { logger } from '@/lib/logger';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -178,7 +179,7 @@ export async function GET(
 
       return showInScheduled;
     });
-    console.log(
+    logger.info(
       `Filter results: ${scheduledReminders.length} total, ${filteredReminders.length} after filtering`
     );
 

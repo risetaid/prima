@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { CMSContentListSkeleton } from '@/components/ui/dashboard-skeleton'
 import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
 
+import { logger } from '@/lib/logger';
 interface Article {
   id: string
   title: string
@@ -75,12 +76,12 @@ export default function ArticlesPage() {
         setArticles(data.data)
         setPagination(data.pagination)
       } else {
-        console.warn('⚠️ Articles: API returned failure, might be missing database tables')
+        logger.warn('⚠️ Articles: API returned failure, might be missing database tables')
         toast.error('CMS belum dikonfigurasi. Hubungi administrator.')
       }
-    } catch (error) {
-      console.error('Error fetching articles:', error)
-      
+    } catch (error: unknown) {
+      logger.error('Error fetching articles:', error instanceof Error ? error : new Error(String(error)))
+
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error('Koneksi bermasalah. Periksa internet Anda.')
       } else {
@@ -109,8 +110,8 @@ export default function ArticlesPage() {
       } else {
         toast.error('Gagal menghapus artikel')
       }
-    } catch (error) {
-      console.error('Error deleting article:', error)
+    } catch (error: unknown) {
+      logger.error('Error deleting article:', error instanceof Error ? error : new Error(String(error)))
       toast.error('Terjadi kesalahan saat menghapus artikel')
     } finally {
       setDeleting(false)

@@ -11,6 +11,7 @@ import { ReminderItem } from "@/components/reminder/ReminderItem";
 import { EditReminderModal } from "@/components/reminder/EditReminderModal";
 import { FloatingActionButtons } from "@/components/reminder/FloatingActionButtons";
 
+import { logger } from '@/lib/logger';
 interface ContentItem {
   id: string;
   title: string;
@@ -79,11 +80,11 @@ export default function ScheduledRemindersPage() {
         const data = await response.json();
         setReminders(data);
       } else {
-        console.error("Failed to fetch scheduled reminders");
+        logger.error("Failed to fetch scheduled reminders");
         setReminders([]);
       }
-    } catch (error) {
-      console.error("Error fetching scheduled reminders:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching scheduled reminders:", error instanceof Error ? error : new Error(String(error)));
       setReminders([]);
     } finally {
       setLoading(false);
@@ -143,8 +144,8 @@ export default function ScheduledRemindersPage() {
               description: error.error || "Terjadi kesalahan pada server",
             });
           }
-        } catch (error) {
-          console.error("Error deleting reminders:", error);
+        } catch (error: unknown) {
+          logger.error("Error deleting reminders:", error instanceof Error ? error : new Error(String(error)));
           toast.error("Gagal menghapus pengingat", {
             description: "Terjadi kesalahan jaringan",
           });
@@ -201,8 +202,8 @@ export default function ScheduledRemindersPage() {
           description: error.error || "Terjadi kesalahan pada server",
         });
       }
-    } catch (error) {
-      console.error("Error updating reminder:", error);
+    } catch (error: unknown) {
+      logger.error("Error updating reminder:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Gagal memperbarui pengingat", {
         description: "Terjadi kesalahan jaringan",
       });

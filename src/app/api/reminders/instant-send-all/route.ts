@@ -162,8 +162,8 @@ export async function POST() {
           scheduledTime: activeReminders[0].scheduledTime,
         });
       }
-    } catch (dbError) {
-      console.error("❌ Database query error:", dbError);
+    } catch (dbError: unknown) {
+      logger.error("❌ Database query error:", dbError instanceof Error ? dbError : new Error(String(dbError)));
       return NextResponse.json(
         {
           success: false,
@@ -177,7 +177,7 @@ export async function POST() {
       );
     }
 
-    console.log(
+    logger.info(
       `📋 Found ${activeReminders.length} active reminders for today`
     );
 
@@ -346,11 +346,12 @@ export async function POST() {
     };
 
     return NextResponse.json(summary);
-  } catch (error) {
-    console.error("❌ Error in instant send all reminders:", error);
-    console.error(
+  } catch (error: unknown) {
+    logger.error("❌ Error in instant send all reminders:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
       "❌ Error stack:",
-      error instanceof Error ? error.stack : "No stack trace"
+      undefined,
+      { stack: error instanceof Error ? error.stack : "No stack trace" }
     );
 
     return NextResponse.json(

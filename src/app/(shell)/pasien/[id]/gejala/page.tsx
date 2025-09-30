@@ -9,6 +9,7 @@ import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
 import { HealthNotesSkeleton } from "@/components/ui/dashboard-skeleton";
 
+import { logger } from '@/lib/logger';
 interface Patient {
   id: string;
   name: string;
@@ -212,8 +213,8 @@ export default function PatientSymptomsPage() {
       ]);
       if (patientRes.ok) setPatient(await patientRes.json());
       if (symptomsRes.ok) setSymptoms(await symptomsRes.json());
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (error: unknown) {
+      logger.error("Error fetching data:", error instanceof Error ? error : new Error(String(error)));
     } finally {
       setLoading(false);
     }
@@ -255,8 +256,8 @@ export default function PatientSymptomsPage() {
           description: "Tidak dapat menghapus gejala. Coba lagi.",
         });
       }
-    } catch (error) {
-      console.error("Error deleting symptoms:", error);
+    } catch (error: unknown) {
+      logger.error("Error deleting symptoms:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Kesalahan Jaringan", {
         description: "Tidak dapat terhubung ke server.",
       });
@@ -416,8 +417,8 @@ function AddSymptomDialog({
         toast.error("Gagal Menambah Gejala", {
           description: "Tidak dapat menambahkan gejala baru. Coba lagi.",
         });
-    } catch (error) {
-      console.error("Error adding symptom:", error);
+    } catch (error: unknown) {
+      logger.error("Error adding symptom:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Kesalahan Jaringan", {
         description: "Tidak dapat terhubung ke server.",
       });
@@ -531,8 +532,8 @@ function EditSymptomDialog({
         toast.error("Gagal Update Gejala", {
           description: "Tidak dapat memperbarui data gejala. Coba lagi.",
         });
-    } catch (error) {
-      console.error("Error updating symptom:", error);
+    } catch (error: unknown) {
+      logger.error("Error updating symptom:", error instanceof Error ? error : new Error(String(error)));
       toast.error("Kesalahan Jaringan", {
         description: "Tidak dapat terhubung ke server.",
       });

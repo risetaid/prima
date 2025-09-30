@@ -4,11 +4,11 @@
  */
 
 import { logger } from '@/lib/logger'
-import { messageQueueService, QueuedMessage } from './message-queue.service'
-import { llmService } from './llm/llm.service'
-import { WhatsAppService } from './whatsapp/whatsapp.service'
-import { ConversationStateService } from './conversation-state.service'
-import { PatientContextService } from './patient/patient-context.service'
+import { messageQueueService, QueuedMessage } from '@/services/message-queue.service'
+import { llmService } from '@/services/llm/llm.service'
+import { WhatsAppService } from '@/services/whatsapp/whatsapp.service'
+import { ConversationStateService } from '@/services/conversation-state.service'
+import { PatientContextService } from '@/services/patient/patient-context.service'
 
 export class MessageWorkerService {
   private isRunning: boolean = false

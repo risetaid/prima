@@ -3,7 +3,7 @@
  * Focused on essential functionality for WhatsApp healthcare messaging
  */
 
-import { ConversationContext } from "./llm.types";
+import { ConversationContext } from "@/services/llm/llm.types";
 
 export interface PromptTemplate {
   systemPrompt: string;

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import Image from "next/image";
+import { logger } from '@/lib/logger';
 
 interface ThumbnailUploadProps {
   featuredImageUrl: string;
@@ -49,8 +50,8 @@ export function ThumbnailUpload({
         } else {
           throw new Error(uploadResult.error || "Upload failed");
         }
-      } catch (error) {
-        console.error("Upload error:", error);
+      } catch (error: unknown) {
+        logger.error("Upload error:", error instanceof Error ? error : new Error(String(error)));
         toast.error("Gagal mengupload gambar");
       }
     }

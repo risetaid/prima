@@ -1,18 +1,18 @@
 // PatientService centralizes patient listing and verification history
-import { PatientRepository } from "./patient.repository";
-import { ComplianceService } from "./compliance.service";
+import { PatientRepository } from "@/services/patient/patient.repository";
+import { ComplianceService } from "@/services/patient/compliance.service";
 import type {
   PatientFilters,
   CreatePatientDTO,
   UpdatePatientDTO,
   PatientRow,
-} from "./patient.types";
-import { ValidationError, NotFoundError } from "./patient.types";
+} from "@/services/patient/patient.types";
+import { ValidationError, NotFoundError } from "@/services/patient/patient.types";
 import { db, patients } from "@/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 import { validatePhoneWithMessage } from "@/lib/phone-utils";
-import { PatientAccessControl } from "./patient-access-control";
+import { PatientAccessControl } from "@/services/patient/patient-access-control";
 
 export class PatientService {
   private repo: PatientRepository;

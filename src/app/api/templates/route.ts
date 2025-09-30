@@ -4,6 +4,7 @@ import { db, whatsappTemplates } from '@/db'
 import { eq, and, asc } from 'drizzle-orm'
 import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
+import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -65,8 +66,8 @@ export async function GET(request: NextRequest) {
     await setCachedData(cacheKey, response, CACHE_TTL.TEMPLATES)
 
     return NextResponse.json(response)
-  } catch (error) {
-    console.error('Template fetch error:', error)
+  } catch (error: unknown) {
+    logger.error('Template fetch error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch templates' },
       { status: 500 }

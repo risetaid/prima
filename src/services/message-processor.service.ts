@@ -1,19 +1,19 @@
 // Message Processor Service - Advanced NLP for Indonesian WhatsApp responses
 // Handles natural language processing, context awareness, and intelligent response classification
 
-import { llmService } from "./llm/llm.service";
+import { llmService } from "@/services/llm/llm.service";
 import {
   ConversationContext,
   LLMRequest,
   ProcessedLLMResponse,
-} from "./llm/llm.types";
-import { PatientContextService } from "./patient/patient-context.service";
+} from "@/services/llm/llm.types";
+import { PatientContextService } from "@/services/patient/patient-context.service";
 import {
   ConversationStateService,
   ConversationMessageData,
-} from "./conversation-state.service";
-import { WhatsAppService } from "./whatsapp/whatsapp.service";
-import { safetyFilterService } from "./llm/safety-filter";
+} from "@/services/conversation-state.service";
+import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { safetyFilterService } from "@/services/llm/safety-filter";
 import { logger } from "@/lib/logger";
 import { tokenizerService } from "@/lib/simple-tokenizer";
 import { llmCostService } from "@/lib/llm-cost-service";
@@ -1861,8 +1861,7 @@ export class MessageProcessorService {
   private async generateDirectLLMResponse(
     message: string,
     context: ConversationContext,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    fullPatientContext?: any
+    fullPatientContext?: FullPatientContext
   ): Promise<ProcessedLLMResponse | null> {
     const startTime = Date.now();
     try {
@@ -1945,8 +1944,7 @@ export class MessageProcessorService {
 
     if (activeReminders.length > 0) {
       patientDetails += `, Active reminders: ${activeReminders
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((r: any) => r.reminderMessage || r.customMessage || "pengingat")
+        .map((r) => r.reminderMessage || r.customMessage || "pengingat")
         .join(", ")}`;
     }
 

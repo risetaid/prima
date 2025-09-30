@@ -6,7 +6,7 @@ import {
   Mail,
   Calendar,
 } from "lucide-react";
-import UserActions from "./UserActions";
+import UserActions from "@/components/admin/UserActions";
 
 interface User {
   id: string;

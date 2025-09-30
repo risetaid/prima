@@ -4,6 +4,7 @@ import { db, patients } from '@/db'
 import { isNull } from 'drizzle-orm'
 import { ComplianceService } from '@/services/patient/compliance.service'
 
+import { logger } from '@/lib/logger';
 export async function GET() {
   try {
     const user = await getCurrentUser()
@@ -38,8 +39,8 @@ export async function GET() {
     }))
 
     return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error fetching patients with compliance:', error)
+  } catch (error: unknown) {
+    logger.error('Error fetching patients with compliance:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

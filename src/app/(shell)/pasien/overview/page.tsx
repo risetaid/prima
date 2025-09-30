@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useEffect } from "react";
-import DashboardClient from "../dashboard-client";
+import DashboardClient from "@/app/(shell)/pasien/dashboard-client";
 import { Header } from "@/components/ui/header";
 import { DashboardSkeleton } from "@/components/ui/dashboard-skeleton";
 

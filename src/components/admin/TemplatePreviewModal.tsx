@@ -4,7 +4,7 @@ import React from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-import { WhatsAppTemplate, categoryLabels, categoryColors } from './types'
+import { WhatsAppTemplate, categoryLabels, categoryColors } from '@/components/admin/types'
 
 interface TemplatePreviewModalProps {
   isOpen: boolean

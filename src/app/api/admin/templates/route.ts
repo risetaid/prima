@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates, users } from '@/db'
 import { eq, and, asc, inArray, isNull } from 'drizzle-orm'
 
+import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser()
@@ -82,8 +83,8 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({ templates })
-  } catch (error) {
-    console.error('Template fetch error:', error)
+  } catch (error: unknown) {
+    logger.error('Template fetch error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to fetch templates' },
       { status: 500 }
@@ -181,8 +182,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ template }, { status: 201 })
-  } catch (error) {
-    console.error('Template creation error:', error)
+  } catch (error: unknown) {
+    logger.error('Template creation error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to create template' },
       { status: 500 }

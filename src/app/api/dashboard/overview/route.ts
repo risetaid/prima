@@ -4,6 +4,7 @@ import { eq, and, isNull, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { ComplianceService } from "@/services/patient/compliance.service";
 
+import { logger } from '@/lib/logger';
 export async function GET() {
   try {
     // Since middleware with auth.protect() already handles authentication and authorization,
@@ -129,8 +130,8 @@ export async function GET() {
       patients: patientsFormatted,
       stats,
     });
-  } catch (error) {
-    console.error("Error fetching dashboard overview:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching dashboard overview:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

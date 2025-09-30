@@ -4,6 +4,7 @@ import { db, cmsVideos } from "@/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { z } from "zod";
 
+import { logger } from '@/lib/logger';
 // Validation schema for updates
 const updateVideoSchema = z.object({
   title: z
@@ -97,8 +98,8 @@ export async function GET(
       success: true,
       data: video[0],
     });
-  } catch (error) {
-    console.error("Error fetching video:", error);
+  } catch (error: unknown) {
+    logger.error("Error fetching video:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -208,7 +209,7 @@ export async function PUT(
       );
     }
 
-    console.error("Error updating video:", error);
+    logger.error("Error updating video:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -254,8 +255,8 @@ export async function DELETE(
       success: true,
       message: "Video deleted successfully",
     });
-  } catch (error) {
-    console.error("Error deleting video:", error);
+  } catch (error: unknown) {
+    logger.error("Error deleting video:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
