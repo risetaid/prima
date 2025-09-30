@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
 import { eq, count } from "drizzle-orm";
 import { nowWIB } from "@/lib/datetime";
+import { logger } from "@/lib/logger";
 // DB utils temporarily inlined
 import {
   getCachedData,
@@ -76,15 +77,15 @@ export async function POST() {
     try {
       cachedSession = await getCachedData<UserSessionData>(cacheKey);
     } catch (cacheError) {
-      console.warn(
-        "⚠️ Cache unavailable, proceeding without cache:",
-        cacheError
-      );
+      logger.warn("Cache unavailable, proceeding without cache", {
+        api: true,
+        error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
       // Continue without cache - don't fail the entire request
     }
 
     if (cachedSession) {
-      console.log("⚡ User session cache hit - instant response");
+      logger.info("User session cache hit - instant response", { api: true, cache: true });
       // Still update login timestamp in background (non-blocking)
       setImmediate(async () => {
         try {
@@ -96,23 +97,21 @@ export async function POST() {
             })
             .where(eq(users.clerkId, userId));
         } catch (error) {
-          console.warn("⚠️ Background login update failed:", error);
+          logger.warn("Background login update failed", { api: true, error: error instanceof Error ? error.message : String(error) });
         }
       });
 
       return NextResponse.json(cachedSession);
     }
 
-    console.log("💾 User session cache miss - fetching from database");
+    logger.info("User session cache miss - fetching from database", { api: true, cache: true });
 
     // Try to get existing user first with connection pool aware settings
     let user = await getCurrentUser();
 
     // FALLBACK: If database fails but user is authenticated in Clerk, provide minimal session
     if (!user) {
-      console.warn(
-        "⚠️ Database unavailable (likely connection pool exhaustion), providing fallback Clerk-only session"
-      );
+      logger.warn("Database unavailable, providing fallback Clerk-only session", { api: true, userId });
       // Smart fallback: Check if this looks like an existing admin user based on Clerk data
       const likelyAdmin =
         clerkUser.primaryEmailAddress?.emailAddress?.includes("admin") ||
@@ -178,10 +177,7 @@ export async function POST() {
         // Get user again after creation with reasonable timeout
         user = await getCurrentUser();
       } catch (syncError) {
-        console.error(
-          "❌ User Session: Failed to sync user from Clerk:",
-          syncError
-        );
+        logger.error("User Session: Failed to sync user from Clerk", syncError as Error, { api: true, userId });
         return NextResponse.json(
           {
             error: "Failed to sync user account",
@@ -217,7 +213,7 @@ export async function POST() {
           })
           .where(eq(users.clerkId, userId));
       } catch (error) {
-        console.warn("⚠️ Background login update failed:", error);
+        logger.warn("Background login update failed", { api: true, error: error instanceof Error ? error.message : String(error) });
         // Don't throw - this is non-critical for user session
       }
     });
@@ -263,14 +259,13 @@ export async function POST() {
 
     // Cache successful session data for future requests
     setCachedData(cacheKey, sessionData, CACHE_TTL.USER_SESSION).catch(
-      (error) => console.warn("⚠️ Failed to cache session data:", error)
+      (error) => logger.warn("Failed to cache session data", { api: true, cache: true, error: error instanceof Error ? error.message : String(error) })
     );
 
     return NextResponse.json(sessionData);
   } catch (error) {
-    console.error("❌ User Session: Unexpected error:", {
-      error: error instanceof Error ? error.message : error,
-      stack: error instanceof Error ? error.stack : "No stack trace",
+    logger.error("User Session: Unexpected error", error as Error, {
+      api: true,
       timestamp: new Date().toISOString(),
       duration: Date.now() - startTime,
     });
@@ -319,7 +314,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("❌ Session Check: Error:", error);
+    logger.error("Session Check: Error", error as Error, { api: true });
     return NextResponse.json(
       {
         authenticated: false,

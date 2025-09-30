@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "minio";
 import { getCurrentUser } from "@/lib/auth-utils";
+import { logger } from "@/lib/logger";
 
 interface MinIOError {
   message: string;
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
       process.env.MINIO_SECRET_KEY || process.env.MINIO_ROOT_PASSWORD;
 
     if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
-      console.error("Missing MinIO environment variables:", {
+      logger.error("Missing MinIO environment variables", new Error("MinIO configuration missing"), {
         endpoint: !!minioEndpoint,
         accessKey: !!minioAccessKey,
         secretKey: !!minioSecretKey,
@@ -196,10 +197,10 @@ export async function POST(request: NextRequest) {
       try {
         await minioClient.setBucketPolicy(bucketName, JSON.stringify(policy));
       } catch (policyError) {
-        console.warn("Failed to set bucket policy:", policyError);
+        logger.warn("Failed to set bucket policy", { error: policyError instanceof Error ? policyError.message : String(policyError) });
       }
     } catch (bucketError) {
-      console.error("Bucket operation error:", bucketError);
+      logger.error("Bucket operation error", bucketError as Error);
       return NextResponse.json(
         {
           error: "Failed to access MinIO bucket",
@@ -232,9 +233,8 @@ export async function POST(request: NextRequest) {
           break; // Success
         } catch (error: unknown) {
           const minioError = error as MinIOError;
-          console.error("Upload attempt failed:", {
+          logger.error("Upload attempt failed", minioError as Error, {
             attempt: attempts + 1,
-            error: minioError.message,
             code: minioError.code,
             filename: currentFilename,
           });
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error("Upload error:", error);
+    logger.error("Upload error", error as Error);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }
@@ -316,7 +316,7 @@ export async function DELETE(request: NextRequest) {
     const minioPassword = process.env.MINIO_ROOT_PASSWORD;
 
     if (!minioEndpoint || !minioUser || !minioPassword) {
-      console.error("Missing MinIO environment variables:", {
+      logger.error("Missing MinIO environment variables", new Error("MinIO configuration missing"), {
         endpoint: !!minioEndpoint,
         user: !!minioUser,
         password: !!minioPassword,
@@ -344,7 +344,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Delete error:", error);
+    logger.error("Delete error", error as Error);
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });
   }
 }

@@ -419,12 +419,22 @@ export async function POST(request: NextRequest) {
 
     // Step 8: Return appropriate response
     if (result.success) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const responseData: any = {
+      const responseData: {
+        success: boolean;
+        message: string;
+        patientId: string | null | undefined;
+        result: string | undefined;
+        processingTimeMs: number;
+        llmIntent?: string;
+        llmConfidence?: number;
+        requiresHumanIntervention?: boolean;
+        llmResponse?: string;
+        recommendedActions?: unknown;
+      } = {
         success: true,
         message: result.message,
-        patientId: result.patientId,
-        result: result.result,
+        patientId: result.patientId ?? null,
+        result: result.result ?? '',
         processingTimeMs: processingTime,
       };
 

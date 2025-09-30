@@ -3,6 +3,7 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { db, users } from "@/db";
 import { eq, count } from "drizzle-orm";
+import { logger } from "@/lib/logger";
 
 type WebhookEvent = {
   type: string;
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
           .limit(1);
 
         if (existingUser[0]) {
-          console.log(`User ${id} already exists, skipping creation`);
+          logger.info(`User ${id} already exists, skipping creation`, { webhook: true, userId: id });
           return; // User already exists, skip creation
         }
 
@@ -91,16 +92,17 @@ export async function POST(request: NextRequest) {
           approvedAt: isFirstUser ? new Date() : null,
         });
 
-        console.log(`User ${id} created successfully via webhook`, {
+        logger.info(`User ${id} created successfully via webhook`, {
+          webhook: true,
+          userId: id,
           role: isFirstUser ? "ADMIN" : "RELAWAN",
           isApproved: isFirstUser,
-          webhook: true,
         });
       });
 
       return NextResponse.json({ success: true });
     } catch (error) {
-      console.error("Failed to create user via webhook:", error);
+      logger.error("Failed to create user via webhook", error as Error, { webhook: true, userId: id });
       return NextResponse.json(
         { error: "Failed to create user" },
         { status: 500 }

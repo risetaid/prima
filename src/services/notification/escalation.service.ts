@@ -75,8 +75,14 @@ export class EscalationService {
     try {
       await this.notificationService.createNotification(data);
     } catch (error) {
-      logger.error('Failed to create volunteer notification:', error instanceof Error ? error : new Error(String(error)));
-      // TODO: Add proper error handling/logging
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error('Failed to create volunteer notification', err, {
+        escalation: true,
+        patientId: data.patientId,
+        reason: data.reason,
+      });
+      // Re-throw to allow caller to handle critical escalation failures
+      throw err;
     }
   }
 

@@ -161,8 +161,20 @@ export class ConversationStateService {
   ): Promise<ConversationMessageData> {
     try {
       // Prepare the insert data with proper type conversions
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const insertData: any = {
+      const insertData: {
+        conversationStateId: string;
+        message: string;
+        direction: 'inbound' | 'outbound';
+        messageType: 'verification' | 'reminder' | 'confirmation' | 'general';
+        intent?: string;
+        confidence?: number;
+        processedAt?: Date;
+        llmResponseId?: string;
+        llmModel?: string;
+        llmTokensUsed?: number;
+        llmResponseTimeMs?: number;
+        llmCost?: string;
+      } = {
         conversationStateId,
         message: message.message,
         direction: message.direction,

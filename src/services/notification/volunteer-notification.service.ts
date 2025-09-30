@@ -114,10 +114,11 @@ export class VolunteerNotificationService {
 
   /**
    * Get configured notification channels
+   * NOTE: Currently returns hardcoded default channels.
+   * Future enhancement: Load from database configuration table
+   * to allow dynamic channel management per volunteer/organization.
    */
   private async getNotificationChannels(): Promise<NotificationChannel[]> {
-    // TODO: Load from configuration/database
-    // For now, return default channels
     return [
       {
         type: "dashboard",

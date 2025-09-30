@@ -130,7 +130,6 @@ export class MessageWorkerService {
 
       if (!patientContext.found) {
         logger.warn('Patient not found for queued message', {
-          messageId: message.id,
           phoneNumber: message.phoneNumber
         })
         return
@@ -138,8 +137,7 @@ export class MessageWorkerService {
 
       // Get conversation history
       const conversationState = await this.conversationStateService.findByPhoneNumber(message.phoneNumber)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let conversationHistory: any[] = []
+      let conversationHistory: Array<{ direction: 'inbound' | 'outbound'; message: string }> = []
 
       if (conversationState) {
         conversationHistory = await this.conversationStateService.getConversationHistory(
@@ -149,9 +147,8 @@ export class MessageWorkerService {
       }
 
       // Build conversation context for LLM
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const llmContext: any = {
-        patientId: message.patientId,
+      const llmContext = {
+        patientId: message.patientId ?? '',
         phoneNumber: message.phoneNumber,
         conversationId: conversationState?.id,
         previousMessages: conversationHistory.map((msg) => ({

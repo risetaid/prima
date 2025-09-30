@@ -378,11 +378,13 @@ export class UnsubscribeAnalyticsService {
       .groupBy(sql<string>`DATE_TRUNC('week', ${patients.unsubscribedAt})`)
       .orderBy(sql<string>`DATE_TRUNC('week', ${patients.unsubscribedAt})`);
 
-    // TODO: Add confidence calculation per week
+    // NOTE: Confidence calculation requires LLM analysis data which is not yet
+    // consistently stored in the patients table. Future enhancement: add confidence
+    // field to track LLM detection confidence for unsubscribe intent.
     return results.map((result) => ({
       week: result.week,
       count: result.count,
-      averageConfidence: 0, // Placeholder for now
+      averageConfidence: 0, // Not yet implemented - requires LLM confidence data
     }));
   }
 
