@@ -392,7 +392,7 @@ export class UnsubscribeAnalyticsService {
    * Get default start date (30 days ago)
    */
   private getDefaultStartDate(): Date {
-    const date = new Date();
+    const date = getWIBTime();
     date.setDate(date.getDate() - 30);
     return date;
   }
