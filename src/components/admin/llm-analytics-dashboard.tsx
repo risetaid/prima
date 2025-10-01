@@ -228,6 +228,7 @@ export function LLMAnalyticsDashboard({
           <TabsTrigger value="models">By Model</TabsTrigger>
           <TabsTrigger value="intents">By Intent</TabsTrigger>
           <TabsTrigger value="daily">Daily Usage</TabsTrigger>
+          <TabsTrigger value="costs">Cost Analysis</TabsTrigger>
         </TabsList>
 
         <TabsContent value="models" className="space-y-4">
@@ -325,6 +326,114 @@ export function LLMAnalyticsDashboard({
                       <span>{formatNumber(day.requests)} req</span>
                       <span>{formatNumber(day.tokens)} tokens</span>
                       <span>{formatCurrency(day.cost)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="costs" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Cost Breakdown by Model</CardTitle>
+                <CardDescription>
+                  Total costs and usage by LLM model
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Object.entries(stats.costByModel || {}).map(
+                    ([model, cost]) => (
+                      <div
+                        key={model}
+                        className="flex items-center justify-between"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">{model}</Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {formatCurrency(cost)}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground">
+                            {stats.totalCost && stats.totalCost > 0
+                              ? ((cost / stats.totalCost) * 100).toFixed(1)
+                              : '0.0'}% of total
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Cost Efficiency</CardTitle>
+                <CardDescription>
+                  Cost per token and efficiency metrics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-sm">Cost per 1K tokens</span>
+                    <span className="font-medium">
+                      {stats.totalTokens && stats.totalTokens > 0
+                        ? formatCurrency((stats.totalCost || 0) / (stats.totalTokens / 1000))
+                        : formatCurrency(0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Cost per request</span>
+                    <span className="font-medium">
+                      {stats.totalRequests && stats.totalRequests > 0
+                        ? formatCurrency((stats.totalCost || 0) / stats.totalRequests)
+                        : formatCurrency(0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm">Avg tokens per request</span>
+                    <span className="font-medium">
+                      {stats.totalRequests && stats.totalRequests > 0
+                        ? Math.round((stats.totalTokens || 0) / stats.totalRequests)
+                        : 0}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Cost Trends</CardTitle>
+              <CardDescription>
+                Daily cost breakdown over time
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {(stats.dailyUsage || []).map((day) => (
+                  <div
+                    key={day.date}
+                    className="flex items-center justify-between py-2 border-b"
+                  >
+                    <div className="font-medium">{day.date}</div>
+                    <div className="flex space-x-6 text-sm">
+                      <span className="text-right min-w-[80px]">
+                        {formatNumber(day.requests)} req
+                      </span>
+                      <span className="text-right min-w-[80px]">
+                        {formatNumber(day.tokens)} tokens
+                      </span>
+                      <span className="text-right min-w-[80px] font-medium">
+                        {formatCurrency(day.cost)}
+                      </span>
                     </div>
                   </div>
                 ))}

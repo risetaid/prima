@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.63.0",
+    "@anthropic-ai/tokenizer": "^0.0.4",
     "@clerk/nextjs": "^6.31.6",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.15",

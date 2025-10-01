@@ -1,0 +1,31 @@
+{
+  "daily": {
+    "date": "2025-10-01",
+    "tokens": 0,
+    "cost": 0
+  },
+  "monthly": {
+    "month": "2025-10",
+    "tokens": 0,
+    "cost": 0
+  },
+  "models": {
+    "claude-3-5-haiku": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cost": 0
+    },
+    "claude-3-5-sonnet": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cost": 0
+    },
+    "claude-3-opus": {
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cost": 0
+    }
+  },
+  "lastUpdated": "2025-10-01T15:13:00.000Z",
+  "version": "1.0"
+}

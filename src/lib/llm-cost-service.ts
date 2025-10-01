@@ -5,7 +5,9 @@
  */
 
 import { logger } from "@/lib/logger";
-import { tokenizerService } from "@/lib/simple-tokenizer";
+import { llmTokenizerService } from "@/lib/llm-tokenizer";
+import { llmUsageService } from "@/services/llm-usage.service";
+import { llmBudgetService } from "@/services/llm-budget.service";
 
 export interface UsageLimits {
   dailyTokens: number;
@@ -23,12 +25,6 @@ class SimpleLLMCostService {
   private readonly DAILY_TOKEN_LIMIT = parseInt(process.env.DAILY_TOKEN_LIMIT || "50000");
   private readonly MONTHLY_TOKEN_LIMIT = parseInt(process.env.MONTHLY_TOKEN_LIMIT || "1000000");
 
-  // Simple in-memory tracking (resets on server restart)
-  private dailyTokens = 0;
-  private monthlyTokens = 0;
-  private lastDailyReset = new Date();
-  private lastMonthlyReset = new Date();
-
   /**
    * Calculate cost for LLM request/response
    */
@@ -38,11 +34,11 @@ class SimpleLLMCostService {
     totalTokens: number;
     totalCost: number;
   }> {
-    const inputTokenCount = tokenizerService.countTokens(inputText, model);
-    const outputTokenCount = tokenizerService.countTokens(outputText, model);
+    const inputTokenCount = llmTokenizerService.countTokens(inputText, model);
+    const outputTokenCount = llmTokenizerService.countTokens(outputText, model);
 
-    const inputCost = tokenizerService.estimateCost(inputTokenCount.tokens, model);
-    const outputCost = tokenizerService.estimateCost(outputTokenCount.tokens, model);
+    const inputCost = llmTokenizerService.estimateCost(inputTokenCount.tokens, model);
+    const outputCost = llmTokenizerService.estimateCost(outputTokenCount.tokens, model);
 
     return {
       inputTokens: inputTokenCount.tokens,
@@ -60,42 +56,41 @@ class SimpleLLMCostService {
     limits: UsageLimits;
     alerts: SimpleCostAlert[];
   }> {
-    this.resetCountersIfNeeded();
-
+    const stats = await llmUsageService.getUsageStats();
     const alerts: SimpleCostAlert[] = [];
     let allowed = true;
 
     // Check daily limit
-    if (this.dailyTokens >= this.DAILY_TOKEN_LIMIT) {
+    if (stats.dailyTokens >= this.DAILY_TOKEN_LIMIT) {
       allowed = false;
       alerts.push({
-        message: `Daily token limit exceeded: ${this.dailyTokens}/${this.DAILY_TOKEN_LIMIT}`,
+        message: `Daily token limit exceeded: ${stats.dailyTokens}/${this.DAILY_TOKEN_LIMIT}`,
         severity: "critical",
       });
-    } else if (this.dailyTokens >= this.DAILY_TOKEN_LIMIT * 0.8) {
+    } else if (stats.dailyTokens >= this.DAILY_TOKEN_LIMIT * 0.8) {
       alerts.push({
-        message: `Daily token limit approaching: ${this.dailyTokens}/${this.DAILY_TOKEN_LIMIT}`,
+        message: `Daily token limit approaching: ${stats.dailyTokens}/${this.DAILY_TOKEN_LIMIT}`,
         severity: "warning",
       });
     }
 
     // Check monthly limit
-    if (this.monthlyTokens >= this.MONTHLY_TOKEN_LIMIT) {
+    if (stats.monthlyTokens >= this.MONTHLY_TOKEN_LIMIT) {
       allowed = false;
       alerts.push({
-        message: `Monthly token limit exceeded: ${this.monthlyTokens}/${this.MONTHLY_TOKEN_LIMIT}`,
+        message: `Monthly token limit exceeded: ${stats.monthlyTokens}/${this.MONTHLY_TOKEN_LIMIT}`,
         severity: "critical",
       });
-    } else if (this.monthlyTokens >= this.MONTHLY_TOKEN_LIMIT * 0.9) {
+    } else if (stats.monthlyTokens >= this.MONTHLY_TOKEN_LIMIT * 0.9) {
       alerts.push({
-        message: `Monthly token limit approaching: ${this.monthlyTokens}/${this.MONTHLY_TOKEN_LIMIT}`,
+        message: `Monthly token limit approaching: ${stats.monthlyTokens}/${this.MONTHLY_TOKEN_LIMIT}`,
         severity: "warning",
       });
     }
 
     const limits: UsageLimits = {
-      dailyTokens: this.dailyTokens,
-      monthlyTokens: this.monthlyTokens,
+      dailyTokens: stats.dailyTokens,
+      monthlyTokens: stats.monthlyTokens,
       dailyLimit: this.DAILY_TOKEN_LIMIT,
       monthlyLimit: this.MONTHLY_TOKEN_LIMIT,
     };
@@ -106,17 +101,9 @@ class SimpleLLMCostService {
   /**
    * Track usage for a request
    */
-  async trackUsage(tokens: number): Promise<void> {
-    this.resetCountersIfNeeded();
-
-    this.dailyTokens += tokens;
-    this.monthlyTokens += tokens;
-
-    logger.debug("LLM usage tracked", {
-      tokens,
-      dailyTotal: this.dailyTokens,
-      monthlyTotal: this.monthlyTokens,
-    });
+  async trackUsage(): Promise<void> {
+    // This method is now deprecated - use trackMessageCost instead for proper cost tracking
+    logger.warn("trackUsage is deprecated, use trackMessageCost for accurate tracking");
   }
 
   /**
@@ -131,7 +118,15 @@ class SimpleLLMCostService {
   ): Promise<void> {
     try {
       const cost = await this.calculateCost(inputText, outputText, model);
-      await this.trackUsage(cost.totalTokens);
+      await llmUsageService.trackUsage(cost.inputTokens, cost.outputTokens, cost.totalCost, model);
+
+      // Check budget limits after tracking usage
+      const usageStats = await llmUsageService.getUsageStats();
+      await llmBudgetService.checkBudgetLimits(
+        usageStats.dailyTokens,
+        usageStats.monthlyTokens,
+        usageStats.models
+      );
 
       logger.debug("Tracking LLM message cost", {
         conversationId,
@@ -154,38 +149,16 @@ class SimpleLLMCostService {
     dailyLimit: number;
     monthlyLimit: number;
   }> {
-    this.resetCountersIfNeeded();
+    const stats = await llmUsageService.getUsageStats();
 
     return {
-      dailyTokens: this.dailyTokens,
-      monthlyTokens: this.monthlyTokens,
+      dailyTokens: stats.dailyTokens,
+      monthlyTokens: stats.monthlyTokens,
       dailyLimit: this.DAILY_TOKEN_LIMIT,
       monthlyLimit: this.MONTHLY_TOKEN_LIMIT,
     };
   }
 
-  /**
-   * Reset counters if needed (based on date)
-   */
-  private resetCountersIfNeeded(): void {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    // Reset daily counter if it's a new day
-    if (this.lastDailyReset < today) {
-      this.dailyTokens = 0;
-      this.lastDailyReset = today;
-      logger.info("Daily token counter reset");
-    }
-
-    // Reset monthly counter if it's a new month
-    if (this.lastMonthlyReset < thisMonth) {
-      this.monthlyTokens = 0;
-      this.lastMonthlyReset = thisMonth;
-      logger.info("Monthly token counter reset");
-    }
-  }
 }
 
 // Export singleton instance
