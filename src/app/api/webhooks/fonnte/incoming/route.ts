@@ -1526,7 +1526,27 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 🔹 PRIORITY 2: No active context - Allow LLM for general queries
+  // 🔹 PRIORITY 2: Fallback verification handler for expired context
+  // If patient is pending verification but context expired, still use verification handler
+  if (patient.verificationStatus === 'PENDING' && !activeContext) {
+    logger.info('Fallback verification handler - context expired but status pending', {
+      patientId: patient.id,
+      message: message?.substring(0, 50),
+      operation: 'fallback_verification'
+    })
+
+    const result = await verificationHandler.process(message || '', patient)
+
+    return NextResponse.json({
+      ok: true,
+      processed: true,
+      action: result.action,
+      source: 'fallback_verification',
+      message: result.message
+    })
+  }
+
+  // 🔹 PRIORITY 3: No active context - Allow LLM for general queries
   logger.info('No active context - allowing LLM processing', {
     patientId: patient.id,
     message: message?.substring(0, 100)

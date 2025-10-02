@@ -260,32 +260,35 @@ export class PatientService {
     const values: Partial<PatientRow> = {
       updatedAt: new Date(),
     };
-    if (body.name !== undefined) values.name = body.name;
-    if (body.phoneNumber !== undefined) {
+
+    // Only update fields that are explicitly provided and not null
+    // This prevents accidental data deletion when frontend sends null values
+    if (body.name !== undefined && body.name !== null) values.name = body.name;
+    if (body.phoneNumber !== undefined && body.phoneNumber !== null) {
       const phoneValidation = validatePhoneWithMessage(body.phoneNumber);
       if (!phoneValidation.isValid) {
         throw new ValidationError(phoneValidation.message);
       }
       values.phoneNumber = body.phoneNumber;
     }
-    if (body.doctorName !== undefined) values.doctorName = body.doctorName;
-    if (body.hospitalName !== undefined)
+    if (body.doctorName !== undefined && body.doctorName !== null) values.doctorName = body.doctorName;
+    if (body.hospitalName !== undefined && body.hospitalName !== null)
       values.hospitalName = body.hospitalName;
-    if (body.address !== undefined) values.address = body.address;
-    if (body.birthDate !== undefined)
+    if (body.address !== undefined && body.address !== null) values.address = body.address;
+    if (body.birthDate !== undefined && body.birthDate !== null)
       values.birthDate = body.birthDate ? new Date(body.birthDate) : null;
-    if (body.diagnosisDate !== undefined)
+    if (body.diagnosisDate !== undefined && body.diagnosisDate !== null)
       values.diagnosisDate = body.diagnosisDate
         ? new Date(body.diagnosisDate)
         : null;
-    if (body.cancerStage !== undefined) values.cancerStage = body.cancerStage;
-    if (body.emergencyContactName !== undefined)
+    if (body.cancerStage !== undefined && body.cancerStage !== null) values.cancerStage = body.cancerStage;
+    if (body.emergencyContactName !== undefined && body.emergencyContactName !== null)
       values.emergencyContactName = body.emergencyContactName;
-    if (body.emergencyContactPhone !== undefined)
+    if (body.emergencyContactPhone !== undefined && body.emergencyContactPhone !== null)
       values.emergencyContactPhone = body.emergencyContactPhone;
-    if (body.notes !== undefined) values.notes = body.notes;
+    if (body.notes !== undefined && body.notes !== null) values.notes = body.notes;
     if (body.isActive !== undefined) values.isActive = body.isActive;
-    if (body.photoUrl !== undefined) values.photoUrl = body.photoUrl;
+    if (body.photoUrl !== undefined && body.photoUrl !== null) values.photoUrl = body.photoUrl;
 
     const updated = await this.repo.updatePatient(id, values);
     await invalidateAfterPatientOperation(id, "update");
