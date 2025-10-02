@@ -180,9 +180,11 @@ Halo ${patientName}!
 
 Apakah Anda bersedia menerima pengingat kesehatan dari PRIMA melalui WhatsApp?
 
-*Balas dengan salah satu:*
-✅ YA / SETUJU / BOLEH
-❌ TIDAK / TOLAK
+*Balas dengan SALAH SATU kata ini saja:*
+✅ *YA*
+❌ *TIDAK*
+
+⚠️ PENTING: Hanya balas dengan kata *YA* atau *TIDAK* saja (tanpa kata lain)
 
 Pesan ini akan kadaluarsa dalam 48 jam.
 

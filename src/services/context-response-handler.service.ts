@@ -49,7 +49,7 @@ export class ContextResponseHandlerService {
 
       await this.whatsappService.sendAck(
         patient.phoneNumber,
-        `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
+        `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\n💙 Tim PRIMA`
       )
 
       // Clear context after successful response
@@ -87,7 +87,8 @@ export class ContextResponseHandlerService {
       }
     }
 
-    // ⚠️ Invalid response - Send clarification (infinite retry)
+    // ⚠️ Invalid response - Send clarification (INFINITE RETRY - NO LIMIT)
+    // Will keep sending clarification messages for attempt 1, 2, 3, 4, 5, ... until valid response
     const attemptCount = await this.conversationService.incrementAttempt(conversationState.id)
     await this.sendVerificationClarification(patient, attemptCount)
 
@@ -163,7 +164,8 @@ export class ContextResponseHandlerService {
       }
     }
 
-    // ⚠️ Invalid response - Send clarification (infinite retry)
+    // ⚠️ Invalid response - Send clarification (INFINITE RETRY - NO LIMIT)
+    // Will keep sending clarification messages for attempt 1, 2, 3, 4, 5, ... until valid response
     const attemptCount = await this.conversationService.incrementAttempt(conversationState.id)
     await this.sendConfirmationClarification(patient, attemptCount)
 
@@ -175,19 +177,22 @@ export class ContextResponseHandlerService {
   }
 
   /**
-   * Send verification clarification (progressive messaging)
+   * Send verification clarification (progressive messaging with INFINITE RETRY)
+   * - Attempt 1: Gentle reminder
+   * - Attempt 2: More explicit instruction
+   * - Attempt 3+: Persistent clear instruction (WILL KEEP SENDING - NO LIMIT)
    */
   private async sendVerificationClarification(patient: Patient, attemptNumber: number): Promise<void> {
     let clarificationMessage: string
 
     // Progressive clarification messages based on attempt count
     if (attemptNumber === 1) {
-      clarificationMessage = `Mohon balas dengan *YA* atau *TIDAK* saja. Terima kasih! 💙`
+      clarificationMessage = `⚠️ Mohon balas dengan kata *YA* atau *TIDAK* saja (satu kata, tanpa kata lain)\n\nTerima kasih! 💙 Tim PRIMA`
     } else if (attemptNumber === 2) {
-      clarificationMessage = `⚠️ Silakan balas dengan:\n*YA* - untuk setuju\n*TIDAK* - untuk tolak\n\n💙 Tim PRIMA`
+      clarificationMessage = `⚠️ PENTING: Balas hanya dengan SALAH SATU kata ini:\n\n✅ *YA*\n❌ *TIDAK*\n\n(Satu kata saja, tanpa tambahan kata lain)\n\n💙 Tim PRIMA`
     } else {
-      // After 3+ attempts, use persistent message
-      clarificationMessage = `🔔 Mohon balas dengan kata:\n\n✅ *YA* - jika setuju\n❌ *TIDAK* - jika tolak\n\n💙 Tim PRIMA`
+      // Attempt 3, 4, 5, ... (INFINITE - will keep sending this same message)
+      clarificationMessage = `🔔 MOHON BALAS DENGAN TEPAT:\n\n✅ Ketik kata *YA* saja - jika setuju\n❌ Ketik kata *TIDAK* saja - jika tolak\n\n⚠️ Hanya satu kata, tanpa kata lain\n\n💙 Tim PRIMA`
     }
 
     await this.whatsappService.sendAck(patient.phoneNumber, clarificationMessage)
@@ -200,19 +205,22 @@ export class ContextResponseHandlerService {
   }
 
   /**
-   * Send reminder confirmation clarification (progressive messaging)
+   * Send reminder confirmation clarification (progressive messaging with INFINITE RETRY)
+   * - Attempt 1: Gentle reminder
+   * - Attempt 2: More explicit instruction
+   * - Attempt 3+: Persistent clear instruction (WILL KEEP SENDING - NO LIMIT)
    */
   private async sendConfirmationClarification(patient: Patient, attemptNumber: number): Promise<void> {
     let clarificationMessage: string
 
     // Progressive clarification messages based on attempt count
     if (attemptNumber === 1) {
-      clarificationMessage = `Mohon balas dengan *SUDAH* atau *BELUM* saja. Terima kasih! 💙`
+      clarificationMessage = `⚠️ Mohon balas dengan kata *SUDAH* atau *BELUM* saja (satu kata, tanpa kata lain)\n\nTerima kasih! 💙 Tim PRIMA`
     } else if (attemptNumber === 2) {
-      clarificationMessage = `⚠️ Silakan balas dengan:\n*SUDAH* - jika sudah selesai\n*BELUM* - jika belum selesai\n\n💙 Tim PRIMA`
+      clarificationMessage = `⚠️ PENTING: Balas hanya dengan SALAH SATU kata ini:\n\n✅ *SUDAH*\n⏰ *BELUM*\n\n(Satu kata saja, tanpa tambahan kata lain)\n\n💙 Tim PRIMA`
     } else {
-      // After 3+ attempts, use persistent message
-      clarificationMessage = `🔔 Mohon balas dengan kata:\n\n✅ *SUDAH* - jika sudah\n⏰ *BELUM* - jika belum\n\n💙 Tim PRIMA`
+      // Attempt 3, 4, 5, ... (INFINITE - will keep sending this same message)
+      clarificationMessage = `🔔 MOHON BALAS DENGAN TEPAT:\n\n✅ Ketik kata *SUDAH* saja - jika sudah selesai\n⏰ Ketik kata *BELUM* saja - jika belum selesai\n\n⚠️ Hanya satu kata, tanpa kata lain\n\n💙 Tim PRIMA`
     }
 
     await this.whatsappService.sendAck(patient.phoneNumber, clarificationMessage)
