@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-utils";
+import { createErrorResponse } from "@/lib/api-utils";
 import { llmCostService } from "@/lib/llm-cost-service";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { logger } from "@/lib/logger";
@@ -6,6 +8,17 @@ import { logger } from "@/lib/logger";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
+    }
+
     // Get LLM usage analytics from database
     const [stats, limits] = await Promise.all([
       analyticsService.getLLMAnalytics(),
@@ -47,15 +60,28 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error) {
     logger.error("Failed to fetch LLM analytics", error as Error);
-    return NextResponse.json(
-      { error: "Failed to fetch analytics data" },
-      { status: 500 }
+    return createErrorResponse(
+      "Failed to fetch analytics data",
+      500,
+      undefined,
+      'INTERNAL_ERROR'
     );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
+    }
+
     const body = await request.json();
     const { action } = body;
 
@@ -77,9 +103,11 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     logger.error("Failed to process LLM analytics action", error as Error);
-    return NextResponse.json(
-      { error: "Failed to process action" },
-      { status: 500 }
+    return createErrorResponse(
+      "Failed to process action",
+      500,
+      undefined,
+      'INTERNAL_ERROR'
     );
   }
 }

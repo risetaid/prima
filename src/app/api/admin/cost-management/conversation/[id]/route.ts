@@ -4,6 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth-utils';
+import { createErrorResponse } from '@/lib/api-utils';
 import { llmCostService } from '@/lib/llm-cost-service';
 import { logger } from '@/lib/logger';
 
@@ -12,6 +14,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const { id: conversationId } = await params;
 
   try {
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
+    }
+
     // Return basic usage statistics instead of detailed conversation costs
     const stats = await llmCostService.getUsageStats();
 

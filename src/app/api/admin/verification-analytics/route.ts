@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth-utils'
+import { createErrorResponse } from '@/lib/api-utils'
 import { verificationAnalytics } from '@/lib/verification-analytics'
 import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await getCurrentUser()
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')

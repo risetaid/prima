@@ -4,6 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth-utils';
+import { createErrorResponse } from '@/lib/api-utils';
 import { llmCostService } from '@/lib/llm-cost-service';
 import { logger } from '@/lib/logger';
 
@@ -11,6 +13,17 @@ import { logger } from '@/lib/logger';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(_request: NextRequest) {
   try {
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
+    }
+
     // Get basic usage statistics and limits
     const [stats, limits] = await Promise.all([
       llmCostService.getUsageStats(),

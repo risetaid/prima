@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-utils";
+import { createErrorResponse } from "@/lib/api-utils";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { logger } from "@/lib/logger";
-import { auth } from "@clerk/nextjs/server";
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
     }
 
     // Get query parameters
@@ -28,26 +34,33 @@ export async function GET(request: NextRequest) {
     const data = await analyticsService.getDashboardData(dateRange);
 
     logger.info("Comprehensive analytics data retrieved", {
-      userId,
+      userId: user.id,
       dateRange: dateRange ? `${startDate} to ${endDate}` : "default"
     });
 
     return NextResponse.json(data);
   } catch (error) {
     logger.error("Failed to get comprehensive analytics data", error as Error);
-    return NextResponse.json(
-      { error: "Failed to get analytics data" },
-      { status: 500 }
+    return createErrorResponse(
+      "Failed to get analytics data",
+      500,
+      undefined,
+      'INTERNAL_ERROR'
     );
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
     }
 
     const body = await request.json();
@@ -58,7 +71,7 @@ export async function POST(request: NextRequest) {
         const exportedData = await analyticsService.exportData(params);
         
         logger.info("Analytics data exported", {
-          userId,
+          userId: user.id,
           format: params.format,
           dateRange: `${params.dateRange.start} to ${params.dateRange.end}`
         });
@@ -69,7 +82,7 @@ export async function POST(request: NextRequest) {
         await analyticsService.trackEvent(params);
         
         logger.debug("Analytics event tracked", {
-          userId,
+          userId: user.id,
           eventType: params.eventType,
           eventName: params.eventName
         });
@@ -80,7 +93,7 @@ export async function POST(request: NextRequest) {
         await analyticsService.recordMetric(params);
         
         logger.debug("Performance metric recorded", {
-          userId,
+          userId: user.id,
           metricType: params.metricType,
           metricName: params.metricName
         });
@@ -92,9 +105,11 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     logger.error("Failed to process analytics action", error as Error);
-    return NextResponse.json(
-      { error: "Failed to process action" },
-      { status: 500 }
+    return createErrorResponse(
+      "Failed to process action",
+      500,
+      undefined,
+      'INTERNAL_ERROR'
     );
   }
 }

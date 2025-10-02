@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth-utils";
+import { createErrorResponse } from "@/lib/api-utils";
 import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
 
 import { logger } from '@/lib/logger';
 export async function GET() {
   try {
+    const user = await getCurrentUser();
+    
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
+      return createErrorResponse(
+        'Unauthorized. Admin access required.',
+        401,
+        undefined,
+        'AUTHORIZATION_ERROR'
+      );
+    }
+
     // Get first developer user for contact info
     const developerResult = await db
       .select({
