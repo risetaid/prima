@@ -85,9 +85,9 @@ export function CMSContentItem({
 
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <Badge className={`${getStatusColor(item.status)} text-xs`}>
-              {item.status === "published" && "Published"}
-              {item.status === "draft" && "Draft"}
-              {item.status === "archived" && "Archived"}
+              {item.status.toLowerCase() === "published" && "Published"}
+              {item.status.toLowerCase() === "draft" && "Draft"}
+              {item.status.toLowerCase() === "archived" && "Archived"}
             </Badge>
             <Badge
               variant="outline"

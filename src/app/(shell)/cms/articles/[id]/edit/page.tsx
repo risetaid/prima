@@ -13,12 +13,13 @@ import { ArticleActions } from "@/components/cms/article-actions";
 import { ArticleFormFields } from "@/components/cms/article-form-fields";
 import { PublishSettings } from "@/components/cms/publish-settings";
 import { ThumbnailUpload } from "@/components/cms/thumbnail-upload";
+import { RoleGuard } from "@/components/auth/role-guard";
 
 interface ArticleEditPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function ArticleEditPage({ params }: ArticleEditPageProps) {
+function ArticleEditPageContent({ params }: ArticleEditPageProps) {
   const {
     loading,
     saving,
@@ -106,5 +107,13 @@ export default function ArticleEditPage({ params }: ArticleEditPageProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ArticleEditPage({ params }: ArticleEditPageProps) {
+  return (
+    <RoleGuard allowedRoles={["ADMIN", "DEVELOPER"]}>
+      <ArticleEditPageContent params={params} />
+    </RoleGuard>
   );
 }

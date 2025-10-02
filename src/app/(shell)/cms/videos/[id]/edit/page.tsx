@@ -17,6 +17,7 @@ import { generateRandomSlug } from '@/lib/slug-utils'
 import { extractYouTubeVideoId, fetchYouTubeVideoData } from '@/lib/youtube-utils'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 import { logger } from '@/lib/logger'
+import { RoleGuard } from '@/components/auth/role-guard'
 
 const categories = [
   { value: 'general', label: 'Umum' },
@@ -32,7 +33,7 @@ interface VideoEditPageProps {
   params: Promise<{ id: string }>
 }
 
-export default function VideoEditPage({ params }: VideoEditPageProps) {
+function VideoEditPageContent({ params }: VideoEditPageProps) {
   const router = useRouter()
   const [videoId, setVideoId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -500,5 +501,13 @@ export default function VideoEditPage({ params }: VideoEditPageProps) {
         loading={deleting}
       />
     </div>
+  )
+}
+
+export default function VideoEditPage({ params }: VideoEditPageProps) {
+  return (
+    <RoleGuard allowedRoles={["ADMIN", "DEVELOPER"]}>
+      <VideoEditPageContent params={params} />
+    </RoleGuard>
   )
 }

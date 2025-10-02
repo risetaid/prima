@@ -34,7 +34,8 @@
       "Bash(git log:*)",
       "mcp__filesystem__read_text_file",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "mcp__sequentialthinking__sequentialthinking"
     ],
     "deny": [],
     "ask": []
