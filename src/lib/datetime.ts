@@ -124,8 +124,7 @@ export const getCurrentDateWIB = () => {
 export const getCurrentTimeWIB = () => {
   const wibNow = nowWIB();
   const hours = String(wibNow.getUTCHours()).padStart(2, "0");
-  const minutes = String(wibNow.getUTCMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
+  return `${hours}:00`;
 };
 
 /**
