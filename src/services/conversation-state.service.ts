@@ -434,18 +434,18 @@ export class ConversationStateService {
 
     switch (context) {
       case 'verification':
-        // Verification conversations expire in 24 hours
-        return new Date(now.getTime() + 24 * 60 * 60 * 1000)
-      case 'reminder_confirmation':
-        // Reminder confirmations expire in 2 hours
-        return new Date(now.getTime() + 2 * 60 * 60 * 1000)
-      case 'emergency':
-        // Emergency conversations expire in 1 hour
+        // Verification conversations expire in 1 hour (reduced from 24h to prevent stale contexts)
         return new Date(now.getTime() + 1 * 60 * 60 * 1000)
+      case 'reminder_confirmation':
+        // Reminder confirmations expire in 30 minutes (reduced from 2h to prevent stale contexts)
+        return new Date(now.getTime() + 30 * 60 * 1000)
+      case 'emergency':
+        // Emergency conversations expire in 30 minutes
+        return new Date(now.getTime() + 30 * 60 * 1000)
       case 'general_inquiry':
       default:
-        // General inquiries expire in 12 hours
-        return new Date(now.getTime() + 12 * 60 * 60 * 1000)
+        // General inquiries expire in 2 hours (reduced from 12h)
+        return new Date(now.getTime() + 2 * 60 * 60 * 1000)
     }
   }
 
@@ -670,8 +670,8 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'verification')
 
-    // Verification context expires in 24 hours (WIB timezone)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    // Verification context expires in 1 hour (reduced to prevent stale contexts)
+    const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000)
 
     return await this.updateConversationState(state.id, {
       currentContext: 'verification',
@@ -700,8 +700,8 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'reminder_confirmation')
 
-    // Reminder confirmation context expires in 2 hours (WIB timezone)
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
+    // Reminder confirmation context expires in 30 minutes (reduced to prevent stale contexts)
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
 
     return await this.updateConversationState(state.id, {
       currentContext: 'reminder_confirmation',

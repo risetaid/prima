@@ -316,6 +316,9 @@ async function handleVerificationAccept(message: string, patient: Patient) {
     `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
   );
 
+  // Clear context after successful verification
+  await conversationService.clearContext(patient.id);
+
   return {
     processed: true,
     action: "verified",
@@ -343,6 +346,9 @@ async function handleVerificationDecline(message: string, patient: Patient) {
     patient.phoneNumber,
     `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`
   );
+
+  // Clear context after successful decline
+  await conversationService.clearContext(patient.id);
 
   return {
     processed: true,
@@ -375,6 +381,9 @@ async function handleVerificationUnsubscribe(
     patient.phoneNumber,
     `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
   );
+
+  // Clear context after unsubscribe
+  await conversationService.clearContext(patient.id);
 
   return {
     processed: true,
@@ -790,6 +799,9 @@ async function handleReminderConfirmed(
 
   await sendAck(patient.phoneNumber, personalizedMessage);
 
+  // Clear context after successful reminder confirmation
+  await conversationService.clearContext(patient.id);
+
   logger.info("Medication taken confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
@@ -829,6 +841,9 @@ async function handleReminderPending(
 
   await sendAck(patient.phoneNumber, personalizedMessage);
 
+  // Clear context after pending response
+  await conversationService.clearContext(patient.id);
+
   logger.info("Medication pending confirmation sent", {
     patientId: patient.id,
     reminderId: reminder.id,
@@ -860,6 +875,9 @@ async function handleReminderHelp(
     patient.phoneNumber,
     `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!\n\n💙 Tim PRIMA`
   );
+
+  // Clear context after help request
+  await conversationService.clearContext(patient.id);
 
   logger.info("Patient requested help - escalating to relawan", {
     patientId: patient.id,
@@ -1415,6 +1433,9 @@ async function processMessageWithUnifiedProcessor(
 
           await sendAck(patient.phoneNumber || "", responseMessage);
 
+          // Clear context after simple medication response
+          await conversationService.clearContext(patient.id);
+
           logger.info(
             "Simple medication response processed via unified processor",
             {
@@ -1601,6 +1622,11 @@ async function updatePatientStatus(
       updatedAt: getWIBTime(),
     })
     .where(eq(patients.id, patientId));
+
+  // Clear context after verification status change
+  if (status === "VERIFIED" || status === "DECLINED") {
+    await conversationService.clearContext(patientId);
+  }
 }
 
 async function logConfirmationResponse(
@@ -1630,6 +1656,9 @@ async function logConfirmationResponse(
         confirmationResponseAt: new Date(),
       })
       .where(eq(reminders.id, pendingReminder[0].id));
+
+    // Clear context after confirmation is logged
+    await conversationService.clearContext(patientId);
   }
 }
 
@@ -1678,6 +1707,9 @@ async function deactivatePatientReminders(patientId: string): Promise<void> {
     .update(reminders)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(reminders.patientId, patientId));
+
+  // Clear context after deactivating reminders (unsubscribe flow)
+  await conversationService.clearContext(patientId);
 }
 
 /**
@@ -1695,6 +1727,11 @@ async function logVerificationEvent(
     action,
     verificationResult,
   });
+
+  // Clear context after verification event is logged
+  if (action === "unsubscribe" || verificationResult === "declined" || verificationResult === "verified") {
+    await conversationService.clearContext(patientId);
+  }
 }
 
 /**
