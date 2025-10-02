@@ -10,6 +10,7 @@ import {
 import { createErrorResponse, handleApiError } from "@/lib/api-utils";
 import { withRateLimit } from "@/middleware/rate-limit";
 import { PatientService } from "@/services/patient/patient.service";
+import { PatientAccessControl } from "@/services/patient/patient-access-control";
 
 export const GET = withRateLimit(async function GET(
   request: NextRequest,
@@ -70,7 +71,7 @@ export const GET = withRateLimit(async function GET(
     return handleApiError(error, "fetching patient");
   }
 },
-"GENERAL");
+  "GENERAL");
 
 export const PUT = withRateLimit(async function PUT(
   request: NextRequest,
@@ -98,6 +99,10 @@ export const PUT = withRateLimit(async function PUT(
         "VALIDATION_ERROR"
       );
     }
+
+    // Check role-based access
+    await PatientAccessControl.requireAccess(user.id, user.role, id, "update this patient");
+
     const body = await request.json();
 
     const service = new PatientService();
@@ -107,7 +112,7 @@ export const PUT = withRateLimit(async function PUT(
     return handleApiError(error, "updating patient");
   }
 },
-"GENERAL");
+  "GENERAL");
 
 export const DELETE = withRateLimit(async function DELETE(
   request: NextRequest,
@@ -135,6 +140,10 @@ export const DELETE = withRateLimit(async function DELETE(
         "VALIDATION_ERROR"
       );
     }
+
+    // Check role-based access
+    await PatientAccessControl.requireAccess(user.id, user.role, id, "delete this patient");
+
     const service = new PatientService();
     const result = await service.deletePatient(id);
     return NextResponse.json(result);
@@ -143,3 +152,4 @@ export const DELETE = withRateLimit(async function DELETE(
   }
 },
 "GENERAL");
+

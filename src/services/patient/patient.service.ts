@@ -24,8 +24,13 @@ export class PatientService {
   }
 
   async list(filters: PatientFilters) {
-    // No caching by default
-    return await this.repo.listPatients(filters);
+    const cacheKey = `patients:${JSON.stringify(filters)}`;
+    const { cacheWithFallback, CACHE_TTL } = await import("@/lib/cache");
+    return await cacheWithFallback(
+      cacheKey,
+      () => this.repo.listPatients(filters),
+      CACHE_TTL.PATIENT
+    );
   }
 
   async listWithCompliance(filters: PatientFilters) {
@@ -130,12 +135,12 @@ export class PatientService {
       volunteerRole: basic.volunteerRole,
       assignedVolunteer: basic.volunteerId
         ? {
-            id: basic.volunteerId,
-            firstName: basic.volunteerFirstName,
-            lastName: basic.volunteerLastName,
-            email: basic.volunteerEmail,
-            role: basic.volunteerRole,
-          }
+          id: basic.volunteerId,
+          firstName: basic.volunteerFirstName,
+          lastName: basic.volunteerLastName,
+          email: basic.volunteerEmail,
+          role: basic.volunteerRole,
+        }
         : null,
       manualConfirmations: confirmations.map((c) => ({
         id: c.id,
@@ -147,10 +152,10 @@ export class PatientService {
         confirmedAt: c.confirmedAt,
         volunteer: c.volunteerId
           ? {
-              id: c.volunteerId,
-              firstName: c.volunteerFirstName,
-              lastName: c.volunteerLastName,
-            }
+            id: c.volunteerId,
+            firstName: c.volunteerFirstName,
+            lastName: c.volunteerLastName,
+          }
           : null,
       })),
       reminderLogs: logs.map((l) => ({
@@ -182,10 +187,24 @@ export class PatientService {
     }
 
     const cancerStageStr = body?.cancerStage || "";
-    const cancerStage =
-      cancerStageStr && ["I", "II", "III", "IV"].includes(cancerStageStr)
-        ? cancerStageStr
-        : null;
+    const normalizedStage = cancerStageStr.toString().toUpperCase().trim();
+
+    let cancerStage: "I" | "II" | "III" | "IV" | null = null;
+    if (normalizedStage) {
+      // Handle numeric inputs (1, 2, 3, 4)
+      if (/^[1-4]$/.test(normalizedStage)) {
+        const stageMap = ["I", "II", "III", "IV"] as const;
+        cancerStage = stageMap[parseInt(normalizedStage) - 1];
+      }
+      // Handle roman numeral inputs (I, II, III, IV) - case insensitive
+      else if ((["I", "II", "III", "IV"] as const).includes(normalizedStage as "I" | "II" | "III" | "IV")) {
+        cancerStage = normalizedStage as "I" | "II" | "III" | "IV";
+      }
+      // Handle lowercase roman numerals (i, ii, iii, iv)
+      else if (["i", "ii", "iii", "iv"].includes(normalizedStage)) {
+        cancerStage = normalizedStage.toUpperCase() as "I" | "II" | "III" | "IV";
+      }
+    }
 
     let assignedVolunteerId: string | null = body?.assignedVolunteerId || null;
     if (!assignedVolunteerId) assignedVolunteerId = currentUser.id;

@@ -17,7 +17,7 @@ export interface ConversationStateData {
   expectedResponseType?: 'yes_no' | 'confirmation' | 'text' | 'number'
   relatedEntityId?: string
   relatedEntityType?: 'reminder_log' | 'verification' | 'general'
-   stateData?: Record<string, unknown>
+  stateData?: Record<string, unknown>
   lastMessage?: string
   lastMessageAt?: Date
   messageCount: number
@@ -76,9 +76,9 @@ export class ConversationStateService {
         return this.mapConversationState(existingState[0])
       }
 
-      // Create new conversation state
+      // Create new conversation state - simplified to 2 hours expiry
       const expiresAt = new Date()
-      expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours expiry
+      expiresAt.setHours(expiresAt.getHours() + 2) // 2 hours expiry
 
       const newState = await db
         .insert(conversationStates)
@@ -328,20 +328,8 @@ export class ConversationStateService {
         updatedAt: new Date(),
       }
 
-      // Set expected response type based on context
-      switch (newContext) {
-        case 'verification':
-          updates.expectedResponseType = 'yes_no';
-          break;
-        case 'reminder_confirmation':
-          updates.expectedResponseType = 'confirmation';
-          break;
-        case 'general_inquiry':
-        case 'emergency':
-        default:
-          updates.expectedResponseType = 'text';
-          break;
-      }
+      // Simplified: all contexts expect text responses
+      updates.expectedResponseType = 'text';
 
       // Set new expiration time based on context
       const newExpiresAt = this.calculateExpirationTime(newContext)
@@ -427,26 +415,12 @@ export class ConversationStateService {
   }
 
   /**
-   * Calculate expiration time based on context
+   * Calculate expiration time - simplified to 2 hours for all contexts
    */
-  private calculateExpirationTime(context: ConversationStateData['currentContext']): Date {
+  private calculateExpirationTime(_context: ConversationStateData['currentContext']): Date {
     const now = new Date()
-
-    switch (context) {
-      case 'verification':
-        // Verification conversations expire in 1 hour (reduced from 24h to prevent stale contexts)
-        return new Date(now.getTime() + 1 * 60 * 60 * 1000)
-      case 'reminder_confirmation':
-        // Reminder confirmations expire in 30 minutes (reduced from 2h to prevent stale contexts)
-        return new Date(now.getTime() + 30 * 60 * 1000)
-      case 'emergency':
-        // Emergency conversations expire in 30 minutes
-        return new Date(now.getTime() + 30 * 60 * 1000)
-      case 'general_inquiry':
-      default:
-        // General inquiries expire in 2 hours (reduced from 12h)
-        return new Date(now.getTime() + 2 * 60 * 60 * 1000)
-    }
+    // All conversations expire in 2 hours for consistency
+    return new Date(now.getTime() + 2 * 60 * 60 * 1000)
   }
 
   /**
@@ -670,8 +644,8 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'verification')
 
-    // Verification context expires in 1 hour (reduced to prevent stale contexts)
-    const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000)
+    // Simplified: all contexts expire in 2 hours
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
 
     return await this.updateConversationState(state.id, {
       currentContext: 'verification',
@@ -700,8 +674,8 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'reminder_confirmation')
 
-    // Reminder confirmation context expires in 30 minutes (reduced to prevent stale contexts)
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000)
+    // Simplified: all contexts expire in 2 hours
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
 
     return await this.updateConversationState(state.id, {
       currentContext: 'reminder_confirmation',

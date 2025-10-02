@@ -6,9 +6,7 @@ import { db, patients, reminders } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
 import type { Patient, Reminder } from "@/db";
 import { llmService } from "@/services/llm/llm.service";
-import type { IntentDetectionResult } from "@/services/llm/llm.types";
 import type { RecommendedResponse } from "@/services/message-processor.service";
-import { distributedLockService } from "@/services/distributed-lock.service";
 import { patientResponseRateLimiter } from "@/services/rate-limit.service";
 
 interface WebhookBody {
@@ -42,6 +40,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ContextResponseHandlerService } from "@/services/context-response-handler.service";
 import { KeywordMatcherService } from "@/services/keyword-matcher.service";
+import { VerificationHandler } from "@/services/verification/verification-handler.service";
 
 const whatsappService = new WhatsAppService();
 const messageProcessorService = new MessageProcessorService();
@@ -52,6 +51,7 @@ const contextHandler = new ContextResponseHandlerService(
   conversationService,
   whatsappService
 );
+const verificationHandler = new VerificationHandler();
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -95,13 +95,13 @@ function normalizeIncoming(body: WebhookBody) {
 
 interface IntentResult {
   intent:
-    | "accept"
-    | "decline"
-    | "unsubscribe"
-    | "confirmation_taken"
-    | "confirmation_pending"
-    | "need_help"
-    | "other";
+  | "accept"
+  | "decline"
+  | "unsubscribe"
+  | "confirmation_taken"
+  | "confirmation_pending"
+  | "need_help"
+  | "other";
   confidence: number;
   matchedWords: string[];
 }
@@ -392,234 +392,9 @@ async function handleVerificationUnsubscribe(
   };
 }
 
-/**
- * Handle verification text responses using LLM-powered intent detection
- */
-async function handleVerificationResponse(
-  message: string,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  logger.info("Processing verification text response", {
-    originalMessage: message,
-    patientId: patient.id,
-    operation: "verification_response",
-  });
+// Consolidated verification logic moved to VerificationHandler service
 
-  try {
-    // Try LLM-powered intent detection first
-    const llmResult = await processVerificationWithLLM(message, patient);
-    if (llmResult.processed) {
-      return llmResult;
-    }
-
-    logger.info(
-      "LLM verification processing failed, falling back to keyword detection",
-      {
-        patientId: patient.id,
-        operation: "verification_response",
-      }
-    );
-  } catch (error) {
-    logger.warn("LLM verification processing failed, using keyword fallback", {
-      patientId: patient.id,
-      operation: "verification_response",
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-
-  // Fallback to keyword-based detection
-  return handleVerificationWithKeywords(message, patient);
-}
-
-/**
- * Process verification response using LLM intent detection
- */
-async function processVerificationWithLLM(
-  message: string,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  try {
-    // Build conversation context for LLM
-    const llmContext = {
-      patientId: patient.id,
-      phoneNumber: patient.phoneNumber,
-      previousMessages: [], // No conversation history for verification typically
-      patientInfo: {
-        name: patient.name,
-        verificationStatus: patient.verificationStatus,
-        activeReminders: [],
-      },
-    };
-
-    // Use LLM to detect intent
-    const intentResult = await llmService.detectIntent(message, llmContext);
-
-    logger.info("LLM verification intent detection result", {
-      patientId: patient.id,
-      llmIntent: intentResult.intent,
-      confidence: intentResult.confidence,
-      entities: intentResult.entities,
-      operation: "llm_verification_detection",
-    });
-
-    // Map LLM intent to verification actions
-    if (intentResult.confidence >= 0.6) {
-      switch (intentResult.intent) {
-        case "verification_response":
-          // LLM detected verification response, need to determine if it's YA or TIDAK
-          const verificationType = await determineVerificationTypeFromMessage(
-            message,
-            intentResult
-          );
-          return await handleVerificationByType(
-            verificationType,
-            message,
-            patient
-          );
-        case "unsubscribe":
-          return handleVerificationUnsubscribe(message, patient);
-        case "emergency":
-          // Handle emergency in verification context
-          await sendAck(
-            patient.phoneNumber,
-            `Kami mendeteksi pesan darurat. Relawan PRIMA akan segera menghubungi Anda untuk membantu proses verifikasi. 🚨`
-          );
-          return {
-            processed: true,
-            action: "emergency_escalation",
-            message:
-              "Emergency detected during verification - volunteer notified",
-          };
-        default:
-          logger.info("LLM returned non-verification intent", {
-            patientId: patient.id,
-            llmIntent: intentResult.intent,
-            operation: "llm_verification_detection",
-          });
-          return { processed: false };
-      }
-    }
-
-    return { processed: false };
-  } catch (error) {
-    logger.error("LLM verification processing failed", error as Error, {
-      patientId: patient.id,
-      operation: "llm_verification_detection",
-    });
-    return { processed: false };
-  }
-}
-
-/**
- * Determine verification type (accept/decline) from message and LLM analysis
- */
-async function determineVerificationTypeFromMessage(
-  message: string,
-  intentResult: IntentDetectionResult
-): Promise<"accept" | "decline"> {
-  // Check LLM entities first
-  if (intentResult.entities && typeof intentResult.entities === "object") {
-    const entities = intentResult.entities as Record<string, unknown>;
-    if (
-      entities.response_type === "positive" ||
-      entities.response_type === "accept"
-    ) {
-      return "accept";
-    }
-    if (
-      entities.response_type === "negative" ||
-      entities.response_type === "decline"
-    ) {
-      return "decline";
-    }
-  }
-
-  // Fallback to keyword analysis within the message
-  const normalizedMessage = message.toLowerCase().trim();
-  const acceptPatterns = [
-    "ya",
-    "iya",
-    "yes",
-    "setuju",
-    "boleh",
-    "mau",
-    "terima",
-    "ok",
-    "oke",
-  ];
-  const declinePatterns = [
-    "tidak",
-    "no",
-    "tolak",
-    "nanti",
-    "belum",
-    "ga",
-    "gak",
-    "engga",
-  ];
-
-  const hasAcceptPattern = acceptPatterns.some((pattern) =>
-    normalizedMessage.includes(pattern)
-  );
-  const hasDeclinePattern = declinePatterns.some((pattern) =>
-    normalizedMessage.includes(pattern)
-  );
-
-  if (hasAcceptPattern && !hasDeclinePattern) return "accept";
-  if (hasDeclinePattern && !hasAcceptPattern) return "decline";
-
-  // If both or neither are present, use LLM's confidence to decide
-  return "accept"; // Default to accept for ambiguous cases
-}
-
-/**
- * Handle verification by determined type
- */
-async function handleVerificationByType(
-  type: "accept" | "decline",
-  message: string,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  if (type === "accept") {
-    return handleVerificationAccept(message, patient);
-  } else {
-    return handleVerificationDecline(message, patient);
-  }
-}
-
-/**
- * Handle verification text responses using keyword-based detection (fallback)
- */
-async function handleVerificationWithKeywords(
-  message: string,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  const intentResult = detectIntentEnhanced(message, "verification");
-
-  logger.info("Processing verification with keyword fallback", {
-    originalMessage: message,
-    intent: intentResult.intent,
-    confidence: intentResult.confidence,
-    matchedWords: intentResult.matchedWords,
-    patientId: patient.id,
-    operation: "keyword_verification_detection",
-  });
-
-  if (intentResult.confidence < 0.4) {
-    return handleVerificationLowConfidence(patient);
-  }
-
-  switch (intentResult.intent) {
-    case "accept":
-      return handleVerificationAccept(message, patient);
-    case "decline":
-      return handleVerificationDecline(message, patient);
-    case "unsubscribe":
-      return handleVerificationUnsubscribe(message, patient);
-    default:
-      return { processed: false };
-  }
-}
+// Legacy verification functions removed - consolidated into VerificationHandler service
 
 async function findPendingReminder(patientId: string) {
   return await db
@@ -782,15 +557,14 @@ async function handleReminderConfirmed(
   // Get reminder type to customize the confirmation message
   const reminderType =
     reminder.reminderType || reminderInfo?.reminderType || "GENERAL";
-  const baseMessage = `Terima kasih ${patient.name}! ✅\n\n${
-    reminderType === "MEDICATION"
-      ? "Obat sudah dikonfirmasi diminum"
-      : reminderType === "APPOINTMENT"
+  const baseMessage = `Terima kasih ${patient.name}! ✅\n\n${reminderType === "MEDICATION"
+    ? "Obat sudah dikonfirmasi diminum"
+    : reminderType === "APPOINTMENT"
       ? "Janji temu sudah dikonfirmasi hadir"
       : "Pengingat sudah dikonfirmasi selesai"
-  } pada ${new Date().toLocaleTimeString("id-ID", {
-    timeZone: "Asia/Jakarta",
-  })}\n\n💙 Tim PRIMA`;
+    } pada ${new Date().toLocaleTimeString("id-ID", {
+      timeZone: "Asia/Jakarta",
+    })}\n\n💙 Tim PRIMA`;
 
   const personalizedMessage = buildPersonalizedMessage(
     reminderInfo,
@@ -954,7 +728,7 @@ async function parseWebhookBody(request: NextRequest) {
         parsed = {};
       }
     }
-  } catch {}
+  } catch { }
   return { parsed, contentType };
 }
 
@@ -1067,153 +841,12 @@ async function logConversation(
       confidence: undefined,
       processedAt: new Date(),
     });
-  } catch {}
+  } catch { }
 }
 
-// Legacy handler - kept for potential rollback
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function processVerificationResponse(
-  message: string | undefined,
-  patient: Patient
-) {
-  logger.info("Processing verification response", {
-    patientId: patient.id,
-    hasMessage: Boolean(message),
-    message:
-      message?.substring(0, 100) +
-      (message && message.length > 100 ? "..." : ""),
-  });
+// Legacy processVerificationResponse function removed - consolidated into VerificationHandler service
 
-  try {
-    // Use distributed locking for verification processing
-    const lockKey = `verification_processing:${patient.id}`;
-    const lockResult = await distributedLockService.withLock(
-      lockKey,
-      async () => {
-        // Double-check patient verification status to prevent race conditions
-        const [currentPatient] = await db
-          .select({ verificationStatus: patients.verificationStatus })
-          .from(patients)
-          .where(eq(patients.id, patient.id))
-          .limit(1);
-
-        if (currentPatient && currentPatient.verificationStatus !== "PENDING") {
-          logger.info("Patient verification already processed", {
-            patientId: patient.id,
-            currentStatus: currentPatient.verificationStatus,
-          });
-          return { alreadyProcessed: true };
-        }
-
-        return await handleVerificationResponse(message || "", patient);
-      },
-      {
-        ttl: 30000, // 30 second lock
-        maxRetries: 2,
-      }
-    );
-
-    if (!lockResult) {
-      logger.warn("Failed to acquire verification processing lock", {
-        patientId: patient.id,
-      });
-      return NextResponse.json(
-        { error: "Could not acquire processing lock - please try again" },
-        { status: 409 }
-      );
-    }
-
-    if ("alreadyProcessed" in lockResult && lockResult.alreadyProcessed) {
-      return NextResponse.json({
-        ok: true,
-        processed: false,
-        action: "already_processed",
-        source: "text_verification",
-      });
-    }
-
-    const verificationResult =
-      "processed" in lockResult ? lockResult : lockResult;
-
-    if ("processed" in verificationResult && verificationResult.processed) {
-      logger.info("Verification response processed successfully", {
-        patientId: patient.id,
-        action:
-          "action" in verificationResult
-            ? verificationResult.action
-            : undefined,
-        message:
-          "message" in verificationResult
-            ? verificationResult.message
-            : undefined,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action:
-          "action" in verificationResult
-            ? verificationResult.action
-            : undefined,
-        source: "text_verification",
-      });
-    }
-  } catch (error) {
-    logger.error("Failed to process verification response", error as Error, {
-      patientId: patient.id,
-      message: message?.substring(0, 100),
-    });
-    return NextResponse.json(
-      { error: "Internal error processing verification" },
-      { status: 500 }
-    );
-  }
-  return null;
-}
-
-// Legacy handler - kept for potential rollback
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function processReminderResponse(
-  message: string | undefined,
-  patient: Patient
-) {
-  logger.info("Processing potential reminder response", {
-    patientId: patient.id,
-    hasMessage: Boolean(message),
-    message:
-      message?.substring(0, 100) +
-      (message && message.length > 100 ? "..." : ""),
-  });
-
-  try {
-    const reminderResult = await handleReminderResponse(message || "", patient);
-
-    if (reminderResult.processed) {
-      logger.info("Reminder response processed successfully", {
-        patientId: patient.id,
-        action: reminderResult.action,
-        message: reminderResult.message,
-      });
-
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action: reminderResult.action,
-        source: "text_reminder",
-      });
-    }
-  } catch (error) {
-    logger.error("Failed to process reminder response", error as Error, {
-      patientId: patient.id,
-      message: message?.substring(0, 100),
-    });
-    return NextResponse.json(
-      { error: "Internal error processing reminder response" },
-      { status: 500 }
-    );
-  }
-  return null;
-}
+// Legacy processReminderResponse function removed - reminder logic handled by unified processor
 
 async function handleUnrecognizedMessage(
   message: string | undefined,
@@ -1408,27 +1041,24 @@ async function processMessageWithUnifiedProcessor(
               reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
                 ? "Obat sudah dikonfirmasi diminum"
                 : reminderType === "APPOINTMENT"
-                ? "Janji temu sudah dikonfirmasi"
-                : "Pengingat sudah dikonfirmasi selesai";
+                  ? "Janji temu sudah dikonfirmasi"
+                  : "Pengingat sudah dikonfirmasi selesai";
 
-            responseMessage = `Terima kasih ${
-              patient.name
-            }! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString(
-              "id-ID",
-              { timeZone: "Asia/Jakarta" }
-            )}\n\n💙 Tim PRIMA`;
+            responseMessage = `Terima kasih ${patient.name
+              }! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString(
+                "id-ID",
+                { timeZone: "Asia/Jakarta" }
+              )}\n\n💙 Tim PRIMA`;
           } else {
-            responseMessage = `Baik ${patient.name}, jangan lupa ${
-              updateResult.reminderType === "MEDICATION" ||
+            responseMessage = `Baik ${patient.name}, jangan lupa ${updateResult.reminderType === "MEDICATION" ||
               updateResult.reminderType === "APPOINTMENT"
-                ? "minum obatnya"
-                : "melakukan pengingatnya"
-            } ya! ${
-              updateResult.reminderType === "MEDICATION" ||
-              updateResult.reminderType === "APPOINTMENT"
+              ? "minum obatnya"
+              : "melakukan pengingatnya"
+              } ya! ${updateResult.reminderType === "MEDICATION" ||
+                updateResult.reminderType === "APPOINTMENT"
                 ? "💊"
                 : "📝"
-            }\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
+              }\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
           }
 
           await sendAck(patient.phoneNumber || "", responseMessage);
@@ -1549,10 +1179,10 @@ async function executeResponseActions(
           await updatePatientStatus(
             patient.id,
             action.data.status as
-              | "PENDING"
-              | "VERIFIED"
-              | "DECLINED"
-              | "EXPIRED"
+            | "PENDING"
+            | "VERIFIED"
+            | "DECLINED"
+            | "EXPIRED"
           );
           break;
         case "log_confirmation":
@@ -1866,19 +1496,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid state' }, { status: 500 })
     }
 
-    // 🚫 BLOCK LLM - Route to strict keyword handlers
+    // 🚫 BLOCK LLM - Use simplified verification handler
     if (activeContext === 'verification') {
-      const result = await contextHandler.handleVerificationResponse(
-        patient,
-        message || '',
-        conversationState
-      )
+      const result = await verificationHandler.process(message || '', patient)
 
       return NextResponse.json({
         ok: true,
         processed: true,
         action: result.action,
-        source: 'strict_verification',
+        source: 'simplified_verification',
         message: result.message
       })
     }
