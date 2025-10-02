@@ -2,6 +2,7 @@
 import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { FollowupService } from "@/services/reminder/followup.service";
+import { ConversationStateService } from "@/services/conversation-state.service";
 import {
   CreateReminderDTO,
   UpdateReminderDTO,
@@ -45,12 +46,14 @@ export class ReminderService {
   private whatsappService: WhatsAppService;
   private followupService: FollowupService;
   private templateService: ReminderTemplatesService;
+  private conversationService: ConversationStateService;
 
   constructor() {
     this.repository = new ReminderRepository();
     this.whatsappService = new WhatsAppService();
     this.followupService = new FollowupService();
     this.templateService = new ReminderTemplatesService();
+    this.conversationService = new ConversationStateService();
   }
 
   // CREATE operations
@@ -325,6 +328,33 @@ export class ReminderService {
       });
 
       let followupsScheduled = 0;
+
+      // Set reminder confirmation context after successful send
+      if (result.success && result.messageId) {
+        try {
+          await this.conversationService.setReminderConfirmationContext(
+            params.patientId,
+            params.phoneNumber,
+            params.reminderId,
+            result.messageId
+          );
+
+          logger.info('Reminder confirmation context set', {
+            patientId: params.patientId,
+            reminderId: params.reminderId,
+            messageId: result.messageId,
+            contextType: 'reminder_confirmation',
+            expiresIn: '2 hours'
+          });
+        } catch (contextError) {
+          logger.warn('Failed to set reminder confirmation context', {
+            error: contextError instanceof Error ? contextError.message : String(contextError),
+            patientId: params.patientId,
+            reminderId: params.reminderId
+          });
+          // Don't fail the reminder send if context setting fails
+        }
+      }
 
       // Schedule followups if successful
       if (result.success) {

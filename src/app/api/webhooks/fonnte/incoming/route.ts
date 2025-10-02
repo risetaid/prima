@@ -40,9 +40,18 @@ import { ConversationStateService } from "@/services/conversation-state.service"
 import { MessageProcessorService } from "@/services/message-processor.service";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { ContextResponseHandlerService } from "@/services/context-response-handler.service";
+import { KeywordMatcherService } from "@/services/keyword-matcher.service";
 
 const whatsappService = new WhatsAppService();
 const messageProcessorService = new MessageProcessorService();
+const conversationService = new ConversationStateService();
+const keywordMatcher = new KeywordMatcherService();
+const contextHandler = new ContextResponseHandlerService(
+  keywordMatcher,
+  conversationService,
+  whatsappService
+);
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -1043,6 +1052,8 @@ async function logConversation(
   } catch {}
 }
 
+// Legacy handler - kept for potential rollback
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function processVerificationResponse(
   message: string | undefined,
   patient: Patient
@@ -1142,6 +1153,8 @@ async function processVerificationResponse(
   return null;
 }
 
+// Legacy handler - kept for potential rollback
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function processReminderResponse(
   message: string | undefined,
   patient: Patient
@@ -1686,7 +1699,9 @@ async function logVerificationEvent(
 
 /**
  * Process followup responses from patients
+ * Legacy handler - kept for potential rollback
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function processFollowupResponse(
   message: string,
   patient: Patient
@@ -1793,44 +1808,82 @@ export async function POST(request: NextRequest) {
 
   await logConversation(patient, sender, message || "");
 
-  // SIMPLIFIED PROCESSING PIPELINE - Single LLM processor with clear fallbacks
+  // 🔹 PRIORITY 1: Check for active context (HIGHEST PRIORITY)
+  const activeContext = await conversationService.getActiveContext(patient.id);
 
-  // PRIORITY 1: Verification responses (keyword-based, no LLM for security)
-  if (patient.verificationStatus === "PENDING") {
-    const result = await processVerificationResponse(message || "", patient);
-    if (result) return result;
+  if (activeContext) {
+    logger.info('Active context detected - using strict keyword matching', {
+      patientId: patient.id,
+      activeContext,
+      message: message?.substring(0, 100)
+    })
+
+    // Get conversation state
+    const conversationState = await conversationService.findByPhoneNumber(patient.phoneNumber)
+
+    if (!conversationState) {
+      logger.error('Conversation state not found for active context', undefined, {
+        patientId: patient.id,
+        activeContext
+      })
+      return NextResponse.json({ error: 'Invalid state' }, { status: 500 })
+    }
+
+    // 🚫 BLOCK LLM - Route to strict keyword handlers
+    if (activeContext === 'verification') {
+      const result = await contextHandler.handleVerificationResponse(
+        patient,
+        message || '',
+        conversationState
+      )
+
+      return NextResponse.json({
+        ok: true,
+        processed: true,
+        action: result.action,
+        source: 'strict_verification',
+        message: result.message
+      })
+    }
+
+    if (activeContext === 'reminder_confirmation') {
+      const result = await contextHandler.handleReminderConfirmationResponse(
+        patient,
+        message || '',
+        conversationState
+      )
+
+      return NextResponse.json({
+        ok: true,
+        processed: true,
+        action: result.action,
+        source: 'strict_confirmation',
+        message: result.message
+      })
+    }
   }
 
-  // PRIORITY 2: Try unified LLM processor for all other messages
-  const unifiedResult = await processMessageWithUnifiedProcessor(
-    message || "",
-    patient
-  );
-  if (unifiedResult.processed) {
+  // 🔹 PRIORITY 2: No active context - Allow LLM for general queries
+  logger.info('No active context - allowing LLM processing', {
+    patientId: patient.id,
+    message: message?.substring(0, 100)
+  })
+
+  const llmResult = await processMessageWithUnifiedProcessor(message || '', patient)
+
+  if (llmResult.processed) {
     return NextResponse.json({
       ok: true,
       processed: true,
-      action: unifiedResult.action,
-      source: "unified_processor",
-    });
+      action: llmResult.action,
+      source: 'llm_processor'
+    })
   }
 
-  // PRIORITY 3: Legacy medication responses (keyword-based fallback)
-  if (patient.verificationStatus === "VERIFIED") {
-    const result = await processReminderResponse(message || "", patient);
-    if (result) return result;
-  }
+  // 🔹 PRIORITY 3: Fallback for unrecognized messages
+  await handleUnrecognizedMessage(message || '', patient)
 
-  // PRIORITY 4: Legacy followup responses (keyword-based fallback)
-  if (patient.verificationStatus === "VERIFIED") {
-    const result = await processFollowupResponse(message || "", patient);
-    if (result) return result;
-  }
-
-  // FALLBACK: Handle unrecognized messages with generic responses
-  await handleUnrecognizedMessage(message || "", patient);
-
-  return NextResponse.json({ ok: true, processed: true, action: "none" });
+  return NextResponse.json({ ok: true, processed: true, action: 'fallback' })
 }
 
 export async function GET(request: NextRequest) {

@@ -29,6 +29,9 @@ export const conversationStates = pgTable(
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     messageCount: integer("message_count").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    contextSetAt: timestamp("context_set_at", { withTimezone: true }),
+    lastClarificationSentAt: timestamp("last_clarification_sent_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

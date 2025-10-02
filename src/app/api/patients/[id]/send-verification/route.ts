@@ -65,17 +65,26 @@ export async function POST(
 
     // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
 
-    // Set conversation state to verification context
-    try {
-      const conversationService = new ConversationStateService();
-      await conversationService.getOrCreateConversationState(
-        patientId,
-        patient.phoneNumber,
-        "verification"
-      );
-    } catch (conversationError: unknown) {
-      logger.warn("Failed to set conversation state for verification", { error: conversationError instanceof Error ? conversationError.message : String(conversationError) });
-      // Don't fail the entire request if conversation state update fails
+    // Set verification context with message ID after successful send
+    if (whatsappResult.success && whatsappResult.messageId) {
+      try {
+        const conversationService = new ConversationStateService();
+        await conversationService.setVerificationContext(
+          patientId,
+          patient.phoneNumber,
+          whatsappResult.messageId
+        );
+
+        logger.info('Verification context set', {
+          patientId,
+          messageId: whatsappResult.messageId,
+          contextType: 'verification',
+          expiresIn: '48 hours'
+        });
+      } catch (conversationError: unknown) {
+        logger.warn("Failed to set verification context", { error: conversationError instanceof Error ? conversationError.message : String(conversationError) });
+        // Don't fail the entire request if conversation state update fails
+      }
     }
 
     return NextResponse.json({

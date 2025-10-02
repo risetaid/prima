@@ -22,6 +22,9 @@ export interface ConversationStateData {
   lastMessageAt?: Date
   messageCount: number
   isActive: boolean
+  attemptCount?: number
+  contextSetAt?: Date
+  lastClarificationSentAt?: Date
   expiresAt: Date
   createdAt: Date
   updatedAt: Date
@@ -658,6 +661,112 @@ export class ConversationStateService {
   }
 
   /**
+   * Set verification context when sending verification message
+   */
+  async setVerificationContext(
+    patientId: string,
+    phoneNumber: string,
+    verificationMessageId: string
+  ): Promise<ConversationStateData> {
+    const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'verification')
+
+    return await this.updateConversationState(state.id, {
+      currentContext: 'verification',
+      expectedResponseType: 'yes_no',
+      relatedEntityType: 'verification',
+      relatedEntityId: verificationMessageId,
+      stateData: {
+        verificationMessageId,
+        contextSetAt: new Date().toISOString(),
+        attemptCount: 0
+      },
+      contextSetAt: new Date(),
+      attemptCount: 0
+    })
+  }
+
+  /**
+   * Set reminder confirmation context when sending reminder
+   */
+  async setReminderConfirmationContext(
+    patientId: string,
+    phoneNumber: string,
+    reminderId: string,
+    reminderMessageId: string
+  ): Promise<ConversationStateData> {
+    const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'reminder_confirmation')
+
+    return await this.updateConversationState(state.id, {
+      currentContext: 'reminder_confirmation',
+      expectedResponseType: 'confirmation',
+      relatedEntityType: 'reminder_log',
+      relatedEntityId: reminderId,
+      stateData: {
+        reminderId,
+        reminderMessageId,
+        contextSetAt: new Date().toISOString(),
+        attemptCount: 0
+      },
+      contextSetAt: new Date(),
+      attemptCount: 0
+    })
+  }
+
+  /**
+   * Clear context after successful keyword match
+   */
+  async clearContext(patientId: string): Promise<void> {
+    const states = await this.getActiveConversationStates(patientId)
+
+    for (const state of states) {
+      await this.updateConversationState(state.id, {
+        currentContext: 'general_inquiry',
+        expectedResponseType: 'text',
+        relatedEntityId: undefined,
+        relatedEntityType: undefined,
+        stateData: {},
+        attemptCount: 0,
+        contextSetAt: undefined,
+        lastClarificationSentAt: undefined
+      })
+    }
+
+    logger.info('Context cleared for patient', { patientId })
+  }
+
+  /**
+   * Increment attempt count (for metrics only - no limit enforcement)
+   */
+  async incrementAttempt(conversationStateId: string): Promise<number> {
+    const state = await this.getConversationStateById(conversationStateId)
+    if (!state) throw new Error('Conversation state not found')
+
+    const newAttemptCount = (state.attemptCount || 0) + 1
+
+    await this.updateConversationState(conversationStateId, {
+      attemptCount: newAttemptCount,
+      lastClarificationSentAt: new Date()
+    })
+
+    return newAttemptCount
+  }
+
+  /**
+   * Get active context type for a patient
+   */
+  async getActiveContext(patientId: string): Promise<'verification' | 'reminder_confirmation' | null> {
+    const states = await this.getActiveConversationStates(patientId)
+
+    for (const state of states) {
+      if (state.currentContext === 'verification' || state.currentContext === 'reminder_confirmation') {
+        return state.currentContext
+      }
+    }
+
+    return null
+  }
+
+  /**
    * Map database row to ConversationStateData
    */
   private mapConversationState(row: ConversationStateRow): ConversationStateData {
@@ -674,6 +783,9 @@ export class ConversationStateService {
       lastMessageAt: row.lastMessageAt || undefined,
       messageCount: row.messageCount,
       isActive: row.isActive,
+      attemptCount: row.attemptCount || undefined,
+      contextSetAt: row.contextSetAt || undefined,
+      lastClarificationSentAt: row.lastClarificationSentAt || undefined,
       expiresAt: row.expiresAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
