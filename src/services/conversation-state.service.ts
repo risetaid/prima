@@ -670,6 +670,9 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'verification')
 
+    // Verification context expires in 24 hours (WIB timezone)
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
     return await this.updateConversationState(state.id, {
       currentContext: 'verification',
       expectedResponseType: 'yes_no',
@@ -681,7 +684,8 @@ export class ConversationStateService {
         attemptCount: 0
       },
       contextSetAt: new Date(),
-      attemptCount: 0
+      attemptCount: 0,
+      expiresAt
     })
   }
 
@@ -696,6 +700,9 @@ export class ConversationStateService {
   ): Promise<ConversationStateData> {
     const state = await this.getOrCreateConversationState(patientId, phoneNumber, 'reminder_confirmation')
 
+    // Reminder confirmation context expires in 2 hours (WIB timezone)
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000)
+
     return await this.updateConversationState(state.id, {
       currentContext: 'reminder_confirmation',
       expectedResponseType: 'confirmation',
@@ -708,7 +715,8 @@ export class ConversationStateService {
         attemptCount: 0
       },
       contextSetAt: new Date(),
-      attemptCount: 0
+      attemptCount: 0,
+      expiresAt
     })
   }
 
