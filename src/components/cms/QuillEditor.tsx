@@ -133,7 +133,7 @@ export function QuillEditor({
         isMountedRef.current = false;
       }
     };
-  }, [placeholder, value]);
+  }, [placeholder]);
 
   // Update content when value prop changes
   useEffect(() => {

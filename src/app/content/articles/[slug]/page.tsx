@@ -125,26 +125,24 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const getCategoryColor = (category: string) => {
     const colors = {
-      general: 'bg-blue-100 text-blue-800 border-blue-200',
-      nutrisi: 'bg-green-100 text-green-800 border-green-200',
-      olahraga: 'bg-purple-100 text-purple-800 border-purple-200',
-      motivational: 'bg-orange-100 text-orange-800 border-orange-200',
-      medical: 'bg-red-100 text-red-800 border-red-200',
-      faq: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      testimoni: 'bg-pink-100 text-pink-800 border-pink-200'
+      GENERAL: 'bg-blue-100 text-blue-800 border-blue-200',
+      NUTRITION: 'bg-green-100 text-green-800 border-green-200',
+      EXERCISE: 'bg-purple-100 text-purple-800 border-purple-200',
+      MOTIVATIONAL: 'bg-orange-100 text-orange-800 border-orange-200',
+      MEDICAL: 'bg-red-100 text-red-800 border-red-200',
+      FAQ: 'bg-indigo-100 text-indigo-800 border-indigo-200',
     }
     return colors[category as keyof typeof colors] || 'bg-gray-100 text-gray-800 border-gray-200'
   }
 
   const getCategoryLabel = (category: string) => {
     const labels = {
-      general: 'Umum',
-      nutrisi: 'Nutrisi',
-      olahraga: 'Olahraga',
-      motivational: 'Motivasi',
-      medical: 'Medis',
-      faq: 'FAQ',
-      testimoni: 'Testimoni'
+      GENERAL: 'Umum',
+      NUTRITION: 'Nutrisi',
+      EXERCISE: 'Olahraga',
+      MOTIVATIONAL: 'Motivasi',
+      MEDICAL: 'Medis',
+      FAQ: 'FAQ',
     }
     return labels[category as keyof typeof labels] || category
   }
@@ -203,9 +201,12 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
             {/* Excerpt */}
             {article.excerpt && (
-              <p className="text-lg text-gray-600 leading-relaxed">
-                {article.excerpt}
-              </p>
+              <div 
+                className="text-lg text-gray-600 leading-relaxed [&_strong]:font-bold [&_em]:italic [&_u]:underline"
+                dangerouslySetInnerHTML={{ 
+                  __html: article.excerpt.replace(/\n/g, '<br />').replace(/\s+/g, ' ') 
+                }}
+              />
             )}
 
             {/* Meta information */}
@@ -247,7 +248,7 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
           <CardContent className="p-6">
             <div className="prose prose-lg max-w-none">
               <div 
-                className="text-gray-900 leading-relaxed"
+                className="text-gray-900 leading-relaxed [&_p]:mb-4 [&_p]:text-gray-900 [&_strong]:font-bold [&_em]:italic [&_u]:underline [&_ol]:list-decimal [&_ol]:ml-6 [&_ul]:list-disc [&_ul]:ml-6 [&_li]:mb-2 [&_blockquote]:border-l-4 [&_blockquote]:border-gray-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_code]:bg-gray-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_pre]:bg-gray-100 [&_pre]:p-4 [&_pre]:rounded [&_pre]:overflow-x-auto [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-4 [&_h1]:text-gray-900 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-3 [&_h2]:text-gray-900 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:mb-2 [&_h3]:text-gray-900"
                 style={{ 
                   fontSize: '18px', 
                   lineHeight: '1.7',

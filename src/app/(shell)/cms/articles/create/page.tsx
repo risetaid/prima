@@ -71,13 +71,12 @@ export default function CreateArticlePage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const categories = [
-    { value: "general", label: "Umum" },
-    { value: "nutrisi", label: "Nutrisi" },
-    { value: "olahraga", label: "Olahraga" },
-    { value: "motivational", label: "Motivasi" },
-    { value: "medical", label: "Medis" },
-    { value: "faq", label: "FAQ" },
-    { value: "testimoni", label: "Testimoni" },
+    { value: "GENERAL", label: "Umum" },
+    { value: "NUTRITION", label: "Nutrisi" },
+    { value: "EXERCISE", label: "Olahraga" },
+    { value: "MOTIVATIONAL", label: "Motivasi" },
+    { value: "MEDICAL", label: "Medis" },
+    { value: "FAQ", label: "FAQ" },
   ];
 
   const generateNewSlug = () => {
@@ -109,7 +108,7 @@ export default function CreateArticlePage() {
   };
 
   const handleSave = async (status: "draft" | "published") => {
-    const dataToSave = { ...formData, status };
+    const dataToSave = { ...formData, status: status.toUpperCase() as "DRAFT" | "PUBLISHED" };
 
     if (!validateForm()) return;
 

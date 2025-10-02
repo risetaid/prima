@@ -180,14 +180,13 @@ function CMSPageContent() {
   // Load content when tab changes or when statistics become available (including empty fallback)
   useEffect(() => {
     if (statistics !== null) {
-      // Load content regardless of statistics content (allow empty stats)
       fetchContent();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, statistics]); // Note: fetchContent omitted to prevent infinite loops
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case "published":
         return "bg-green-100 text-green-800 border-green-200";
       case "draft":

@@ -112,7 +112,7 @@ export function CMSContentItem({
 
       {/* Action Buttons */}
       <div className="absolute top-3 right-3 sm:top-4 sm:right-4 flex flex-col gap-2">
-        {item.status === "published" && (
+        {item.status.toLowerCase() === "published" && (
           <Button asChild variant="outline" size="sm" className="w-20">
             <Link
               href={`/content/${item.type === "article" ? "articles" : "videos"}/${item.slug}`}
