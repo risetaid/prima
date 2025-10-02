@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { ConversationStateService } from "@/services/conversation-state.service";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 
 export type VerificationResult = {
     processed: boolean;
@@ -81,6 +82,9 @@ export class VerificationHandler {
             })
             .where(eq(patients.id, patient.id));
 
+        // Invalidate cache after verification status update
+        await invalidateAfterPatientOperation(patient.id, 'update');
+
         await this.whatsappService.sendAck(
             patient.phoneNumber,
             `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
@@ -104,6 +108,9 @@ export class VerificationHandler {
                 updatedAt: new Date(),
             })
             .where(eq(patients.id, patient.id));
+
+        // Invalidate cache after verification status update
+        await invalidateAfterPatientOperation(patient.id, 'update');
 
         await this.whatsappService.sendAck(
             patient.phoneNumber,
@@ -129,6 +136,9 @@ export class VerificationHandler {
                 isActive: false,
             })
             .where(eq(patients.id, patient.id));
+
+        // Invalidate cache after verification status update
+        await invalidateAfterPatientOperation(patient.id, 'update');
 
         await this.whatsappService.sendAck(
             patient.phoneNumber,

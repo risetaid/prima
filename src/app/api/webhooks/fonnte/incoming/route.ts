@@ -1244,6 +1244,7 @@ async function updatePatientStatus(
   const { db, patients } = await import("@/db");
   const { eq } = await import("drizzle-orm");
   const { getWIBTime } = await import("@/lib/timezone");
+  const { invalidateAfterPatientOperation } = await import("@/lib/cache-invalidation");
 
   await db
     .update(patients)
@@ -1252,6 +1253,9 @@ async function updatePatientStatus(
       updatedAt: getWIBTime(),
     })
     .where(eq(patients.id, patientId));
+
+  // Invalidate cache after verification status update
+  await invalidateAfterPatientOperation(patientId, 'update');
 
   // Clear context after verification status change
   if (status === "VERIFIED" || status === "DECLINED") {
