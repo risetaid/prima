@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category") || "";
     const offset = (page - 1) * limit;
     const isPublic = searchParams.get("public") === "true";
+    const isEnhanced = searchParams.get("enhanced") === "true";
 
     // Different authentication requirements based on access type
     let user;
@@ -238,30 +239,163 @@ export async function GET(request: NextRequest) {
       .slice(0, limit);
 
     // Build response
-    let response: {
+    interface EnhancedResponse {
       success: boolean;
       data: UnifiedContent[];
       statistics?: object;
       pagination?: object;
       filters?: object;
-    } = {
-      success: true,
-      data: combinedContent,
-    };
+      enhancedTemplates?: {
+        id: string;
+        name: string;
+        category: string;
+        template: string;
+        variables: string[];
+        description: string;
+      }[];
+      availableArticles?: {
+        id: string;
+        title: string;
+        slug: string;
+        category: string;
+        url: string;
+        type: 'article';
+        excerpt: string;
+      }[];
+      availableVideos?: {
+        id: string;
+        title: string;
+        slug: string;
+        category: string;
+        url: string;
+        type: 'video';
+        description: string;
+      }[];
+    }
+
+    let response: EnhancedResponse;
+
+    if (isEnhanced) {
+      // For enhanced templates, return data in ContentSelector expected format
+      const enhancedTemplates = [
+        {
+          id: "motivation_with_video",
+          name: "Motivasi dengan Video",
+          category: "motivational",
+          template: "Semangat {nama}! 💪\n\n🎬 Tonton video motivasi: {video_url}\n\nAnda tidak sendirian dalam perjuangan ini! ❤️",
+          variables: ["{nama}", "{video_url}"],
+          description: "Pesan motivasi dengan link video"
+        },
+        {
+          id: "nutrition_reminder",
+          name: "Pengingat Nutrisi",
+          category: "nutrition",
+          template: "Halo {nama}, jangan lupa makan bergizi hari ini! 🥗\n\n📚 Tips nutrisi untuk pasien kanker: {artikel_url}\n\nMakan yang cukup ya! 😊",
+          variables: ["{nama}", "{artikel_url}"],
+          description: "Pengingat makan bergizi dengan artikel nutrisi"
+        },
+        {
+          id: "exercise_motivation",
+          name: "Motivasi Olahraga",
+          category: "exercise",
+          template: "Waktu olahraga ringan, {nama}! 🚶‍♀️\n\n🎥 Video gerakan sederhana: {video_url}\n\nTubuh sehat, jiwa kuat! 💪",
+          variables: ["{nama}", "{video_url}"],
+          description: "Motivasi olahraga dengan video demonstrasi"
+        },
+        {
+          id: "general_reminder",
+          name: "Pengingat Umum",
+          category: "general",
+          template: "Halo {nama}! ⏰\n\nIni adalah pengingat untuk Anda. {customMessage}\n\nJangan lupa dilakukan ya! 💙 Tim PRIMA",
+          variables: ["{nama}", "{customMessage}"],
+          description: "Pengingat umum yang dapat dikustomisasi"
+        },
+        {
+          id: "wellness_check",
+          name: "Cek Kesehatan",
+          category: "medical",
+          template: "Halo {nama}! 💙\n\nBagaimana kabar Anda hari ini? {customMessage}\n\nKami siap membantu jika ada yang dibutuhkan. 🙏 Tim PRIMA",
+          variables: ["{nama}", "{customMessage}"],
+          description: "Cek kondisi kesehatan pasien"
+        },
+      ];
+
+      // Transform content data to match expected format
+      // Get articles with excerpt data
+      const articleResults = await db
+        .select({
+          id: cmsArticles.id,
+          title: cmsArticles.title,
+          slug: cmsArticles.slug,
+          excerpt: cmsArticles.excerpt,
+          category: cmsArticles.category,
+        })
+        .from(cmsArticles)
+        .where(and(eq(cmsArticles.status, 'PUBLISHED'), isNull(cmsArticles.deletedAt)))
+        .orderBy(desc(cmsArticles.publishedAt))
+        .limit(50);
+
+      const availableArticles = articleResults.map((article: { id: string; title: string; slug: string; excerpt: string | null; category: string }) => ({
+        id: article.id,
+        title: article.title,
+        slug: article.slug,
+        category: article.category.toLowerCase(),
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/content/articles/${article.slug}`,
+        type: 'article' as const,
+        excerpt: article.excerpt || ''
+      }));
+
+      // Get videos with description data
+      const videoResults = await db
+        .select({
+          id: cmsVideos.id,
+          title: cmsVideos.title,
+          slug: cmsVideos.slug,
+          description: cmsVideos.description,
+          category: cmsVideos.category,
+        })
+        .from(cmsVideos)
+        .where(and(eq(cmsVideos.status, 'PUBLISHED'), isNull(cmsVideos.deletedAt)))
+        .orderBy(desc(cmsVideos.publishedAt))
+        .limit(50);
+
+      const availableVideos = videoResults.map((video: { id: string; title: string; slug: string; description: string | null; category: string }) => ({
+        id: video.id,
+        title: video.title,
+        slug: video.slug,
+        category: video.category.toLowerCase(),
+        url: `${process.env.NEXT_PUBLIC_APP_URL}/content/videos/${video.slug}`,
+        type: 'video' as const,
+        description: video.description || ''
+      }));
+
+      response = {
+        success: true,
+        data: combinedContent,
+        enhancedTemplates,
+        availableArticles,
+        availableVideos
+      };
+    } else {
+      response = {
+        success: true,
+        data: combinedContent,
+      };
+    }
 
     // Add pagination for non-admin requests
     if (isPublic) {
       // Get total counts for pagination
-      const [totalArticles, totalVideos] = await Promise.all([
+      const [totalArticlesResult, totalVideosResult] = await Promise.all([
         type === 'all' || type === 'article' ?
-          db.select().from(cmsArticles)
-            .where(and(eq(cmsArticles.status, 'PUBLISHED'), isNull(cmsArticles.deletedAt))) : [],
+          db.select({ count: count() }).from(cmsArticles)
+            .where(and(eq(cmsArticles.status, 'PUBLISHED'), isNull(cmsArticles.deletedAt))) : [{ count: 0 }],
         type === 'all' || type === 'video' ?
-          db.select().from(cmsVideos)
-            .where(and(eq(cmsVideos.status, 'PUBLISHED'), isNull(cmsVideos.deletedAt))) : []
+          db.select({ count: count() }).from(cmsVideos)
+            .where(and(eq(cmsVideos.status, 'PUBLISHED'), isNull(cmsVideos.deletedAt))) : [{ count: 0 }]
       ]);
 
-      const totalCount = totalArticles.length + totalVideos.length;
+      const totalCount = (totalArticlesResult[0]?.count || 0) + (totalVideosResult[0]?.count || 0);
       const hasMore = offset + limit < totalCount;
 
       response = {

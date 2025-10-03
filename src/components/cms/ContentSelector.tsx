@@ -11,6 +11,21 @@ import { FileText, Video, Link, MessageCircle, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { logger } from '@/lib/logger';
 
+interface UnifiedContent {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
+  status: "draft" | "published" | "archived";
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  type: "article" | "video";
+  thumbnailUrl: string | null;
+  featuredImageUrl: string | null;
+  authorName: string;
+}
+
 interface ContentItem {
   id: string
   title: string
@@ -55,13 +70,82 @@ export default function ContentSelector({
 
   const fetchEnhancedTemplates = async () => {
     try {
-      const response = await fetch('/api/cms/enhanced-templates')
+      const response = await fetch('/api/cms/content?enhanced=true&type=all&status=published&limit=100')
       const data = await response.json()
 
       if (data.success) {
-        setTemplates(data.data.enhancedTemplates)
-        setArticles(data.data.availableArticles)
-        setVideos(data.data.availableVideos)
+        // Extract enhanced templates from the existing template logic
+        const enhancedTemplates = [
+          {
+            id: "motivation_with_video",
+            name: "Motivasi dengan Video",
+            category: "motivational",
+            template: "Semangat {nama}! 💪\n\n🎬 Tonton video motivasi: {video_url}\n\nAnda tidak sendirian dalam perjuangan ini! ❤️",
+            variables: ["{nama}", "{video_url}"],
+            description: "Pesan motivasi dengan link video"
+          },
+          {
+            id: "nutrition_reminder",
+            name: "Pengingat Nutrisi",
+            category: "nutrition",
+            template: "Halo {nama}, jangan lupa makan bergizi hari ini! 🥗\n\n📚 Tips nutrisi untuk pasien kanker: {artikel_url}\n\nMakan yang cukup ya! 😊",
+            variables: ["{nama}", "{artikel_url}"],
+            description: "Pengingat makan bergizi dengan artikel nutrisi"
+          },
+          {
+            id: "exercise_motivation",
+            name: "Motivasi Olahraga",
+            category: "exercise",
+            template: "Waktu olahraga ringan, {nama}! 🚶‍♀️\n\n🎥 Video gerakan sederhana: {video_url}\n\nTubuh sehat, jiwa kuat! 💪",
+            variables: ["{nama}", "{video_url}"],
+            description: "Motivasi olahraga dengan video demonstrasi"
+          },
+          {
+            id: "general_reminder",
+            name: "Pengingat Umum",
+            category: "general",
+            template: "Halo {nama}! ⏰\n\nIni adalah pengingat untuk Anda. {customMessage}\n\nJangan lupa dilakukan ya! 💙 Tim PRIMA",
+            variables: ["{nama}", "{customMessage}"],
+            description: "Pengingat umum yang dapat dikustomisasi"
+          },
+          {
+            id: "wellness_check",
+            name: "Cek Kesehatan",
+            category: "medical",
+            template: "Halo {nama}! 💙\n\nBagaimana kabar Anda hari ini? {customMessage}\n\nKami siap membantu jika ada yang dibutuhkan. 🙏 Tim PRIMA",
+            variables: ["{nama}", "{customMessage}"],
+            description: "Cek kondisi kesehatan pasien"
+          },
+        ]
+
+        // Transform content data to match expected format
+        const availableArticles = data.data
+          .filter((item: UnifiedContent) => item.type === 'article')
+          .map((item: UnifiedContent) => ({
+            id: item.id,
+            title: item.title,
+            slug: item.slug,
+            category: item.category.toLowerCase(),
+            url: `${window.location.origin}/content/articles/${item.slug}`,
+            type: 'article' as const,
+            excerpt: (item as UnifiedContent & { excerpt?: string }).excerpt || ''
+          }))
+
+        const availableVideos = data.data
+          .filter((item: UnifiedContent) => item.type === 'video')
+          .map((item: UnifiedContent) => ({
+            id: item.id,
+            title: item.title,
+            slug: item.slug,
+            category: item.category.toLowerCase(),
+            url: `${window.location.origin}/content/videos/${item.slug}`,
+            type: 'video' as const,
+            description: (item as UnifiedContent & { description?: string }).description || ''
+          }))
+
+        setTemplates(enhancedTemplates)
+        setArticles(availableArticles)
+        setVideos(availableVideos)
       } else {
         toast.error('Gagal memuat template')
       }
@@ -80,7 +164,7 @@ export default function ContentSelector({
     }
 
     try {
-      const response = await fetch('/api/cms/enhanced-templates', {
+      const response = await fetch('/api/cms/content?action=template', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -247,7 +331,7 @@ export default function ContentSelector({
                 {(() => {
                   const item = (selectedContentType === 'article' ? articles : videos)
                     .find(i => i.id === selectedContent)
-                  
+
                   return item ? (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -297,7 +381,7 @@ export default function ContentSelector({
 
       {/* Generate Button */}
       <div className="flex justify-center">
-        <Button 
+        <Button
           onClick={generateMessage}
           disabled={!selectedTemplate}
           size="lg"
