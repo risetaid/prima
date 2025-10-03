@@ -191,7 +191,7 @@ export class ReminderTemplatesService {
     }
 
     reminderText += `Silakan konfirmasi dengan membalas:\n`;
-    reminderText += `✅ *SELESAI* jika sudah dilakukan\n`;
+    reminderText += `✅ *SUDAH* jika sudah dilakukan\n`;
     reminderText += `⏰ *BELUM* jika belum dilakukan\n\n`;
     reminderText += `💙 Tim PRIMA`;
 
@@ -213,8 +213,8 @@ export class ReminderTemplatesService {
            `Halo ${patientName}!\n\n` +
            `${message}\n\n` +
            `Silakan konfirmasi dengan membalas:\n` +
-           `✅ *SELESAI* jika sudah dilakukan\n` +
-           `⏰ *BELUM* jika belum dilakukan\n\n` +
+            `✅ *SUDAH* jika sudah dilakukan\n` +
+            `⏰ *BELUM* jika belum dilakukan\n\n` +
            `💙 Tim PRIMA`;
   }
 
@@ -376,7 +376,7 @@ export class ReminderTemplatesService {
       case 'APPOINTMENT':
         return baseMessage + `✅ *HADIR* jika akan datang\n⏰ *TERLAMBAT* jika akan terlambat\n❌ *BATAL* jika tidak bisa hadir\n\nTerima kasih! 💙 Tim PRIMA`;
       case 'GENERAL':
-        return baseMessage + `✅ *SELESAI* jika sudah dilakukan\n⏰ *BELUM* jika belum dilakukan\n\nTerima kasih! 💙 Tim PRIMA`;
+        return baseMessage + `✅ *SUDAH* jika sudah dilakukan\n⏰ *BELUM* jika belum dilakukan\n\nTerima kasih! 💙 Tim PRIMA`;
       default:
         return baseMessage + `✅ *YA* atau *SETUJU* untuk konfirmasi\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`;
     }

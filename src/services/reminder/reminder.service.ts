@@ -56,6 +56,35 @@ export class ReminderService {
     this.conversationService = new ConversationStateService();
   }
 
+  /**
+   * Replace template variables in message
+   */
+  private replaceTemplateVariables(
+    message: string,
+    patientName: string,
+    additionalVars?: Record<string, string>
+  ): string {
+    let processedMessage = message;
+
+    // Replace patient name
+    processedMessage = processedMessage.replace(/{nama}/g, patientName);
+
+    // Replace additional variables if provided
+    if (additionalVars) {
+      Object.keys(additionalVars).forEach((key) => {
+        const placeholder = `{${key}}`;
+        if (processedMessage.includes(placeholder)) {
+          processedMessage = processedMessage.replace(
+            new RegExp(placeholder, 'g'),
+            additionalVars[key] || ""
+          );
+        }
+      });
+    }
+
+    return processedMessage;
+  }
+
   // CREATE operations
   async createReminder(dto: CreateReminderDTO) {
     // Validate patient exists
@@ -302,12 +331,15 @@ export class ReminderService {
   }> {
     try {
       const reminderType = params.reminderType as ReminderType;
+      // Replace template variables in the message first
+      const processedMessage = this.replaceTemplateVariables(params.message, params.patientName);
+      
       let formattedMessage = this.templateService.formatReminderMessage({
         patientName: params.patientName,
         reminderType,
         title: params.reminderTitle || undefined,
         description: params.reminderDescription || undefined,
-        message: params.message,
+        message: processedMessage,
         scheduledTime: "",
         metadata: {},
       });

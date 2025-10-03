@@ -826,8 +826,8 @@ async function sendImmediateReminders(
     const scheduleDate = schedule.startDate.toISOString().split("T")[0];
 
     if (shouldSendReminderNow(scheduleDate, time)) {
-      // Generate enhanced message with content attachments
-      const enhancedMessage = generateEnhancedMessage(message, validatedContent);
+      // Generate enhanced message with content attachments and template replacement
+      const enhancedMessage = generateEnhancedMessage(message, validatedContent, patient.name);
 
       // Send via Fonnte
       const result = await sendWhatsAppMessage({
@@ -1101,6 +1101,33 @@ function getContentIcon(contentType: string): string {
   }
 }
 
+// Helper function to replace template variables in message
+function replaceTemplateVariables(
+  message: string,
+  patientName: string,
+  additionalVars?: Record<string, string>
+): string {
+  let processedMessage = message;
+
+  // Replace patient name
+  processedMessage = processedMessage.replace(/{nama}/g, patientName);
+
+  // Replace additional variables if provided
+  if (additionalVars) {
+    Object.keys(additionalVars).forEach((key) => {
+      const placeholder = `{${key}}`;
+      if (processedMessage.includes(placeholder)) {
+        processedMessage = processedMessage.replace(
+          new RegExp(placeholder, 'g'),
+          additionalVars[key] || ""
+        );
+      }
+    });
+  }
+
+  return processedMessage;
+}
+
 // Helper function to generate enhanced WhatsApp message with content links
 function generateEnhancedMessage(
   originalMessage: string,
@@ -1109,13 +1136,19 @@ function generateEnhancedMessage(
     type: "article" | "video";
     title: string;
     url: string;
-  }>
+  }>,
+  patientName?: string
 ) {
-  if (contentAttachments.length === 0) {
-    return originalMessage;
+  let message = originalMessage;
+
+  // Replace template variables if patient name is provided
+  if (patientName) {
+    message = replaceTemplateVariables(message, patientName);
   }
 
-  let message = originalMessage;
+  if (contentAttachments.length === 0) {
+    return message;
+  }
 
   // Group content by type for better organization
   const contentByType: { [key: string]: ValidatedContent[] } = {};
@@ -1124,6 +1157,8 @@ function generateEnhancedMessage(
     if (!contentByType[type]) {
       contentByType[type] = [];
     }
+
+
     contentByType[type].push(content);
   });
 
