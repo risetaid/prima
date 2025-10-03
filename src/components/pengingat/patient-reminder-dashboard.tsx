@@ -375,6 +375,58 @@ export function PatientReminderDashboard({
     );
   };
 
+  const handlePendingAction = async (reminderId: string, action: "ya" | "tidak") => {
+    try {
+      // Convert "ya"/"tidak" to boolean
+      const confirmed = action === "ya";
+      
+      // API call to update reminder status - reminderId here is actually ReminderLog ID
+      const response = await fetch(
+        `/api/patients/${patientId}/reminders/${reminderId}/confirm`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            confirmed: confirmed,
+            reminderLogId: reminderId, // Pass the ReminderLog ID
+          }),
+        }
+      );
+
+      if (response.ok) {
+        // Refresh data to update the table cards
+        await fetchAllReminders();
+        await fetchStats();
+
+        // Show success toast message
+        if (confirmed) {
+          toast.success("✅ Konfirmasi Berhasil", {
+            description: "Pasien sudah minum obat sesuai jadwal",
+            duration: 4000,
+          });
+        } else {
+          toast.warning("⚠️ Konfirmasi Berhasil", {
+            description: "Pasien belum minum obat - akan dipantau lebih lanjut",
+            duration: 4000,
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        logger.error("Failed to confirm reminder:", errorData);
+        toast.error("❌ Gagal Mengupdate", {
+          description: errorData.error || "Tidak dapat menyimpan status pengingat. Coba lagi.",
+          duration: 5000,
+        });
+      }
+    } catch (error: unknown) {
+      logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
+      toast.error("❌ Kesalahan Jaringan", {
+        description: "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
+        duration: 5000,
+      });
+    }
+  };
+
   const handleDeleteSelected = async () => {
     if (selectedReminders.length === 0) {
       toast.warning("Pilih pengingat yang akan dihapus");
@@ -428,37 +480,7 @@ export function PatientReminderDashboard({
     }
   };
 
-  const handlePendingAction = async (
-    reminderId: string,
-    action: "ya" | "tidak"
-  ) => {
-    try {
-      const response = await fetch(
-        `/api/patients/${params.id}/reminders/${reminderId}/confirm`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            confirmationStatus: action === "ya" ? "CONFIRMED" : "NOT_CONFIRMED",
-            reminderLogId: reminderId,
-          }),
-        }
-      );
 
-      if (response.ok) {
-        toast.success(
-          `Konfirmasi "${action === "ya" ? "Ya" : "Tidak"}" berhasil disimpan`
-        );
-        await fetchStats();
-        await fetchAllReminders();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save confirmation");
-      }
-    } catch {
-      toast.error("Gagal menyimpan konfirmasi");
-    }
-  };
 
   if (loading) {
     return (
