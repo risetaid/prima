@@ -22,19 +22,25 @@ export function TimePicker24h({
   const [selectedHour, setSelectedHour] = useState<string>("");
   const [selectedMinute, setSelectedMinute] = useState<string>("");
 
-  // Parse initial value
+  // Parse initial value - only on mount or when value changes to different time
   useEffect(() => {
     if (value && value.includes(":")) {
       const [hour, minute] = value.split(":");
-      setSelectedHour(hour.padStart(2, "0"));
-      setSelectedMinute(minute.padStart(2, "0"));
-    } else {
-      // Set default to current time if no value
+      const newHour = hour.padStart(2, "0");
+      const newMinute = minute.padStart(2, "0");
+
+      // Only update if different from current state to prevent loops
+      if (newHour !== selectedHour || newMinute !== selectedMinute) {
+        setSelectedHour(newHour);
+        setSelectedMinute(newMinute);
+      }
+    } else if (!selectedHour && !selectedMinute) {
+      // Set default to current time if no value and no state yet
       const now = new Date();
       setSelectedHour(now.getHours().toString().padStart(2, "0"));
       setSelectedMinute(now.getMinutes().toString().padStart(2, "0"));
     }
-  }, [value]);
+  }, [value, selectedHour, selectedMinute]);
 
   // Update parent when selections change
   useEffect(() => {
