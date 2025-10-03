@@ -1,7 +1,7 @@
 // ComplianceService centralizes compliance calculations for patients
-// Now uses standardized CompletionCalculationService for consistency
 import { logger } from "@/lib/logger";
-import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
+import { db, reminders, manualConfirmations } from "@/db";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 
 export interface ComplianceResult {
   deliveredCount: number; // Total reminders sent
@@ -23,7 +23,7 @@ export interface ComplianceStats {
 
 export class ComplianceService {
   /**
-   * Calculate compliance rate using standardized completion logic
+   * Calculate compliance rate
    */
   private computeRate(totalReminders: number, completedReminders: number): number {
     if (!totalReminders || totalReminders <= 0) return 0;
@@ -31,10 +31,76 @@ export class ComplianceService {
     return Math.max(0, Math.min(100, rate));
   }
 
+  /**
+   * Get patient completion stats (inline simplified version)
+   */
+  private async getPatientStats(patientId: string) {
+    // Get all active reminders
+    const allReminders = await db
+      .select({
+        id: reminders.id,
+        status: reminders.status,
+        confirmationStatus: reminders.confirmationStatus,
+      })
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.patientId, patientId),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
+        )
+      );
+
+    // Get manual confirmations
+    const reminderIds = allReminders.map(r => r.id);
+    const manualConfs = reminderIds.length > 0
+      ? await db
+          .select({ reminderId: manualConfirmations.reminderId })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
+
+    const manuallyConfirmedIds = new Set(manualConfs.map(c => c.reminderId));
+
+    // Count stats
+    let completed = 0;
+    let pending = 0;
+    let failed = 0;
+    let automated = 0;
+    let manual = 0;
+
+    for (const reminder of allReminders) {
+      const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
+
+      if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
+        completed++;
+        if (isManuallyConfirmed) manual++;
+        else automated++;
+      } else if (reminder.status === 'FAILED') {
+        failed++;
+      } else if (reminder.status === 'PENDING') {
+        pending++;
+      }
+    }
+
+    const total = allReminders.length;
+    const complianceRate = this.computeRate(total, completed);
+
+    return {
+      totalReminders: total,
+      completedReminders: completed,
+      pendingReminders: pending,
+      failedReminders: failed,
+      automatedCompletions: automated,
+      manualCompletions: manual,
+      complianceRate,
+    };
+  }
+
   async getRatesMap(patientIds: string[]) {
     const results = await Promise.all(
       patientIds.map(async (patientId) => {
-        const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+        const stats = await this.getPatientStats(patientId);
         return {
           patientId,
           totalReminders: stats.totalReminders,
@@ -69,18 +135,18 @@ export class ComplianceService {
   }
 
   async getPatientRate(patientId: string): Promise<number> {
-    const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+    const stats = await this.getPatientStats(patientId);
     return stats.complianceRate;
   }
 
   /**
-   * Calculate compliance for a single patient using standardized logic
+   * Calculate compliance for a single patient
    */
   async calculatePatientCompliance(
     patientId: string
   ): Promise<ComplianceResult> {
     try {
-      const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+      const stats = await this.getPatientStats(patientId);
 
       logger.info("Compliance calculation completed", {
         patientId,
@@ -91,8 +157,8 @@ export class ComplianceService {
       });
 
       return {
-        deliveredCount: stats.totalReminders, // Total reminders
-        confirmedCount: stats.completedReminders, // Completed reminders
+        deliveredCount: stats.totalReminders,
+        confirmedCount: stats.completedReminders,
         complianceRate: stats.complianceRate,
         lastCalculated: new Date(),
       };
@@ -105,7 +171,6 @@ export class ComplianceService {
         }
       );
 
-      // Return zero values on error
       return {
         deliveredCount: 0,
         confirmedCount: 0,
@@ -116,10 +181,10 @@ export class ComplianceService {
   }
 
   /**
-   * Get detailed compliance statistics for a patient using standardized logic
+   * Get detailed compliance statistics for a patient
    */
   async getPatientComplianceStats(patientId: string): Promise<ComplianceStats> {
-    const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+    const stats = await this.getPatientStats(patientId);
 
     return {
       totalReminders: stats.totalReminders,
@@ -134,7 +199,7 @@ export class ComplianceService {
   }
 
   /**
-   * Calculate compliance for multiple patients using standardized logic
+   * Calculate compliance for multiple patients
    */
   async calculateBulkCompliance(
     patientIds: string[]
@@ -146,7 +211,7 @@ export class ComplianceService {
     const results: Record<string, ComplianceResult> = {};
 
     for (const patientId of patientIds) {
-      const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+      const stats = await this.getPatientStats(patientId);
 
       results[patientId] = {
         deliveredCount: stats.totalReminders,
@@ -160,14 +225,23 @@ export class ComplianceService {
   }
 
   /**
-   * Get reminder status counts using standardized logic
+   * Get reminder status counts (simple categorization)
    */
   async getReminderStatusCounts(patientId: string): Promise<{
     terjadwal: number;
     perluDiperbarui: number;
     selesai: number;
   }> {
-    return await CompletionCalculationService.getReminderStatusCounts(patientId);
+    const stats = await this.getPatientStats(patientId);
+
+    // perluDiperbarui = total - completed - pending - failed
+    const perluDiperbarui = stats.totalReminders - stats.completedReminders - stats.pendingReminders - stats.failedReminders;
+
+    return {
+      terjadwal: stats.pendingReminders,
+      perluDiperbarui: Math.max(0, perluDiperbarui),
+      selesai: stats.completedReminders,
+    };
   }
 
   /**

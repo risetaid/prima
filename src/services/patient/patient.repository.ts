@@ -13,7 +13,6 @@ import type { InferInsertModel } from "drizzle-orm";
 import type {
   PatientFilters,
 } from "@/services/patient/patient.types";
-import { PatientQueryBuilder } from "@/services/patient/patient-query-builder";
 
 export class PatientRepository {
   async patientExists(patientId: string): Promise<boolean> {
@@ -219,8 +218,7 @@ export class PatientRepository {
     return rows;
   }
 
-  // ===== Standardized Compliance counts using CompletionCalculationService =====
-  // Uses unified completion logic for consistency across all endpoints
+  // ===== Standardized Compliance counts using ComplianceService =====
   async getCompletedComplianceCounts(patientIds: string[]) {
     if (!patientIds.length)
       return [] as Array<{
@@ -230,16 +228,17 @@ export class PatientRepository {
       }>;
 
     // Import here to avoid circular dependency
-    const { CompletionCalculationService } = await import("@/services/reminder/completion-calculation.service");
+    const { ComplianceService } = await import("@/services/patient/compliance.service");
+    const complianceService = new ComplianceService();
 
     const results = await Promise.all(
       patientIds.map(async (patientId) => {
-        const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+        const stats = await complianceService.getPatientComplianceStats(patientId);
 
         return {
           patientId,
-          totalConfirmed: stats.completedReminders, // Total completed reminders
-          takenCount: stats.completedReminders, // In simplified logic, completed = taken
+          totalConfirmed: stats.confirmedReminders,
+          takenCount: stats.confirmedReminders,
         };
       })
     );
@@ -251,8 +250,44 @@ export class PatientRepository {
 
   // ===== Patient detail building blocks =====
   async getPatientBasicData(patientId: string) {
-    // Use the consolidated query builder for consistency
-    return await PatientQueryBuilder.getPatientWithVolunteer(patientId);
+    // Get patient with volunteer info (inlined from PatientQueryBuilder)
+    const result = await db
+      .select({
+        id: patients.id,
+        name: patients.name,
+        phoneNumber: patients.phoneNumber,
+        address: patients.address,
+        birthDate: patients.birthDate,
+        diagnosisDate: patients.diagnosisDate,
+        cancerStage: patients.cancerStage,
+        assignedVolunteerId: patients.assignedVolunteerId,
+        doctorName: patients.doctorName,
+        hospitalName: patients.hospitalName,
+        emergencyContactName: patients.emergencyContactName,
+        emergencyContactPhone: patients.emergencyContactPhone,
+        notes: patients.notes,
+        isActive: patients.isActive,
+        deletedAt: patients.deletedAt,
+        verificationStatus: patients.verificationStatus,
+        photoUrl: patients.photoUrl,
+        verificationSentAt: patients.verificationSentAt,
+        verificationResponseAt: patients.verificationResponseAt,
+        verificationMessage: patients.verificationMessage,
+        verificationAttempts: patients.verificationAttempts,
+        verificationExpiresAt: patients.verificationExpiresAt,
+        createdAt: patients.createdAt,
+        updatedAt: patients.updatedAt,
+        volunteerFirstName: users.firstName,
+        volunteerLastName: users.lastName,
+        volunteerEmail: users.email,
+        volunteerRole: users.role,
+      })
+      .from(patients)
+      .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
+      .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
+      .limit(1);
+
+    return result[0] || null;
   }
 
   async getPatientManualConfirmations(patientId: string) {

@@ -190,7 +190,7 @@ export class PatientService {
       cancerStage: basic.cancerStage,
       assignedVolunteerId: basic.assignedVolunteerId,
       doctorName: basic.doctorName,
-      hospitalName: basic.hospitalName || basic.volunteerHospitalName, // Use patient's hospitalName or fallback to volunteer's
+      hospitalName: basic.hospitalName,
       emergencyContactName: basic.emergencyContactName,
       emergencyContactPhone: basic.emergencyContactPhone,
       notes: basic.notes,
@@ -205,14 +205,14 @@ export class PatientService {
       verificationMessage: basic.verificationMessage,
       verificationAttempts: basic.verificationAttempts,
       verificationExpiresAt: basic.verificationExpiresAt,
-      volunteerId: basic.volunteerId,
+      volunteerId: basic.assignedVolunteerId,
       volunteerFirstName: basic.volunteerFirstName,
       volunteerLastName: basic.volunteerLastName,
       volunteerEmail: basic.volunteerEmail,
       volunteerRole: basic.volunteerRole,
-      assignedVolunteer: basic.volunteerId
+      assignedVolunteer: basic.assignedVolunteerId
         ? {
-          id: basic.volunteerId,
+          id: basic.assignedVolunteerId,
           firstName: basic.volunteerFirstName,
           lastName: basic.volunteerLastName,
           email: basic.volunteerEmail,

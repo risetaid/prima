@@ -7,7 +7,6 @@ import {
 import { ValidatedContent } from "@/services/reminder/reminder.types";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
-import { distributedLockService } from "@/services/distributed-lock.service";
 
 export class WhatsAppService {
   private readonly MAX_RETRY_ATTEMPTS = 3;
@@ -119,7 +118,7 @@ export class WhatsAppService {
   }
 
   async send(toPhoneNumber: string, message: string) {
-    logger.info("Attempting to send WhatsApp message (sendAck)", {
+    logger.info("Attempting to send WhatsApp message", {
       phoneNumber: toPhoneNumber,
       messageLength: message.length,
       messagePreview:
@@ -141,30 +140,8 @@ export class WhatsAppService {
       );
     }
 
-    // Use distributed locking to prevent concurrent sends to the same number
-    const lockKey = `whatsapp_send:${toPhoneNumber}:${Date.now()}`;
-    const lockResult = await distributedLockService.withLock(
-      lockKey,
-      async () => {
-        return await this.sendWithRetry(toPhoneNumber, message);
-      },
-      {
-        ttl: 30000, // 30 second lock
-        maxRetries: 2,
-      }
-    );
-
-    if (!lockResult) {
-      logger.warn("Failed to acquire WhatsApp send lock", {
-        phoneNumber: toPhoneNumber,
-        lockKey,
-      });
-      throw new Error(
-        "Could not acquire lock for WhatsApp send - please try again"
-      );
-    }
-
-    return lockResult;
+    // Send with retry logic (rate limiter prevents concurrent sends)
+    return await this.sendWithRetry(toPhoneNumber, message);
   }
 
   /**

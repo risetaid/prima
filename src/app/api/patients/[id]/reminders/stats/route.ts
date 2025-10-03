@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
-
+import { db, reminders, manualConfirmations } from "@/db";
+import { eq, and, isNull, inArray } from "drizzle-orm";
 import {
   getCachedData,
   setCachedData,
@@ -40,14 +40,65 @@ export async function GET(
 
 
 
-    // Get reminder status counts using standardized completion logic
-    const statusCounts = await CompletionCalculationService.getReminderStatusCounts(id);
+    // Get all active reminders for patient
+    const allReminders = await db
+      .select({
+        id: reminders.id,
+        status: reminders.status,
+        confirmationStatus: reminders.confirmationStatus,
+        sentAt: reminders.sentAt,
+      })
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.patientId, id),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt)
+        )
+      );
+
+    // Get manual confirmations
+    const reminderIds = allReminders.map(r => r.id);
+    const confirmations = reminderIds.length > 0
+      ? await db
+          .select({ reminderId: manualConfirmations.reminderId })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
+
+    const confirmedReminderIds = new Set(confirmations.map(c => c.reminderId));
+
+    // Simple categorization logic
+    let terjadwal = 0;
+    let perluDiperbarui = 0;
+    let selesai = 0;
+
+    for (const reminder of allReminders) {
+      // Selesai: confirmed OR manually confirmed
+      if (
+        reminder.confirmationStatus === 'CONFIRMED' ||
+        confirmedReminderIds.has(reminder.id)
+      ) {
+        selesai++;
+      }
+      // Perlu Diperbarui: sent but no confirmation
+      else if (
+        reminder.status === 'SENT' ||
+        reminder.status === 'DELIVERED'
+      ) {
+        perluDiperbarui++;
+      }
+      // Terjadwal: pending or failed
+      else {
+        terjadwal++;
+      }
+    }
 
     const stats = {
-      terjadwal: statusCounts.terjadwal,
-      perluDiperbarui: statusCounts.perluDiperbarui,
-      selesai: statusCounts.selesai,
-      semua: statusCounts.terjadwal + statusCounts.perluDiperbarui + statusCounts.selesai,
+      terjadwal,
+      perluDiperbarui,
+      selesai,
+      semua: terjadwal + perluDiperbarui + selesai,
     };
 
     // Cache the stats with shorter TTL since they change more frequently

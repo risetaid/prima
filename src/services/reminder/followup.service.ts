@@ -5,7 +5,6 @@ import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 import { getWIBTime } from "@/lib/timezone";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { FollowupQueueService } from "@/services/reminder/followup-queue.service";
 import {
   FollowupData,
   FollowupType,
@@ -25,11 +24,33 @@ export class FollowupService {
   private readonly MAX_FOLLOWUP_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
   private whatsappService: WhatsAppService;
-  private queueService: FollowupQueueService;
 
   constructor() {
     this.whatsappService = new WhatsAppService();
-    this.queueService = new FollowupQueueService();
+  }
+
+  /**
+   * Add followup to sorted set queue (inline from FollowupQueueService)
+   */
+  private async enqueueFollowup(followupId: string, scheduledAt: Date): Promise<void> {
+    const score = scheduledAt.getTime();
+    await redis.zadd(this.FOLLOWUP_QUEUE_KEY, score, followupId);
+  }
+
+  /**
+   * Get due followups from queue
+   */
+  private async getDueFollowups(): Promise<string[]> {
+    const now = Date.now();
+    const followupIds = await redis.zrangebyscore(this.FOLLOWUP_QUEUE_KEY, 0, now);
+    return followupIds;
+  }
+
+  /**
+   * Remove followup from queue
+   */
+  private async dequeueFollowup(followupId: string): Promise<void> {
+    await redis.zrem(this.FOLLOWUP_QUEUE_KEY, followupId);
   }
 
   /**
@@ -229,7 +250,7 @@ export class FollowupService {
     );
 
     // Schedule in queue
-    await this.queueService.enqueueFollowup(followupId, params.scheduledAt);
+    await this.enqueueFollowup(followupId, params.scheduledAt);
 
     return followupId;
   }
@@ -239,37 +260,26 @@ export class FollowupService {
    */
   async processPendingFollowups(): Promise<FollowupProcessingResult[]> {
     try {
-      const dueJobs = await this.queueService.processQueue();
+      const dueFollowupIds = await this.getDueFollowups();
       const results: FollowupProcessingResult[] = [];
 
-      for (const job of dueJobs) {
+      for (const followupId of dueFollowupIds) {
         try {
-          const result = await this.processFollowup(job.followupId);
+          const result = await this.processFollowup(followupId);
           results.push(result);
 
+          // Remove from queue if processed successfully
           if (result.processed) {
-            await this.queueService.completeJob(job.id);
-          } else {
-            await this.queueService.failJob(
-              job.id,
-              result.error || 'Processing failed',
-              job.retryCount + 1,
-              job.maxRetries
-            );
+            await this.dequeueFollowup(followupId);
           }
         } catch (error) {
-          logger.error("Failed to process followup job", error instanceof Error ? error : new Error(String(error)), {
-            followupId: job.followupId,
-            jobId: job.id,
+          logger.error("Failed to process followup", error instanceof Error ? error : new Error(String(error)), {
+            followupId,
             operation: "process_pending_followups"
           });
 
-          await this.queueService.failJob(
-            job.id,
-            error instanceof Error ? error.message : String(error),
-            job.retryCount + 1,
-            job.maxRetries
-          );
+          // Remove from queue anyway to avoid retry loops
+          await this.dequeueFollowup(followupId);
         }
       }
 
@@ -556,7 +566,7 @@ export class FollowupService {
       followup.updatedAt = getWIBTime();
 
       await this.storeFollowupData(followup);
-      await this.queueService.dequeueFollowup(followupId);
+      await this.dequeueFollowup(followupId);
 
       // Remove from reminder index
       await redis.hdel(this.FOLLOWUP_REMINDER_KEY + followup.reminderId, followupId);

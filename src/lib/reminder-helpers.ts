@@ -2,7 +2,7 @@
 // Type-safe utilities for common reminder patterns
 
 import { db, reminders, reminderLogs, manualConfirmations } from '@/db';
-import { eq, and, gte, lte, isNull, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, isNull, desc, asc, sql, inArray } from 'drizzle-orm';
 import type {
   Reminder,
   ReminderLog,
@@ -267,7 +267,7 @@ export class ReminderHelpers {
     return updated;
   }
 
-  // Analytics helpers - now uses standardized completion logic
+  // Analytics helpers - simplified with ComplianceService
   static async getReminderStats(patientId?: string): Promise<{
     total: number;
     active: number;
@@ -277,36 +277,50 @@ export class ReminderHelpers {
     complianceRate: number;
   }> {
     // Import here to avoid circular dependency
-    const { CompletionCalculationService } = await import("@/services/reminder/completion-calculation.service");
+    const { ComplianceService } = await import("@/services/patient/compliance.service");
+    const complianceService = new ComplianceService();
 
     if (patientId) {
-      // Use standardized logic for specific patient
-      const stats = await CompletionCalculationService.getPatientCompletionStats(patientId);
+      // Use ComplianceService for specific patient
+      const stats = await complianceService.getPatientComplianceStats(patientId);
 
       return {
         total: stats.totalReminders,
-        active: stats.totalReminders - stats.failedReminders, // Active = total - failed
-        completed: stats.completedReminders,
+        active: stats.totalReminders - stats.failedReminders,
+        completed: stats.confirmedReminders,
         failed: stats.failedReminders,
         pending: stats.pendingReminders,
         complianceRate: stats.complianceRate,
       };
     } else {
-      // For global stats, use original logic but with standardized completion check
+      // For global stats, simple aggregation
       const conditions = [isNull(reminders.deletedAt)];
       const allReminders = await db
-        .select()
+        .select({
+          id: reminders.id,
+          isActive: reminders.isActive,
+          status: reminders.status,
+          confirmationStatus: reminders.confirmationStatus,
+        })
         .from(reminders)
         .where(and(...conditions));
 
+      // Get manual confirmations for all reminders
+      const reminderIds = allReminders.map(r => r.id);
+      const manualConfs = reminderIds.length > 0
+        ? await db
+            .select({ reminderId: manualConfirmations.reminderId })
+            .from(manualConfirmations)
+            .where(inArray(manualConfirmations.reminderId, reminderIds))
+        : [];
+
+      const manuallyConfirmedIds = new Set(manualConfs.map(c => c.reminderId));
+
       const total = allReminders.length;
       const active = allReminders.filter(r => r.isActive).length;
-
-      // Use standardized completion logic - check both manual and automated confirmations
-      const reminderIds = allReminders.map(r => r.id);
-      const completionStatuses = await CompletionCalculationService.getRemindersCompletion(reminderIds);
-
-      const completed = Object.values(completionStatuses).filter(status => status.isCompleted).length;
+      const completed = allReminders.filter(r =>
+        r.confirmationStatus === 'CONFIRMED' || manuallyConfirmedIds.has(r.id)
+      ).length;
       const failed = allReminders.filter(r => r.status === 'FAILED').length;
       const pending = allReminders.filter(r => r.status === 'PENDING').length;
       const complianceRate = total > 0 ? (completed / total) * 100 : 0;
@@ -327,19 +341,27 @@ export class ReminderHelpers {
     active: number;
     completed: number;
   }>> {
-    // Import here to avoid circular dependency
-    const { CompletionCalculationService } = await import("@/services/reminder/completion-calculation.service");
-
-    // Get all reminders grouped by type
+    // Get all reminders with completion status
     const allReminders = await db
       .select({
         id: reminders.id,
         reminderType: reminders.reminderType,
         isActive: reminders.isActive,
-        patientId: reminders.patientId,
+        confirmationStatus: reminders.confirmationStatus,
       })
       .from(reminders)
       .where(isNull(reminders.deletedAt));
+
+    // Get manual confirmations
+    const reminderIds = allReminders.map(r => r.id);
+    const manualConfs = reminderIds.length > 0
+      ? await db
+          .select({ reminderId: manualConfirmations.reminderId })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
+
+    const manuallyConfirmedIds = new Set(manualConfs.map(c => c.reminderId));
 
     // Group by reminder type
     const remindersByType = new Map<string, typeof allReminders>();
@@ -350,17 +372,15 @@ export class ReminderHelpers {
       remindersByType.get(reminder.reminderType)!.push(reminder);
     });
 
-    // Calculate stats for each type using standardized completion logic
+    // Calculate stats for each type
     const stats: Record<string, { total: number; active: number; completed: number }> = {};
 
     for (const [reminderType, typeReminders] of remindersByType.entries()) {
       const total = typeReminders.length;
       const active = typeReminders.filter(r => r.isActive).length;
-
-      // Get completion status for these reminders
-      const reminderIds = typeReminders.map(r => r.id);
-      const completionStatuses = await CompletionCalculationService.getRemindersCompletion(reminderIds);
-      const completed = Object.values(completionStatuses).filter(status => status.isCompleted).length;
+      const completed = typeReminders.filter(r =>
+        r.confirmationStatus === 'CONFIRMED' || manuallyConfirmedIds.has(r.id)
+      ).length;
 
       stats[reminderType] = {
         total,

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { logger } from "@/lib/logger";
-import { CompletionCalculationService } from "@/services/reminder/completion-calculation.service";
+import { db, reminders, manualConfirmations } from "@/db";
+import { eq, and, isNull, or, desc, inArray } from "drizzle-orm";
 
 interface CompletedReminder {
   id: string;
@@ -37,27 +38,69 @@ export async function GET(
       "view this patient's completed reminders"
     );
 
-    // Get completed reminders using standardized completion logic
-    const completedRemindersData = await CompletionCalculationService.getCompletedReminders(
-      patientId,
-      { limit: 50 }
-    );
-
-    // Transform the data to match the expected interface
-    const transformedReminders: CompletedReminder[] = completedRemindersData.map(
-      (reminder) => ({
-        id: reminder.reminderId,
-        scheduledTime: reminder.scheduledTime,
-        reminderDate: reminder.sentAt?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
-        customMessage: reminder.message || undefined,
-        confirmationStatus: reminder.status.confirmationStatus,
-        confirmedAt: reminder.status.confirmedAt?.toISOString() || new Date().toISOString(),
-        sentAt: reminder.sentAt?.toISOString() || null,
-        notes: reminder.patientResponse || undefined,
-        completionType: reminder.status.completionType,
-        responseSource: reminder.status.responseSource,
+    // Get completed reminders (confirmed status or manually confirmed)
+    const allReminders = await db
+      .select({
+        id: reminders.id,
+        scheduledTime: reminders.scheduledTime,
+        startDate: reminders.startDate,
+        message: reminders.message,
+        status: reminders.status,
+        confirmationStatus: reminders.confirmationStatus,
+        confirmationResponseAt: reminders.confirmationResponseAt,
+        confirmationResponse: reminders.confirmationResponse,
+        sentAt: reminders.sentAt,
       })
-    );
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.patientId, patientId),
+          eq(reminders.isActive, true),
+          isNull(reminders.deletedAt),
+          or(
+            eq(reminders.confirmationStatus, 'CONFIRMED'),
+            eq(reminders.status, 'DELIVERED')
+          )
+        )
+      )
+      .orderBy(desc(reminders.confirmationResponseAt))
+      .limit(50);
+
+    // Get manual confirmations for these reminders
+    const reminderIds = allReminders.map(r => r.id);
+    const manualConfs = reminderIds.length > 0
+      ? await db
+          .select({
+            reminderId: manualConfirmations.reminderId,
+            confirmedAt: manualConfirmations.confirmedAt,
+            notes: manualConfirmations.notes,
+          })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
+
+    const manualConfMap = new Map(manualConfs.map(c => [c.reminderId, c]));
+
+    // Transform to expected interface
+    const transformedReminders: CompletedReminder[] = allReminders
+      .filter(r => r.confirmationStatus === 'CONFIRMED' || manualConfMap.has(r.id))
+      .map((reminder) => {
+        const manualConf = manualConfMap.get(reminder.id);
+        const isManual = !!manualConf;
+
+        return {
+          id: reminder.id,
+          scheduledTime: reminder.scheduledTime,
+          reminderDate: reminder.startDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+          customMessage: reminder.message || undefined,
+          confirmationStatus: reminder.confirmationStatus || undefined,
+          confirmedAt: (manualConf?.confirmedAt || reminder.confirmationResponseAt || new Date()).toISOString(),
+          sentAt: reminder.sentAt?.toISOString() || null,
+          notes: manualConf?.notes || reminder.confirmationResponse || undefined,
+          completionType: (isManual ? 'MANUAL' : 'AUTOMATED') as 'AUTOMATED' | 'MANUAL' | 'NONE',
+          responseSource: (isManual ? 'MANUAL_ENTRY' : 'PATIENT_TEXT') as 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM',
+        };
+      });
 
     logger.info('Completed reminders fetched', {
       patientId,

@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
-import { distributedLockService } from "@/services/distributed-lock.service";
 import { reminderProcessingRateLimiter } from "@/services/rate-limit.service";
 import { apiSuccess, apiError } from "@/lib/api-response";
 
@@ -64,7 +63,7 @@ export async function POST(request: NextRequest) {
 
 async function processReminders() {
   const cronInstance = `cron_${Date.now()}`;
-  logger.info("Cron job triggered, attempting to acquire lock", {
+  logger.info("Cron job triggered", {
     cronInstance,
     triggerTime: new Date().toISOString(),
   });
@@ -86,28 +85,8 @@ async function processReminders() {
       });
     }
 
-    // Use distributed lock to prevent multiple cron instances from running simultaneously
-    const lockResult = await distributedLockService.withLock(
-      cronInstance,
-      async () => {
-        return await processRemindersWithLock();
-      },
-      {
-        ttl: 600000, // 10 minute lock to handle 1min n8n triggers
-        maxRetries: 1,
-      }
-    );
-
-    if (!lockResult) {
-      logger.warn("Could not acquire cron processing lock", { cronInstance });
-      return apiError("Cron already running", {
-        status: 409,
-        code: "CRON_LOCK_CONFLICT",
-        operation: "cron_lock",
-      });
-    }
-
-    return lockResult;
+    // Process reminders directly (rely on cron scheduler to prevent concurrent runs)
+    return await processRemindersWithLock();
   } catch (error) {
     logger.error("Cron processing failed", error as Error, { cronInstance });
     return apiError("Cron processing failed", {
@@ -189,97 +168,63 @@ async function processRemindersWithLock() {
       try {
         processedCount++;
 
-        // Use individual reminder locking to prevent concurrent processing
-        const reminderLockKey = `reminder_processing:${reminder.id}`;
-        const reminderResult = await distributedLockService.withLock(
-          reminderLockKey,
-          async () => {
-            // Double-check if reminder is still pending (might have been processed by another instance)
-            const [currentReminder] = await db
-              .select({ status: reminders.status, sentAt: reminders.sentAt })
-              .from(reminders)
-              .where(eq(reminders.id, reminder.id))
-              .limit(1);
+        // Double-check if reminder is still pending (prevent duplicate processing)
+        const [currentReminder] = await db
+          .select({ status: reminders.status, sentAt: reminders.sentAt })
+          .from(reminders)
+          .where(eq(reminders.id, reminder.id))
+          .limit(1);
 
-            if (currentReminder && currentReminder.status !== "PENDING") {
-              logger.info("Reminder already processed, skipping", {
-                reminderId: reminder.id,
-                currentStatus: currentReminder.status,
-              });
-              return { alreadyProcessed: true };
-            }
-
-            // Extract attachedContent from metadata
-            const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
-            const attachedContent = metadata?.attachedContent && Array.isArray(metadata.attachedContent)
-              ? metadata.attachedContent
-              : undefined;
-
-            // Use ReminderService to send message with type-specific formatting
-            const sendResult = await reminderService!.sendReminder({
-              patientId: reminder.patientId,
-              phoneNumber: reminder.patientPhone,
-              message: reminder.message,
-              reminderId: reminder.id,
-              reminderName: reminder.title || "Pengingat",
-              patientName: reminder.patientName,
-              reminderType: reminder.reminderType,
-              reminderTitle: reminder.title ? reminder.title : undefined,
-              reminderDescription: reminder.description
-                ? reminder.description
-                : undefined,
-              attachedContent: attachedContent,
-            });
-
-            // Update reminder status in a transaction
-            const status = sendResult.success ? "SENT" : "FAILED";
-            await db.transaction(async (tx) => {
-              await tx
-                .update(reminders)
-                .set({
-                  sentAt: getWIBTime(),
-                  status: status,
-                  fonnteMessageId: sendResult.messageId,
-                  updatedAt: getWIBTime(),
-                })
-                .where(eq(reminders.id, reminder.id));
-
-              // Log the reminder send transaction
-              logger.info("Reminder status updated in transaction", {
-                reminderId: reminder.id,
-                newStatus: status,
-                messageId: sendResult.messageId,
-              });
-            });
-
-            return {
-              sendResult,
-              alreadyProcessed: false,
-            };
-          },
-          {
-            ttl: 60000, // 1 minute lock per reminder
-            maxRetries: 1,
-          }
-        );
-
-        if (!reminderResult) {
-          logger.warn("Failed to acquire reminder processing lock", {
+        if (currentReminder && currentReminder.status !== "PENDING") {
+          logger.info("Reminder already processed, skipping", {
             reminderId: reminder.id,
+            currentStatus: currentReminder.status,
           });
-          failedCount++;
-          errors.push(
-            `Reminder ${reminder.id}: Could not acquire processing lock`
-          );
           continue;
         }
 
-        if (reminderResult.alreadyProcessed) {
-          // Skip this reminder as it was already processed
-          continue;
-        }
+        // Extract attachedContent from metadata
+        const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
+        const attachedContent = metadata?.attachedContent && Array.isArray(metadata.attachedContent)
+          ? metadata.attachedContent
+          : undefined;
 
-        const { sendResult } = reminderResult;
+        // Use ReminderService to send message with type-specific formatting
+        const sendResult = await reminderService!.sendReminder({
+          patientId: reminder.patientId,
+          phoneNumber: reminder.patientPhone,
+          message: reminder.message,
+          reminderId: reminder.id,
+          reminderName: reminder.title || "Pengingat",
+          patientName: reminder.patientName,
+          reminderType: reminder.reminderType,
+          reminderTitle: reminder.title ? reminder.title : undefined,
+          reminderDescription: reminder.description
+            ? reminder.description
+            : undefined,
+          attachedContent: attachedContent,
+        });
+
+        // Update reminder status in a transaction
+        const status = sendResult.success ? "SENT" : "FAILED";
+        await db.transaction(async (tx) => {
+          await tx
+            .update(reminders)
+            .set({
+              sentAt: getWIBTime(),
+              status: status,
+              fonnteMessageId: sendResult.messageId,
+              updatedAt: getWIBTime(),
+            })
+            .where(eq(reminders.id, reminder.id));
+
+          // Log the reminder send transaction
+          logger.info("Reminder status updated in transaction", {
+            reminderId: reminder.id,
+            newStatus: status,
+            messageId: sendResult.messageId,
+          });
+        });
 
         if (sendResult?.success) {
           successCount++;

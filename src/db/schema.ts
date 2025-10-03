@@ -9,8 +9,6 @@ export * from "@/db/patient-schema";
 export * from "@/db/reminder-schema";
 export * from "@/db/cms-schema";
 export * from "@/db/llm-schema"; // Contains conversation tracking tables
-export * from "@/db/message-queue-schema";
-export * from "@/db/distributed-locks-schema";
 export * from "@/db/rate-limits-schema";
 
 // Import tables for relations
