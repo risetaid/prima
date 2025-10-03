@@ -3,7 +3,7 @@ import { getAuthUser } from "@/lib/auth-utils";
 import { logger } from "@/lib/logger";
 import { db, reminders, patients } from "@/db";
 import { eq, and, isNull, sql, or, ne } from "drizzle-orm";
-import { getWIBTime, getWIBDateString, getWIBTimeString } from "@/lib/timezone";
+import { getWIBTime, getCurrentDateWIB, getCurrentTimeWIB } from "@/lib/datetime";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { ValidatedContent } from "@/services/reminder/reminder.types";
 import { RateLimiter } from "@/lib/rate-limiter";
@@ -93,14 +93,14 @@ export async function POST() {
         : patientConditions[0];
 
     // Get reminder schedules for TODAY ONLY (00:00 to 23:59 WIB)
-    const todayWIB = getWIBDateString();
+    const todayWIB = getCurrentDateWIB();
     const { startOfDay, endOfDay } = createWIBDateRange(todayWIB);
 
     logger.debug("Querying reminders for today", {
       today: todayWIB,
       startOfDay: startOfDay.toISOString(),
       endOfDay: endOfDay.toISOString(),
-      currentTimeWIB: `${getWIBDateString()} ${getWIBTimeString()}`,
+      currentTimeWIB: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
       userRole: user.role,
       userId: user.id,
     });
@@ -197,7 +197,7 @@ export async function POST() {
 
     const logMessage = `🚀 Starting instant send for ${
       activeReminders.length
-    } reminders at ${getWIBDateString()} ${getWIBTimeString()}`;
+    } reminders at ${getCurrentDateWIB()} ${getCurrentTimeWIB()}`;
     debugLogs.push(logMessage);
 
     // Process reminders with time-based filtering and duplicate prevention
@@ -326,7 +326,7 @@ export async function POST() {
           : `📋 Instant send completed: No active reminders found for today`,
       execution: {
         timestamp: new Date().toISOString(),
-        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+        wibTime: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
         duration: `${duration}ms`,
         provider: "FONNTE",
         triggeredBy: user.email || user.id,
@@ -360,7 +360,7 @@ export async function POST() {
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
         timestamp: new Date().toISOString(),
-        wibTime: `${getWIBDateString()} ${getWIBTimeString()}`,
+        wibTime: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
       },
       { status: 500 }
     );

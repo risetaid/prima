@@ -12,7 +12,7 @@
  * - Medical-grade validation
  */
 
-import { createApiHandler } from "@/lib/api-handler";
+import { createApiHandler } from "@/lib/api-helpers";
 import { PatientService } from "@/services/patient/patient.service";
 import type { PatientFilters } from "@/services/patient/patient.types";
 import { ValidationError } from "@/services/patient/patient.types";
@@ -49,8 +49,8 @@ export const GET = createApiHandler(
     };
 
     // For non-admin and non-developer users, filter by their assigned patients using consolidated access control
-    if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
-      filters.assignedVolunteerId = user.id;
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      filters.assignedVolunteerId = user!.id;
     }
 
     const service = new PatientService();
@@ -73,6 +73,6 @@ export const POST = createApiHandler(
     }
 
     const service = new PatientService();
-    return await service.createPatient(body, { id: user.id, role: user.role });
+    return await service.createPatient(body, { id: user!.id, role: user!.role });
   }
 );

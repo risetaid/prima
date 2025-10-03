@@ -30,7 +30,7 @@ export default function CompletedRemindersPage() {
 
   const fetchCompletedReminders = async (patientId: string) => {
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders/completed`)
+      const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed`)
       if (response.ok) {
         const data = await response.json()
         setReminders(data)

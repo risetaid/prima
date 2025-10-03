@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { createErrorResponse } from '@/lib/api-utils'
+import { createErrorResponse } from '@/lib/api-helpers'
 import { verificationAnalytics } from '@/lib/verification-analytics'
 import { logger } from '@/lib/logger'
 

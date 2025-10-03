@@ -90,3 +90,27 @@ export const cmsVideos = pgTable(
     deletedAtIdx: index("cms_videos_deleted_at_idx").on(table.deletedAt),
   })
 );
+
+// ===== RATE LIMITING TABLES =====
+
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    rateLimitKey: text('rate_limit_key').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    rateLimitKeyIdx: index('rate_limits_rate_limit_key_idx').on(table.rateLimitKey),
+    createdAtIdx: index('rate_limits_created_at_idx').on(table.createdAt),
+    rateLimitKeyCreatedAtIdx: index('rate_limits_key_created_at_idx').on(table.rateLimitKey, table.createdAt),
+  })
+);
+
+// ===== TYPE EXPORTS =====
+export type CmsArticle = typeof cmsArticles.$inferSelect;
+export type NewCmsArticle = typeof cmsArticles.$inferInsert;
+export type CmsVideo = typeof cmsVideos.$inferSelect;
+export type NewCmsVideo = typeof cmsVideos.$inferInsert;
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type NewRateLimit = typeof rateLimits.$inferInsert;

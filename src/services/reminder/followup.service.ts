@@ -3,7 +3,7 @@
 
 import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
-import { getWIBTime } from "@/lib/timezone";
+import { getWIBTime } from "@/lib/datetime";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import {
   FollowupData,

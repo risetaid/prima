@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
-import { invalidateAfterPatientOperation } from '@/lib/cache-invalidation'
+import { invalidatePatientCache } from '@/lib/cache'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
 
 import { logger } from '@/lib/logger';
@@ -50,7 +50,7 @@ export async function POST(
       await sendWhatsAppMessage({ to, body })
     } catch {}
 
-    await invalidateAfterPatientOperation(patientId, 'update')
+    await invalidatePatientCache(patientId)
 
     return NextResponse.json({
       success: true,

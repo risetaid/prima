@@ -11,8 +11,8 @@ import {
   NotFoundError,
   ValidatedContent,
 } from "@/services/reminder/reminder.types";
-import { getWIBTime, shouldSendReminderNow } from "@/lib/timezone";
-import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { getWIBTime, shouldSendReminderNow } from "@/lib/datetime";
+import { del, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
 
@@ -151,7 +151,7 @@ export class ReminderService {
       }
     }
 
-    await invalidateCache(CACHE_KEYS.reminderStats(dto.patientId));
+    await del(CACHE_KEYS.reminderStats(dto.patientId));
     return createdSchedules;
   }
 
@@ -198,7 +198,7 @@ export class ReminderService {
       }
     }
 
-    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
+    await del(CACHE_KEYS.reminderStats(reminder.patientId));
     return { ...updated, attachedContent: validatedContent };
   }
 
@@ -216,7 +216,7 @@ export class ReminderService {
     );
 
     await this.repository.softDelete(id, getWIBTime());
-    await invalidateCache(CACHE_KEYS.reminderStats(reminder.patientId));
+    await del(CACHE_KEYS.reminderStats(reminder.patientId));
 
     return {
       success: true,
@@ -401,7 +401,7 @@ export class ReminderService {
         }
       }
 
-      await invalidateCache(CACHE_KEYS.reminderStats(params.patientId));
+      await del(CACHE_KEYS.reminderStats(params.patientId));
       return {
         success: result.success,
         messageId: result.messageId,

@@ -3,20 +3,15 @@
 // Re-export all enums
 export * from "@/db/enums";
 
-// Re-export all tables
+// Re-export all tables from consolidated schemas
 export * from "@/db/core-schema";
-export * from "@/db/patient-schema";
 export * from "@/db/reminder-schema";
-export * from "@/db/cms-schema";
-export * from "@/db/llm-schema"; // Contains conversation tracking tables
-export * from "@/db/rate-limits-schema";
+export * from "@/db/content-schema";
 
 // Import tables for relations
-import { users } from "@/db/core-schema";
-import { patients, medicalRecords, healthNotes } from "@/db/patient-schema";
-import { reminders, manualConfirmations, whatsappTemplates } from "@/db/reminder-schema";
-import { cmsArticles, cmsVideos } from "@/db/cms-schema";
-import { conversationStates, conversationMessages, volunteerNotifications } from "@/db/llm-schema";
+import { users, patients, medicalRecords, healthNotes } from "@/db/core-schema";
+import { reminders, manualConfirmations, whatsappTemplates, conversationStates, conversationMessages, volunteerNotifications } from "@/db/reminder-schema";
+import { cmsArticles, cmsVideos } from "@/db/content-schema";
 
 // ===== RELATIONS =====
 

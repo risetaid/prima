@@ -35,7 +35,7 @@ export default function PendingUpdatePage() {
   const fetchPendingReminders = async (patientId: string) => {
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/pending`
+        `/api/patients/${patientId}/reminders?filter=pending`
       );
       if (response.ok) {
         const data = await response.json();

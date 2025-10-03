@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
-import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
+import { invalidatePatientCache } from "@/lib/cache";
 import { ConversationStateService } from "@/services/conversation-state.service";
 
 export type VerificationResponse = {
@@ -106,7 +106,7 @@ Terima kasih! 💙 Tim PRIMA`;
         }
 
         // Invalidate cache
-        await invalidateAfterPatientOperation(patientId, 'update');
+await invalidatePatientCache(patientId);
 
         logger.info("Verification message sent successfully", {
           phoneNumber,
@@ -217,16 +217,8 @@ Terima kasih! 💙 Tim PRIMA`;
         status,
       });
 
-      // Invalidate cache with robust error handling
-      const cacheResult = await invalidateAfterPatientOperation(patientId, 'update');
-      if (!cacheResult.success) {
-        logger.warn("Cache invalidation failed after verification update", {
-          patientId,
-          cacheErrors: cacheResult.errors,
-        });
-        // Don't fail the verification process if cache invalidation fails
-        // The UI will show stale data but the database is correct
-      }
+      // Invalidate cache
+      await invalidatePatientCache(patientId);
 
       // Send acknowledgment
       const patient = await db
@@ -266,8 +258,6 @@ Terima kasih! 💙 Tim PRIMA`;
         patientId,
         action,
         message: message.substring(0, 50),
-        cacheInvalidationSuccess: cacheResult.success,
-        cacheErrors: cacheResult.errors.length > 0 ? cacheResult.errors : undefined,
       });
 
       return {

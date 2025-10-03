@@ -12,29 +12,12 @@ interface AllReminder {
   reminderDate: string;
   customMessage?: string;
   status: "scheduled" | "pending" | "completed_taken" | "completed_not_taken";
+  confirmationStatus?: "CONFIRMED" | "MISSED" | "PENDING";
 }
 
-interface ScheduledReminder {
-  id: string;
-  scheduledTime: string;
-  reminderDate: string;
-  customMessage?: string;
-}
 
-interface PendingReminder {
-  id: string;
-  scheduledTime: string;
-  reminderDate: string;
-  customMessage?: string;
-}
 
-interface CompletedReminder {
-  id: string;
-  scheduledTime: string;
-  reminderDate: string;
-  customMessage?: string;
-  confirmationStatus?: string;
-}
+
 
 export default function AllRemindersPage() {
   const router = useRouter();
@@ -50,41 +33,30 @@ export default function AllRemindersPage() {
 
   const fetchAllReminders = async (patientId: string) => {
     try {
-      // Fetch scheduled reminders (same as desktop)
-      const scheduledResponse = await fetch(
-        `/api/patients/${patientId}/reminders/scheduled`
+      // Fetch all reminders with the new consolidated endpoint
+      const allResponse = await fetch(
+        `/api/patients/${patientId}/reminders?filter=all`
       );
-      const scheduledData = scheduledResponse.ok
-        ? await scheduledResponse.json()
-        : [];
+      const allData = allResponse.ok
+        ? await allResponse.json()
+        : { reminders: [] };
 
-      // Fetch pending reminders
-      const pendingResponse = await fetch(
-        `/api/patients/${patientId}/reminders/pending`
-      );
-      const pendingData = pendingResponse.ok
-        ? await pendingResponse.json()
-        : [];
-
-      // Fetch completed reminders
-      const completedResponse = await fetch(
-        `/api/patients/${patientId}/reminders/completed`
-      );
-      const completedData = completedResponse.ok
-        ? await completedResponse.json()
-        : [];
+      // Extract reminders array from the response
+      const remindersData = allData.reminders || [];
 
       // Transform to unified format
-      const allReminders = [
-        ...scheduledData.map((r: ScheduledReminder) => ({ ...r, status: "scheduled" })),
-        ...pendingData.map((r: PendingReminder) => ({ ...r, status: "pending" })),
-        ...completedData.map((r: CompletedReminder) => ({
-          ...r,
-          status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" :
-                  r.confirmationStatus === 'MISSED' ? "completed_not_taken" :
-                  r.confirmationStatus === 'PENDING' ? "completed_not_taken" : "completed_not_taken",
-        })),
-      ];
+      const allReminders = remindersData.map((r: AllReminder) => {
+        // Determine status based on reminder properties
+        if (r.confirmationStatus) {
+          return {
+            ...r,
+            status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" :
+                    r.confirmationStatus === 'MISSED' ? "completed_not_taken" :
+                    r.confirmationStatus === 'PENDING' ? "completed_not_taken" : "completed_not_taken",
+          };
+        }
+        return { ...r, status: "all" };
+      });
 
       setReminders(allReminders);
     } catch (error: unknown) {

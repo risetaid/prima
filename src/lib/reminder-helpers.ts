@@ -10,7 +10,7 @@ import type {
   ReminderLogCreateInput,
   ManualConfirmationCreateInput
 } from '@/lib/reminder-types';
-import { getWIBTime } from '@/lib/timezone';
+import { getWIBTime } from '@/lib/datetime';
 
 export class ReminderHelpers {
   // Query helpers

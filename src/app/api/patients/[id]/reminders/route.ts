@@ -1,21 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { shouldSendReminderNow } from "@/lib/timezone";
-import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
-import { createErrorResponse, handleApiError } from "@/lib/api-utils";
-import {
-  db,
-  patients,
-  reminders,
-  cmsArticles,
-  cmsVideos,
-} from "@/db";
-import { eq, desc, and, isNull } from "drizzle-orm";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
-import { getWIBTime } from "@/lib/timezone";
-import { logger } from "@/lib/logger";
 import { requirePatientAccess } from "@/lib/patient-access-control";
-// Rate limiter temporarily disabled
+import { logger } from "@/lib/logger";
+import { db, reminders, manualConfirmations, patients } from "@/db";
+import { eq, and, isNull, or, desc, asc, gte, lte, inArray, notExists } from "drizzle-orm";
+import { getWIBTime } from "@/lib/datetime";
+import { del, CACHE_KEYS } from "@/lib/cache";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
+import { shouldSendReminderNow } from "@/lib/datetime";
+import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
+import { cmsArticles, cmsVideos } from "@/db";
+
+interface CompletedReminder {
+  id: string;
+  scheduledTime: string;
+  reminderDate: string;
+  customMessage?: string;
+  confirmationStatus?: string;
+  confirmedAt: string;
+  sentAt: string | null;
+  notes?: string | null;
+  completionType: 'AUTOMATED' | 'MANUAL' | 'NONE';
+  responseSource?: 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM';
+}
 
 type Patient = {
   id: string;
@@ -47,6 +54,22 @@ type ValidatedContent = {
   url: string;
 };
 
+// Helper function to create WIB date range
+function createWIBDateRange(dateString: string) {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid date format: ${dateString}`);
+  }
+
+  const startOfDay = new Date(date);
+  startOfDay.setUTCHours(17, 0, 0, 0); // 17:00 UTC = 00:00 WIB (UTC+7)
+
+  const endOfDay = new Date(date);
+  endOfDay.setUTCHours(16, 59, 59, 999); // 16:59 UTC next day = 23:59 WIB
+  endOfDay.setDate(endOfDay.getDate() + 1);
+
+  return { startOfDay, endOfDay };
+}
 
 export async function GET(
   request: NextRequest,
@@ -58,62 +81,458 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
+    const { id: patientId } = await params;
 
-    // Check role-based access to this patient
+    // Check patient access control
     await requirePatientAccess(
       user.id,
       user.role,
-      id,
+      patientId,
       "view this patient's reminders"
     );
 
-    // Get reminders for patient with patient info
-    const patientReminders = await db
-      .select({
-        // Reminder fields
-        id: reminders.id,
-        patientId: reminders.patientId,
-        scheduledTime: reminders.scheduledTime,
-        startDate: reminders.startDate,
-        endDate: reminders.endDate,
-        customMessage: reminders.message,
-        isActive: reminders.isActive,
-        createdById: reminders.createdById,
-        createdAt: reminders.createdAt,
-        updatedAt: reminders.updatedAt,
-        // Patient fields
-        patientName: patients.name,
-        patientPhoneNumber: patients.phoneNumber,
-      })
-      .from(reminders)
-      .leftJoin(patients, eq(reminders.patientId, patients.id))
-      .where(eq(reminders.patientId, id))
-      .orderBy(desc(reminders.createdAt));
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const filter = searchParams.get("filter") || "all";
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const dateFilter = searchParams.get("date");
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const offset = (page - 1) * limit;
 
-    // Format response to match Prisma structure
-    const formattedReminders = patientReminders.map((reminder) => ({
-      id: reminder.id,
-      patientId: reminder.patientId,
-      scheduledTime: reminder.scheduledTime,
-      frequency: "DAILY", // Default frequency for new schema
-      startDate: reminder.startDate,
-      endDate: reminder.endDate,
-      customMessage: reminder.customMessage,
-      isActive: reminder.isActive,
-      createdById: reminder.createdById,
-      createdAt: reminder.createdAt,
-      updatedAt: reminder.updatedAt,
-      patient: {
-        name: reminder.patientName,
-        phoneNumber: reminder.patientPhoneNumber,
-      },
-    }));
-
-    return NextResponse.json(formattedReminders);
+    // Handle different filter types
+    switch (filter) {
+      case "completed":
+        return await getCompletedReminders(patientId, user.id);
+      case "pending":
+        return await getPendingReminders(patientId, page, limit, dateFilter);
+      case "scheduled":
+        return await getScheduledReminders(patientId, page, limit, dateFilter);
+      case "all":
+      default:
+        return await getAllReminders(patientId, includeDeleted, limit, offset);
+    }
   } catch (error) {
-    return handleApiError(error, "creating patient reminders");
+    logger.error("Error fetching reminders", error instanceof Error ? error : new Error(String(error)), {
+      operation: 'fetch_reminders'
+    });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
+}
+
+async function getCompletedReminders(patientId: string, userId: string) {
+  // Get completed reminders (confirmed status or manually confirmed)
+  const allReminders = await db
+    .select({
+      id: reminders.id,
+      scheduledTime: reminders.scheduledTime,
+      startDate: reminders.startDate,
+      message: reminders.message,
+      status: reminders.status,
+      confirmationStatus: reminders.confirmationStatus,
+      confirmationResponseAt: reminders.confirmationResponseAt,
+      confirmationResponse: reminders.confirmationResponse,
+      sentAt: reminders.sentAt,
+    })
+    .from(reminders)
+    .where(
+      and(
+        eq(reminders.patientId, patientId),
+        eq(reminders.isActive, true),
+        isNull(reminders.deletedAt),
+        or(
+          eq(reminders.confirmationStatus, 'CONFIRMED'),
+          eq(reminders.status, 'DELIVERED')
+        )
+      )
+    )
+    .orderBy(desc(reminders.confirmationResponseAt))
+    .limit(50);
+
+  // Get manual confirmations for these reminders
+  const reminderIds = allReminders.map(r => r.id);
+  const manualConfs = reminderIds.length > 0
+    ? await db
+        .select({
+          reminderId: manualConfirmations.reminderId,
+          confirmedAt: manualConfirmations.confirmedAt,
+          notes: manualConfirmations.notes,
+        })
+        .from(manualConfirmations)
+        .where(inArray(manualConfirmations.reminderId, reminderIds))
+    : [];
+
+  const manualConfMap = new Map(manualConfs.map(c => [c.reminderId, c]));
+
+  // Transform to expected interface
+  const transformedReminders: CompletedReminder[] = allReminders
+    .filter(r => r.confirmationStatus === 'CONFIRMED' || manualConfMap.has(r.id))
+    .map((reminder) => {
+      const manualConf = manualConfMap.get(reminder.id);
+      const isManual = !!manualConf;
+
+      return {
+        id: reminder.id,
+        scheduledTime: reminder.scheduledTime,
+        reminderDate: reminder.startDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        customMessage: reminder.message || undefined,
+        confirmationStatus: reminder.confirmationStatus || undefined,
+        confirmedAt: (manualConf?.confirmedAt || reminder.confirmationResponseAt || new Date()).toISOString(),
+        sentAt: reminder.sentAt?.toISOString() || null,
+        notes: manualConf?.notes || reminder.confirmationResponse || undefined,
+        completionType: (isManual ? 'MANUAL' : 'AUTOMATED') as 'AUTOMATED' | 'MANUAL' | 'NONE',
+        responseSource: (isManual ? 'MANUAL_ENTRY' : 'PATIENT_TEXT') as 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM',
+      };
+    });
+
+  logger.info('Completed reminders fetched', {
+    patientId,
+    userId,
+    count: transformedReminders.length,
+    operation: 'fetch_completed_reminders'
+  });
+
+  return NextResponse.json(transformedReminders);
+}
+
+async function getPendingReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
+  const offset = (page - 1) * limit;
+
+  // Build where conditions with proper logic - match stats API criteria
+  const whereConditions = [
+    eq(reminders.patientId, patientId),
+    // Match stats API logic: include SENT or DELIVERED reminders
+    or(
+      eq(reminders.status, "SENT"),
+      eq(reminders.status, "DELIVERED")
+    ),
+    // Include soft delete filter like other APIs
+    isNull(reminders.deletedAt),
+    eq(reminders.isActive, true),
+    // Must not have manual confirmation
+    notExists(
+      db
+        .select()
+        .from(manualConfirmations)
+        .where(eq(manualConfirmations.reminderId, reminders.id))
+    ),
+    // Must not be confirmed (manually or automatically)
+    // Include reminders that need manual confirmation even if automated response was MISSED
+    and(
+      or(
+        isNull(reminders.confirmationStatus),
+        eq(reminders.confirmationStatus, 'PENDING'),
+        eq(reminders.confirmationStatus, 'MISSED')
+      ),
+      isNull(reminders.confirmationResponse)
+    ),
+  ];
+
+  // Add date range filter if provided - use consistent timezone logic
+  if (dateFilter) {
+    try {
+      const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
+      whereConditions.push(gte(reminders.sentAt, startOfDay));
+      whereConditions.push(lte(reminders.sentAt, endOfDay));
+    } catch (dateError: unknown) {
+      logger.error("Error in date filtering:", dateError instanceof Error ? dateError : new Error(String(dateError)));
+      // Continue without date filter if there's an error
+    }
+  }
+
+  // Get reminders that are SENT but don't have manual confirmation yet
+  const pendingReminders = await db
+    .select({
+      id: reminders.id,
+      sentAt: reminders.sentAt,
+      // Automated confirmation fields
+      confirmationStatus: reminders.confirmationStatus,
+      confirmationResponse: reminders.confirmationResponse,
+      confirmationResponseAt: reminders.confirmationResponseAt,
+      confirmationSentAt: reminders.confirmationSentAt,
+      // Schedule fields from reminders table
+      scheduledTime: reminders.scheduledTime,
+      customMessage: reminders.message,
+    })
+    .from(reminders)
+    .where(and(...whereConditions))
+    .orderBy(desc(reminders.sentAt))
+    .offset(offset)
+    .limit(limit);
+
+  // Transform to match frontend interface
+  const formattedReminders = pendingReminders.map((reminder) => ({
+    id: reminder.id,
+    scheduledTime: reminder.scheduledTime || "12:00",
+    reminderDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    customMessage: reminder.customMessage,
+    status: "PENDING_UPDATE",
+    // Include automated confirmation fields for UI to handle properly
+    confirmationStatus: reminder.confirmationStatus,
+    confirmationResponse: reminder.confirmationResponse,
+    confirmationResponseAt: reminder.confirmationResponseAt,
+    confirmationSentAt: reminder.confirmationSentAt,
+  }));
+
+  return NextResponse.json(formattedReminders);
+}
+
+async function getScheduledReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
+  const offset = (page - 1) * limit;
+
+  // Build conditions array with soft delete filter
+  const conditions = [
+    eq(reminders.patientId, patientId),
+    eq(reminders.isActive, true),
+    isNull(reminders.deletedAt), // Critical: soft delete filter
+  ];
+
+  // Add date range filter if provided for startDate - use consistent timezone logic
+  if (dateFilter) {
+    try {
+      const { startOfDay, endOfDay } = createWIBDateRange(dateFilter);
+      conditions.push(
+        gte(reminders.startDate, startOfDay),
+        lte(reminders.startDate, endOfDay)
+      );
+    } catch (dateError: unknown) {
+      logger.error("Error in date filtering:", dateError instanceof Error ? dateError : new Error(String(dateError)));
+    }
+  }
+
+  // Build base query for scheduled reminders
+  const baseQuery = db
+    .select({
+      id: reminders.id,
+      patientId: reminders.patientId,
+      scheduledTime: reminders.scheduledTime,
+      startDate: reminders.startDate,
+      endDate: reminders.endDate,
+      customMessage: reminders.message,
+      isActive: reminders.isActive,
+      createdAt: reminders.createdAt,
+      updatedAt: reminders.updatedAt,
+      metadata: reminders.metadata,
+    })
+    .from(reminders)
+    .where(and(...conditions));
+
+  // Execute query with pagination
+  const scheduledReminders = await baseQuery
+    .orderBy(asc(reminders.startDate))
+    .limit(limit)
+    .offset(offset);
+
+  // Get patient details for reminders
+  const patientIds = [...new Set(scheduledReminders.map((r) => r.patientId))];
+  const patientDetails =
+    patientIds.length > 0
+      ? await db
+          .select({
+            id: patients.id,
+            name: patients.name,
+            phoneNumber: patients.phoneNumber,
+          })
+          .from(patients)
+          .where(inArray(patients.id, patientIds))
+      : [];
+
+  // Get reminder logs for debugging (latest 5 per reminder)
+  const reminderIds = scheduledReminders.map((r) => r.id);
+  const recentLogs =
+    reminderIds.length > 0
+      ? await db
+          .select({
+            id: reminders.id,
+            status: reminders.status,
+            sentAt: reminders.sentAt,
+          })
+          .from(reminders)
+          .where(inArray(reminders.id, reminderIds))
+          .orderBy(desc(reminders.sentAt))
+          .limit(reminderIds.length * 5)
+      : [];
+
+  // Get manual confirmations for the filtering logic
+  const allConfirmations =
+    reminderIds.length > 0
+      ? await db
+          .select({
+            id: manualConfirmations.id,
+            reminderId: manualConfirmations.reminderId,
+          })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
+
+  // Create lookup maps
+  const patientMap = new Map();
+  patientDetails.forEach((patient) => {
+    patientMap.set(patient.id, patient);
+  });
+
+  const logsMap = new Map();
+  recentLogs.forEach((log) => {
+    if (!logsMap.has(log.id)) {
+      logsMap.set(log.id, []);
+    }
+    logsMap.get(log.id).push(log);
+  });
+
+  // Content attachments map - extract from metadata
+  const contentAttachmentsMap = new Map();
+  scheduledReminders.forEach((reminder) => {
+    const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
+    if (metadata?.attachedContent && Array.isArray(metadata.attachedContent)) {
+      contentAttachmentsMap.set(reminder.id, metadata.attachedContent);
+    }
+  });
+
+  // Filter reminders using the same logic as the stats API
+  const filteredReminders = scheduledReminders.filter((reminder) => {
+    const logs = logsMap.get(reminder.id) || [];
+
+    // For each log, determine its status using the same logic as the stats API
+    if (logs.length === 0) {
+      // No logs yet - this should be counted as terjadwal
+      return true;
+    }
+
+    // Evaluate all logs to determine if reminder should be shown in scheduled
+    let showInScheduled = false;
+
+    for (const log of logs) {
+      // Type guard for confirmation objects
+      const logConfirmation = allConfirmations.find(
+        (conf) => conf.reminderId === log.id
+      );
+
+      if (logConfirmation) {
+        // Log has been confirmed - don't show in scheduled
+        showInScheduled = false;
+      } else if (["SENT", "DELIVERED"].includes(log.status)) {
+        // Log sent but not confirmed - don't show in scheduled
+        showInScheduled = false;
+      } else if (log.status === "FAILED") {
+        // Log failed - show in scheduled for retry
+        showInScheduled = true;
+      } else {
+        // Unknown status - treat as scheduled
+        showInScheduled = true;
+      }
+    }
+
+    return showInScheduled;
+  });
+
+  logger.info(
+    `Filter results: ${scheduledReminders.length} total, ${filteredReminders.length} after filtering`
+  );
+
+  // Transform to match frontend interface
+  const formattedReminders = filteredReminders.map((reminder) => ({
+    id: reminder.id,
+    scheduledTime: reminder.scheduledTime,
+    nextReminderDate: reminder.startDate.toISOString().split("T")[0],
+    customMessage: reminder.customMessage,
+    patient: patientMap.get(reminder.patientId) || null,
+    reminderLogs: logsMap.get(reminder.id) || [],
+    attachedContent: contentAttachmentsMap.get(reminder.id) || [],
+  }));
+
+  return NextResponse.json(formattedReminders);
+}
+
+async function getAllReminders(patientId: string, includeDeleted: boolean, limit: number, offset: number) {
+  // Build the where condition
+  const whereCondition = includeDeleted
+    ? eq(reminders.patientId, patientId)
+    : and(
+        eq(reminders.patientId, patientId),
+        isNull(reminders.deletedAt)
+      );
+
+  // Get all reminders for patient with patient info
+  const patientReminders = await db
+    .select({
+      // Reminder fields
+      id: reminders.id,
+      patientId: reminders.patientId,
+      reminderType: reminders.reminderType,
+      scheduledTime: reminders.scheduledTime,
+      message: reminders.message,
+      startDate: reminders.startDate,
+      endDate: reminders.endDate,
+      isActive: reminders.isActive,
+      status: reminders.status,
+      confirmationStatus: reminders.confirmationStatus,
+      sentAt: reminders.sentAt,
+      confirmationResponseAt: reminders.confirmationResponseAt,
+      confirmationResponse: reminders.confirmationResponse,
+      title: reminders.title,
+      description: reminders.description,
+      priority: reminders.priority,
+      createdById: reminders.createdById,
+      createdAt: reminders.createdAt,
+      updatedAt: reminders.updatedAt,
+      deletedAt: reminders.deletedAt,
+      // Patient fields
+      patientName: patients.name,
+      patientPhoneNumber: patients.phoneNumber,
+    })
+    .from(reminders)
+    .leftJoin(patients, eq(reminders.patientId, patients.id))
+    .where(whereCondition)
+    .orderBy(desc(reminders.createdAt));
+
+  // Apply pagination if specified
+  const paginatedReminders = limit ? patientReminders.slice(offset, offset + limit) : patientReminders;
+
+  // Format response to match expected structure
+  const formattedReminders = paginatedReminders.map((reminder) => ({
+    id: reminder.id,
+    patientId: reminder.patientId,
+    reminderType: reminder.reminderType,
+    scheduledTime: reminder.scheduledTime,
+    message: reminder.message,
+    startDate: reminder.startDate,
+    endDate: reminder.endDate,
+    isActive: reminder.isActive,
+    status: reminder.status,
+    confirmationStatus: reminder.confirmationStatus,
+    sentAt: reminder.sentAt,
+    confirmationResponseAt: reminder.confirmationResponseAt,
+    confirmationResponse: reminder.confirmationResponse,
+    title: reminder.title,
+    description: reminder.description,
+    priority: reminder.priority,
+    createdById: reminder.createdById,
+    createdAt: reminder.createdAt,
+    updatedAt: reminder.updatedAt,
+    deletedAt: reminder.deletedAt,
+    patient: {
+      name: reminder.patientName,
+      phoneNumber: reminder.patientPhoneNumber,
+    },
+  }));
+
+  // Include pagination metadata if pagination is requested
+  const response = {
+    reminders: formattedReminders,
+    total: patientReminders.length,
+    ...(limit && {
+      pagination: {
+        limit,
+        offset,
+        remaining: Math.max(0, patientReminders.length - (offset + limit))
+      }
+    })
+  };
+
+  return NextResponse.json(response);
 }
 
 export async function POST(
@@ -212,6 +631,61 @@ export async function POST(
       );
     }
     return handleApiError(error, "creating patient reminders");
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const { reminderIds } = await request.json();
+
+    if (!reminderIds || !Array.isArray(reminderIds)) {
+      return NextResponse.json(
+        { error: "Invalid reminderIds" },
+        { status: 400 }
+      );
+    }
+
+    // Soft delete multiple scheduled reminders by setting deletedAt timestamp
+    const deleteResult = await db
+      .update(reminders)
+      .set({
+        deletedAt: getWIBTime(),
+        isActive: false,
+        updatedAt: getWIBTime(),
+      })
+      .where(
+        and(
+          inArray(reminders.id, reminderIds),
+          eq(reminders.patientId, id),
+          eq(reminders.isActive, true)
+        )
+      )
+      .returning({
+        id: reminders.id,
+      });
+
+    // Invalidate cache after bulk deletion
+    await del(CACHE_KEYS.reminderStats(id));
+
+    return NextResponse.json({
+      success: true,
+      message: "Reminders berhasil dihapus",
+      deletedCount: deleteResult.length,
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 
@@ -372,16 +846,12 @@ async function sendImmediateReminders(
       }).where(eq(reminders.id, schedule.id));
 
       // Invalidate cache after creating reminder log
-      await invalidateCache(CACHE_KEYS.reminderStats(patient.id));
+      await del(CACHE_KEYS.reminderStats(patient.id));
 
       break; // Only send one immediate reminder
     }
   }
 }
-
-
-
-
 
 function generateRecurrenceDates(customRecurrence: CustomRecurrence): string[] {
   const dates: string[] = [];

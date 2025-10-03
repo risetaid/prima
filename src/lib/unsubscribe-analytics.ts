@@ -5,7 +5,7 @@
 
 import { db, patients } from "@/db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
-import { getWIBTime } from "@/lib/timezone";
+import { getWIBTime } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
 
 // TypeScript interfaces for analysis data

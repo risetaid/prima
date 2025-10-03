@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db, whatsappTemplates } from '@/db'
 import { eq, and, asc } from 'drizzle-orm'
-import { getCachedData, setCachedData, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
+import { get, set, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
 
 import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const cacheKey = category ? `${CACHE_KEYS.templates}:${category}` : CACHE_KEYS.templates
     
     // Try to get from cache first
-    const cachedTemplates = await getCachedData(cacheKey)
+    const cachedTemplates = await get(cacheKey)
     
     if (cachedTemplates) {
       return NextResponse.json(cachedTemplates)
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Cache the templates (longer TTL since they don't change often)
-    await setCachedData(cacheKey, response, CACHE_TTL.TEMPLATES)
+    await set(cacheKey, response, CACHE_TTL.TEMPLATES)
 
     return NextResponse.json(response)
   } catch (error: unknown) {

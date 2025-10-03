@@ -6,6 +6,8 @@ import {
   uuid,
   index,
   jsonb,
+  integer,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // Import clean enums
@@ -17,8 +19,8 @@ import {
   templateCategoryEnum,
 } from "@/db/enums";
 
-// Import patient table for foreign key reference
-import { patients } from "@/db/patient-schema";
+// Import patient and users tables for foreign key reference
+import { patients, users } from "@/db/core-schema";
 
 // Re-export enums for convenience
 export {
@@ -83,6 +85,12 @@ export const reminders = pgTable(
     typeStatusIdx: index("reminders_type_status_idx").on(table.reminderType, table.status),
     patientTypeIdx: index("reminders_patient_type_idx").on(table.patientId, table.reminderType),
     activeTypeIdx: index("reminders_active_type_idx").on(table.isActive, table.reminderType),
+    // Foreign key to users
+    createdByIdFk: foreignKey({
+      columns: [table.createdById],
+      foreignColumns: [users.id],
+      name: "reminders_created_by_id_users_id_fk",
+    }),
   })
 );
 
@@ -117,6 +125,22 @@ export const manualConfirmations = pgTable(
     confirmedAtIdx: index("manual_confirmations_confirmed_at_idx").on(table.confirmedAt),
     patientVolunteerIdx: index("manual_confirmations_patient_volunteer_idx").on(table.patientId, table.volunteerId),
     reminderConfirmationIdx: index("manual_confirmations_reminder_confirmation_idx").on(table.reminderType, table.confirmationType),
+    // Foreign keys
+    patientIdFk: foreignKey({
+      columns: [table.patientId],
+      foreignColumns: [patients.id],
+      name: "manual_confirmations_patient_id_patients_id_fk",
+    }),
+    volunteerIdFk: foreignKey({
+      columns: [table.volunteerId],
+      foreignColumns: [users.id],
+      name: "manual_confirmations_volunteer_id_users_id_fk",
+    }),
+    reminderIdFk: foreignKey({
+      columns: [table.reminderId],
+      foreignColumns: [reminders.id],
+      name: "manual_confirmations_reminder_id_reminders_id_fk",
+    }),
   })
 );
 
@@ -167,10 +191,120 @@ export const whatsappTemplates = pgTable(
     isActiveIdx: index("whatsapp_templates_is_active_idx").on(table.isActive),
     createdByIdx: index("whatsapp_templates_created_by_idx").on(table.createdBy),
     deletedAtIdx: index("whatsapp_templates_deleted_at_idx").on(table.deletedAt),
+    // Foreign key to users
+    createdByFk: foreignKey({
+      columns: [table.createdBy],
+      foreignColumns: [users.id],
+      name: "whatsapp_templates_created_by_users_id_fk",
+    }),
   })
 );
 
-// Export types for use in other files
+// ===== CONVERSATION TRACKING TABLES =====
+
+export const conversationStates = pgTable(
+  "conversation_states",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id").notNull(),
+    phoneNumber: text("phone_number").notNull(),
+    currentContext: text("current_context").notNull(),
+    expectedResponseType: text("expected_response_type"),
+    relatedEntityId: uuid("related_entity_id"),
+    relatedEntityType: text("related_entity_type"),
+    stateData: jsonb("state_data"),
+    lastMessage: text("last_message"),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    messageCount: integer("message_count").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    contextSetAt: timestamp("context_set_at", { withTimezone: true }),
+    lastClarificationSentAt: timestamp("last_clarification_sent_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => ({
+    patientIdIdx: index("conversation_states_patient_id_idx").on(table.patientId),
+    deletedAtIdx: index("conversation_states_deleted_at_idx").on(table.deletedAt),
+    // Foreign key to patients
+    patientIdFk: foreignKey({
+      columns: [table.patientId],
+      foreignColumns: [patients.id],
+      name: "conversation_states_patient_id_patients_id_fk",
+    }),
+  })
+);
+
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationStateId: uuid("conversation_state_id").notNull(),
+    message: text("message").notNull(),
+    direction: text("direction").notNull(),
+    messageType: text("message_type").notNull(),
+    intent: text("intent"),
+    confidence: integer("confidence"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    conversationStateIdIdx: index("conversation_messages_conversation_state_id_idx").on(table.conversationStateId),
+    conversationStateIdFk: foreignKey({
+      columns: [table.conversationStateId],
+      foreignColumns: [conversationStates.id],
+      name: "conversation_messages_conversation_state_id_conversation_states_id_fk",
+    }),
+  })
+);
+
+export const volunteerNotifications = pgTable(
+  "volunteer_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    patientId: uuid("patient_id").notNull(),
+    message: text("message").notNull(),
+    priority: text("priority").notNull(),
+    status: text("status").notNull().default("pending"),
+    assignedVolunteerId: uuid("assigned_volunteer_id"),
+    escalationReason: text("escalation_reason").notNull(),
+    confidence: integer("confidence"),
+    intent: text("intent"),
+    patientContext: jsonb("patient_context"),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    response: text("response"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    patientIdIdx: index("volunteer_notifications_patient_id_idx").on(table.patientId),
+    // Foreign key to patients
+    patientIdFk: foreignKey({
+      columns: [table.patientId],
+      foreignColumns: [patients.id],
+      name: "volunteer_notifications_patient_id_patients_id_fk",
+    }),
+    assignedVolunteerIdFk: foreignKey({
+      columns: [table.assignedVolunteerId],
+      foreignColumns: [users.id],
+      name: "volunteer_notifications_assigned_volunteer_id_users_id_fk",
+    }),
+  })
+);
+
+// ===== TYPE EXPORTS =====
 export type Reminder = typeof reminders.$inferSelect;
 export type ReminderInsert = typeof reminders.$inferInsert;
 export type ReminderLog = typeof reminderLogs.$inferSelect;
@@ -179,3 +313,9 @@ export type ManualConfirmation = typeof manualConfirmations.$inferSelect;
 export type ManualConfirmationInsert = typeof manualConfirmations.$inferInsert;
 export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
 export type WhatsappTemplateInsert = typeof whatsappTemplates.$inferInsert;
+export type ConversationState = typeof conversationStates.$inferSelect;
+export type NewConversationState = typeof conversationStates.$inferInsert;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type NewConversationMessage = typeof conversationMessages.$inferInsert;
+export type VolunteerNotification = typeof volunteerNotifications.$inferSelect;
+export type NewVolunteerNotification = typeof volunteerNotifications.$inferInsert;

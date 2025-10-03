@@ -5,7 +5,7 @@ import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
 import { db, reminders } from '@/db'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
-import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
+import { del, CACHE_KEYS } from '@/lib/cache'
 
 const StatusSchema = z.object({
   id: z.string().min(1), // message id
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Invalidate cache if we have patientId
     if (logData.length > 0) {
-      await invalidateCache(CACHE_KEYS.reminderStats(logData[0].patientId))
+      await del(CACHE_KEYS.reminderStats(logData[0].patientId))
     }
   } catch (error) {
     logger.error('Failed to update message status', error as Error, { id, status })

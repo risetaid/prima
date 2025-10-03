@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
 
 import {
-  getCachedData,
-  setCachedData,
+  get,
+  set,
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/cache";
-import { createErrorResponse, handleApiError } from "@/lib/api-utils";
+import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 import { withRateLimit } from "@/middleware/rate-limit";
 import { PatientService } from "@/services/patient/patient.service";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
@@ -41,7 +41,7 @@ export const GET = withRateLimit(async function GET(
 
     // Try to get from cache first
     const cacheKey = CACHE_KEYS.patient(id);
-    const cachedPatient = await getCachedData(cacheKey);
+    const cachedPatient = await get(cacheKey);
 
     if (cachedPatient) {
       return NextResponse.json(cachedPatient);
@@ -64,7 +64,7 @@ export const GET = withRateLimit(async function GET(
     }
 
     // Cache the patient data
-    await setCachedData(cacheKey, patient, CACHE_TTL.PATIENT);
+    await set(cacheKey, patient, CACHE_TTL.PATIENT);
 
     return NextResponse.json(patient);
   } catch (error) {

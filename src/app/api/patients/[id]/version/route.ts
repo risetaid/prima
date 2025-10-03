@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-utils";
-import { createErrorResponse, handleApiError } from "@/lib/api-utils";
+import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 

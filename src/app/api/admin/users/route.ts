@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, users } from "@/db";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, ilike, or, and } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { createErrorResponse, handleApiError } from "@/lib/api-utils";
+import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
@@ -27,11 +27,40 @@ export async function GET() {
       );
     }
 
+    // Parse query parameters for filtering and pagination
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status") || "all";
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const search = searchParams.get("search");
+    const offset = (page - 1) * limit;
+
     // Create alias for approver table to avoid naming conflicts
     const approver = alias(users, "approver");
 
-    // Get all users with approval info using Drizzle
-    const allUsers = await db
+    // Build where conditions
+    const whereConditions = [];
+    
+    // Status filter
+    if (status === "pending") {
+      whereConditions.push(eq(users.isApproved, false));
+    } else if (status === "approved") {
+      whereConditions.push(eq(users.isApproved, true));
+    }
+    
+    // Search filter
+    if (search) {
+      whereConditions.push(
+        or(
+          ilike(users.firstName, `%${search}%`),
+          ilike(users.lastName, `%${search}%`),
+          ilike(users.email, `%${search}%`)
+        )
+      );
+    }
+
+    // Get users with approval info using Drizzle
+    const query = db
       .select({
         // User fields
         id: users.id,
@@ -51,11 +80,29 @@ export async function GET() {
         approverEmail: approver.email,
       })
       .from(users)
-      .leftJoin(approver, eq(users.approvedBy, approver.id))
-      .orderBy(
-        asc(users.isApproved), // Pending approvals first
-        desc(users.createdAt)
-      );
+      .leftJoin(approver, eq(users.approvedBy, approver.id));
+
+    // Apply where conditions if any
+    const finalQuery = whereConditions.length > 0 
+      ? query.where(and(...whereConditions))
+      : query;
+
+    // Get total count for pagination
+    const countQuery = db
+      .select({ count: users.id })
+      .from(users)
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined);
+
+    const [allUsers, totalCount] = await Promise.all([
+      finalQuery
+        .orderBy(
+          asc(users.isApproved), // Pending approvals first
+          desc(users.createdAt)
+        )
+        .limit(limit)
+        .offset(offset),
+      countQuery
+    ]);
 
     // Format response to match Prisma structure
     const formattedUsers = allUsers.map((user) => ({
@@ -81,7 +128,13 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       users: formattedUsers,
-      count: formattedUsers.length,
+      pagination: {
+        page,
+        limit,
+        total: totalCount.length,
+        totalPages: Math.ceil(totalCount.length / limit),
+        hasMore: offset + limit < totalCount.length,
+      },
       pendingCount: formattedUsers.filter((u) => !u.isApproved).length,
     });
   } catch (error) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, users } from "@/db";
 import { eq } from "drizzle-orm";
-import { getWIBTime } from "@/lib/timezone";
+import { getWIBTime } from "@/lib/datetime";
 import { clerkClient } from "@clerk/nextjs/server";
 
 import { logger } from '@/lib/logger';

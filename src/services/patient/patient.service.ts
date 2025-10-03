@@ -10,7 +10,7 @@ import type {
 import { ValidationError, NotFoundError } from "@/services/patient/patient.types";
 import { db, patients, conversationStates, conversationMessages } from "@/db";
 import { and, eq, isNull, inArray, desc } from "drizzle-orm";
-import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
+import { invalidatePatientCache } from "@/lib/cache";
 import { validatePhoneWithMessage } from "@/lib/phone-utils";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 
@@ -49,13 +49,13 @@ export class PatientService {
 
     // Try cache
     try {
-      const { getCachedData, setCachedData } = await import("@/lib/cache");
-      const cached = await getCachedData(cacheKey);
+      const { get, set } = await import("@/lib/cache");
+      const cached = await get(cacheKey);
       if (cached) return cached;
 
       const rows = await this.repo.listPatients(filters);
       const withRates = await this.compliance.attachCompliance(rows);
-      await setCachedData(cacheKey, withRates, 600); // 10 minutes
+      await set(cacheKey, withRates, 600); // 10 minutes
       return withRates;
     } catch {
       // Fallback without cache
@@ -368,7 +368,7 @@ export class PatientService {
     if (body.photoUrl !== undefined && body.photoUrl !== null) values.photoUrl = body.photoUrl;
 
     const updated = await this.repo.updatePatient(id, values);
-    await invalidateAfterPatientOperation(id, "update");
+    await invalidatePatientCache(id);
     return updated;
   }
 
@@ -377,7 +377,7 @@ export class PatientService {
     const now = new Date();
     await this.repo.softDeletePatient(id, now);
     await this.repo.setAllRemindersActive(id, false, now);
-    await invalidateAfterPatientOperation(id, "delete");
+    await invalidatePatientCache(id);
     return { message: "Patient deleted successfully", deletedAt: now };
   }
 
@@ -413,7 +413,7 @@ export class PatientService {
       currentUser.email ||
       currentUser.id;
 
-    await invalidateAfterPatientOperation(id, "reactivate");
+    await invalidatePatientCache(id);
 
     return {
       success: true,

@@ -4,8 +4,8 @@ import { eq, count } from "drizzle-orm";
 import type { User } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import {
-  getCachedData,
-  setCachedData,
+  get,
+  set,
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/cache";
@@ -106,7 +106,7 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
   const cacheKey = CACHE_KEYS.userSession(userId);
 
   // Try to get from cache first
-  const cachedUser = await getCachedData<AuthUser>(cacheKey);
+  const cachedUser = await get<AuthUser>(cacheKey);
   if (cachedUser) {
     logger.info("User data retrieved from cache", {
       auth: true,
@@ -280,7 +280,7 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
     };
 
     // Cache fallback user for short time to prevent repeated failures
-    await setCachedData(cacheKey, fallbackUser, 60); // 1 minute
+    await set(cacheKey, fallbackUser, 60); // 1 minute
     return fallbackUser;
   }
 
@@ -291,7 +291,7 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
   };
 
   // Cache the user data
-  await setCachedData(cacheKey, authUser, CACHE_TTL.USER_SESSION);
+  await set(cacheKey, authUser, CACHE_TTL.USER_SESSION);
 
   logger.info("User data cached successfully", {
     auth: true,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, manualConfirmations, reminders } from "@/db";
 import { eq, and } from "drizzle-orm";
-import { invalidateCache, CACHE_KEYS } from "@/lib/cache";
+import { del, CACHE_KEYS } from "@/lib/cache";
 
 import { logger } from '@/lib/logger';
 export async function PUT(
@@ -214,7 +214,7 @@ export async function PUT(
       );
 
       // Invalidate cache after confirmation
-      await invalidateCache(CACHE_KEYS.reminderStats(id));
+      await del(CACHE_KEYS.reminderStats(id));
       logger.info("🗑️ Cache invalidated for patient:", { patientId: id });
 
       logger.info("🎉 REMINDER CONFIRMATION COMPLETED SUCCESSFULLY");

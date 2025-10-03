@@ -1,9 +1,9 @@
-import { createApiHandler } from "@/lib/api-handler";
+import { createApiHandler } from "@/lib/api-helpers";
 import { db, reminders } from "@/db";
 import { eq } from "drizzle-orm";
-import { getWIBTime } from "@/lib/timezone";
+import { getWIBTime } from "@/lib/datetime";
 
-import { invalidateAfterReminderOperation } from "@/lib/cache-invalidation";
+import { invalidateReminderCache } from "@/lib/cache";
 import { requirePatientAccess } from "@/lib/patient-access-control";
 import { z } from "zod";
 
@@ -61,8 +61,8 @@ export const PUT = createApiHandler(
 
     // Check role-based access to this patient's reminder
     await requirePatientAccess(
-      context.user.id,
-      context.user.role,
+      context.user!.id,
+      context.user!.role,
       patientId,
       "update this patient's reminder"
     );
@@ -85,8 +85,8 @@ export const PUT = createApiHandler(
 
     const updatedReminder = updatedReminderResult[0];
 
-    // Invalidate cache after update using systematic approach
-    await invalidateAfterReminderOperation(patientId, "update");
+    // Invalidate cache after update
+    await invalidateReminderCache(patientId);
 
     return {
       message: "Reminder updated successfully",
@@ -126,8 +126,8 @@ export const DELETE = createApiHandler(
 
     // Check role-based access to this patient's reminder
     await requirePatientAccess(
-      context.user.id,
-      context.user.role,
+      context.user!.id,
+      context.user!.role,
       reminder.patientId,
       "delete this patient's reminder"
     );
@@ -142,8 +142,8 @@ export const DELETE = createApiHandler(
       })
       .where(eq(reminders.id, id));
 
-    // Invalidate cache after deletion using systematic approach
-    await invalidateAfterReminderOperation(reminder.patientId, "delete");
+    // Invalidate cache after deletion
+    await invalidateReminderCache(reminder.patientId);
 
     return {
       success: true,

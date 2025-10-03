@@ -7,8 +7,8 @@ import { nowWIB } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
 // DB utils temporarily inlined
 import {
-  getCachedData,
-  setCachedData,
+  get,
+  set,
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/cache";
@@ -75,7 +75,7 @@ export async function POST() {
     let cachedSession = null;
 
     try {
-      cachedSession = await getCachedData<UserSessionData>(cacheKey);
+      cachedSession = await get<UserSessionData>(cacheKey);
     } catch (cacheError) {
       logger.warn("Cache unavailable, proceeding without cache", {
         api: true,
@@ -253,13 +253,17 @@ export async function POST() {
         redirectTo: "/pending-approval",
       };
       // Cache unapproved response too (shorter TTL)
-      setCachedData(cacheKey, unapprovedResponse, 60); // 1 minute for unapproved
+      set(cacheKey, unapprovedResponse, 60); // 1 minute for unapproved
       return NextResponse.json(unapprovedResponse, { status: 403 });
     }
 
     // Cache successful session data for future requests
-    setCachedData(cacheKey, sessionData, CACHE_TTL.USER_SESSION).catch(
-      (error) => logger.warn("Failed to cache session data", { api: true, cache: true, error: error instanceof Error ? error.message : String(error) })
+set(cacheKey, sessionData, CACHE_TTL.USER_SESSION).catch(
+      (error: unknown) => {
+        logger.warn("Failed to cache user session", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     );
 
     return NextResponse.json(sessionData);

@@ -74,7 +74,7 @@ export default function ScheduledRemindersPage() {
   const fetchScheduledReminders = async (patientId: string) => {
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/scheduled`
+        `/api/patients/${patientId}/reminders?filter=scheduled`
       );
       if (response.ok) {
         const data = await response.json();

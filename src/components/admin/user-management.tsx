@@ -93,7 +93,7 @@ export default function UserManagement() {
 
   const handleApproval = useCallback((userId: string, action: "approve" | "reject") =>
     performUserAction(
-      `/api/admin/users/${userId}/${action}`,
+      `/api/admin/users/${userId}?action=${action}`,
       userId,
       `User ${action === "approve" ? "approved" : "rejected"} successfully`,
       `Failed to ${action} user`
@@ -101,7 +101,7 @@ export default function UserManagement() {
 
   const toggleUserStatus = useCallback((userId: string, currentStatus: boolean) =>
     performUserAction(
-      `/api/admin/users/${userId}/toggle-status`,
+      `/api/admin/users/${userId}?action=toggle-status`,
       userId,
       `User ${currentStatus ? "deactivated" : "activated"} successfully`,
       "Failed to update user status"
@@ -121,7 +121,7 @@ export default function UserManagement() {
     const newRole = roleHierarchy[currentRole];
 
     performUserAction(
-      `/api/admin/users/${user.clerkId}/toggle-role`,
+      `/api/admin/users/${user.clerkId}?action=toggle-role`,
       user.id,
       `User role updated to ${newRole} successfully`,
       "Failed to update user role",
@@ -136,7 +136,7 @@ export default function UserManagement() {
     }
 
     performUserAction(
-      `/api/admin/users/${user.clerkId}/toggle-role`,
+      `/api/admin/users/${user.clerkId}?action=toggle-role`,
       user.id,
       `User demoted to ${targetRole} successfully`,
       "Failed to demote user",

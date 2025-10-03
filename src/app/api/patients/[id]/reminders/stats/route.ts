@@ -3,9 +3,9 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { db, reminders, manualConfirmations } from "@/db";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 import {
-  getCachedData,
-  setCachedData,
-  invalidateCache,
+  get,
+  set,
+  del,
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/cache";
@@ -29,13 +29,13 @@ export async function GET(
     // Try to get from cache first (unless invalidating)
     const cacheKey = CACHE_KEYS.reminderStats(id);
     if (!invalidate) {
-      const cachedStats = await getCachedData(cacheKey);
+      const cachedStats = await get(cacheKey);
       if (cachedStats) {
         return NextResponse.json(cachedStats);
       }
     } else {
       // Invalidate cache when requested
-      await invalidateCache(cacheKey);
+      await del(cacheKey);
     }
 
 
@@ -102,7 +102,7 @@ export async function GET(
     };
 
     // Cache the stats with shorter TTL since they change more frequently
-    await setCachedData(cacheKey, stats, CACHE_TTL.REMINDER_STATS);
+    await set(cacheKey, stats, CACHE_TTL.REMINDER_STATS);
 
     return NextResponse.json(stats);
   } catch {

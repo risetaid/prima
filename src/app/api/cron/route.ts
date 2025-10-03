@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { reminderProcessingRateLimiter } from "@/services/rate-limit.service";
-import { apiSuccess, apiError } from "@/lib/api-response";
+import { apiSuccess, apiError } from "@/lib/api-helpers";
 
 // Import reminder service for follow-up scheduling
 let reminderService:
@@ -109,7 +109,7 @@ async function processRemindersWithLock() {
     // Import dependencies
     const { db, reminders, patients } = await import("@/db");
     const { eq, and, lte, isNull } = await import("drizzle-orm");
-    const { getWIBTime, getWIBTimeString } = await import("@/lib/timezone");
+    const { getWIBTime, getCurrentTimeWIB } = await import("@/lib/datetime");
 
     // Import reminder service for follow-up scheduling
     if (!reminderService) {
@@ -119,7 +119,7 @@ async function processRemindersWithLock() {
       reminderService = new ReminderService();
     }
 
-    const currentTime = getWIBTimeString();
+    const currentTime = getCurrentTimeWIB();
 
     // Find reminders that should be sent now:
     // 1. Active reminders
