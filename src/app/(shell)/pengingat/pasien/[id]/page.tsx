@@ -113,7 +113,7 @@ export default function PatientReminderPage() {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders/completed`, {
+      const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed`, {
         signal: controller.signal
       });
 

@@ -10,22 +10,25 @@ import { EditReminderModal } from "@/components/pengingat/EditReminderModal";
 import type { Reminder, ReminderStats, ContentItem } from "@/components/pengingat/types";
 import { logger } from '@/lib/logger';
 
-interface ScheduledReminderApi {
+
+
+interface ScheduledReminderResponse {
   id: string;
   scheduledTime?: string;
   reminderDate?: string;
+  nextReminderDate?: string;
   customMessage?: string;
   attachedContent?: ContentItem[];
 }
 
-interface PendingReminderApi {
+interface PendingReminderResponse {
   id: string;
   scheduledTime?: string;
   reminderDate?: string;
   customMessage?: string;
 }
 
-interface CompletedReminderApi {
+interface CompletedReminderResponse {
   id: string;
   scheduledTime?: string;
   reminderDate?: string;
@@ -101,18 +104,17 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/scheduled`,
+        `/api/patients/${patientId}/reminders?filter=scheduled`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const data = await response.json();
         logger.info("Scheduled reminders data:", data);
-        const mappedData = data.map((item: ScheduledReminderApi) => ({
+        const mappedData = data.map((item: ScheduledReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
-          reminderDate:
-            item.reminderDate || new Date().toISOString().split("T")[0],
+          reminderDate: item.reminderDate || item.nextReminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "scheduled",
           attachedContent: item.attachedContent || [],
@@ -140,14 +142,14 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/pending`,
+        `/api/patients/${patientId}/reminders?filter=pending`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const data = await response.json();
         logger.info("Pending reminders data:", data);
-        const mappedData = data.map((item: PendingReminderApi) => ({
+        const mappedData = data.map((item: PendingReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate: item.reminderDate || new Date().toISOString().split("T")[0],
@@ -177,14 +179,14 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/completed`,
+        `/api/patients/${patientId}/reminders?filter=completed`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const data = await response.json();
         logger.info("Completed reminders data:", data);
-        const mappedData = data.map((item: CompletedReminderApi) => ({
+        const mappedData = data.map((item: CompletedReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
