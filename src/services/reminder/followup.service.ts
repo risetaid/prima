@@ -20,6 +20,7 @@ export class FollowupService {
   private readonly FOLLOWUP_PREFIX = "followup:data:";
   private readonly FOLLOWUP_QUEUE_KEY = "followup:schedule";
   private readonly FOLLOWUP_PATIENT_KEY = "followup:patient:";
+  private readonly FOLLOWUP_REMINDER_KEY = "followup:reminder:";
   private readonly DEFAULT_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
   private readonly MAX_FOLLOWUP_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
@@ -218,6 +219,13 @@ export class FollowupService {
       this.FOLLOWUP_PATIENT_KEY + params.patientId,
       followupId,
       followupData.scheduledAt.toISOString()
+    );
+
+    // Add to reminder index for easy cancellation
+    await redis.hset(
+      this.FOLLOWUP_REMINDER_KEY + params.reminderId,
+      followupId,
+      '1' // Just a marker value
     );
 
     // Schedule in queue
@@ -498,6 +506,42 @@ export class FollowupService {
   }
 
   /**
+   * Cancel all followups for a specific reminder
+   */
+  async cancelFollowupsForReminder(reminderId: string): Promise<void> {
+    try {
+      const cancelledFollowups: string[] = [];
+
+      // Get all followup IDs for this reminder from the index
+      const reminderFollowups = await redis.hgetall(this.FOLLOWUP_REMINDER_KEY + reminderId);
+
+      for (const followupId of Object.keys(reminderFollowups)) {
+        const followup = await this.getFollowupData(followupId);
+        if (followup && (followup.status === 'PENDING' || followup.status === 'SENT')) {
+          await this.cancelFollowup(followupId);
+          cancelledFollowups.push(followupId);
+        }
+      }
+
+      // Clean up the reminder index
+      await redis.del(this.FOLLOWUP_REMINDER_KEY + reminderId);
+
+      logger.info("Cancelled followups for reminder", {
+        reminderId,
+        cancelledCount: cancelledFollowups.length,
+        cancelledFollowups,
+        operation: "cancel_followups_for_reminder"
+      });
+    } catch (error) {
+      logger.error("Failed to cancel followups for reminder", error instanceof Error ? error : new Error(String(error)), {
+        reminderId,
+        operation: "cancel_followups_for_reminder"
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Cancel a followup
    */
   async cancelFollowup(followupId: string): Promise<void> {
@@ -513,6 +557,9 @@ export class FollowupService {
 
       await this.storeFollowupData(followup);
       await this.queueService.dequeueFollowup(followupId);
+
+      // Remove from reminder index
+      await redis.hdel(this.FOLLOWUP_REMINDER_KEY + followup.reminderId, followupId);
 
       logger.info("Followup cancelled", {
         followupId,

@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { db, patients, reminders } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { PatientContextService } from "@/services/patient/patient-context.service";
+import { FollowupService } from "@/services/reminder/followup.service";
 
 export interface SimpleMessageContext {
   patientId: string;
@@ -209,6 +210,20 @@ export class SimpleMessageProcessorService {
           confirmationResponseAt: new Date(),
         })
         .where(eq(reminders.id, reminderToUpdate.id));
+
+      // Cancel any pending followups if reminder is confirmed
+      if (isConfirmed) {
+        try {
+          const followupService = new FollowupService();
+          await followupService.cancelFollowupsForReminder(reminderToUpdate.id);
+        } catch (error) {
+          logger.warn("Failed to cancel followups after reminder confirmation", {
+            reminderId: reminderToUpdate.id,
+            error: error instanceof Error ? error.message : String(error)
+          });
+          // Don't fail the confirmation if followup cancellation fails
+        }
+      }
 
       logger.info("Reminder confirmation updated", {
         patientId: context.patientId,

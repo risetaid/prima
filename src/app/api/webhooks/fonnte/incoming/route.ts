@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { KeywordMatcherService } from "@/services/keyword-matcher.service";
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
+import { FollowupService } from "@/services/reminder/followup.service";
 
 interface WebhookBody {
   sender?: string;
@@ -524,6 +525,18 @@ export async function POST(request: NextRequest) {
               confirmationResponseAt: new Date()
             })
             .where(eq(reminders.id, reminder.id))
+
+          // Cancel any pending followups for this reminder
+          try {
+            const followupService = new FollowupService();
+            await followupService.cancelFollowupsForReminder(reminder.id);
+          } catch (error) {
+            logger.warn("Failed to cancel followups after reminder confirmation", {
+              reminderId: reminder.id,
+              error: error instanceof Error ? error.message : String(error)
+            });
+            // Don't fail the confirmation if followup cancellation fails
+          }
 
           await whatsappService.sendAck(
             patient.phoneNumber,
