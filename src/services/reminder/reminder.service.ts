@@ -146,6 +146,7 @@ export class ReminderService {
           reminderType: schedule.reminderType || "GENERAL",
           reminderTitle: schedule.title || undefined,
           reminderDescription: schedule.description || undefined,
+          attachedContent: validatedContent.length > 0 ? validatedContent : undefined,
         });
       }
     }
@@ -292,6 +293,7 @@ export class ReminderService {
     reminderType: string;
     reminderTitle?: string | null;
     reminderDescription?: string | null;
+    attachedContent?: unknown[];
   }): Promise<{
     success: boolean;
     messageId?: string;
@@ -300,7 +302,7 @@ export class ReminderService {
   }> {
     try {
       const reminderType = params.reminderType as ReminderType;
-      const formattedMessage = this.templateService.formatReminderMessage({
+      let formattedMessage = this.templateService.formatReminderMessage({
         patientName: params.patientName,
         reminderType,
         title: params.reminderTitle || undefined,
@@ -309,6 +311,11 @@ export class ReminderService {
         scheduledTime: "",
         metadata: {},
       });
+
+      // Add attached content to message if present
+      if (params.attachedContent && Array.isArray(params.attachedContent) && params.attachedContent.length > 0) {
+        formattedMessage = this.appendContentToMessage(formattedMessage, params.attachedContent);
+      }
 
       const result = await this.whatsappService.send(
         params.phoneNumber,
@@ -412,6 +419,47 @@ export class ReminderService {
         followupsScheduled: 0,
       };
     }
+  }
+
+  /**
+   * Append content attachments to message with proper formatting
+   */
+  private appendContentToMessage(message: string, attachedContent: unknown[]): string {
+    if (!attachedContent.length) return message;
+
+    let enhancedMessage = message;
+
+    // Group content by type
+    const contentByType: { [key: string]: Array<{ id: string; type: string; title: string; url: string }> } = {};
+
+    attachedContent.forEach((item: unknown) => {
+      const content = item as { id: string; type: string; title: string; url: string };
+      if (!content.type || !content.title || !content.url) return;
+
+      const type = content.type.toLowerCase();
+      if (!contentByType[type]) {
+        contentByType[type] = [];
+      }
+      contentByType[type].push(content);
+    });
+
+    // Add content sections with proper icons and formatting
+    Object.keys(contentByType).forEach((contentType) => {
+      const contents = contentByType[contentType];
+      const prefix = contentType === "article" ? "📚 Baca juga:" : contentType === "video" ? "🎥 Tonton juga:" : "📖 Lihat juga:";
+
+      enhancedMessage += `\n\n${prefix}`;
+
+      contents.forEach((content) => {
+        const icon = contentType === "article" ? "📄" : contentType === "video" ? "🎥" : "📖";
+        enhancedMessage += `\n${icon} ${content.title}`;
+        enhancedMessage += `\n   ${content.url}`;
+      });
+    });
+
+    enhancedMessage += "\n\n💙 Tim PRIMA";
+
+    return enhancedMessage;
   }
 
   /**

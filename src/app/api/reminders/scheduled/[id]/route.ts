@@ -10,6 +10,11 @@ import { z } from "zod";
 const updateReminderBodySchema = z.object({
   reminderTime: z.string().min(1, "Reminder time is required"),
   customMessage: z.string().min(1, "Custom message is required"),
+  attachedContent: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    type: z.enum(["ARTICLE", "VIDEO"]),
+  })).optional(),
 });
 
 const updateReminderParamsSchema = z.object({
@@ -25,7 +30,7 @@ export const PUT = createApiHandler(
     params: updateReminderParamsSchema,
   },
   async (body: UpdateReminderBody, context) => {
-    const { reminderTime, customMessage } = body;
+    const { reminderTime, customMessage, attachedContent } = body;
     const { id } = context.params!;
 
     if (!reminderTime || !customMessage) {
@@ -68,6 +73,7 @@ export const PUT = createApiHandler(
       .set({
         scheduledTime: reminderTime,
         message: customMessage,
+        metadata: attachedContent && attachedContent.length > 0 ? { attachedContent } : null,
         updatedAt: getWIBTime(),
       })
       .where(eq(reminders.id, id))

@@ -71,6 +71,7 @@ export async function GET(
         isActive: reminders.isActive,
         createdAt: reminders.createdAt,
         updatedAt: reminders.updatedAt,
+        metadata: reminders.metadata,
       })
       .from(reminders)
       .where(and(...conditions));
@@ -140,8 +141,14 @@ export async function GET(
       logsMap.get(log.id).push(log);
     });
 
-    // Content attachments map - simplified system without medicationDetails
+    // Content attachments map - extract from metadata
     const contentAttachmentsMap = new Map();
+    scheduledReminders.forEach((reminder) => {
+      const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
+      if (metadata?.attachedContent && Array.isArray(metadata.attachedContent)) {
+        contentAttachmentsMap.set(reminder.id, metadata.attachedContent);
+      }
+    });
 
     // Filter reminders using the same logic as the stats API
     const filteredReminders = scheduledReminders.filter((reminder) => {

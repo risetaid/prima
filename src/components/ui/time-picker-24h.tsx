@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface TimePicker24hProps {
   value: string; // HH:MM format
@@ -21,8 +21,9 @@ export function TimePicker24h({
 }: TimePicker24hProps) {
   const [selectedHour, setSelectedHour] = useState<string>("");
   const [selectedMinute, setSelectedMinute] = useState<string>("");
+  const isInitialized = useRef(false);
 
-  // Parse initial value - only on mount or when value changes to different time
+  // Parse initial value - only on mount or when external value changes
   useEffect(() => {
     if (value && value.includes(":")) {
       const [hour, minute] = value.split(":");
@@ -33,24 +34,29 @@ export function TimePicker24h({
       if (newHour !== selectedHour || newMinute !== selectedMinute) {
         setSelectedHour(newHour);
         setSelectedMinute(newMinute);
+        isInitialized.current = true;
       }
-    } else if (!selectedHour && !selectedMinute) {
-      // Set default to current time if no value and no state yet
+    } else if (!isInitialized.current) {
+      // Set default to current time only once on mount if no value
       const now = new Date();
       setSelectedHour(now.getHours().toString().padStart(2, "0"));
       setSelectedMinute(now.getMinutes().toString().padStart(2, "0"));
+      isInitialized.current = true;
     }
-  }, [value, selectedHour, selectedMinute]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]); // Intentionally exclude selectedHour and selectedMinute to prevent infinite loop
 
-  // Update parent when selections change
+  // Update parent when selections change - but NOT when onChange changes
   useEffect(() => {
-    if (selectedHour && selectedMinute) {
+    if (selectedHour && selectedMinute && isInitialized.current) {
       const timeString = `${selectedHour}:${selectedMinute}`;
+      // Only call onChange if the time actually changed
       if (timeString !== value) {
         onChange(timeString);
       }
     }
-  }, [selectedHour, selectedMinute, onChange, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedHour, selectedMinute, value]); // Remove onChange from dependencies to prevent infinite loop
 
   // Get current time for validation
   const now = new Date();

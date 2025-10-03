@@ -323,6 +323,7 @@ async function createReminderSchedules(
         endDate: reminderDate, // Each reminder has its own single date
         isActive: true,
         createdById: userId,
+        metadata: validatedContent.length > 0 ? { attachedContent: validatedContent } : null,
       })
       .returning();
 

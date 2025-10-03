@@ -158,6 +158,7 @@ async function processRemindersWithLock() {
         reminderType: reminders.reminderType,
         title: reminders.title,
         description: reminders.description,
+        metadata: reminders.metadata,
         // Patient info
         patientName: patients.name,
         patientPhone: patients.phoneNumber,
@@ -208,6 +209,12 @@ async function processRemindersWithLock() {
               return { alreadyProcessed: true };
             }
 
+            // Extract attachedContent from metadata
+            const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
+            const attachedContent = metadata?.attachedContent && Array.isArray(metadata.attachedContent)
+              ? metadata.attachedContent
+              : undefined;
+
             // Use ReminderService to send message with type-specific formatting
             const sendResult = await reminderService!.sendReminder({
               patientId: reminder.patientId,
@@ -221,6 +228,7 @@ async function processRemindersWithLock() {
               reminderDescription: reminder.description
                 ? reminder.description
                 : undefined,
+              attachedContent: attachedContent,
             });
 
             // Update reminder status in a transaction

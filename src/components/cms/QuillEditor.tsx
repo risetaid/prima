@@ -133,7 +133,8 @@ export function QuillEditor({
         isMountedRef.current = false;
       }
     };
-  }, [placeholder]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeholder]); // Intentionally exclude 'value' - it's only used for initial content. Subsequent value changes are handled by separate useEffect below
 
   // Update content when value prop changes
   useEffect(() => {
