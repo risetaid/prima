@@ -7,25 +7,20 @@ import { get, set, CACHE_TTL } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
 
-// Interface for unified content response
+// Interface for unified content response - matches frontend ContentItem interface
 interface UnifiedContent {
   id: string;
   title: string;
   slug: string;
-  description?: string;
   category: string;
-  tags: string[];
-  publishedAt: Date | null;
-  createdAt: Date;
-  type: 'article' | 'video';
-  thumbnailUrl?: string;
-  url: string; // Public accessible URL
-  excerpt?: string; // For articles
-  videoUrl?: string; // For videos
-  durationMinutes?: string; // For videos
-  author?: string | null;
-  featuredImageUrl?: string | null;
-  status?: string;
+  status: "draft" | "published" | "archived";
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  type: "article" | "video";
+  thumbnailUrl: string | null;
+  featuredImageUrl: string | null;
+  authorName: string;
 }
 
 // Schema for template creation request
@@ -171,18 +166,15 @@ export async function GET(request: NextRequest) {
         id: article.id,
         title: article.title,
         slug: article.slug,
-        description: article.excerpt || undefined,
         category: article.category,
-        tags: article.tags,
-        publishedAt: article.publishedAt,
-        createdAt: article.createdAt,
+        status: article.status.toLowerCase() as "draft" | "published" | "archived",
+        publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
+        createdAt: article.createdAt.toISOString(),
+        updatedAt: article.updatedAt.toISOString(),
         type: "article" as const,
-        thumbnailUrl: article.featuredImageUrl || undefined,
-        url: `/content/articles/${article.slug}`,
-        excerpt: article.excerpt || undefined,
-        author: article.authorName,
+        thumbnailUrl: article.featuredImageUrl,
         featuredImageUrl: article.featuredImageUrl,
-        status: article.status,
+        authorName: article.authorName,
       }));
     }
 
@@ -224,18 +216,15 @@ export async function GET(request: NextRequest) {
         id: video.id,
         title: video.title,
         slug: video.slug,
-        description: video.description || undefined,
         category: video.category,
-        tags: video.tags,
-        publishedAt: video.publishedAt,
-        createdAt: video.createdAt,
+        status: video.status.toLowerCase() as "draft" | "published" | "archived",
+        publishedAt: video.publishedAt ? video.publishedAt.toISOString() : null,
+        createdAt: video.createdAt.toISOString(),
+        updatedAt: video.updatedAt.toISOString(),
         type: "video" as const,
-        thumbnailUrl: video.thumbnailUrl || undefined,
-        url: `/content/videos/${video.slug}`,
-        videoUrl: video.videoUrl,
-        durationMinutes: video.durationMinutes || undefined,
-        author: video.authorName,
-        status: video.status,
+        thumbnailUrl: video.thumbnailUrl,
+        featuredImageUrl: null,
+        authorName: video.authorName,
       }));
     }
 
@@ -357,7 +346,7 @@ export async function GET(request: NextRequest) {
       {
         success: false,
         error: "CMS content loading failed",
-        details: process.env.NODE_ENV === "development" 
+        details: process.env.NODE_ENV === "development"
           ? (error instanceof Error ? error.message : "Unknown error")
           : "Server error",
       },
