@@ -81,16 +81,19 @@ export async function GET(request: NextRequest) {
         isNull(contentType === 'article' ? cmsArticles.deletedAt : cmsVideos.deletedAt),
       ];
 
-      // Status filter
+      // Status filter (from effectiveStatus)
       if (effectiveStatus !== "all") {
         const statusField = contentType === 'article' ? cmsArticles.status : cmsVideos.status;
         conditions.push(eq(statusField, effectiveStatus.toUpperCase() as "DRAFT" | "PUBLISHED" | "ARCHIVED"));
       }
 
-      // Published filter
-      if (effectivePublished !== undefined) {
+      // Published filter (from effectivePublished query param)
+      // NOTE: This can be redundant with effectiveStatus filter above when isPublic=true
+      // TODO: Refactor to eliminate redundancy
+      if (effectivePublished !== undefined && effectiveStatus === "all") {
         const statusField = contentType === 'article' ? cmsArticles.status : cmsVideos.status;
-        if (effectivePublished === "true") {
+        // Handle both boolean true and string "true"
+        if (effectivePublished === true || effectivePublished === "true") {
           conditions.push(eq(statusField, "PUBLISHED"));
         } else {
           conditions.push(
