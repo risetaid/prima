@@ -3,7 +3,7 @@
 
 import { db } from '@/db'
 import { patients } from '@/db'
-import { eq, or } from 'drizzle-orm'
+import { eq, or, and } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { generatePhoneAlternatives } from '@/lib/phone-utils'
 
@@ -34,7 +34,7 @@ export class PatientLookupService {
         alternativesCount: alternatives.length
       })
 
-      // Try to find patient with original phone number first
+      // Try to find PENDING patient first (for webhook processing) - ONLY ACTIVE
       let patientResult = await db
         .select({
           id: patients.id,
@@ -44,15 +44,15 @@ export class PatientLookupService {
           isActive: patients.isActive
         })
         .from(patients)
-        .where(eq(patients.phoneNumber, phoneNumber))
+        .where(and(
+          eq(patients.phoneNumber, phoneNumber), 
+          eq(patients.verificationStatus, 'PENDING'),
+          eq(patients.isActive, true)
+        ))
         .limit(1)
 
-      // If not found, try alternative formats
-      if (!patientResult.length && alternatives.length > 0) {
-        const whereClause = or(
-          ...alternatives.map(alt => eq(patients.phoneNumber, alt))
-        )
-
+      // If no PENDING patient found, try VERIFIED patients - ONLY ACTIVE
+      if (!patientResult.length) {
         patientResult = await db
           .select({
             id: patients.id,
@@ -62,8 +62,91 @@ export class PatientLookupService {
             isActive: patients.isActive
           })
           .from(patients)
-          .where(whereClause)
+          .where(and(
+            eq(patients.phoneNumber, phoneNumber), 
+            eq(patients.verificationStatus, 'VERIFIED'),
+            eq(patients.isActive, true)
+          ))
           .limit(1)
+      }
+
+      // If still not found, try any status (fallback) - ONLY ACTIVE
+      if (!patientResult.length) {
+        patientResult = await db
+          .select({
+            id: patients.id,
+            name: patients.name,
+            phoneNumber: patients.phoneNumber,
+            verificationStatus: patients.verificationStatus,
+            isActive: patients.isActive
+          })
+          .from(patients)
+          .where(and(
+            eq(patients.phoneNumber, phoneNumber),
+            eq(patients.isActive, true)
+          ))
+          .limit(1)
+      }
+
+      // If not found, try alternative formats (prioritize PENDING)
+      if (!patientResult.length && alternatives.length > 0) {
+        const whereClause = or(
+          ...alternatives.map(alt => eq(patients.phoneNumber, alt))
+        )
+
+        // Try PENDING patients with alternative phone formats first - ONLY ACTIVE
+        patientResult = await db
+          .select({
+            id: patients.id,
+            name: patients.name,
+            phoneNumber: patients.phoneNumber,
+            verificationStatus: patients.verificationStatus,
+            isActive: patients.isActive
+          })
+          .from(patients)
+          .where(and(
+            whereClause, 
+            eq(patients.verificationStatus, 'PENDING'),
+            eq(patients.isActive, true)
+          ))
+          .limit(1)
+
+        // If no PENDING found, try VERIFIED - ONLY ACTIVE
+        if (!patientResult.length) {
+          patientResult = await db
+            .select({
+              id: patients.id,
+              name: patients.name,
+              phoneNumber: patients.phoneNumber,
+              verificationStatus: patients.verificationStatus,
+              isActive: patients.isActive
+            })
+            .from(patients)
+            .where(and(
+              whereClause, 
+              eq(patients.verificationStatus, 'VERIFIED'),
+              eq(patients.isActive, true)
+            ))
+            .limit(1)
+        }
+
+        // Final fallback - any status - ONLY ACTIVE
+        if (!patientResult.length) {
+          patientResult = await db
+            .select({
+              id: patients.id,
+              name: patients.name,
+              phoneNumber: patients.phoneNumber,
+              verificationStatus: patients.verificationStatus,
+              isActive: patients.isActive
+            })
+            .from(patients)
+            .where(and(
+              whereClause,
+              eq(patients.isActive, true)
+            ))
+            .limit(1)
+        }
       }
 
       if (patientResult.length > 0) {

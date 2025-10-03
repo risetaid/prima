@@ -8,8 +8,6 @@ const preloadAdminChunks = () => {
     Promise.all([
       import('@/components/admin/user-management'),
       import('@/components/admin/template-management'),
-      import('@/components/admin/comprehensive-analytics-dashboard'),
-      import('@/components/admin/llm-analytics-dashboard'),
     ]).catch(() => {
       // Silently fail if preloading fails
     });
@@ -54,10 +52,8 @@ export function useAdminPreloader(userRole?: string | null) {
         import('@/components/admin/template-management').catch(() => {});
         break;
       case '/admin/analytics':
-        import('@/components/admin/comprehensive-analytics-dashboard').catch(() => {});
         break;
       case '/admin/llm-analytics':
-        import('@/components/admin/llm-analytics-dashboard').catch(() => {});
         break;
       default:
         break;

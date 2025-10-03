@@ -49,6 +49,32 @@ export class CacheInvalidationService {
   }
 
   /**
+   * Safe invalidation of patient data with error handling and result reporting
+   */
+  static async safeInvalidatePatientData(patientId: string): Promise<{
+    success: boolean;
+    successfulKeys: string[];
+    failedKeys: string[];
+    errors: string[];
+  }> {
+    const keysToInvalidate = [
+      CACHE_KEYS.patient(patientId),
+      CACHE_KEYS.reminderStats(patientId),
+      CACHE_KEYS.remindersAll(patientId),
+      CACHE_KEYS.healthNotes(patientId),
+    ];
+
+    logger.info("Safe invalidating patient-related cache", {
+      cache: true,
+      operation: "safe_invalidate_patient_data",
+      patientId,
+      keysCount: keysToInvalidate.length,
+    });
+
+    return await CacheInvalidationService.safeInvalidate(keysToInvalidate);
+  }
+
+  /**
    * Invalidate all cache entries related to a user
    */
   static async invalidateUserData(userId: string): Promise<void> {
@@ -104,6 +130,30 @@ export class CacheInvalidationService {
     });
 
     await invalidateMultipleCache(keysToInvalidate);
+  }
+
+  /**
+   * Safe invalidation of dashboard data with error handling and result reporting
+   */
+  static async safeInvalidateDashboardData(): Promise<{
+    success: boolean;
+    successfulKeys: string[];
+    failedKeys: string[];
+    errors: string[];
+  }> {
+    const keysToInvalidate = [
+      "dashboard:overview",
+      "dashboard:stats",
+      "dashboard:recent-activity",
+    ];
+
+    logger.info("Safe invalidating dashboard cache", {
+      cache: true,
+      operation: "safe_invalidate_dashboard_data",
+      keysCount: keysToInvalidate.length,
+    });
+
+    return await CacheInvalidationService.safeInvalidate(keysToInvalidate);
   }
 
   /**
@@ -224,12 +274,12 @@ export class CacheInvalidationService {
   }
 
   /**
-   * Comprehensive invalidation for patient operations
+   * Comprehensive invalidation for patient operations with robust error handling
    */
   static async invalidateAfterPatientOperation(
     patientId: string,
     operation: "create" | "update" | "delete" | "reactivate"
-  ): Promise<void> {
+  ): Promise<{ success: boolean; errors: string[] }> {
     logger.info("Invalidating cache after patient operation", {
       cache: true,
       operation: "patient_operation_invalidation",
@@ -237,8 +287,37 @@ export class CacheInvalidationService {
       patientOperation: operation,
     });
 
-    // Always invalidate patient-specific data
-    await CacheInvalidationService.invalidatePatientData(patientId);
+    const allErrors: string[] = [];
+
+    try {
+      // Always invalidate patient-specific data with retry logic
+      const patientResult = await CacheInvalidationService.safeInvalidatePatientData(patientId);
+      if (!patientResult.success) {
+        allErrors.push(...patientResult.errors);
+        logger.warn("Patient cache invalidation failed, attempting retry", {
+          cache: true,
+          operation: "patient_operation_invalidation_retry",
+          patientId,
+          errors: patientResult.errors,
+        });
+
+        // Retry once after a short delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const retryResult = await CacheInvalidationService.safeInvalidatePatientData(patientId);
+        if (!retryResult.success) {
+          allErrors.push(...retryResult.errors);
+        logger.error("Patient cache invalidation failed after retry", new Error("Cache invalidation retry failed"));
+        }
+      }
+    } catch (error) {
+      const errorMsg = `Patient cache invalidation threw error: ${error instanceof Error ? error.message : String(error)}`;
+      allErrors.push(errorMsg);
+      logger.error("Patient cache invalidation exception", error instanceof Error ? error : new Error(String(error)), {
+        cache: true,
+        operation: "patient_operation_invalidation_exception",
+        patientId,
+      });
+    }
 
     // For create/update operations, also invalidate dashboard
     if (
@@ -246,8 +325,49 @@ export class CacheInvalidationService {
       operation === "update" ||
       operation === "delete"
     ) {
-      await CacheInvalidationService.invalidateDashboardData();
+      try {
+        const dashboardResult = await CacheInvalidationService.safeInvalidateDashboardData();
+        if (!dashboardResult.success) {
+          allErrors.push(...dashboardResult.errors);
+          logger.warn("Dashboard cache invalidation failed", {
+            cache: true,
+            operation: "dashboard_invalidation_failed",
+            patientId,
+            errors: dashboardResult.errors,
+          });
+        }
+      } catch (error) {
+        const errorMsg = `Dashboard cache invalidation threw error: ${error instanceof Error ? error.message : String(error)}`;
+        allErrors.push(errorMsg);
+        logger.error("Dashboard cache invalidation exception", error instanceof Error ? error : new Error(String(error)), {
+          cache: true,
+          operation: "dashboard_invalidation_exception",
+          patientId,
+        });
+      }
     }
+
+    const success = allErrors.length === 0;
+
+    if (!success) {
+      logger.error("Cache invalidation completed with errors", undefined, {
+        cache: true,
+        operation: "patient_operation_invalidation_completed_with_errors",
+        patientId,
+        patientOperation: operation,
+        errorCount: allErrors.length,
+        errors: allErrors,
+      });
+    } else {
+      logger.info("Cache invalidation completed successfully", {
+        cache: true,
+        operation: "patient_operation_invalidation_success",
+        patientId,
+        patientOperation: operation,
+      });
+    }
+
+    return { success, errors: allErrors };
   }
 
   /**

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
-import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { ConversationStateService } from "@/services/conversation-state.service";
+import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
 
 import { logger } from '@/lib/logger';
 // Send verification message to patient
@@ -33,67 +32,40 @@ export async function POST(
 
     const patient = patientResult[0];
 
-    // Send verification message with clear instructions
-    const whatsappService = new WhatsAppService();
-    const whatsappResult = await whatsappService.sendVerificationMessage(
+    // Send verification message using simple service
+    const verificationService = new SimpleVerificationService();
+    const success = await verificationService.sendVerification(
+      patientId,
       patient.phoneNumber,
       patient.name
     );
 
-    if (!whatsappResult.success) {
+    if (!success) {
       return NextResponse.json(
-        { error: "Failed to send WhatsApp message: " + whatsappResult.error },
+        { error: "Failed to send verification message" },
         { status: 500 }
       );
     }
 
-    // Update patient verification status
-    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours expiry
-    const currentAttempts = parseInt(patient.verificationAttempts || "0");
-
-    await db
-      .update(patients)
-      .set({
-        verificationStatus: "PENDING",
-        verificationSentAt: new Date(),
-        verificationMessage: `Text message: Verification request sent to ${patient.name}`,
-        verificationAttempts: (currentAttempts + 1).toString(),
-        verificationExpiresAt: expiresAt,
-        updatedAt: new Date(),
+    // Get updated patient data for response
+    const updatedPatient = await db
+      .select({
+        verificationExpiresAt: patients.verificationExpiresAt,
+        verificationAttempts: patients.verificationAttempts
       })
-      .where(eq(patients.id, patientId));
+      .from(patients)
+      .where(eq(patients.id, patientId))
+      .limit(1);
 
-    // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
-
-    // Set verification context with message ID after successful send
-    if (whatsappResult.success && whatsappResult.messageId) {
-      try {
-        const conversationService = new ConversationStateService();
-        await conversationService.setVerificationContext(
-          patientId,
-          patient.phoneNumber,
-          whatsappResult.messageId
-        );
-
-        logger.info('Verification context set', {
-          patientId,
-          messageId: whatsappResult.messageId,
-          contextType: 'verification',
-          expiresIn: '48 hours'
-        });
-      } catch (conversationError: unknown) {
-        logger.warn("Failed to set verification context", { error: conversationError instanceof Error ? conversationError.message : String(conversationError) });
-        // Don't fail the entire request if conversation state update fails
-      }
-    }
+    const expiresAt = updatedPatient[0]?.verificationExpiresAt || new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const attempts = parseInt(updatedPatient[0]?.verificationAttempts || "1");
 
     return NextResponse.json({
       success: true,
-      message:
-        "Verification message sent successfully with clear response options",
+      message: "Verification message sent successfully",
       expiresAt: expiresAt.toISOString(),
-      attempt: currentAttempts + 1,
-      method: "text_verification",
+      attempt: attempts,
+      method: "simple_verification",
     });
   } catch (error: unknown) {
     logger.error("Send verification error:", error instanceof Error ? error : new Error(String(error)));

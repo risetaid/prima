@@ -8,7 +8,7 @@ export * from "@/db/core-schema";
 export * from "@/db/patient-schema";
 export * from "@/db/reminder-schema";
 export * from "@/db/cms-schema";
-export * from "@/db/llm-schema";
+export * from "@/db/llm-schema"; // Contains conversation tracking tables
 export * from "@/db/message-queue-schema";
 export * from "@/db/distributed-locks-schema";
 export * from "@/db/rate-limits-schema";
@@ -125,7 +125,7 @@ export const cmsVideosRelations = relations(cmsVideos, ({}) => ({
   // No relations needed for CMS content
 }));
 
-// ===== LLM RELATIONS =====
+// ===== CONVERSATION TRACKING RELATIONS =====
 
 export const conversationStatesRelations = relations(conversationStates, ({ one, many }) => ({
   patient: one(patients, {
@@ -171,7 +171,7 @@ export type NewCmsArticle = typeof cmsArticles.$inferInsert;
 export type CmsVideo = typeof cmsVideos.$inferSelect;
 export type NewCmsVideo = typeof cmsVideos.$inferInsert;
 
-// LLM Types
+// Conversation Tracking Types
 export type ConversationState = typeof conversationStates.$inferSelect;
 export type NewConversationState = typeof conversationStates.$inferInsert;
 export type ConversationMessage = typeof conversationMessages.$inferSelect;

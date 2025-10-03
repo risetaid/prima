@@ -1,4 +1,5 @@
-ALTER TYPE "user_role" ADD VALUE 'DEVELOPER';--> statement-breakpoint
+-- ALTER TYPE "user_role" ADD VALUE 'DEVELOPER'; -- Already exists, skipping
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "conversation_messages" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"conversation_state_id" uuid NOT NULL,

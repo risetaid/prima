@@ -4,15 +4,10 @@ import {
   VerificationWebhookService,
   WebhookPayload,
 } from "@/services/webhook/verification-webhook.service";
-import {
-  MessageProcessorService,
-  MessageContext,
-  ResponseAction,
-} from "@/services/message-processor.service";
+import { SimpleMessageProcessorService } from "@/services/simple-message-processor.service";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientContextService } from "@/services/patient/patient-context.service";
-import { ReminderService } from "@/services/reminder/reminder.service";
-import { logger, LogValue } from "@/lib/logger";
+import { logger } from "@/lib/logger";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 
 // Validation schema for WhatsApp webhook payload
@@ -28,165 +23,7 @@ const WhatsAppWebhookSchema = z.object({
 // Type for validated webhook data
 type ValidatedWebhookData = z.infer<typeof WhatsAppWebhookSchema>;
 
-/**
- * Execute response actions from LLM processing
- */
-async function executeResponseActions(
-  actions: ResponseAction[],
-  patientId: string,
-  phoneNumber: string,
-  message: string
-): Promise<void> {
-  const reminderService = new ReminderService();
 
-  for (const action of actions) {
-    try {
-      switch (action.type) {
-        case "log_confirmation":
-          // Log the confirmation in reminders table
-          try {
-            const { db, reminders } = await import("@/db");
-            const { eq, and } = await import("drizzle-orm");
-
-            // Find the most recent reminder for this patient that needs confirmation
-            const recentReminders = await db
-              .select({
-                id: reminders.id,
-                confirmationStatus: reminders.confirmationStatus,
-                sentAt: reminders.sentAt,
-              })
-              .from(reminders)
-              .where(
-                and(
-                  eq(reminders.patientId, patientId),
-                  eq(reminders.confirmationStatus, "PENDING")
-                )
-              )
-              .orderBy(reminders.sentAt)
-              .limit(5); // Get last 5 pending confirmations
-
-            if (recentReminders.length > 0) {
-              // Update the most recent pending confirmation
-              const reminderToUpdate =
-                recentReminders[recentReminders.length - 1]; // Most recent
-
-              const status = (action.data.status as string) || "CONFIRMED";
-              const validStatuses = ["CONFIRMED", "MISSED", "PENDING"] as const;
-              const confirmationStatus = validStatuses.includes(
-                status as (typeof validStatuses)[number]
-              )
-                ? (status as "CONFIRMED" | "MISSED" | "PENDING")
-                : "CONFIRMED";
-
-              await db
-                .update(reminders)
-                .set({
-                  confirmationStatus,
-                  confirmationResponse:
-                    (action.data.response as string) || message,
-                  confirmationResponseAt: new Date(),
-                })
-                .where(eq(reminders.id, reminderToUpdate.id));
-
-              logger.info("Confirmation logged in database", {
-                patientId,
-                reminderId: reminderToUpdate.id,
-                status: action.data.status || "CONFIRMED",
-                response: action.data.response || message,
-              });
-            } else {
-              logger.warn("No pending reminders found for confirmation", {
-                patientId,
-                actionData: action.data,
-              });
-            }
-          } catch (dbError) {
-            logger.error(
-              "Failed to log confirmation in database",
-              dbError as Error,
-              {
-                patientId,
-                actionData: action.data,
-              }
-            );
-          }
-          break;
-
-        case "send_followup":
-          // Schedule a follow-up reminder
-          if (action.data.type === "reminder" && action.data.delay) {
-            const delay =
-              typeof action.data.delay === "number"
-                ? action.data.delay
-                : parseInt(String(action.data.delay));
-            const followUpTime = new Date(Date.now() + delay);
-
-            // Create a follow-up reminder schedule
-            const followUpReminders = await reminderService.createReminder({
-              patientId,
-              message: `⏰ Pengingat Susulan\n\nHalo! Kami ingin memastikan Anda sudah menyelesaikan rutinitas kesehatan sebelumnya.\n\nBalas SUDAH atau BELUM.\n\n💙 Tim PRIMA`,
-              time: followUpTime.toTimeString().split(" ")[0], // HH:MM:SS format
-              selectedDates: [followUpTime.toISOString().split("T")[0]], // Today's date
-              createdById: "system", // System-generated reminder
-            });
-
-            const followUpReminder = followUpReminders?.[0];
-            logger.info("Follow-up reminder scheduled", {
-              patientId,
-              followUpTime: followUpTime.toISOString(),
-              delay,
-              reminderId: followUpReminder?.id,
-            });
-          }
-          break;
-
-        case "notify_volunteer":
-          // This would notify volunteers - for now just log
-          logger.warn("Volunteer notification required", {
-            patientId,
-            priority: action.data.priority || "medium",
-            message: action.data.message || message,
-            reason: action.data.reason || "llm_recommendation",
-          });
-          // Volunteer notification system would integrate with volunteer management
-          break;
-
-        case "update_patient_status":
-          // Update patient status
-          if (action.data.status) {
-            // This would update patient status in database
-            logger.info("Patient status update requested", {
-              patientId,
-              newStatus: action.data.status,
-            });
-            // Patient status update would update patient record in database
-          }
-          break;
-
-        case "create_manual_confirmation":
-          // Create manual confirmation record
-          logger.info("Manual confirmation requested", {
-            patientId,
-            reminderLogId: action.data.reminderLogId as LogValue,
-            volunteerId: action.data.volunteerId as LogValue,
-          });
-          // Manual confirmation creation would create reminder confirmation record
-          break;
-
-        default:
-          logger.warn("Unknown action type", {
-            actionType: action.type,
-            patientId,
-          });
-      }
-    } catch (error) {
-      logger.error("Failed to execute response action", error as Error, {
-        actionType: action.type,
-        patientId,
-      });
-    }
-  }
-}
 
 /**
  * Production WhatsApp Webhook Route
@@ -260,145 +97,88 @@ export async function POST(request: NextRequest) {
       name: validatedData.name,
     };
 
-    // Step 5: Process message with LLM-based conversation handling
-    let useLLM = true; // Feature flag for LLM processing
-    let llmResult = null;
-    let llmSuccess = false;
+    // Step 5: Process message with simple keyword-based processing
+    let processingResult = null;
+    let processingSuccess = false;
 
-    if (useLLM) {
-      try {
-        // Get patient context first
-        const patientContextService = new PatientContextService();
-        const patientContextResult =
-          await patientContextService.getPatientContext(validatedData.sender);
+    try {
+      // Get patient context first
+      const patientContextService = new PatientContextService();
+      const patientContextResult =
+        await patientContextService.getPatientContext(validatedData.sender);
 
-        const messageProcessor = new MessageProcessorService();
-        const messageContext: MessageContext = {
-          patientId: patientContextResult.context?.patient.id || "unknown",
+      if (!patientContextResult.found || !patientContextResult.context) {
+        logger.warn("Patient context not found", {
+          phoneNumber: validatedData.sender,
+        });
+      } else {
+        const simpleProcessor = new SimpleMessageProcessorService();
+        const messageContext = {
+          patientId: patientContextResult.context.patient.id,
           phoneNumber: validatedData.sender,
           message: validatedData.message,
           timestamp: new Date(),
-          patientName: patientContextResult.context?.patient.name,
-          verificationStatus:
-            patientContextResult.context?.patient.verificationStatus,
-          activeReminders: patientContextResult.context?.activeReminders,
-          fullPatientContext: patientContextResult.context,
+          verificationStatus: patientContextResult.context.patient.verificationStatus,
         };
 
-        llmResult = await messageProcessor.processMessage(messageContext);
-        llmSuccess = true;
+        processingResult = await simpleProcessor.processMessage(messageContext);
+        processingSuccess = processingResult.processed;
 
-        logger.info("LLM message processing successful", {
-          intent: llmResult.intent.primary,
-          confidence: llmResult.intent.confidence,
-          requiresHumanIntervention: llmResult.requiresHumanIntervention,
-          responseType: llmResult.response.type,
+        logger.info("Simple message processing completed", {
+          processed: processingResult.processed,
+          type: processingResult.type,
+          action: processingResult.action,
+          message: processingResult.message.substring(0, 50),
         });
 
-        // Step 5.1: Send LLM-generated response if auto-reply is recommended
-        if (
-          llmResult.response.type === "auto_reply" &&
-          llmResult.response.message
-        ) {
+        // Step 5.1: Send response if message was processed
+        if (processingResult.processed && processingResult.message) {
           try {
             const whatsAppService = new WhatsAppService();
             await whatsAppService.sendPersonalizedResponse(
               validatedData.sender,
-              llmResult.context.patientName || "Pasien",
-              llmResult.intent.primary,
-              llmResult.response.message
+              patientContextResult.context.patient.name || "Pasien",
+              processingResult.type,
+              processingResult.message
             );
-            logger.info("LLM personalized response sent", {
+            logger.info("Simple response sent", {
               phoneNumber: validatedData.sender,
-              intent: llmResult.intent.primary,
-              responseLength: llmResult.response.message.length,
+              type: processingResult.type,
+              action: processingResult.action,
+              responseLength: processingResult.message.length,
             });
           } catch (sendError) {
             logger.error(
-              "Failed to send LLM personalized response",
+              "Failed to send simple response",
               sendError as Error,
               {
                 phoneNumber: validatedData.sender,
-                intent: llmResult.intent.primary,
+                type: processingResult.type,
               }
             );
           }
         }
-
-        // Step 5.3: Execute response actions (follow-up reminders, logging, etc.)
-        if (
-          llmResult.response.actions &&
-          llmResult.response.actions.length > 0
-        ) {
-          try {
-            await executeResponseActions(
-              llmResult.response.actions,
-              llmResult.context.patientId || "unknown",
-              validatedData.sender,
-              validatedData.message
-            );
-            logger.info("Response actions executed", {
-              patientId: llmResult.context.patientId || "unknown",
-              actionCount: llmResult.response.actions.length,
-            });
-          } catch (actionError) {
-            logger.error(
-              "Failed to execute response actions",
-              actionError as Error,
-              {
-                patientId: llmResult.context.patientId || "unknown",
-                actionCount: llmResult.response.actions.length,
-              }
-            );
-          }
-        }
-
-        // Step 5.2: Handle emergency situations
-        if (llmResult.intent.primary === "emergency") {
-          try {
-            const whatsAppService = new WhatsAppService();
-            await whatsAppService.sendEmergencyAlert(
-              validatedData.sender,
-              llmResult.context.patientName || "Pasien",
-              validatedData.message,
-              "urgent"
-            );
-            logger.warn("LLM emergency alert sent", {
-              phoneNumber: validatedData.sender,
-              message: validatedData.message,
-            });
-          } catch (alertError) {
-            logger.error(
-              "Failed to send LLM emergency alert",
-              alertError as Error,
-              {
-                phoneNumber: validatedData.sender,
-              }
-            );
-          }
-        }
-      } catch (error) {
-        logger.warn("LLM processing failed, falling back to keyword-based", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        useLLM = false;
-        llmSuccess = false;
       }
+    } catch (error) {
+      logger.warn("Simple processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      processingSuccess = false;
     }
 
-    // Step 6: Process through verification webhook service ONLY if LLM failed
+    // Step 6: Process through verification webhook service ONLY if simple processing didn't handle it
     let result;
-    if (llmSuccess) {
-      // LLM succeeded, return success without calling verification service
+    if (processingSuccess) {
+      // Simple processing succeeded, return success
       result = {
         success: true,
-        message: "LLM processed successfully",
-        patientId: llmResult?.context.patientId || "unknown",
-        result: "llm_processed",
+        message: "Message processed successfully",
+        patientId: processingResult ? "processed" : "unknown",
+        result: "simple_processed",
         status: 200,
       };
     } else {
-      // LLM failed, fall back to verification service
+      // Simple processing didn't handle it, fall back to verification service
       const verificationService = new VerificationWebhookService();
       result = await verificationService.processWebhook(webhookPayload);
     }
@@ -412,9 +192,9 @@ export async function POST(request: NextRequest) {
       result: result.result,
       status: result.status,
       processingTimeMs: processingTime,
-      usedLLM: useLLM,
-      llmIntent: llmResult?.intent.primary,
-      llmConfidence: llmResult?.intent.confidence,
+      usedSimpleProcessing: true,
+      processingType: processingResult?.type || "unknown",
+      processingAction: processingResult?.action || "none",
     });
 
     // Step 8: Return appropriate response
@@ -425,11 +205,10 @@ export async function POST(request: NextRequest) {
         patientId: string | null | undefined;
         result: string | undefined;
         processingTimeMs: number;
-        llmIntent?: string;
-        llmConfidence?: number;
-        requiresHumanIntervention?: boolean;
-        llmResponse?: string;
-        recommendedActions?: unknown;
+        processingType?: string;
+        processingAction?: string;
+        processedMessage?: boolean;
+        responseMessage?: string;
       } = {
         success: true,
         message: result.message,
@@ -438,17 +217,15 @@ export async function POST(request: NextRequest) {
         processingTimeMs: processingTime,
       };
 
-      // Include LLM results if available
-      if (llmResult) {
-        responseData.llmIntent = llmResult.intent.primary;
-        responseData.llmConfidence = llmResult.intent.confidence;
-        responseData.requiresHumanIntervention =
-          llmResult.requiresHumanIntervention;
+      // Include processing results if available
+      if (processingResult) {
+        responseData.processingType = processingResult.type;
+        responseData.processingAction = processingResult.action;
+        responseData.processedMessage = processingResult.processed;
 
-        // Use LLM-generated response if confidence is high enough
-        if (llmResult.intent.confidence && llmResult.intent.confidence >= 0.6) {
-          responseData.llmResponse = llmResult.response.message;
-          responseData.recommendedActions = llmResult.response.actions;
+        // Include response message if processed
+        if (processingResult.processed) {
+          responseData.responseMessage = processingResult.message;
         }
       }
 

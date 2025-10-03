@@ -91,13 +91,7 @@ export const LazyAdminTemplatesPage = dynamic(
   }
 ) as ComponentType<Record<string, never>>;
 
-export const LazyAdminLLMAnalyticsPage = dynamic(
-  () => import("./llm-analytics/page").then((mod) => ({ default: mod.default })),
-  {
-    loading: () => <AdminPageSkeleton />,
-    ssr: false,
-  }
-) as ComponentType<Record<string, never>>;
+
 
 // Lazy loaded admin components (already created in lazy-components.tsx)
 export const LazyUserManagementComponent = dynamic(
@@ -116,26 +110,7 @@ export const LazyTemplateManagementComponent = dynamic(
   }
 ) as ComponentType<Record<string, never>>;
 
-// Lazy loaded analytics components
-export const LazyComprehensiveAnalytics = dynamic(
-  () => import("@/components/admin/comprehensive-analytics-dashboard").then((mod) => ({
-    default: mod.ComprehensiveAnalyticsDashboard,
-  })),
-  {
-    loading: () => <AnalyticsDashboardSkeleton />,
-    ssr: false,
-  }
-) as ComponentType<{ className?: string }>;
 
-export const LazyLLMAnalytics = dynamic(
-  () => import("@/components/admin/llm-analytics-dashboard").then((mod) => ({
-    default: mod.LLMAnalyticsDashboard,
-  })),
-  {
-    loading: () => <AnalyticsDashboardSkeleton />,
-    ssr: false,
-  }
-) as ComponentType<{ className?: string }>;
 
 // HOC for protecting admin routes with lazy loading
 export function withAdminProtection<P extends object>(
@@ -163,8 +138,7 @@ export const preloadAdminChunks = () => {
     import("@/components/admin/template-management").catch(() => {});
     
     // Preload analytics
-    import("@/components/admin/comprehensive-analytics-dashboard").catch(() => {});
-    import("@/components/admin/llm-analytics-dashboard").catch(() => {});
+
   }
 };
 

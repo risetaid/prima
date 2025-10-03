@@ -16,7 +16,7 @@ export interface ConversationStateData {
   currentContext: 'verification' | 'reminder_confirmation' | 'general_inquiry' | 'emergency'
   expectedResponseType?: 'yes_no' | 'confirmation' | 'text' | 'number'
   relatedEntityId?: string
-  relatedEntityType?: 'reminder_log' | 'verification' | 'general'
+  relatedEntityType?: 'reminder' | 'reminder_log' | 'verification' | 'general'
   stateData?: Record<string, unknown>
   lastMessage?: string
   lastMessageAt?: Date
@@ -39,12 +39,6 @@ export interface ConversationMessageData {
   intent?: string
   confidence?: number
   processedAt?: Date
-  // LLM-specific fields
-  llmResponseId?: string
-  llmModel?: string
-  llmTokensUsed?: number
-  llmCost?: number
-  llmResponseTimeMs?: number
   createdAt: Date
 }
 
@@ -185,16 +179,9 @@ export class ConversationStateService {
         intent: message.intent,
         confidence: message.confidence,
         processedAt: message.processedAt,
-        llmResponseId: message.llmResponseId,
-        llmModel: message.llmModel,
-        llmTokensUsed: message.llmTokensUsed,
-        llmResponseTimeMs: message.llmResponseTimeMs,
       }
 
       // Convert llmCost to string for decimal storage
-      if (message.llmCost !== undefined) {
-        insertData.llmCost = message.llmCost.toString()
-      }
 
       const newMessage = await db
         .insert(conversationMessages)
@@ -216,9 +203,7 @@ export class ConversationStateService {
         conversationStateId,
         direction: message.direction,
         messageType: message.messageType,
-        intent: message.intent,
-        llmModel: message.llmModel,
-        llmTokensUsed: message.llmTokensUsed
+        intent: message.intent
       })
 
       return this.mapConversationMessage(newMessage[0])
@@ -332,7 +317,7 @@ export class ConversationStateService {
       updates.expectedResponseType = 'text';
 
       // Set new expiration time based on context
-      const newExpiresAt = this.calculateExpirationTime(newContext)
+      const newExpiresAt = this.calculateExpirationTime()
       updates.expiresAt = newExpiresAt
 
       const updated = await this.updateConversationState(conversationStateId, updates)
@@ -417,7 +402,7 @@ export class ConversationStateService {
   /**
    * Calculate expiration time - simplified to 2 hours for all contexts
    */
-  private calculateExpirationTime(_context: ConversationStateData['currentContext']): Date {
+  private calculateExpirationTime(): Date {
     const now = new Date()
     // All conversations expire in 2 hours for consistency
     return new Date(now.getTime() + 2 * 60 * 60 * 1000)
@@ -585,7 +570,7 @@ export class ConversationStateService {
 
   /**
    * Update conversation state with reminder context
-   * This helps the LLM understand the medication reminder context
+   * This helps understand the medication reminder context
    */
   async updateWithReminderContext(
     conversationStateId: string,
@@ -787,11 +772,6 @@ export class ConversationStateService {
       intent: row.intent || undefined,
       confidence: row.confidence || undefined,
       processedAt: row.processedAt || undefined,
-      llmResponseId: row.llmResponseId || undefined,
-      llmModel: row.llmModel || undefined,
-      llmTokensUsed: row.llmTokensUsed || undefined,
-      llmCost: row.llmCost ? parseFloat(row.llmCost) : undefined,
-      llmResponseTimeMs: row.llmResponseTimeMs || undefined,
       createdAt: row.createdAt,
     }
   }

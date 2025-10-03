@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 import { isDuplicateEvent, hashFallbackId } from "@/lib/idempotency";
-import { db, patients, reminders } from "@/db";
+import { db, reminders } from "@/db";
 import { eq, and, desc } from "drizzle-orm";
-import type { Patient, Reminder } from "@/db";
-import { llmService } from "@/services/llm/llm.service";
-import type { RecommendedResponse } from "@/services/message-processor.service";
+import type { Patient } from "@/db";
 import { patientResponseRateLimiter } from "@/services/rate-limit.service";
+import { PatientLookupService } from "@/services/patient/patient-lookup.service";
+import { ConversationStateService } from "@/services/conversation-state.service";
+import { logger } from "@/lib/logger";
+import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
+import { KeywordMatcherService } from "@/services/keyword-matcher.service";
+import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
 
 interface WebhookBody {
   sender?: string;
@@ -33,25 +37,10 @@ interface WebhookBody {
   [key: string]: unknown;
 }
 
-import { PatientLookupService } from "@/services/patient/patient-lookup.service";
-import { ConversationStateService } from "@/services/conversation-state.service";
-import { MessageProcessorService } from "@/services/message-processor.service";
-import { logger } from "@/lib/logger";
-import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { ContextResponseHandlerService } from "@/services/context-response-handler.service";
-import { KeywordMatcherService } from "@/services/keyword-matcher.service";
-import { VerificationHandler } from "@/services/verification/verification-handler.service";
-
 const whatsappService = new WhatsAppService();
-const messageProcessorService = new MessageProcessorService();
 const conversationService = new ConversationStateService();
 const keywordMatcher = new KeywordMatcherService();
-const contextHandler = new ContextResponseHandlerService(
-  keywordMatcher,
-  conversationService,
-  whatsappService
-);
-const verificationHandler = new VerificationHandler();
+const simpleVerificationService = new SimpleVerificationService();
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -93,616 +82,15 @@ function normalizeIncoming(body: WebhookBody) {
   return normalized;
 }
 
-interface IntentResult {
-  intent:
-  | "accept"
-  | "decline"
-  | "unsubscribe"
-  | "confirmation_taken"
-  | "confirmation_pending"
-  | "need_help"
-  | "other";
-  confidence: number;
-  matchedWords: string[];
-}
 
-function detectIntentEnhanced(
-  rawMessage: string,
-  context?: "verification" | "reminder"
-): IntentResult {
-  const msg = (rawMessage || "").toLowerCase().trim();
-  const words = msg.split(/\s+/);
 
-  // Check for general inquiry patterns that should NOT be classified as verification/medication
-  const generalInquiryPatterns = [
-    "halo",
-    "hai",
-    "hello",
-    "hi",
-    "siapa",
-    "apa",
-    "bagaimana",
-    "gimana",
-    "kenapa",
-    "kapan",
-    "dimana",
-    "berapa",
-    "info",
-    "informasi",
-    "kabar",
-    "bantuan",
-    "help",
-    "tolong",
-    "tanya",
-    "pertanyaan",
-    "kamu",
-    "nama",
-  ];
 
-  // If message contains general inquiry patterns and is in verification/reminder context,
-  // reduce confidence significantly to avoid false classification
-  const hasGeneralInquiry = generalInquiryPatterns.some((pattern) =>
-    msg.includes(pattern)
-  );
-
-  // Enhanced Indonesian language patterns with weights
-  const patterns = {
-    accept: [
-      // Direct acceptance
-      { words: ["ya", "iya", "yaa", "iya", "yes", "yep", "yup"], weight: 10 },
-      { words: ["setuju", "stuju", "setujuu"], weight: 10 },
-      { words: ["boleh", "blh", "bole", "bolh"], weight: 9 },
-      { words: ["baik", "bagus", "good"], weight: 8 },
-      { words: ["ok", "oke", "okay", "okey", "okeh"], weight: 8 },
-      { words: ["siap", "ready", "sip"], weight: 7 },
-      { words: ["mau", "ingin", "pengen", "want"], weight: 7 },
-      { words: ["terima", "accept", "trimakasih"], weight: 6 },
-      // Phrases
-      { words: ["ya boleh", "iya setuju", "ok siap"], weight: 12 },
-    ],
-    decline: [
-      {
-        words: ["tidak", "tdk", "gak", "ga", "engga", "enggak", "no", "nope"],
-        weight: 10,
-      },
-      { words: ["tolak", "refuse", "nolak"], weight: 10 },
-      { words: ["nanti", "besok", "later"], weight: 7 },
-      { words: ["jangan", "dont", "stop"], weight: 8 },
-      { words: ["maaf", "sorry", "sori"], weight: 6 },
-      // Phrases
-      { words: ["tidak mau", "ga mau", "tidak setuju"], weight: 12 },
-    ],
-    unsubscribe: [
-      { words: ["berhenti", "stop", "cancel", "batal"], weight: 10 },
-      { words: ["keluar", "out", "exit"], weight: 9 },
-      { words: ["hapus", "delete", "remove"], weight: 9 },
-      { words: ["unsubscribe", "unsub", "cabut"], weight: 10 },
-    ],
-    confirmation_taken: [
-      { words: ["sudah", "udah", "done", "selesai"], weight: 10 },
-      {
-        words: ["sudah lakukan", "sudah selesai", "sudah dilakukan"],
-        weight: 9,
-      },
-      { words: ["oke", "ok", "siap", "good"], weight: 7 },
-      // Phrases
-      {
-        words: ["sudah selesai", "sudah lakukan", "sudah dilakukan"],
-        weight: 15,
-      },
-      { words: ["sudah beres", "sudah selesai"], weight: 14 },
-    ],
-    confirmation_pending: [
-      { words: ["belum", "not yet", "nanti"], weight: 10 },
-      { words: ["sebentar", "tunggu", "wait"], weight: 8 },
-      { words: ["lupa", "forgot", "lupaa"], weight: 9 },
-      // Phrases
-      { words: ["belum selesai", "belum lakukan"], weight: 14 },
-      { words: ["nanti dulu", "sebentar lagi"], weight: 12 },
-    ],
-    need_help: [
-      { words: ["bantuan", "help", "tolong"], weight: 10 },
-      { words: ["bingung", "confused", "susah"], weight: 9 },
-      { words: ["tanya", "ask", "pertanyaan"], weight: 8 },
-      { words: ["relawan", "staff", "perawat"], weight: 8 },
-      // Phrases
-      { words: ["butuh bantuan", "perlu bantuan", "minta tolong"], weight: 15 },
-    ],
-  };
-
-  let bestMatch: IntentResult = {
-    intent: "other",
-    confidence: 0,
-    matchedWords: [],
-  };
-
-  for (const [intentKey, patternList] of Object.entries(patterns)) {
-    const intent = intentKey as IntentResult["intent"];
-    let totalScore = 0;
-    const matchedWords: string[] = [];
-
-    for (const pattern of patternList) {
-      const patternWords = pattern.words.join(" ");
-
-      // Check for full phrase match
-      if (msg.includes(patternWords)) {
-        totalScore += pattern.weight * 1.5; // Bonus for phrase match
-        matchedWords.push(patternWords);
-        continue;
-      }
-
-      // Check individual words
-      for (const word of pattern.words) {
-        if (words.includes(word) || msg.includes(word)) {
-          totalScore += pattern.weight;
-          matchedWords.push(word);
-        }
-      }
-    }
-
-    // Calculate confidence based on score and context
-    let confidence = Math.min(totalScore / 10, 1); // Normalize to 0-1
-
-    // Context bonus
-    if (context === "verification" && ["accept", "decline"].includes(intent)) {
-      confidence *= 1.2;
-    } else if (
-      context === "reminder" &&
-      ["confirmation_taken", "confirmation_pending", "need_help"].includes(
-        intent
-      )
-    ) {
-      confidence *= 1.2;
-    }
-
-    // General inquiry penalty - significantly reduce confidence for general chat
-    if (
-      hasGeneralInquiry &&
-      (context === "verification" || context === "reminder")
-    ) {
-      confidence *= 0.1; // Massive penalty to prevent misclassification
-    }
-
-    if (confidence > bestMatch.confidence) {
-      bestMatch = {
-        intent,
-        confidence,
-        matchedWords: [...new Set(matchedWords)],
-      };
-    }
-  }
-
-  return bestMatch;
-}
 
 async function sendAck(phoneNumber: string, message: string) {
   try {
     await whatsappService.sendAck(phoneNumber, message);
   } catch (e) {
     logger.warn("Failed to send ACK via WhatsApp", { error: e as Error });
-  }
-}
-
-async function handleVerificationLowConfidence(patient: Patient) {
-  await sendAck(
-    patient.phoneNumber,
-    `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`
-  );
-  return {
-    processed: true,
-    action: "clarification_requested",
-    message: "Low confidence response - clarification sent",
-  };
-}
-
-async function handleVerificationAccept(message: string, patient: Patient) {
-  logger.info("Updating patient verification status to verified", {
-    patientId: patient.id,
-  });
-
-  await db
-    .update(patients)
-    .set({
-      verificationStatus: "VERIFIED",
-      verificationResponseAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(patients.id, patient.id));
-
-  // Verification result logged in patient record
-
-  await sendAck(
-    patient.phoneNumber,
-    `Terima kasih ${patient.name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
-  );
-
-  // Clear context after successful verification
-  await conversationService.clearContext(patient.id);
-
-  return {
-    processed: true,
-    action: "verified",
-    message: "Patient verified via text",
-  };
-}
-
-async function handleVerificationDecline(message: string, patient: Patient) {
-  logger.info("Updating patient verification status to declined", {
-    patientId: patient.id,
-  });
-
-  await db
-    .update(patients)
-    .set({
-      verificationStatus: "DECLINED",
-      verificationResponseAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(patients.id, patient.id));
-
-  // Verification result logged in patient record
-
-  await sendAck(
-    patient.phoneNumber,
-    `Baik ${patient.name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`
-  );
-
-  // Clear context after successful decline
-  await conversationService.clearContext(patient.id);
-
-  return {
-    processed: true,
-    action: "declined",
-    message: "Patient declined verification via text",
-  };
-}
-
-async function handleVerificationUnsubscribe(
-  message: string,
-  patient: Patient
-) {
-  logger.info("Processing unsubscribe request", { patientId: patient.id });
-
-  await db
-    .update(patients)
-    .set({
-      verificationStatus: "DECLINED",
-      verificationResponseAt: new Date(),
-      updatedAt: new Date(),
-      isActive: false,
-    })
-    .where(eq(patients.id, patient.id));
-
-  // Reminder schedules are now handled by the reminders table
-
-  // Verification result logged in patient record
-
-  await sendAck(
-    patient.phoneNumber,
-    `Baik ${patient.name}, kami akan berhenti mengirimkan pengingat. 🛑\n\nSemua pengingat telah dinonaktifkan.\n\nJika suatu saat ingin bergabung kembali, hubungi relawan PRIMA.\n\nSemoga sehat selalu! 🙏💙`
-  );
-
-  // Clear context after unsubscribe
-  await conversationService.clearContext(patient.id);
-
-  return {
-    processed: true,
-    action: "unsubscribed",
-    message: "Patient unsubscribed",
-  };
-}
-
-// Consolidated verification logic moved to VerificationHandler service
-
-// Legacy verification functions removed - consolidated into VerificationHandler service
-
-async function findPendingReminder(patientId: string) {
-  return await db
-    .select()
-    .from(reminders)
-    .where(
-      and(eq(reminders.patientId, patientId), eq(reminders.status, "SENT"))
-    )
-    .orderBy(desc(reminders.sentAt))
-    .limit(1);
-}
-
-/**
- * Get patient medication details for personalization
- * Note: This is a simplified version since patientVariables table no longer exists
- */
-async function getPatientReminderInfo(
-  patientId: string
-): Promise<Record<string, unknown> | null> {
-  try {
-    // Medication details system removed - get message from reminders table instead
-    const recentReminders = await db
-      .select({
-        message: reminders.message,
-        reminderType: reminders.reminderType,
-      })
-      .from(reminders)
-      .where(
-        and(eq(reminders.patientId, patientId), eq(reminders.isActive, true))
-      )
-      .orderBy(desc(reminders.createdAt))
-      .limit(5);
-
-    // Return basic reminder info instead of medication details
-    // System simplified to use message content instead of structured medication data
-    if (recentReminders.length > 0) {
-      return {
-        recentReminder: recentReminders[0],
-        hasRecentReminders: true,
-      };
-    }
-
-    return null;
-  } catch (error) {
-    logger.warn("Failed to get patient reminder info", {
-      patientId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
-}
-
-/**
- * Build personalized reminder message
- */
-function buildPersonalizedMessage(
-  reminderInfo: Record<string, unknown> | null,
-  template: string
-): string {
-  if (!reminderInfo) {
-    return template.replace(/obat/gi, "pengingat");
-  }
-
-  const recentReminder =
-    (reminderInfo.recentReminder as Record<string, unknown>) || {};
-  const reminderType = recentReminder.reminderType || "GENERAL";
-
-  let personalization = "pengingat";
-  if (reminderType === "MEDICATION") personalization = "obat";
-  else if (reminderType === "APPOINTMENT") personalization = "janji temu";
-
-  return template
-    .replace(/obat/gi, personalization)
-    .replace(
-      /\{name\}/gi,
-      String((recentReminder as Record<string, unknown>).title || "pengingat")
-    )
-    .replace(/\{type\}/gi, personalization);
-}
-
-async function handleReminderLowConfidence(patient: Patient) {
-  // Get patient medication details for personalization
-  const reminderInfo = await getPatientReminderInfo(patient.id);
-
-  const baseMessage = `Halo ${patient.name}, mohon balas dengan jelas:\n\n✅ *SUDAH* jika sudah selesai\n⏰ *BELUM* jika belum selesai\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
-
-  const personalizedMessage = buildPersonalizedMessage(
-    reminderInfo,
-    baseMessage
-  );
-
-  await sendAck(patient.phoneNumber, personalizedMessage);
-
-  logger.info("Medication low confidence response sent", {
-    patientId: patient.id,
-    reminderInfo: reminderInfo,
-    personalized: reminderInfo !== null,
-  });
-
-  return {
-    processed: true,
-    action: "clarification_requested",
-    message: "Low confidence response - clarification sent",
-  };
-}
-
-async function handleReminderNoPendingReminder(
-  message: string,
-  patient: Patient
-) {
-  const intentResult = detectIntentEnhanced(message, "reminder");
-
-  if (intentResult.intent !== "other" && intentResult.confidence > 0.5) {
-    // Get patient medication details for personalization
-    const reminderInfo = await getPatientReminderInfo(patient.id);
-
-    const baseMessage = `Halo ${patient.name}, saat ini tidak ada pengingat yang menunggu konfirmasi.\n\nJika ada pertanyaan, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`;
-
-    const personalizedMessage = buildPersonalizedMessage(
-      reminderInfo,
-      baseMessage
-    );
-
-    await sendAck(patient.phoneNumber, personalizedMessage);
-
-    logger.info("No pending reminder response sent", {
-      patientId: patient.id,
-      reminderInfo: reminderInfo,
-      personalized: reminderInfo !== null,
-    });
-    return {
-      processed: true,
-      action: "no_pending_reminder",
-      message: "Response without pending reminder",
-    };
-  }
-
-  return { processed: false, message: "No pending reminder found" };
-}
-
-async function handleReminderConfirmed(
-  message: string,
-  reminder: Reminder,
-  patient: Patient
-) {
-  // Get patient medication details for personalization
-  const reminderInfo = await getPatientReminderInfo(patient.id);
-
-  // Use standardized completion logic - mark as CONFIRMED
-  await db
-    .update(reminders)
-    .set({
-      status: "DELIVERED",
-      confirmationStatus: "CONFIRMED",
-      confirmationResponse: message,
-      confirmationResponseAt: new Date(),
-    })
-    .where(eq(reminders.id, reminder.id));
-
-  // Get reminder type to customize the confirmation message
-  const reminderType =
-    reminder.reminderType || reminderInfo?.reminderType || "GENERAL";
-  const baseMessage = `Terima kasih ${patient.name}! ✅\n\n${reminderType === "MEDICATION"
-    ? "Obat sudah dikonfirmasi diminum"
-    : reminderType === "APPOINTMENT"
-      ? "Janji temu sudah dikonfirmasi hadir"
-      : "Pengingat sudah dikonfirmasi selesai"
-    } pada ${new Date().toLocaleTimeString("id-ID", {
-      timeZone: "Asia/Jakarta",
-    })}\n\n💙 Tim PRIMA`;
-
-  const personalizedMessage = buildPersonalizedMessage(
-    reminderInfo,
-    baseMessage
-  );
-
-  await sendAck(patient.phoneNumber, personalizedMessage);
-
-  // Clear context after successful reminder confirmation
-  await conversationService.clearContext(patient.id);
-
-  logger.info("Medication taken confirmation sent", {
-    patientId: patient.id,
-    reminderId: reminder.id,
-    reminderInfo: reminderInfo,
-    personalized: reminderInfo !== null,
-  });
-
-  return {
-    processed: true,
-    action: "confirmed",
-    message: "Medication confirmed via text",
-  };
-}
-
-async function handleReminderPending(
-  message: string,
-  reminder: Reminder,
-  patient: Patient
-) {
-  // Get patient medication details for personalization
-  const reminderInfo = await getPatientReminderInfo(patient.id);
-
-  await db
-    .update(reminders)
-    .set({
-      confirmationResponse: message,
-      confirmationResponseAt: new Date(),
-    })
-    .where(eq(reminders.id, reminder.id));
-
-  const baseMessage = `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
-
-  const personalizedMessage = buildPersonalizedMessage(
-    reminderInfo,
-    baseMessage
-  );
-
-  await sendAck(patient.phoneNumber, personalizedMessage);
-
-  // Clear context after pending response
-  await conversationService.clearContext(patient.id);
-
-  logger.info("Medication pending confirmation sent", {
-    patientId: patient.id,
-    reminderId: reminder.id,
-    reminderInfo: reminderInfo,
-    personalized: reminderInfo !== null,
-  });
-
-  return {
-    processed: true,
-    action: "extended",
-    message: "Medication reminder extended",
-  };
-}
-
-async function handleReminderHelp(
-  message: string,
-  reminder: Reminder,
-  patient: Patient
-) {
-  await db
-    .update(reminders)
-    .set({
-      confirmationResponse: message,
-      confirmationResponseAt: new Date(),
-    })
-    .where(eq(reminders.id, reminder.id));
-
-  await sendAck(
-    patient.phoneNumber,
-    `Baik ${patient.name}, relawan kami akan segera menghubungi Anda untuk membantu. 🤝\n\nTunggu sebentar ya!\n\n💙 Tim PRIMA`
-  );
-
-  // Clear context after help request
-  await conversationService.clearContext(patient.id);
-
-  logger.info("Patient requested help - escalating to relawan", {
-    patientId: patient.id,
-    reminderId: reminder.id,
-  });
-
-  return {
-    processed: true,
-    action: "escalated",
-    message: "Medication reminder escalated to relawan",
-  };
-}
-
-/**
- * Handle reminder text responses using enhanced intent detection
- */
-async function handleReminderResponse(
-  message: string,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  const pendingReminder = await findPendingReminder(patient.id);
-
-  if (!pendingReminder.length) {
-    return handleReminderNoPendingReminder(message, patient);
-  }
-
-  const reminder = pendingReminder[0];
-  const intentResult = detectIntentEnhanced(message, "reminder");
-
-  logger.info("Processing medication text response", {
-    originalMessage: message,
-    intent: intentResult.intent,
-    confidence: intentResult.confidence,
-    matchedWords: intentResult.matchedWords,
-    patientId: patient.id,
-    reminderId: reminder.id,
-  });
-
-  if (intentResult.confidence < 0.4) {
-    return handleReminderLowConfidence(patient);
-  }
-
-  switch (intentResult.intent) {
-    case "confirmation_taken":
-      return handleReminderConfirmed(message, reminder, patient);
-    case "confirmation_pending":
-      return handleReminderPending(message, reminder, patient);
-    case "need_help":
-      return handleReminderHelp(message, reminder, patient);
-    default:
-      return { processed: false };
   }
 }
 
@@ -844,10 +232,6 @@ async function logConversation(
   } catch { }
 }
 
-// Legacy processVerificationResponse function removed - consolidated into VerificationHandler service
-
-// Legacy processReminderResponse function removed - reminder logic handled by unified processor
-
 async function handleUnrecognizedMessage(
   message: string | undefined,
   patient: Patient
@@ -864,556 +248,16 @@ async function handleUnrecognizedMessage(
       : "no message",
   });
 
-  // Get patient medication details for personalization
-  const reminderInfo = await getPatientReminderInfo(patient.id);
-
   if (patient.verificationStatus === "PENDING") {
     await sendAck(
       patient.phoneNumber,
       `Halo ${patient.name}, mohon balas pesan verifikasi dengan:\n\n✅ *YA* atau *SETUJU* untuk menerima pengingat\n❌ *TIDAK* atau *TOLAK* untuk menolak\n\nTerima kasih! 💙 Tim PRIMA`
     );
   } else if (patient.verificationStatus === "VERIFIED") {
-    const intentResult = detectIntentEnhanced(message || "");
-    if (intentResult.confidence > 0.3) {
-      const baseMessage = `Halo ${patient.name}, untuk konfirmasi obat, mohon balas dengan:\n\n✅ *SUDAH* jika sudah minum obat\n⏰ *BELUM* jika belum minum\n🆘 *BANTUAN* jika butuh bantuan\n\nTerima kasih! 💙 Tim PRIMA`;
-
-      const personalizedMessage = buildPersonalizedMessage(
-        reminderInfo,
-        baseMessage
-      );
-
-      await sendAck(patient.phoneNumber, personalizedMessage);
-
-      logger.info("Verified patient unrecognized message response sent", {
-        patientId: patient.id,
-        reminderInfo: reminderInfo,
-        personalized: reminderInfo !== null,
-      });
-    } else {
-      await sendAck(
-        patient.phoneNumber,
-        `Halo ${patient.name}, terima kasih atas pesannya.\n\nJika ada pertanyaan tentang obat, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`
-      );
-    }
-  }
-}
-
-/**
- * Smart verification response detection
- * Only treats message as verification response if it's truly a YA/TIDAK answer
- */
-function isActualVerificationResponse(message: string | undefined): boolean {
-  if (!message) return false;
-
-  const normalizedMessage = message.toLowerCase().trim();
-  const words = normalizedMessage.split(/\s+/);
-
-  // Must be short response (max 3 words) to be verification
-  if (words.length > 3) return false;
-
-  // Explicit verification keywords
-  const verificationKeywords = [
-    "ya",
-    "iya",
-    "yes",
-    "y",
-    "ok",
-    "oke",
-    "setuju",
-    "terima",
-    "mau",
-    "tidak",
-    "no",
-    "n",
-    "ga",
-    "gak",
-    "engga",
-    "enggak",
-    "tolak",
-    "nolak",
-  ];
-
-  // General inquiry keywords that should NOT be treated as verification
-  const generalKeywords = [
-    "halo",
-    "hai",
-    "hello",
-    "siapa",
-    "apa",
-    "bagaimana",
-    "gimana",
-    "kenapa",
-    "kapan",
-    "dimana",
-    "berapa",
-    "info",
-    "informasi",
-    "bantuan",
-    "help",
-    "tolong",
-    "tanya",
-    "kabar",
-  ];
-
-  // If contains general inquiry keywords, not verification
-  if (generalKeywords.some((keyword) => normalizedMessage.includes(keyword))) {
-    return false;
-  }
-
-  // Must contain verification keywords to be considered verification
-  return verificationKeywords.some((keyword) =>
-    normalizedMessage.includes(keyword)
-  );
-}
-
-/**
- * Unified message processing using MessageProcessorService
- * This provides consistent handling across all message types with LLM integration
- * ENHANCED: Now includes context-aware medication response detection
- */
-async function processMessageWithUnifiedProcessor(
-  message: string | undefined,
-  patient: Patient
-): Promise<{ processed: boolean; action?: string; message?: string }> {
-  // Smart verification detection: only skip unified processor for actual verification responses
-  if (
-    patient.verificationStatus === "PENDING" &&
-    isActualVerificationResponse(message)
-  ) {
-    logger.info("Skipping unified processor for actual verification response", {
-      patientId: patient.id,
-      verificationStatus: patient.verificationStatus,
-      message: message?.substring(0, 50),
-      operation: "verification_response_protection",
-    });
-    return {
-      processed: false,
-      message: "Actual verification response - using verification handlers",
-    };
-  }
-
-  try {
-    logger.info("Processing message with unified processor", {
-      patientId: patient.id,
-      verificationStatus: patient.verificationStatus,
-      messageLength: message?.length || 0,
-      operation: "unified_processing",
-    });
-
-    // ENHANCED: Check for simple medication responses first (context-aware)
-    if (patient.verificationStatus === "VERIFIED" && message) {
-      // Build context for simple medication detection
-      const llmContext = {
-        patientId: patient.id,
-        phoneNumber: patient.phoneNumber || "",
-        previousMessages: [],
-        patientInfo: {
-          name: patient.name,
-          verificationStatus: patient.verificationStatus,
-          activeReminders: [],
-        },
-      };
-
-      // Use LLM service to detect simple medication response
-      const simpleResponse = await llmService.detectSimpleMedicationResponse(
-        message,
-        llmContext
-      );
-
-      if (
-        simpleResponse.isMedicationResponse &&
-        simpleResponse.responseType !== "unknown"
-      ) {
-        // Handle simple medication response with automatic status update
-        const updateResult = await llmService.updateReminderStatusFromResponse(
-          patient.id,
-          simpleResponse.responseType,
-          message
-        );
-
-        if (updateResult.success) {
-          // Send appropriate response based on medication status
-          let responseMessage = "";
-          if (simpleResponse.responseType === "taken") {
-            // Get reminder type from the updated reminder
-            const reminderType = updateResult.reminderType || "GENERAL";
-            const confirmationText =
-              reminderType === "MEDICATION" || reminderType === "APPOINTMENT"
-                ? "Obat sudah dikonfirmasi diminum"
-                : reminderType === "APPOINTMENT"
-                  ? "Janji temu sudah dikonfirmasi"
-                  : "Pengingat sudah dikonfirmasi selesai";
-
-            responseMessage = `Terima kasih ${patient.name
-              }! ✅\n\n${confirmationText} pada ${new Date().toLocaleTimeString(
-                "id-ID",
-                { timeZone: "Asia/Jakarta" }
-              )}\n\n💙 Tim PRIMA`;
-          } else {
-            responseMessage = `Baik ${patient.name}, jangan lupa ${updateResult.reminderType === "MEDICATION" ||
-              updateResult.reminderType === "APPOINTMENT"
-              ? "minum obatnya"
-              : "melakukan pengingatnya"
-              } ya! ${updateResult.reminderType === "MEDICATION" ||
-                updateResult.reminderType === "APPOINTMENT"
-                ? "💊"
-                : "📝"
-              }\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`;
-          }
-
-          await sendAck(patient.phoneNumber || "", responseMessage);
-
-          // Clear context after simple medication response
-          await conversationService.clearContext(patient.id);
-
-          logger.info(
-            "Simple medication response processed via unified processor",
-            {
-              patientId: patient.id,
-              responseType: simpleResponse.responseType,
-              updatedReminderId: updateResult.updatedReminderId,
-              confidence: simpleResponse.confidence,
-              operation: "simple_medication_response",
-            }
-          );
-
-          return {
-            processed: true,
-            action:
-              simpleResponse.responseType === "taken"
-                ? "medication_taken"
-                : "medication_not_taken",
-            message: `Simple medication response processed: ${simpleResponse.responseType}`,
-          };
-        } else {
-          logger.warn("Failed to update reminder status from simple response", {
-            patientId: patient.id,
-            error: updateResult.error,
-            responseType: simpleResponse.responseType,
-            operation: "simple_medication_response_failed",
-          });
-          // Continue with normal unified processing
-        }
-      }
-    }
-
-    // Build message context for the processor
-    const messageContext = {
-      patientId: patient.id,
-      phoneNumber: patient.phoneNumber,
-      message: message || "",
-      timestamp: new Date(),
-      patientName: patient.name,
-      verificationStatus: patient.verificationStatus,
-    };
-
-    // Process message using the unified processor
-    const processedResult = await messageProcessorService.processMessage(
-      messageContext
+    await sendAck(
+      patient.phoneNumber,
+      `Halo ${patient.name}, terima kasih atas pesannya.\n\nJika ada pertanyaan tentang obat, hubungi relawan PRIMA.\n\n💙 Tim PRIMA`
     );
-
-    logger.info("Unified processing completed", {
-      patientId: patient.id,
-      intent: processedResult.intent.primary,
-      confidence: processedResult.confidence,
-      requiresHumanIntervention: processedResult.requiresHumanIntervention,
-      operation: "unified_processing",
-    });
-
-    // Execute the recommended response actions
-    await executeResponseActions(
-      processedResult.response,
-      patient,
-      messageContext.message
-    );
-
-    return {
-      processed: true,
-      action: processedResult.intent.primary,
-      message: `Processed via unified processor: ${processedResult.intent.primary}`,
-    };
-  } catch (error) {
-    const err = error as Error;
-    logger.error("Unified message processing failed", err, {
-      patientId: patient.id,
-      message: message?.substring(0, 100),
-      operation: "unified_processing",
-      errorType: err.constructor.name,
-      errorMessage: err.message,
-      stack: err.stack?.substring(0, 500),
-    });
-
-    // Log the failure but don't fail the webhook - continue to legacy processing
-    logger.warn(
-      "Continuing with legacy processing after unified processor failure",
-      {
-        patientId: patient.id,
-        operation: "fallback_to_legacy",
-      }
-    );
-
-    // Fall back to legacy processing
-    return {
-      processed: false,
-      message: "Unified processing failed, falling back to legacy handlers",
-    };
-  }
-}
-
-/**
- * Execute response actions recommended by the MessageProcessorService
- */
-async function executeResponseActions(
-  response: RecommendedResponse,
-  patient: Patient,
-  message?: string
-): Promise<void> {
-  if (!response || !response.actions) {
-    return;
-  }
-
-  for (const action of response.actions) {
-    try {
-      switch (action.type) {
-        case "update_patient_status":
-          await updatePatientStatus(
-            patient.id,
-            action.data.status as
-            | "PENDING"
-            | "VERIFIED"
-            | "DECLINED"
-            | "EXPIRED"
-          );
-          break;
-        case "log_confirmation":
-          await logConfirmationResponse(
-            patient.id,
-            action.data.status as string,
-            action.data.response as string
-          );
-          break;
-        case "send_followup":
-          await scheduleFollowup(
-            patient.id,
-            action.data.type as string,
-            action.data.delay as number
-          );
-          break;
-        case "notify_volunteer":
-          await notifyVolunteers(
-            patient,
-            action.data.priority as string,
-            action.data.message as string
-          );
-          break;
-        case "deactivate_reminders":
-          await deactivatePatientReminders(patient.id);
-          break;
-        case "log_verification_event":
-          await logVerificationEvent(
-            patient.id,
-            action.data.action as string,
-            message || "",
-            action.data.verificationResult as string
-          );
-          break;
-        default:
-          logger.warn("Unknown action type", { actionType: action.type });
-      }
-    } catch (error) {
-      logger.error("Failed to execute response action", error as Error, {
-        actionType: action.type,
-        patientId: patient.id,
-      });
-    }
-  }
-
-  // Send the response message if specified
-  if (response.message) {
-    await sendAck(patient.phoneNumber, response.message);
-  }
-}
-
-/**
- * Helper functions for action execution
- */
-async function updatePatientStatus(
-  patientId: string,
-  status: "PENDING" | "VERIFIED" | "DECLINED" | "EXPIRED"
-): Promise<void> {
-  const { db, patients } = await import("@/db");
-  const { eq } = await import("drizzle-orm");
-  const { getWIBTime } = await import("@/lib/timezone");
-  const { invalidateAfterPatientOperation } = await import("@/lib/cache-invalidation");
-
-  await db
-    .update(patients)
-    .set({
-      verificationStatus: status,
-      updatedAt: getWIBTime(),
-    })
-    .where(eq(patients.id, patientId));
-
-  // Invalidate cache after verification status update
-  await invalidateAfterPatientOperation(patientId, 'update');
-
-  // Clear context after verification status change
-  if (status === "VERIFIED" || status === "DECLINED") {
-    await conversationService.clearContext(patientId);
-  }
-}
-
-async function logConfirmationResponse(
-  patientId: string,
-  status: string,
-  response: string
-): Promise<void> {
-  const { db, reminders } = await import("@/db");
-  const { eq, and, desc } = await import("drizzle-orm");
-
-  // Find the most recent pending reminder
-  const pendingReminder = await db
-    .select()
-    .from(reminders)
-    .where(
-      and(eq(reminders.patientId, patientId), eq(reminders.status, "SENT"))
-    )
-    .orderBy(desc(reminders.sentAt))
-    .limit(1);
-
-  if (pendingReminder.length > 0) {
-    await db
-      .update(reminders)
-      .set({
-        status: status === "CONFIRMED" ? "DELIVERED" : "SENT",
-        confirmationResponse: response,
-        confirmationResponseAt: new Date(),
-      })
-      .where(eq(reminders.id, pendingReminder[0].id));
-
-    // Clear context after confirmation is logged
-    await conversationService.clearContext(patientId);
-  }
-}
-
-async function scheduleFollowup(
-  patientId: string,
-  type: string,
-  delay: number
-): Promise<void> {
-  // This would need the reminder log ID, so for now we'll just log
-  logger.info("Followup action requested", { patientId, type, delay });
-}
-
-async function notifyVolunteers(
-  patient: Patient,
-  priority: string,
-  message: string
-): Promise<void> {
-  logger.info("Volunteer notification requested", {
-    patientId: patient.id,
-    priority,
-    message: message?.substring(0, 100),
-  });
-
-  // Implementation would depend on volunteer notification system
-  // For now, just log the emergency
-  if (priority === "urgent") {
-    logger.warn("Emergency escalation required", {
-      patientId: patient.id,
-      patientName: patient.name,
-      phoneNumber: patient.phoneNumber,
-      message,
-    });
-  }
-}
-
-/**
- * Helper function to deactivate all reminders for a patient
- */
-async function deactivatePatientReminders(patientId: string): Promise<void> {
-  const { db, reminders } = await import("@/db");
-  const { eq } = await import("drizzle-orm");
-
-  logger.info("Deactivating all reminders for patient", { patientId });
-
-  await db
-    .update(reminders)
-    .set({ isActive: false, updatedAt: new Date() })
-    .where(eq(reminders.patientId, patientId));
-
-  // Clear context after deactivating reminders (unsubscribe flow)
-  await conversationService.clearContext(patientId);
-}
-
-/**
- * Helper function to log verification events
- */
-async function logVerificationEvent(
-  patientId: string,
-  action: string,
-  patientResponse: string,
-  verificationResult: string
-): Promise<void> {
-  // Verification events are now logged in the patient record
-  logger.info("Verification event logged in patient record", {
-    patientId,
-    action,
-    verificationResult,
-  });
-
-  // Clear context after verification event is logged
-  if (action === "unsubscribe" || verificationResult === "declined" || verificationResult === "verified") {
-    await conversationService.clearContext(patientId);
-  }
-}
-
-/**
- * Process followup responses from patients
- * Legacy handler - kept for potential rollback
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function processFollowupResponse(
-  message: string,
-  patient: Patient
-): Promise<NextResponse | null> {
-  try {
-    const { FollowupService } = await import(
-      "@/services/reminder/followup.service"
-    );
-    const followupService = new FollowupService();
-
-    const result = await followupService.processFollowupResponse(
-      patient.id,
-      patient.phoneNumber || "",
-      message
-    );
-
-    if (result.processed) {
-      logger.info("Followup response processed", {
-        patientId: patient.id,
-        processed: result.processed,
-        emergencyDetected: result.emergencyDetected,
-        escalated: result.escalated,
-        operation: "process_followup_response",
-      });
-
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action: "followup_response",
-        emergencyDetected: result.emergencyDetected,
-        escalated: result.escalated,
-      });
-    }
-
-    return null; // Not a followup response, continue to other processors
-  } catch (error) {
-    logger.error("Failed to process followup response", error as Error, {
-      patientId: patient.id,
-      operation: "process_followup_response",
-    });
-    return null; // Don't fail the webhook, continue processing
   }
 }
 
@@ -1459,6 +303,14 @@ export async function POST(request: NextRequest) {
       : "no message",
   });
 
+  // DEBUG: Log verification processing conditions
+  logger.info("Verification processing debug", {
+    patientId: patient.id,
+    verificationStatus: patient.verificationStatus,
+    message: message?.substring(0, 100),
+    hasMessage: !!message,
+  });
+
   // Check patient response rate limiting
   const rateLimitResult =
     await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id);
@@ -1482,6 +334,13 @@ export async function POST(request: NextRequest) {
   // 🔹 PRIORITY 1: Check for active context (HIGHEST PRIORITY)
   const activeContext = await conversationService.getActiveContext(patient.id);
 
+  logger.info("Context check for patient", {
+    patientId: patient.id,
+    activeContext,
+    verificationStatus: patient.verificationStatus,
+  });
+
+  // Check if this is a verification or reminder response that should bypass LLM
   if (activeContext) {
     logger.info('Active context detected - using strict keyword matching', {
       patientId: patient.id,
@@ -1500,46 +359,116 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid state' }, { status: 500 })
     }
 
-    // 🚫 BLOCK LLM - Use simplified verification handler
+    // 🚫 BLOCK LLM - Use simple verification service
     if (activeContext === 'verification') {
-      const result = await verificationHandler.process(message || '', patient)
+      logger.info("Processing verification response via active context", {
+        patientId: patient.id,
+        message: message?.substring(0, 50),
+        activeContext,
+      });
+
+      const result = await simpleVerificationService.processResponse(message || '', patient.id)
+
+      logger.info("Verification response processed", {
+        patientId: patient.id,
+        action: result.action,
+        success: result.processed,
+      });
 
       return NextResponse.json({
         ok: true,
         processed: true,
         action: result.action,
-        source: 'simplified_verification',
+        source: 'simple_verification',
         message: result.message
       })
     }
 
     if (activeContext === 'reminder_confirmation') {
-      const result = await contextHandler.handleReminderConfirmationResponse(
-        patient,
-        message || '',
-        conversationState
-      )
+      const confirmationMatch = keywordMatcher.matchConfirmation(message || '')
+      
+      if (confirmationMatch === 'done' || confirmationMatch === 'not_yet') {
+        const relatedReminderId = conversationState.relatedEntityId
+        
+        if (relatedReminderId && conversationState.relatedEntityType === 'reminder') {
+          if (confirmationMatch === 'done') {
+            await db.update(reminders)
+              .set({
+                status: 'DELIVERED',
+                confirmationStatus: 'CONFIRMED',
+                confirmationResponse: message,
+                confirmationResponseAt: new Date()
+              })
+              .where(eq(reminders.id, relatedReminderId))
 
+            await whatsappService.sendAck(
+              patient.phoneNumber,
+              `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
+            )
+
+            await conversationService.clearContext(patient.id)
+
+            return NextResponse.json({
+              ok: true,
+              processed: true,
+              action: 'confirmed',
+              source: 'reminder_confirmation'
+            })
+          } else {
+            await db.update(reminders)
+              .set({
+                confirmationResponse: message,
+                confirmationResponseAt: new Date()
+              })
+              .where(eq(reminders.id, relatedReminderId))
+
+            await whatsappService.sendAck(
+              patient.phoneNumber,
+              `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\n💙 Tim PRIMA`
+            )
+
+            await conversationService.clearContext(patient.id)
+
+            return NextResponse.json({
+              ok: true,
+              processed: true,
+              action: 'not_yet',
+              source: 'reminder_confirmation'
+            })
+          }
+        }
+      }
+      
+      await whatsappService.sendAck(
+        patient.phoneNumber,
+        `Halo ${patient.name}, mohon balas dengan:\n\n✅ *SUDAH* untuk konfirmasi\n❌ *BELUM* untuk belum selesai\n\n💙 Tim PRIMA`
+      )
+      
       return NextResponse.json({
         ok: true,
         processed: true,
-        action: result.action,
-        source: 'strict_confirmation',
-        message: result.message
+        action: 'clarification_sent',
+        source: 'reminder_confirmation'
       })
     }
   }
 
-  // 🔹 PRIORITY 2: Fallback verification handler for expired context
-  // If patient is pending verification but context expired, still use verification handler
+  // 🔹 PRIORITY 2: Fallback verification service for expired context
+  // If patient is pending verification but context expired, still use simple verification service
   if (patient.verificationStatus === 'PENDING' && !activeContext) {
-    logger.info('Fallback verification handler - context expired but status pending', {
+    logger.info('Fallback verification service - context expired but status pending', {
       patientId: patient.id,
       message: message?.substring(0, 50),
       operation: 'fallback_verification'
     })
 
-    const result = await verificationHandler.process(message || '', patient)
+    const result = await simpleVerificationService.processResponse(message || '', patient.id)
+
+    logger.info("Fallback verification response processed", {
+      patientId: patient.id,
+      action: result.action,
+      success: result.processed,
+    });
 
     return NextResponse.json({
       ok: true,
@@ -1550,24 +479,89 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 🔹 PRIORITY 3: No active context - Allow LLM for general queries
-  logger.info('No active context - allowing LLM processing', {
+  // 🔹 PRIORITY 3: No active context - Check for simple reminder responses
+  logger.info('No active context - checking for simple responses', {
     patientId: patient.id,
-    message: message?.substring(0, 100)
+    message: message?.substring(0, 100),
+    verificationStatus: patient.verificationStatus
   })
 
-  const llmResult = await processMessageWithUnifiedProcessor(message || '', patient)
+  // Check if patient has pending reminders and might be responding to one
+  if (patient.verificationStatus === 'VERIFIED' && message) {
+    // Try to match simple confirmation keywords (SUDAH/BELUM)
+    const confirmationMatch = keywordMatcher.matchConfirmation(message)
 
-  if (llmResult.processed) {
-    return NextResponse.json({
-      ok: true,
-      processed: true,
-      action: llmResult.action,
-      source: 'llm_processor'
-    })
+    if (confirmationMatch !== 'invalid') {
+      // Find the most recent pending reminder for this patient
+      const recentReminder = await db
+        .select()
+        .from(reminders)
+        .where(and(
+          eq(reminders.patientId, patient.id),
+          eq(reminders.status, 'SENT')
+        ))
+        .orderBy(desc(reminders.sentAt))
+        .limit(1)
+
+      if (recentReminder.length > 0) {
+        const reminder = recentReminder[0]
+
+        logger.info('Processing simple reminder confirmation', {
+          patientId: patient.id,
+          reminderId: reminder.id,
+          confirmationMatch,
+          message: message?.substring(0, 50)
+        })
+
+        // Handle simple confirmation directly
+        if (confirmationMatch === 'done') {
+          // Update reminder as confirmed
+          await db.update(reminders)
+            .set({
+              status: 'DELIVERED',
+              confirmationStatus: 'CONFIRMED',
+              confirmationResponse: message,
+              confirmationResponseAt: new Date()
+            })
+            .where(eq(reminders.id, reminder.id))
+
+          await whatsappService.sendAck(
+            patient.phoneNumber,
+            `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`
+          )
+
+          return NextResponse.json({
+            ok: true,
+            processed: true,
+            action: 'confirmed',
+            source: 'simple_reminder_confirmation'
+          })
+        } else if (confirmationMatch === 'not_yet') {
+          // Update reminder response but keep status as SENT
+          await db.update(reminders)
+            .set({
+              confirmationResponse: message,
+              confirmationResponseAt: new Date()
+            })
+            .where(eq(reminders.id, reminder.id))
+
+          await whatsappService.sendAck(
+            patient.phoneNumber,
+            `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
+          )
+
+          return NextResponse.json({
+            ok: true,
+            processed: true,
+            action: 'not_yet',
+            source: 'simple_reminder_confirmation'
+          })
+        }
+      }
+    }
   }
 
-  // 🔹 PRIORITY 3: Fallback for unrecognized messages
+  // 🔹 PRIORITY 4: Fallback for unrecognized messages
   await handleUnrecognizedMessage(message || '', patient)
 
   return NextResponse.json({ ok: true, processed: true, action: 'fallback' })

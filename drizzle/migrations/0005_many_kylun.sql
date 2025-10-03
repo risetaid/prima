@@ -1,5 +1,5 @@
-ALTER TYPE "reminder_type" ADD VALUE 'MEDICATION';--> statement-breakpoint
-ALTER TYPE "template_category" ADD VALUE 'MEDICATION';--> statement-breakpoint
+-- ALTER TYPE "reminder_type" ADD VALUE 'MEDICATION'; -- Already exists--> statement-breakpoint
+-- ALTER TYPE "template_category" ADD VALUE 'MEDICATION'; -- Already exists--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "reminder_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"reminder_id" uuid NOT NULL,

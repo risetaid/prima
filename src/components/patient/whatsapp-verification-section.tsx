@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, RefreshCw } from "lucide-react";
 import { formatDateTimeWIB } from "@/lib/datetime";
 import VerificationBadge, {
   getVerificationStatusTitle,
@@ -59,7 +59,15 @@ export function WhatsAppVerificationSection({
               </p>
             </div>
           </div>
-          <div className="flex justify-center sm:justify-end">
+          <div className="flex items-center justify-center sm:justify-end gap-3">
+            <button
+              onClick={onUpdate}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+              title="Perbarui status verifikasi"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span className="hidden sm:inline">Perbarui</span>
+            </button>
             <VerificationBadge
               status={
                 patient.verificationStatus as

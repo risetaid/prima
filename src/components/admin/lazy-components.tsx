@@ -31,22 +31,7 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-const AnalyticsSkeleton = () => (
-  <div className="space-y-6 animate-pulse">
-    <div className="flex items-center justify-between">
-      <div className="h-8 bg-gray-200 rounded w-48"></div>
-      <div className="h-10 bg-gray-200 rounded w-24"></div>
-    </div>
-    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-      {[...Array(8)].map((_, i) => (
-        <div key={i} className="bg-white p-4 rounded-lg border">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-          <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+
 
 const EditorSkeleton = () => (
   <div className="h-64 bg-gray-100 rounded animate-pulse flex items-center justify-center">
@@ -55,25 +40,6 @@ const EditorSkeleton = () => (
 );
 
 // Lazy loaded components with proper types
-export const LazyComprehensiveAnalyticsDashboard = dynamic(
-  () => import("./comprehensive-analytics-dashboard").then((mod) => ({
-    default: mod.ComprehensiveAnalyticsDashboard,
-  })),
-  {
-    loading: () => <DashboardSkeleton />,
-    ssr: false, // Disable SSR for heavy analytics dashboard
-  }
-) as ComponentType<{ className?: string }>;
-
-export const LazyLLMAnalyticsDashboard = dynamic(
-  () => import("./llm-analytics-dashboard").then((mod) => ({
-    default: mod.LLMAnalyticsDashboard,
-  })),
-  {
-    loading: () => <AnalyticsSkeleton />,
-    ssr: false,
-  }
-) as ComponentType<{ className?: string }>;
 
 export const LazyUserManagement = dynamic(
   () => import("./user-management"),

@@ -5,14 +5,13 @@ import {
   boolean,
   uuid,
   integer,
-  numeric,
   jsonb,
   index,
   foreignKey,
 } from "drizzle-orm/pg-core";
 import { patients } from "@/db/patient-schema";
 
-// ===== LLM TABLES =====
+// ===== CONVERSATION TRACKING TABLES =====
 
 export const conversationStates = pgTable(
   "conversation_states",
@@ -64,22 +63,12 @@ export const conversationMessages = pgTable(
     intent: text("intent"),
     confidence: integer("confidence"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
-    llmResponseId: text("llm_response_id"),
-    llmModel: text("llm_model"),
-    llmTokensUsed: integer("llm_tokens_used"),
-    llmCost: numeric("llm_cost", { precision: 10, scale: 6 }),
-    llmResponseTimeMs: integer("llm_response_time_ms"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => ({
     conversationStateIdIdx: index("conversation_messages_conversation_state_id_idx").on(table.conversationStateId),
-    llmModelIdx: index("conversation_messages_llm_model_idx").on(table.llmModel),
-    llmTokensIdx: index("conversation_messages_llm_tokens_idx").on(table.llmTokensUsed),
-    llmCostIdx: index("conversation_messages_llm_cost_idx").on(table.llmCost),
-    llmStatsIdx: index("conversation_messages_llm_stats_idx").on(table.llmModel, table.llmTokensUsed, table.llmCost),
-    // Foreign key to conversation_states
     conversationStateIdFk: foreignKey({
       columns: [table.conversationStateId],
       foreignColumns: [conversationStates.id],
@@ -88,7 +77,7 @@ export const conversationMessages = pgTable(
   })
 );
 
-// LLM response cache removed - now using Redis for simpler caching
+
 
 export const volunteerNotifications = pgTable(
   "volunteer_notifications",

@@ -241,46 +241,66 @@ export default function PatientDetailPage() {
     }
   }, [params.id, fetchPatient, fetchHealthNotes, fetchCompletedReminders]);
 
-  // Add polling for real-time verification updates (reduced frequency and added safeguards)
+  // Smart polling for real-time verification status updates
   useEffect(() => {
     if (!params.id) return;
 
+    let isPolling = false;
+    let lastVersion: number | null = null;
     let pollCount = 0;
-    const maxPollsPerSession = 3; // Reduced further to prevent excessive calls
-    let isPolling = false; // Prevent concurrent polling requests
+    const maxPollsPerSession = 50; // Allow more polls for better UX
 
-    const pollInterval = setInterval(() => {
-      // Stop polling after maximum polls or if already polling
-      if (pollCount >= maxPollsPerSession || isPolling) {
-        if (pollCount >= maxPollsPerSession) {
-          clearInterval(pollInterval);
-        }
-        return;
-      }
+    const pollVersion = async () => {
+      if (isPolling) return;
 
-      // Only poll if page is visible and patient status is pending
-      if (
-        document.visibilityState === "visible" &&
-        patient?.verificationStatus === "PENDING"
-      ) {
+      try {
         isPolling = true;
-        fetchPatient(params.id as string, true)
-          .catch(error => {
-            logger.error("Polling failed:", error instanceof Error ? error : new Error(String(error)));
-            // Stop polling on errors to prevent infinite retries
-            if (pollCount >= 2) {
-              clearInterval(pollInterval);
-            }
-          })
-          .finally(() => {
-            isPolling = false;
-            pollCount++;
+        pollCount++;
+
+        // Poll lightweight version endpoint
+        const response = await fetch(`/api/patients/${params.id}/version`);
+        if (!response.ok) {
+          logger.warn("Version polling failed", { status: response.status });
+          return;
+        }
+
+        const versionData = await response.json();
+        const currentVersion = versionData.version;
+
+        // Check if version changed (patient data was updated)
+        if (lastVersion !== null && lastVersion !== currentVersion) {
+          logger.info("Patient data changed, refreshing...", {
+            oldVersion: lastVersion,
+            newVersion: currentVersion,
+            oldStatus: patient?.verificationStatus,
+            newStatus: versionData.verificationStatus
           });
+
+          // Immediately fetch full patient data
+          await fetchPatient(params.id as string, true);
+        }
+
+        lastVersion = currentVersion;
+
+      } catch (error) {
+        logger.error("Version polling error:", error instanceof Error ? error : new Error(String(error)));
+      } finally {
+        isPolling = false;
       }
-    }, 300000); // Increased to 5 minutes to be very conservative
+    };
+
+    // Initial version fetch
+    pollVersion();
+
+    // Poll every 15 seconds when page is visible
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible" && pollCount < maxPollsPerSession) {
+        pollVersion();
+      }
+    }, 15000); // 15 seconds - much more responsive than 5 minutes
 
     return () => clearInterval(pollInterval);
-  }, [params.id, patient?.verificationStatus, fetchPatient]);
+  }, [params.id, fetchPatient, patient?.verificationStatus]);
 
   const handleAddNote = async (note: string, date: string) => {
     try {

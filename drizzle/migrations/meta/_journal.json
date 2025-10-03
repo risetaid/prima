@@ -57,6 +57,13 @@
       "when": 1759388538366,
       "tag": "0007_robust_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1759449636253,
+      "tag": "0008_funny_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

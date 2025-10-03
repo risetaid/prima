@@ -186,7 +186,7 @@ export class PatientContextService {
 
       // Get current conversation state
       const conversationState = await this.getCurrentConversationState(
-        phoneNumber
+        patientId
       );
 
       const context: PatientContext = {
@@ -588,17 +588,20 @@ export class PatientContextService {
   }
 
   /**
-   * Get current conversation state for a phone number
+   * Get current conversation state for a patient
    */
-  private async getCurrentConversationState(phoneNumber: string) {
+  private async getCurrentConversationState(patientId: string) {
     try {
-      const state = await this.conversationStateService.findByPhoneNumber(
-        phoneNumber
+      const states = await this.conversationStateService.getActiveConversationStates(
+        patientId
       );
 
-      if (!state) {
+      if (states.length === 0) {
         return undefined;
       }
+
+      // Return the most recent active conversation state
+      const state = states[0];
 
       return {
         id: state.id,
@@ -610,7 +613,7 @@ export class PatientContextService {
       };
     } catch (error) {
       logger.error("Failed to get conversation state", error as Error, {
-        phoneNumber,
+        patientId,
       });
       return undefined;
     }
