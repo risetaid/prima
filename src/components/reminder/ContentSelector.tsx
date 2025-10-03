@@ -70,10 +70,11 @@ export function ContentSelector({
         limit: '10',
         search: searchQuery,
         category: selectedCategory,
-        type: selectedType
+        type: selectedType === 'all' ? 'all' : selectedType,
+        public: 'true'
       })
 
-      const response = await fetch(`/api/cms/published-content?${params}`)
+      const response = await fetch(`/api/cms/content?${params}&public=true`)
       if (!response.ok) {
         throw new Error('Failed to fetch content')
       }
@@ -97,19 +98,18 @@ export function ContentSelector({
     }
   }, [searchQuery, selectedCategory, selectedType, page])
 
-  // Fetch categories
+  // Fetch categories - using static data for now since API endpoint doesn't exist
   const fetchCategories = useCallback(async () => {
-    try {
-      const response = await fetch('/api/cms/published-content/categories')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setCategories(data.categories)
-        }
-      }
-    } catch (err) {
-      logger.warn('Failed to fetch categories', { error: err as Error })
-    }
+    // Static categories based on the database enum
+    const staticCategories: Category[] = [
+      { value: 'GENERAL', label: 'Umum', icon: '📄' },
+      { value: 'NUTRITION', label: 'Nutrisi', icon: '🥗' },
+      { value: 'EXERCISE', label: 'Olahraga', icon: '🏃‍♀️' },
+      { value: 'MOTIVATIONAL', label: 'Motivasi', icon: '💪' },
+      { value: 'MEDICAL', label: 'Medis', icon: '⚕️' },
+      { value: 'FAQ', label: 'FAQ', icon: '❓' },
+    ]
+    setCategories(staticCategories)
   }, [])
 
   // Load content when expanded or filters change
