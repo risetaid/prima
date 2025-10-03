@@ -118,7 +118,7 @@ export default function VideoPage() {
     try {
       logger.info("Fetching published videos");
 
-      const response = await fetch("/api/content/public?type=videos&limit=20");
+      const response = await fetch("/api/cms/content?type=videos&public=true&limit=20");
 
       if (!response.ok) {
         if (response.status === 401) {

@@ -79,7 +79,7 @@ export default function BeritaPage() {
     try {
       logger.info('Fetching published articles')
 
-      const response = await fetch('/api/content/public?type=articles&limit=20')
+      const response = await fetch('/api/cms/content?type=articles&public=true&limit=20')
 
       if (!response.ok) {
         if (response.status === 401) {
