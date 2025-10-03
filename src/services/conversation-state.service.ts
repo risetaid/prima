@@ -665,7 +665,7 @@ export class ConversationStateService {
     return await this.updateConversationState(state.id, {
       currentContext: 'reminder_confirmation',
       expectedResponseType: 'confirmation',
-      relatedEntityType: 'reminder_log',
+      relatedEntityType: 'reminder',
       relatedEntityId: reminderId,
       stateData: {
         reminderId,
