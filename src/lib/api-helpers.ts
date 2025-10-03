@@ -531,7 +531,7 @@ export function createApiHandler<T = unknown, R = unknown>(
 ) {
   return async function (
     request: NextRequest,
-    { params }: { params?: Promise<Record<string, string | string[]>> }
+    { params }: { params: Promise<any> }
   ): Promise<NextResponse> {
     const startTime = Date.now();
     const requestId = crypto.randomUUID().slice(0, 8);
