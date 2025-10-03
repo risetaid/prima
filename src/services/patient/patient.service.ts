@@ -8,8 +8,8 @@ import type {
   PatientRow,
 } from "@/services/patient/patient.types";
 import { ValidationError, NotFoundError } from "@/services/patient/patient.types";
-import { db, patients } from "@/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { db, patients, conversationStates, conversationMessages } from "@/db";
+import { and, eq, isNull, inArray, desc } from "drizzle-orm";
 import { invalidateAfterPatientOperation } from "@/lib/cache-invalidation";
 import { validatePhoneWithMessage } from "@/lib/phone-utils";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
@@ -76,8 +76,85 @@ export class PatientService {
   async getVerificationHistory(patientId: string) {
     if (!patientId) throw new ValidationError("Missing patientId");
     await this.verifyPatientExists(patientId);
-    // Verification logs table was removed - return empty array
-    return [];
+
+    // Get conversation states for this patient
+    const conversationStateIds = await db
+      .select({ id: conversationStates.id })
+      .from(conversationStates)
+      .where(and(
+        eq(conversationStates.patientId, patientId),
+        eq(conversationStates.isActive, true)
+      ));
+
+    const stateIds = conversationStateIds.map((state: { id: string }) => state.id);
+
+    if (stateIds.length === 0) {
+      return [];
+    }
+
+    // Get conversation messages for these states
+    const messages = await db
+      .select({
+        id: conversationMessages.id,
+        message: conversationMessages.message,
+        direction: conversationMessages.direction,
+        messageType: conversationMessages.messageType,
+        intent: conversationMessages.intent,
+        createdAt: conversationMessages.createdAt,
+        conversationStateId: conversationMessages.conversationStateId,
+        context: conversationStates.currentContext,
+        expectedResponseType: conversationStates.expectedResponseType,
+        relatedEntityType: conversationStates.relatedEntityType,
+      })
+      .from(conversationMessages)
+      .innerJoin(conversationStates, eq(conversationMessages.conversationStateId, conversationStates.id))
+      .where(inArray(conversationMessages.conversationStateId, stateIds))
+      .orderBy(desc(conversationMessages.createdAt))
+      .limit(50);
+
+    // Transform messages into history format
+    return messages.map((msg) => {
+      let action = 'Pesan masuk';
+      let result = undefined;
+
+      if (msg.direction === 'outbound') {
+        action = 'Pesan keluar';
+        if (msg.messageType === 'verification') {
+          action = '📱 Verifikasi dikirim';
+        } else if (msg.messageType === 'reminder') {
+          action = '⏰ Pengingat dikirim';
+        } else if (msg.messageType === 'confirmation') {
+          action = '✅ Konfirmasi dikirim';
+        }
+      } else if (msg.direction === 'inbound') {
+        action = '💬 Respon pasien';
+        if (msg.intent === 'verification_accept') {
+          action = '✅ Verifikasi diterima';
+          result = 'verified';
+        } else if (msg.intent === 'verification_decline') {
+          action = '❌ Verifikasi ditolak';
+          result = 'declined';
+        } else if (msg.intent === 'reminder_confirmed') {
+          action = '✅ Pengingat dikonfirmasi';
+          result = 'confirmed';
+        } else if (msg.intent === 'reminder_missed') {
+          action = '❌ Pengingat dilewatkan';
+          result = 'missed';
+        }
+      }
+
+      return {
+        id: msg.id,
+        timestamp: msg.createdAt.toISOString(),
+        action,
+        message: msg.message,
+        response: msg.direction === 'inbound' ? msg.message : undefined,
+        result,
+        context: msg.context,
+        expectedResponseType: msg.expectedResponseType,
+        relatedEntityType: msg.relatedEntityType,
+      };
+    });
   }
 
   async getDetail(patientId: string, user?: { id: string; role: string }) {

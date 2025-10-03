@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
-import { db, patients } from '@/db'
-import { eq, and } from 'drizzle-orm'
-import { PatientService } from '@/services/patient/patient.service'
+import { db, patients, conversationMessages, conversationStates } from '@/db'
+import { eq, and, desc, inArray } from 'drizzle-orm'
 
 import { logger } from '@/lib/logger';
 // Get patient response history for a patient
@@ -12,7 +11,7 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -36,12 +35,88 @@ export async function GET(
       )
     }
 
-    // Get patient response history with user details via service
-    const service = new PatientService()
-    await service.getVerificationHistory(patientId) // Call but don't store result since table was removed
+    // Get conversation states for this patient
+    const conversationStateIds = await db
+      .select({ id: conversationStates.id })
+      .from(conversationStates)
+      .where(and(
+        eq(conversationStates.patientId, patientId),
+        eq(conversationStates.isActive, true)
+      ))
 
-    // Since verification logs table was removed, service returns empty array
-    const history: Array<Record<string, unknown>> = []
+    const stateIds = conversationStateIds.map(state => state.id)
+
+    if (stateIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        history: [],
+        total: 0
+      })
+    }
+
+    // Get conversation messages for these states
+    const messages = await db
+      .select({
+        id: conversationMessages.id,
+        message: conversationMessages.message,
+        direction: conversationMessages.direction,
+        messageType: conversationMessages.messageType,
+        intent: conversationMessages.intent,
+        createdAt: conversationMessages.createdAt,
+        conversationStateId: conversationMessages.conversationStateId,
+        context: conversationStates.currentContext,
+        expectedResponseType: conversationStates.expectedResponseType,
+        relatedEntityType: conversationStates.relatedEntityType,
+      })
+      .from(conversationMessages)
+      .innerJoin(conversationStates, eq(conversationMessages.conversationStateId, conversationStates.id))
+      .where(inArray(conversationMessages.conversationStateId, stateIds))
+      .orderBy(desc(conversationMessages.createdAt))
+      .limit(50) // Limit to last 50 messages
+
+    // Transform messages into history format
+    const history = messages.map((msg) => {
+      let action = 'Pesan masuk'
+      let result = undefined
+
+      if (msg.direction === 'outbound') {
+        action = 'Pesan keluar'
+        if (msg.messageType === 'verification') {
+          action = '📱 Verifikasi dikirim'
+        } else if (msg.messageType === 'reminder') {
+          action = '⏰ Pengingat dikirim'
+        } else if (msg.messageType === 'confirmation') {
+          action = '✅ Konfirmasi dikirim'
+        }
+      } else if (msg.direction === 'inbound') {
+        action = '💬 Respon pasien'
+        if (msg.intent === 'verification_accept') {
+          action = '✅ Verifikasi diterima'
+          result = 'verified'
+        } else if (msg.intent === 'verification_decline') {
+          action = '❌ Verifikasi ditolak'
+          result = 'declined'
+        } else if (msg.intent === 'reminder_confirmed') {
+          action = '✅ Pengingat dikonfirmasi'
+          result = 'confirmed'
+        } else if (msg.intent === 'reminder_missed') {
+          action = '❌ Pengingat dilewatkan'
+          result = 'missed'
+        }
+      }
+
+      return {
+        id: msg.id,
+        timestamp: msg.createdAt.toISOString(),
+        action,
+        message: msg.message,
+        response: msg.direction === 'inbound' ? msg.message : undefined,
+        result,
+        context: msg.context,
+        expectedResponseType: msg.expectedResponseType,
+        relatedEntityType: msg.relatedEntityType,
+      }
+    })
 
     return NextResponse.json({
       success: true,
