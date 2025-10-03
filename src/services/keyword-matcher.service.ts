@@ -24,9 +24,10 @@ export class KeywordMatcherService {
   ]
 
   // Confirmation patterns - ONLY EXACT MATCHES
-  // HANYA terima: SUDAH atau BELUM (case-insensitive)
+  // HANYA terima: SUDAH/SELESAI atau BELUM (case-insensitive)
   private readonly CONFIRMATION_DONE = [
     'sudah',
+    'selesai',
   ]
 
   private readonly CONFIRMATION_NOT_YET = [
@@ -85,11 +86,12 @@ export class KeywordMatcherService {
   }
 
   /**
-   * Match confirmation response (SUDAH/BELUM)
-   * STRICT: Only accepts EXACT single word "SUDAH" or "BELUM" (case-insensitive)
+   * Match confirmation response (SUDAH/SELESAI/BELUM)
+   * STRICT: Only accepts EXACT single word "SUDAH", "SELESAI", or "BELUM" (case-insensitive)
    *
    * Case-insensitive normalization handles all capitalization variations:
    * - Accepts: "SUDAH", "sudah", "SuDaH", "sUdAh", etc → all match as "sudah"
+   * - Accepts: "SELESAI", "selesai", "SeLeSaI", etc → all match as "selesai"
    * - Accepts: "BELUM", "belum", "BeLuM", "bElUm", etc → all match as "belum"
    *
    * @param message - User message to match
@@ -108,27 +110,27 @@ export class KeywordMatcherService {
       return 'invalid'
     }
 
-    // Check for EXACT done keyword: "sudah"
-    if (normalized === 'sudah') {
+    // Check for EXACT done keywords: "sudah" or "selesai"
+    if (this.CONFIRMATION_DONE.includes(normalized)) {
       logger.info('Confirmation match: DONE', {
         message,
         normalized,
-        matchedKeyword: 'sudah',
+        matchedKeyword: normalized,
       })
       return 'done'
     }
 
     // Check for EXACT not yet keyword: "belum"
-    if (normalized === 'belum') {
+    if (this.CONFIRMATION_NOT_YET.includes(normalized)) {
       logger.info('Confirmation match: NOT_YET', {
         message,
         normalized,
-        matchedKeyword: 'belum',
+        matchedKeyword: normalized,
       })
       return 'not_yet'
     }
 
-    logger.debug('Confirmation match failed: not exact SUDAH or BELUM', {
+    logger.debug('Confirmation match failed: not exact SUDAH/SELESAI or BELUM', {
       message,
       normalized,
     })
@@ -168,7 +170,7 @@ export class KeywordMatcherService {
     not_yet: string[]
   } {
     return {
-      done: ['SUDAH'],
+      done: ['SUDAH', 'SELESAI'],
       not_yet: ['BELUM'],
     }
   }
