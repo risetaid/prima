@@ -26,6 +26,7 @@ interface Article {
   createdAt: string
   author?: string
   featuredImageUrl?: string
+  type?: 'article' | 'video'
 }
 
 export default function BeritaPage() {
