@@ -3,8 +3,9 @@
 
 import { db } from '@/db'
 import { conversationStates, conversationMessages } from '@/db'
-import { eq, and, desc, gte, lt, sql } from 'drizzle-orm'
+import { eq, and, desc, gte, lt, sql, or } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
+import { generatePhoneAlternatives } from '@/lib/phone-utils'
 
 type ConversationStateRow = typeof conversationStates.$inferSelect
 type ConversationMessageRow = typeof conversationMessages.$inferSelect
@@ -479,16 +480,32 @@ export class ConversationStateService {
   }
 
   /**
-   * Find conversation state by phone number
+   * Find conversation state by phone number with normalization
+   * Handles Indonesian phone number variations (08xxxxxxxx vs 628xxxxxxxx)
    */
   async findByPhoneNumber(phoneNumber: string): Promise<ConversationStateData | null> {
     try {
+      // Generate alternative phone number formats for matching
+      const phoneAlternatives = generatePhoneAlternatives(phoneNumber)
+      const allPhoneNumbers = [phoneNumber, ...phoneAlternatives]
+
+      logger.debug('Finding conversation state by phone', {
+        originalPhone: phoneNumber,
+        alternatives: phoneAlternatives,
+        totalVariations: allPhoneNumbers.length
+      })
+
+      // Create OR clause for all phone number variations
+      const phoneClause = or(
+        ...allPhoneNumbers.map(phone => eq(conversationStates.phoneNumber, phone))
+      )
+
       const states = await db
         .select()
         .from(conversationStates)
         .where(
           and(
-            eq(conversationStates.phoneNumber, phoneNumber),
+            phoneClause,
             eq(conversationStates.isActive, true),
             gte(conversationStates.expiresAt, new Date())
           )
@@ -497,10 +514,23 @@ export class ConversationStateService {
         .limit(1)
 
       if (states.length === 0) {
+        logger.debug('No conversation state found for phone variations', {
+          phoneNumber,
+          alternatives: phoneAlternatives
+        })
         return null
       }
 
-      return this.mapConversationState(states[0])
+      const foundState = this.mapConversationState(states[0])
+
+      logger.info('Conversation state found by phone', {
+        phoneNumber,
+        matchedPhone: foundState.phoneNumber,
+        stateId: foundState.id,
+        context: foundState.currentContext
+      })
+
+      return foundState
     } catch (error) {
       logger.error('Failed to find conversation state by phone number', error as Error, {
         phoneNumber
