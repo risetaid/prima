@@ -1,19 +1,5 @@
 {
   "mcpServers": {
-    "context7": {
-      "command": "bunx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp"
-      ],
-      "env": {
-        "DEFAULT_MINIMUM_TOKENS": ""
-      },
-      "alwaysAllow": [
-        "get-library-docs",
-        "resolve-library-id"
-      ]
-    },
     "sequentialthinking": {
       "command": "bunx",
       "args": [
