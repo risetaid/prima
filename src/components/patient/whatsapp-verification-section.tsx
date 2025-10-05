@@ -2,23 +2,25 @@
 
 import { MessageSquare, RefreshCw } from "lucide-react";
 import { formatDateTimeWIB } from "@/lib/datetime";
+import { Button } from "@/components/ui/button";
 import VerificationBadge, {
   getVerificationStatusTitle,
   getVerificationStatusDescription,
 } from "@/components/patient/verification-badge";
 import VerificationActionsPanel from "@/components/patient/verification-actions-panel";
-import VerificationHistory from "@/components/patient/verification-history";
 import VerificationStatusIcon from "@/components/patient/verification-status-icon";
 import { Patient } from "@/db/schema";
 
 interface WhatsAppVerificationSectionProps {
   patient: Patient;
   onUpdate: () => void;
+  onTabChange?: (tab: string) => void;
 }
 
 export function WhatsAppVerificationSection({
   patient,
   onUpdate,
+  onTabChange,
 }: WhatsAppVerificationSectionProps) {
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
@@ -141,9 +143,26 @@ export function WhatsAppVerificationSection({
           />
         </div>
 
-        {/* Verification History */}
+        {/* Response History Link */}
         <div className="border-t border-gray-200 pt-6">
-          <VerificationHistory patientId={patient.id} />
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-blue-900 mb-1">
+                  📊 Riwayat Respon Pasien
+                </h3>
+                <p className="text-sm text-blue-700">
+                  Lihat semua riwayat interaksi WhatsApp pasien dengan analisis lengkap
+                </p>
+              </div>
+              <Button 
+                onClick={() => onTabChange?.('responses')}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Lihat Riwayat
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

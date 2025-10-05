@@ -1,7 +1,6 @@
 // Reminder Service - Core business logic for reminder management
 import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { FollowupService } from "@/services/reminder/followup.service";
 import { ConversationStateService } from "@/services/conversation-state.service";
 import {
   CreateReminderDTO,
@@ -44,14 +43,12 @@ export interface ReminderConfig {
 export class ReminderService {
   private repository: ReminderRepository;
   private whatsappService: WhatsAppService;
-  private followupService: FollowupService;
   private templateService: ReminderTemplatesService;
   private conversationService: ConversationStateService;
 
   constructor() {
     this.repository = new ReminderRepository();
     this.whatsappService = new WhatsAppService();
-    this.followupService = new FollowupService();
     this.templateService = new ReminderTemplatesService();
     this.conversationService = new ConversationStateService();
   }
@@ -327,7 +324,6 @@ export class ReminderService {
     success: boolean;
     messageId?: string;
     error?: string;
-    followupsScheduled?: number;
   }> {
     try {
       const reminderType = params.reminderType as ReminderType;
@@ -366,8 +362,6 @@ export class ReminderService {
         fonnteMessageId: result.messageId,
       });
 
-      let followupsScheduled = 0;
-
       // Set reminder confirmation context after successful send
       if (result.success && result.messageId) {
         try {
@@ -395,50 +389,13 @@ export class ReminderService {
         }
       }
 
-      // Schedule followups if successful
-      if (result.success) {
-        try {
-          await this.followupService.scheduleTypeAwareFollowups({
-            patientId: params.patientId,
-            reminderId: params.reminderId,
-            phoneNumber: params.phoneNumber,
-            patientName: params.patientName,
-            reminderType: reminderType,
-            reminderTitle: params.reminderTitle || params.message,
-            reminderMessage: params.message,
-            priority: "MEDIUM",
-            metadata: {},
-          });
-
-          followupsScheduled = 3; // Typically schedules 3 followups
-
-          logger.info("Followups scheduled for reminder", {
-            reminderScheduleId: params.reminderId,
-            patientId: params.patientId,
-            reminderType: params.reminderType,
-            reminderMessage: params.message,
-            operation: "schedule_followups_after_reminder",
-          });
-        } catch (followupError) {
-          logger.error(
-            "Failed to schedule followups after reminder",
-            followupError as Error,
-            {
-              reminderScheduleId: params.reminderId,
-              patientId: params.patientId,
-              operation: "schedule_followups_after_reminder",
-            }
-          );
-          // Don't fail the reminder send if followup scheduling fails
-        }
-      }
+  
 
       await del(CACHE_KEYS.reminderStats(params.patientId));
       return {
         success: result.success,
         messageId: result.messageId,
         error: result.error,
-        followupsScheduled,
       };
     } catch (error) {
       logger.error("Failed to send reminder", error as Error, {
@@ -448,7 +405,6 @@ export class ReminderService {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
-        followupsScheduled: 0,
       };
     }
   }

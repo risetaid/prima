@@ -4,6 +4,7 @@ import { db, patients, conversationMessages, conversationStates } from '@/db'
 import { eq, and, desc, inArray } from 'drizzle-orm'
 
 import { logger } from '@/lib/logger';
+
 // Get patient response history for a patient
 export async function GET(
   request: NextRequest,
@@ -62,6 +63,8 @@ export async function GET(
         direction: conversationMessages.direction,
         messageType: conversationMessages.messageType,
         intent: conversationMessages.intent,
+        confidence: conversationMessages.confidence,
+        processedAt: conversationMessages.processedAt,
         createdAt: conversationMessages.createdAt,
         conversationStateId: conversationMessages.conversationStateId,
         context: conversationStates.currentContext,
@@ -74,34 +77,66 @@ export async function GET(
       .orderBy(desc(conversationMessages.createdAt))
       .limit(50) // Limit to last 50 messages
 
-    // Transform messages into history format
+    // Transform messages into enhanced history format
     const history = messages.map((msg) => {
       let action = 'Pesan masuk'
       let result = undefined
+      let classification = ''
+      let processingTime = undefined
 
+      // Enhanced action classification based on message type and intent
       if (msg.direction === 'outbound') {
-        action = 'Pesan keluar'
-        if (msg.messageType === 'verification') {
-          action = '📱 Verifikasi dikirim'
-        } else if (msg.messageType === 'reminder') {
-          action = '⏰ Pengingat dikirim'
-        } else if (msg.messageType === 'confirmation') {
-          action = '✅ Konfirmasi dikirim'
+        switch (msg.messageType) {
+          case 'verification':
+            action = '📱 Verifikasi dikirim'
+            classification = 'Verifikasi'
+            break
+          case 'reminder':
+            action = '⏰ Pengingat dikirim'
+            classification = 'Pengingat'
+            break
+          case 'confirmation':
+            action = '✅ Konfirmasi dikirim'
+            classification = 'Konfirmasi'
+            break
+          default:
+            action = '💬 Pesan keluar'
+            classification = 'Umum'
         }
       } else if (msg.direction === 'inbound') {
-        action = '💬 Respon pasien'
-        if (msg.intent === 'verification_accept') {
-          action = '✅ Verifikasi diterima'
-          result = 'verified'
-        } else if (msg.intent === 'verification_decline') {
-          action = '❌ Verifikasi ditolak'
-          result = 'declined'
-        } else if (msg.intent === 'reminder_confirmed') {
-          action = '✅ Pengingat dikonfirmasi'
-          result = 'confirmed'
-        } else if (msg.intent === 'reminder_missed') {
-          action = '❌ Pengingat dilewatkan'
-          result = 'missed'
+        switch (msg.intent) {
+          case 'verification_accept':
+            action = '✅ Verifikasi diterima'
+            result = 'verified'
+            classification = 'Diterima'
+            break
+          case 'verification_decline':
+            action = '❌ Verifikasi ditolak'
+            result = 'declined'
+            classification = 'Ditolak'
+            break
+          case 'reminder_confirmed':
+            action = '✅ Pengingat dikonfirmasi'
+            result = 'confirmed'
+            classification = 'Selesai'
+            break
+          case 'reminder_missed':
+            action = '❌ Pengingat dilewatkan'
+            result = 'missed'
+            classification = 'Belum'
+            break
+          case 'unrecognized':
+            action = '❓ Respon tidak dikenali'
+            classification = 'Tidak dikenali'
+            break
+          default:
+            action = '💬 Respon pasien'
+            classification = 'Umum'
+        }
+
+        // Calculate processing time if processedAt is available
+        if (msg.processedAt) {
+          processingTime = new Date(msg.processedAt).getTime() - new Date(msg.createdAt).getTime()
         }
       }
 
@@ -112,9 +147,15 @@ export async function GET(
         message: msg.message,
         response: msg.direction === 'inbound' ? msg.message : undefined,
         result,
+        classification,
+        messageType: msg.messageType,
+        intent: msg.intent,
+        confidence: msg.confidence,
         context: msg.context,
         expectedResponseType: msg.expectedResponseType,
         relatedEntityType: msg.relatedEntityType,
+        processingTime,
+        direction: msg.direction
       }
     })
 
@@ -132,5 +173,3 @@ export async function GET(
     )
   }
 }
-
-// Helper function removed - was unused since verification logs table was removed

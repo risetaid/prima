@@ -166,6 +166,11 @@ export const medicalRecords = pgTable(
   })
 );
 
+// ===== DEPRECATED: Health Notes Table =====
+// This table is DEPRECATED and no longer used in the application.
+// It is kept for historical data preservation only.
+// DO NOT use this table in new code.
+// Feature removed: 2025-10-05 - Health notes functionality removed from UI
 export const healthNotes = pgTable(
   "health_notes",
   {
@@ -208,5 +213,15 @@ export type Patient = typeof patients.$inferSelect;
 export type NewPatient = typeof patients.$inferInsert;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type NewMedicalRecord = typeof medicalRecords.$inferInsert;
+
+/**
+ * @deprecated This type is deprecated. The health notes feature has been removed.
+ * Table kept for historical data only. Do not use in new code.
+ */
 export type HealthNote = typeof healthNotes.$inferSelect;
+
+/**
+ * @deprecated This type is deprecated. The health notes feature has been removed.
+ * Table kept for historical data only. Do not use in new code.
+ */
 export type NewHealthNote = typeof healthNotes.$inferInsert;

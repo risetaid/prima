@@ -36,7 +36,6 @@ export const CACHE_KEYS = {
   userProfile: (userId: string) => `user:${userId}`,
   userSession: (clerkId: string) => `session:${clerkId}`,
   remindersAll: (patientId: string) => `reminders:${patientId}:all`,
-  healthNotes: (patientId: string) => `health-notes:${patientId}`,
 } as const;
 
 // ===== CORE CACHE FUNCTIONS =====
@@ -135,7 +134,6 @@ export async function invalidatePatientCache(patientId: string): Promise<void> {
     CACHE_KEYS.patient(patientId),
     CACHE_KEYS.reminderStats(patientId),
     CACHE_KEYS.remindersAll(patientId),
-    CACHE_KEYS.healthNotes(patientId),
   ];
 
   await invalidateMultiple(keysToInvalidate);

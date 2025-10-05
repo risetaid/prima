@@ -12,7 +12,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { KeywordMatcherService } from "@/services/keyword-matcher.service";
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
-import { FollowupService } from "@/services/reminder/followup.service";
+
 
 interface WebhookBody {
   sender?: string;
@@ -210,33 +210,91 @@ async function findPatient(sender: string, parsed: WebhookBody) {
   return found.patient;
 }
 
-async function logConversation(
+async function recordPatientResponse(
   patient: Patient,
   sender: string,
-  message: string | undefined
+  message: string,
+  context: {
+    source: 'verification' | 'reminder_confirmation' | 'general';
+    intent?: string;
+    confidence?: number;
+    relatedEntityId?: string;
+    relatedEntityType?: 'reminder' | 'verification' | null;
+    processingTimeMs?: number;
+    responseClassification?: 'accepted' | 'declined' | 'confirmed' | 'missed' | 'unrecognized';
+  }
 ) {
   try {
     const conv = new ConversationStateService();
+    
+    // Determine appropriate conversation state
+    const conversationContext = context.source === 'verification' ? 'verification' : 
+                              context.source === 'reminder_confirmation' ? 'reminder_confirmation' : 
+                              'general_inquiry';
+
     const state = await conv.getOrCreateConversationState(
       patient.id,
       sender,
-      "general_inquiry"
+      conversationContext
     );
+
+    // Classify message type accurately
+    const messageType = context.source === 'verification' ? 'verification' :
+                      context.source === 'reminder_confirmation' ? 'confirmation' : 
+                      'general';
+
     await conv.addMessage(state.id, {
-      message: message || "",
+      message: message,
       direction: "inbound",
-      messageType: "general",
-      intent: undefined,
-      confidence: undefined,
+      messageType: messageType,
+      intent: context.intent,
+      confidence: context.confidence,
       processedAt: new Date(),
     });
-  } catch { }
+
+    logger.info('Patient response recorded', {
+      patientId: patient.id,
+      source: context.source,
+      messageType,
+      intent: context.intent,
+      confidence: context.confidence,
+      processingTimeMs: context.processingTimeMs,
+      classification: context.responseClassification
+    });
+
+  } catch (error) {
+    logger.error('Failed to record patient response', error as Error, {
+      patientId: patient.id,
+      source: context.source,
+      message: message.substring(0, 50)
+    });
+  }
 }
+
+
 
 async function handleUnrecognizedMessage(
   message: string | undefined,
   patient: Patient
 ) {
+  // Record unrecognized message response
+  if (message) {
+    try {
+      await recordPatientResponse(patient, patient.phoneNumber, message, {
+        source: 'general',
+        intent: 'unrecognized',
+        confidence: 0,
+        processingTimeMs: 0,
+        responseClassification: 'unrecognized'
+      })
+    } catch (error) {
+      logger.warn('Failed to record unrecognized message', {
+        patientId: patient.id,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
   logger.info("Sending unrecognized message response", {
     patientId: patient.id,
     verificationStatus: patient.verificationStatus,
@@ -330,7 +388,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  await logConversation(patient, sender, message || "");
+  
 
   // 🔹 PRIORITY 1: Check for active context (HIGHEST PRIORITY)
   const activeContext = await conversationService.getActiveContext(patient.id);
@@ -368,12 +426,26 @@ export async function POST(request: NextRequest) {
         activeContext,
       });
 
+      const startTime = Date.now()
       const result = await simpleVerificationService.processResponse(message || '', patient.id)
+      const processingTimeMs = Date.now() - startTime
+
+      // Record verification response with proper context
+      await recordPatientResponse(patient, sender, message || '', {
+        source: 'verification',
+        intent: result.action === 'verified' ? 'verification_accept' : 'verification_decline',
+        confidence: 100, // Keyword matching is 100% confident
+        relatedEntityId: patient.id,
+        relatedEntityType: 'verification',
+        processingTimeMs,
+        responseClassification: result.action === 'verified' ? 'accepted' : 'declined'
+      })
 
       logger.info("Verification response processed", {
         patientId: patient.id,
         action: result.action,
         success: result.processed,
+        processingTimeMs
       });
 
       return NextResponse.json({
@@ -392,6 +464,17 @@ export async function POST(request: NextRequest) {
         const relatedReminderId = conversationState.relatedEntityId
         
         if (relatedReminderId && conversationState.relatedEntityType === 'reminder') {
+          // Record reminder confirmation response
+          await recordPatientResponse(patient, sender, message || '', {
+            source: 'reminder_confirmation',
+            intent: confirmationMatch === 'done' ? 'reminder_confirmed' : 'reminder_missed',
+            confidence: 100, // Exact keyword match
+            relatedEntityId: relatedReminderId,
+            relatedEntityType: 'reminder',
+            processingTimeMs: 0, // Keyword matching is very fast
+            responseClassification: confirmationMatch === 'done' ? 'confirmed' : 'missed'
+          })
+
           if (confirmationMatch === 'done') {
             await db.update(reminders)
               .set({
@@ -463,12 +546,26 @@ export async function POST(request: NextRequest) {
       operation: 'fallback_verification'
     })
 
+    const startTime = Date.now()
     const result = await simpleVerificationService.processResponse(message || '', patient.id)
+    const processingTimeMs = Date.now() - startTime
+
+    // Record fallback verification response
+    await recordPatientResponse(patient, sender, message || '', {
+      source: 'verification',
+      intent: result.action === 'verified' ? 'verification_accept' : 'verification_decline',
+      confidence: 100, // Keyword matching is 100% confident
+      relatedEntityId: patient.id,
+      relatedEntityType: 'verification',
+      processingTimeMs,
+      responseClassification: result.action === 'verified' ? 'accepted' : 'declined'
+    })
 
     logger.info("Fallback verification response processed", {
       patientId: patient.id,
       action: result.action,
       success: result.processed,
+      processingTimeMs
     });
 
     return NextResponse.json({
@@ -514,6 +611,17 @@ export async function POST(request: NextRequest) {
           message: message?.substring(0, 50)
         })
 
+        // Record simple reminder response
+        await recordPatientResponse(patient, sender, message || '', {
+          source: 'reminder_confirmation',
+          intent: confirmationMatch === 'done' ? 'reminder_confirmed' : 'reminder_missed',
+          confidence: 100, // Exact keyword match
+          relatedEntityId: reminder.id,
+          relatedEntityType: 'reminder',
+          processingTimeMs: 0, // Keyword matching is very fast
+          responseClassification: confirmationMatch === 'done' ? 'confirmed' : 'missed'
+        })
+
         // Handle simple confirmation directly
         if (confirmationMatch === 'done') {
           // Update reminder as confirmed
@@ -526,17 +634,7 @@ export async function POST(request: NextRequest) {
             })
             .where(eq(reminders.id, reminder.id))
 
-          // Cancel any pending followups for this reminder
-          try {
-            const followupService = new FollowupService();
-            await followupService.cancelFollowupsForReminder(reminder.id);
-          } catch (error) {
-            logger.warn("Failed to cancel followups after reminder confirmation", {
-              reminderId: reminder.id,
-              error: error instanceof Error ? error.message : String(error)
-            });
-            // Don't fail the confirmation if followup cancellation fails
-          }
+          
 
           await whatsappService.sendAck(
             patient.phoneNumber,

@@ -233,7 +233,6 @@ async function processRemindersWithLock() {
             patientId: reminder.patientId,
             patientName: reminder.patientName,
             messageId: sendResult?.messageId,
-            followupsScheduled: sendResult?.followupsScheduled,
           });
         } else {
           failedCount++;
@@ -266,9 +265,6 @@ async function processRemindersWithLock() {
       errors: errors.length,
     });
 
-    // Process followups
-    const followupResult = await processFollowups();
-
     return apiSuccess(
       {
         reminders: {
@@ -278,10 +274,7 @@ async function processRemindersWithLock() {
           failed: failedCount,
           errors: errors.slice(0, 5), // Only show first 5 errors
         },
-        followups: followupResult,
-        message: `Processed ${processedCount} reminders (${successCount} sent, ${failedCount} failed) and ${
-          followupResult.processed || 0
-        } followups`,
+        message: `Processed ${processedCount} reminders (${successCount} sent, ${failedCount} failed)`,
       },
       {
         message: "Cron job completed successfully",
@@ -298,41 +291,5 @@ async function processRemindersWithLock() {
       },
       operation: "cron_job",
     });
-  }
-}
-
-async function processFollowups() {
-  try {
-    const { FollowupService } = await import(
-      "@/services/reminder/followup.service"
-    );
-
-    const followupService = new FollowupService();
-    const results = await followupService.processPendingFollowups();
-
-    const processed = results.length;
-    const successful = results.filter((r) => r.processed).length;
-    const failed = processed - successful;
-
-    logger.info("Followups processed", {
-      processed,
-      successful,
-      failed,
-    });
-
-    return {
-      processed,
-      successful,
-      failed,
-      results: results.slice(0, 5), // Only return first 5 results
-    };
-  } catch (error) {
-    logger.error("Failed to process followups in cron", error as Error);
-    return {
-      processed: 0,
-      successful: 0,
-      failed: 0,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
 }

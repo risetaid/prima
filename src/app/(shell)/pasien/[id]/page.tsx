@@ -15,9 +15,9 @@ import { logger } from "@/lib/logger";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { PatientHeaderCard } from "@/components/patient/patient-header-card";
 import { PatientProfileTab } from "@/components/patient/patient-profile-tab";
-import { PatientHealthTab } from "@/components/patient/patient-health-tab";
 import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
 import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
+import PatientResponseHistoryTab from "@/components/patient/patient-response-history-tab";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { Patient as SchemaPatient } from "@/db/schema";
 import { AlertTriangle } from "lucide-react";
@@ -31,20 +31,6 @@ interface Patient extends SchemaPatient {
     email: string;
     role: string | null;
   } | null;
-}
-
-interface HealthNote {
-  id: string;
-  date: string;
-  note: string;
-  createdAt: string;
-}
-
-interface ApiHealthNote {
-  id: string;
-  noteDate: string;
-  note: string;
-  createdAt: string;
 }
 
 interface CompletedReminder {
@@ -63,7 +49,6 @@ export default function PatientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [healthNotes, setHealthNotes] = useState<HealthNote[]>([]);
   const [completedReminders, setCompletedReminders] = useState<
     CompletedReminder[]
   >([]);
@@ -148,43 +133,6 @@ export default function PatientDetailPage() {
     }
   }, []);
 
-  const fetchHealthNotes = useCallback(async (patientId: string) => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-      const response = await fetch(`/api/patients/${patientId}/health-notes`, {
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        const formattedNotes: HealthNote[] = data.healthNotes.map(
-          (note: ApiHealthNote) => ({
-            id: note.id,
-            date: note.noteDate.split("T")[0],
-            note: note.note,
-            createdAt: note.createdAt,
-          })
-        );
-        setHealthNotes(formattedNotes);
-      } else if (response.status === 404) {
-        setHealthNotes([]);
-      } else {
-        logger.error("Health notes fetch error", undefined, {
-          patientId,
-          status: response.status,
-          statusText: response.statusText,
-        });
-        toast.error("Gagal memuat catatan kesehatan");
-      }
-    } catch (error: unknown) {
-      logger.error("Health notes fetch error", error instanceof Error ? error : new Error(String(error)), { patientId });
-      toast.error("Gagal memuat catatan kesehatan");
-    }
-  }, []);
 
   const fetchCompletedReminders = useCallback(async (patientId: string) => {
     try {
@@ -236,10 +184,9 @@ export default function PatientDetailPage() {
   useEffect(() => {
     if (params.id) {
       fetchPatient(params.id as string);
-      fetchHealthNotes(params.id as string);
       fetchCompletedReminders(params.id as string);
     }
-  }, [params.id, fetchPatient, fetchHealthNotes, fetchCompletedReminders]);
+  }, [params.id, fetchPatient, fetchCompletedReminders]);
 
   // Smart polling for real-time verification status updates
   useEffect(() => {
@@ -302,98 +249,6 @@ export default function PatientDetailPage() {
     return () => clearInterval(pollInterval);
   }, [params.id, fetchPatient, patient?.verificationStatus]);
 
-  const handleAddNote = async (note: string, date: string) => {
-    try {
-      const response = await fetch(`/api/patients/${params.id}/health-notes`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: note.trim(), noteDate: date }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const formattedNote: HealthNote = {
-          id: data.healthNote.id,
-          date: data.healthNote.noteDate.split("T")[0],
-          note: data.healthNote.note,
-          createdAt: data.healthNote.createdAt,
-        };
-        setHealthNotes((prev) => [...prev, formattedNote]);
-        toast.success("Catatan berhasil ditambahkan");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Gagal menambahkan catatan");
-      }
-    } catch (error: unknown) {
-      logger.error("Error adding health note", error instanceof Error ? error : new Error(String(error)), { patientId: params.id as string });
-      toast.error("Gagal menambahkan catatan");
-    }
-  };
-
-  const handleEditNote = async (noteId: string, note: string, date: string) => {
-    try {
-      const response = await fetch(
-        `/api/patients/${params.id}/health-notes/${noteId}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ note: note.trim(), noteDate: date }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const updatedNote: HealthNote = {
-          id: data.healthNote.id,
-          date: data.healthNote.noteDate.split("T")[0],
-          note: data.healthNote.note,
-          createdAt: data.healthNote.createdAt,
-        };
-        setHealthNotes((prev) =>
-          prev.map((note) => (note.id === noteId ? updatedNote : note))
-        );
-        toast.success("Catatan berhasil diperbarui");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Gagal memperbarui catatan");
-      }
-    } catch {
-      toast.error("Gagal memperbarui catatan");
-    }
-  };
-
-  const handleDeleteSelectedNotes = async (noteIds: string[]) => {
-    if (noteIds.length === 0) {
-      toast.error("Pilih catatan yang akan dihapus");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `/api/patients/${params.id}/health-notes/bulk-delete`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ noteIds }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setHealthNotes((prev) =>
-          prev.filter((note) => !noteIds.includes(note.id))
-        );
-        toast.success(
-          data.message || `${noteIds.length} catatan berhasil dihapus`
-        );
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Gagal menghapus catatan");
-      }
-    } catch {
-      toast.error("Gagal menghapus catatan");
-    }
-  };
 
   const handleAddReminder = () => {
     if (!patient) return;
@@ -614,14 +469,14 @@ export default function PatientDetailPage() {
                 <TabsTrigger value="profile" disabled>
                   Profil
                 </TabsTrigger>
-                <TabsTrigger value="health" disabled>
-                  Kesehatan
+                <TabsTrigger value="verification" disabled>
+                  Verifikasi
                 </TabsTrigger>
                 <TabsTrigger value="reminders" disabled>
                   Pengingat
                 </TabsTrigger>
-                <TabsTrigger value="verification" disabled>
-                  Verifikasi
+                <TabsTrigger value="responses" disabled>
+                  Riwayat Respon
                 </TabsTrigger>
               </TabsList>
 
@@ -813,9 +668,9 @@ export default function PatientDetailPage() {
           >
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">Profil</TabsTrigger>
-              <TabsTrigger value="health">Kesehatan</TabsTrigger>
-              <TabsTrigger value="reminders">Pengingat</TabsTrigger>
               <TabsTrigger value="verification">Verifikasi</TabsTrigger>
+              <TabsTrigger value="reminders">Pengingat</TabsTrigger>
+              <TabsTrigger value="responses">Riwayat Respon</TabsTrigger>
             </TabsList>
 
             {/* Profile Tab */}
@@ -837,14 +692,12 @@ export default function PatientDetailPage() {
                />
             </TabsContent>
 
-            {/* Health Notes Tab */}
-            <TabsContent value="health">
-              <PatientHealthTab
-                healthNotes={healthNotes}
-                patientId={params.id as string}
-                onAddNote={handleAddNote}
-                onEditNote={handleEditNote}
-                onDeleteNotes={handleDeleteSelectedNotes}
+            {/* Verification Tab */}
+            <TabsContent value="verification">
+              <PatientVerificationTab
+                patient={patient}
+                onUpdate={() => fetchPatient(params.id as string)}
+                onTabChange={setActiveTab}
               />
             </TabsContent>
 
@@ -858,11 +711,11 @@ export default function PatientDetailPage() {
               />
             </TabsContent>
 
-            {/* Verification Tab */}
-            <TabsContent value="verification">
-              <PatientVerificationTab
-                patient={patient}
-                onUpdate={() => fetchPatient(params.id as string)}
+            {/* Response History Tab */}
+            <TabsContent value="responses">
+              <PatientResponseHistoryTab 
+                patientId={params.id as string}
+                patientName={patient?.name || ''}
               />
             </TabsContent>
           </Tabs>

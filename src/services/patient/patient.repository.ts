@@ -3,7 +3,6 @@
 import {
   db,
   patients,
-  healthNotes,
   users,
   reminders,
   manualConfirmations,
@@ -24,118 +23,7 @@ export class PatientRepository {
     return rows.length > 0;
   }
 
-
-
-
-
-
-
-  // ===== Health Notes =====
-  async listHealthNotes(patientId: string) {
-    return await db
-      .select({
-        id: healthNotes.id,
-        patientId: healthNotes.patientId,
-        note: healthNotes.note,
-        noteDate: healthNotes.noteDate,
-        recordedBy: healthNotes.recordedBy,
-        createdAt: healthNotes.createdAt,
-        updatedAt: healthNotes.updatedAt,
-      })
-      .from(healthNotes)
-      .where(
-        and(eq(healthNotes.patientId, patientId), isNull(healthNotes.deletedAt))
-      )
-      .orderBy(desc(healthNotes.noteDate));
-  }
-
-  async getHealthNote(patientId: string, noteId: string) {
-    const rows = await db
-      .select({
-        id: healthNotes.id,
-        patientId: healthNotes.patientId,
-        note: healthNotes.note,
-        noteDate: healthNotes.noteDate,
-        recordedBy: healthNotes.recordedBy,
-        createdAt: healthNotes.createdAt,
-        updatedAt: healthNotes.updatedAt,
-      })
-      .from(healthNotes)
-      .where(
-        and(
-          eq(healthNotes.id, noteId),
-          eq(healthNotes.patientId, patientId),
-          isNull(healthNotes.deletedAt)
-        )
-      )
-      .limit(1);
-    return rows[0] || null;
-  }
-
-  async createHealthNote(
-    patientId: string,
-    note: string,
-    noteDate: Date,
-    recordedBy: string
-  ) {
-    const inserted = await db
-      .insert(healthNotes)
-      .values({ patientId, note, noteDate, recordedBy })
-      .returning({
-        id: healthNotes.id,
-        patientId: healthNotes.patientId,
-        note: healthNotes.note,
-        noteDate: healthNotes.noteDate,
-        recordedBy: healthNotes.recordedBy,
-        createdAt: healthNotes.createdAt,
-        updatedAt: healthNotes.updatedAt,
-      });
-    return inserted[0];
-  }
-
-  async updateHealthNote(noteId: string, note: string, noteDate: Date) {
-    const updated = await db
-      .update(healthNotes)
-      .set({ note, noteDate })
-      .where(eq(healthNotes.id, noteId))
-      .returning({
-        id: healthNotes.id,
-        patientId: healthNotes.patientId,
-        note: healthNotes.note,
-        noteDate: healthNotes.noteDate,
-        recordedBy: healthNotes.recordedBy,
-        createdAt: healthNotes.createdAt,
-        updatedAt: healthNotes.updatedAt,
-      });
-    return updated[0];
-  }
-
-  async softDeleteHealthNote(patientId: string, noteId: string) {
-    const deleted = await db
-      .update(healthNotes)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(eq(healthNotes.id, noteId), eq(healthNotes.patientId, patientId))
-      )
-      .returning({ id: healthNotes.id });
-    return deleted.length;
-  }
-
-  async softDeleteHealthNotes(patientId: string, noteIds: string[]) {
-    if (!noteIds.length) return 0;
-    const deleted = await db
-      .update(healthNotes)
-      .set({ deletedAt: new Date(), updatedAt: new Date() })
-      .where(
-        and(
-          inArray(healthNotes.id, noteIds),
-          eq(healthNotes.patientId, patientId)
-        )
-      )
-      .returning({ id: healthNotes.id });
-    return deleted.length;
-  }
-
+  // ===== User Management =====
   async getUsersByIds(userIds: string[]) {
     if (!userIds.length)
       return [] as Array<{

@@ -16,6 +16,15 @@ interface HistoryEntry {
   message?: string
   response?: string
   result?: string
+  classification?: string
+  messageType?: string
+  intent?: string
+  confidence?: number
+  context?: string
+  expectedResponseType?: string
+  relatedEntityType?: string
+  processingTime?: number
+  direction?: 'inbound' | 'outbound'
   processedBy?: {
     id: string
     name: string
@@ -69,7 +78,42 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
     if (action.includes('👤')) return '👤'
     if (action.includes('⏰')) return '⏰'
     if (action.includes('💬')) return '💬'
+    if (action.includes('❓')) return '❓'
     return '📝'
+  }
+
+  const getClassificationBadge = (entry: HistoryEntry) => {
+    if (!entry.classification) return null
+    
+    const colors = {
+      'Verifikasi': 'bg-blue-100 text-blue-800',
+      'Pengingat': 'bg-yellow-100 text-yellow-800',
+      'Konfirmasi': 'bg-green-100 text-green-800',
+      'Diterima': 'bg-green-100 text-green-800',
+      'Ditolak': 'bg-red-100 text-red-800',
+      'Selesai': 'bg-emerald-100 text-emerald-800',
+      'Belum': 'bg-orange-100 text-orange-800',
+      'Tidak dikenali': 'bg-gray-100 text-gray-800',
+      'Umum': 'bg-gray-100 text-gray-800'
+    }
+    
+    const colorClass = colors[entry.classification as keyof typeof colors] || 'bg-gray-100 text-gray-800'
+    
+    return (
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${colorClass}`}>
+        {entry.classification}
+      </span>
+    )
+  }
+
+  const getProcessingTimeDisplay = (processingTime?: number) => {
+    if (!processingTime) return null
+    
+    if (processingTime < 1000) {
+      return `${processingTime}ms`
+    } else {
+      return `${(processingTime / 1000).toFixed(1)}s`
+    }
   }
 
   return (
@@ -146,9 +190,28 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
                             {entry.action}
                           </h5>
                           
-                          <p className="text-xs text-gray-500 mt-1">
-                            {formatDateTimeWIB(new Date(entry.timestamp))}
-                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-gray-500">
+                              {formatDateTimeWIB(new Date(entry.timestamp))}
+                            </p>
+                            
+                            {/* Classification badge */}
+                            {getClassificationBadge(entry)}
+                            
+                            {/* Processing time for inbound messages */}
+                            {entry.direction === 'inbound' && entry.processingTime && (
+                              <span className="text-xs text-gray-400">
+                                ⚡ {getProcessingTimeDisplay(entry.processingTime)}
+                              </span>
+                            )}
+                            
+                            {/* Confidence score for inbound messages */}
+                            {entry.direction === 'inbound' && entry.confidence !== undefined && (
+                              <span className="text-xs text-gray-400">
+                                🎯 {entry.confidence}%
+                              </span>
+                            )}
+                          </div>
                           
                           {entry.processedBy && (
                             <p className="text-xs text-blue-600 mt-1">
@@ -162,6 +225,8 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
                             entry.result === 'verified' ? 'bg-green-100 text-green-800' :
                             entry.result === 'declined' ? 'bg-red-100 text-red-800' :
                             entry.result === 'expired' ? 'bg-orange-100 text-orange-800' :
+                            entry.result === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+                            entry.result === 'missed' ? 'bg-orange-100 text-orange-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
                             {entry.result}
@@ -169,19 +234,37 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
                         )}
                       </div>
                       
-                      {/* Message content */}
+                      {/* Enhanced message content */}
                       {entry.message && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-900">
-                          <strong>Pesan:</strong> {entry.message.substring(0, 100)}
-                          {entry.message.length > 100 && '...'}
+                        <div className={`mt-2 p-2 rounded text-xs ${
+                          entry.direction === 'outbound' 
+                            ? 'bg-blue-50 text-blue-900' 
+                            : 'bg-green-50 text-green-900'
+                        }`}>
+                          <strong>{entry.direction === 'outbound' ? 'Pesan Terkirim:' : 'Respon Pasien:'}</strong> {entry.message.substring(0, 150)}
+                          {entry.message.length > 150 && '...'}
                         </div>
                       )}
                       
-                      {/* Patient response */}
-                      {entry.response && (
-                         <div className="mt-2 p-2 bg-green-50 rounded text-xs text-green-900">
-                           <strong>Respon pasien:</strong> &quot;{entry.response}&quot;
-                         </div>
+                      {/* Additional metadata */}
+                      {(entry.context || entry.relatedEntityType || entry.intent) && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {entry.context && (
+                            <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                              Konteks: {entry.context}
+                            </span>
+                          )}
+                          {entry.relatedEntityType && (
+                            <span className="text-xs text-gray-500 bg-gray-50 px-2 py-1 rounded">
+                              Tipe: {entry.relatedEntityType}
+                            </span>
+                          )}
+                          {entry.intent && entry.intent !== 'unrecognized' && (
+                            <span className="text-xs text-purple-500 bg-purple-50 px-2 py-1 rounded">
+                              Intent: {entry.intent}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -194,4 +277,3 @@ export default function VerificationHistory({ patientId }: VerificationHistoryPr
     </div>
   )
 }
-

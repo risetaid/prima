@@ -31,6 +31,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   whatsappTemplatesCreated: many(whatsappTemplates),
   manualConfirmations: many(manualConfirmations),
   medicalRecords: many(medicalRecords),
+  // @deprecated - Health notes feature removed, kept for historical data only
   healthNotesRecorded: many(healthNotes),
 }));
 
@@ -42,6 +43,7 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   reminders: many(reminders),
   manualConfirmations: many(manualConfirmations),
   medicalRecords: many(medicalRecords),
+  // @deprecated - Health notes feature removed, kept for historical data only
   healthNotes: many(healthNotes),
 }));
 
@@ -88,6 +90,9 @@ export const whatsappTemplatesRelations = relations(
   })
 );
 
+/**
+ * @deprecated Health notes feature removed. Relations kept for historical data only.
+ */
 export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
   patient: one(patients, {
     fields: [healthNotes.patientId],
@@ -155,7 +160,15 @@ export type ManualConfirmation = typeof manualConfirmations.$inferSelect;
 export type NewManualConfirmation = typeof manualConfirmations.$inferInsert;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type NewMedicalRecord = typeof medicalRecords.$inferInsert;
+
+/**
+ * @deprecated Health notes feature removed. Type kept for historical data only.
+ */
 export type HealthNote = typeof healthNotes.$inferSelect;
+
+/**
+ * @deprecated Health notes feature removed. Type kept for historical data only.
+ */
 export type NewHealthNote = typeof healthNotes.$inferInsert;
 
 // CMS Content Types
