@@ -143,9 +143,19 @@ class RedisClient {
       })
 
       this.client.on('end', () => {
-        logger.warn('Redis connection ended', {
+        logger.error('Redis connection ended unexpectedly', new Error('Connection ended'), {
           redis: true,
-          cluster: this.isCluster
+          cluster: this.isCluster,
+          status: this.client?.status || 'unknown',
+          willRetry: true
+        })
+      })
+
+      this.client.on('close', () => {
+        logger.warn('Redis connection closed', {
+          redis: true,
+          cluster: this.isCluster,
+          status: this.client?.status || 'unknown'
         })
       })
 
@@ -469,6 +479,38 @@ class RedisClient {
   // Check if using cluster mode
   isClusterMode(): boolean {
     return this.isCluster
+  }
+
+  // Force reconnect (for manual recovery)
+  async forceReconnect(): Promise<boolean> {
+    try {
+      if (this.client && this.client.status !== 'end') {
+        logger.info('Disconnecting Redis client for reconnect', {
+          redis: true,
+          status: this.client.status
+        })
+        await this.client.quit()
+      }
+      
+      this.client = null
+      this.isConnecting = false
+      
+      logger.info('Attempting to reinitialize Redis', {
+        redis: true,
+        hasUrl: !!(process.env.REDIS_URL || process.env.KV_URL)
+      })
+      
+      await this.initializeClient()
+      
+      // Test connection
+      const pingResult = await this.ping()
+      return pingResult.success
+    } catch (error) {
+      logger.error('Force reconnect failed', error instanceof Error ? error : new Error(String(error)), {
+        redis: true
+      })
+      return false
+    }
   }
 }
 

@@ -12,14 +12,24 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Parse Redis URL to show details
+    const redisUrl = process.env.REDIS_URL || ''
+    let urlParts = { host: 'unknown', port: 'unknown' }
+    try {
+      const url = new URL(redisUrl)
+      urlParts = { host: url.hostname, port: url.port || '6379' }
+    } catch {}
+
     const diagnostics = {
       environment: {
         nodeEnv: process.env.NODE_ENV,
         hasRedisUrl: !!process.env.REDIS_URL,
         hasKvUrl: !!process.env.KV_URL,
         redisUrlFormat: process.env.REDIS_URL 
-          ? process.env.REDIS_URL.substring(0, 20) + '...' 
+          ? process.env.REDIS_URL.substring(0, 30) + '...' 
           : 'not set',
+        host: urlParts.host,
+        port: urlParts.port,
       },
       client: {
         status: redis.getStatus(),
@@ -65,6 +75,25 @@ export async function GET(request: Request) {
       await redis.del('debug_test')
     } catch (error) {
       diagnostics.tests.get.error = error instanceof Error ? error.message : String(error)
+    }
+
+    // Add reconnect test if requested
+    const url = new URL(request.url)
+    if (url.searchParams.get('reconnect') === 'true') {
+      try {
+        diagnostics.tests.ping.error += ' | Attempting reconnect...'
+        const reconnectSuccess = await redis.forceReconnect()
+        diagnostics.tests.ping.success = reconnectSuccess
+        diagnostics.tests.ping.error = reconnectSuccess 
+          ? 'Reconnect successful!' 
+          : 'Reconnect failed'
+        diagnostics.client = {
+          status: redis.getStatus(),
+          isConnected: redis.isConnected(),
+        }
+      } catch (error) {
+        diagnostics.tests.ping.error += ' | Reconnect error: ' + (error instanceof Error ? error.message : String(error))
+      }
     }
 
     return NextResponse.json(diagnostics)
