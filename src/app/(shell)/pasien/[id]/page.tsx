@@ -52,6 +52,12 @@ export default function PatientDetailPage() {
   const [completedReminders, setCompletedReminders] = useState<
     CompletedReminder[]
   >([]);
+  const [reminderStats, setReminderStats] = useState<{
+    semua: number;
+    selesai: number;
+    terjadwal: number;
+    perluDiperbarui: number;
+  } | null>(null);
   const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
@@ -134,6 +140,35 @@ export default function PatientDetailPage() {
   }, []);
 
 
+  const fetchReminderStats = useCallback(async (patientId: string) => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch(
+        `/api/patients/${patientId}/reminders/stats`,
+        { signal: controller.signal }
+      );
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        setReminderStats(data);
+      } else {
+        logger.error("Failed to fetch reminder stats", undefined, {
+          patientId,
+          status: response.status,
+          statusText: response.statusText
+        });
+        setReminderStats(null);
+      }
+    } catch (error: unknown) {
+      logger.error("Error fetching reminder stats", error instanceof Error ? error : new Error(String(error)), { patientId });
+      setReminderStats(null);
+    }
+  }, []);
+
   const fetchCompletedReminders = useCallback(async (patientId: string) => {
     try {
       const controller = new AbortController();
@@ -185,8 +220,9 @@ export default function PatientDetailPage() {
     if (params.id) {
       fetchPatient(params.id as string);
       fetchCompletedReminders(params.id as string);
+      fetchReminderStats(params.id as string);
     }
-  }, [params.id, fetchPatient, fetchCompletedReminders]);
+  }, [params.id, fetchPatient, fetchCompletedReminders, fetchReminderStats]);
 
   // Smart polling for real-time verification status updates
   useEffect(() => {
@@ -706,6 +742,7 @@ export default function PatientDetailPage() {
               <PatientRemindersTab
                 patient={patient}
                 completedReminders={completedReminders}
+                reminderStats={reminderStats}
                 onAddReminder={handleAddReminder}
                 onViewReminders={handleViewReminders}
               />

@@ -36,6 +36,12 @@ interface CompletedReminder {
 interface PatientRemindersTabProps {
   patient: Patient;
   completedReminders: CompletedReminder[];
+  reminderStats: {
+    semua: number;
+    selesai: number;
+    terjadwal: number;
+    perluDiperbarui: number;
+  } | null;
   onAddReminder: () => void;
   onViewReminders: () => void;
 }
@@ -43,6 +49,7 @@ interface PatientRemindersTabProps {
 export function PatientRemindersTab({
   patient,
   completedReminders,
+  reminderStats,
   onAddReminder,
   onViewReminders,
 }: PatientRemindersTabProps) {
@@ -84,13 +91,13 @@ export function PatientRemindersTab({
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-green-600 mb-2">
-                {completedReminders.length}
+                {reminderStats?.semua ?? 0}
               </div>
               <p className="text-gray-600">Total Pengingat</p>
             </div>
             <div className="text-center">
               <div className="text-3xl font-bold text-orange-600 mb-2">
-                {completedReminders.filter(r => r.sentAt).length}
+                {reminderStats?.selesai ?? 0}
               </div>
               <p className="text-gray-600">Terkirim</p>
             </div>
