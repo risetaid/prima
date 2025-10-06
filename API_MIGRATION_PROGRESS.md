@@ -8,7 +8,7 @@
 
 ## 📊 Migration Status
 
-### ✅ COMPLETED MIGRATIONS (3 routes)
+### ✅ COMPLETED MIGRATIONS (13 routes)
 
 1. **`/api/user/profile`** ✅
    - Migrated to `createApiHandler` with `auth: "optional"`
@@ -26,11 +26,98 @@
    - Patient access control preserved
    - Response format standardized
 
+4. **`/api/admin/users`** ✅
+   - Admin/Developer access control preserved
+   - Query parameter validation for status, search, pagination
+   - Soft delete filtering maintained
+
+5. **`/api/cms/articles`** ✅
+   - Article CRUD operations migrated
+   - Category and status filtering
+   - Admin-only access preserved
+   - Slug generation logic maintained
+
+6. **`/api/templates`** ✅
+   - Template listing with caching
+   - Category filtering with Zod validation
+   - Redis caching integrated
+
+7. **`/api/auth/clear-cache`** ✅
+   - Emergency cache clearing for developers
+   - Direct Clerk auth integration
+   - Session and profile cache invalidation
+
+8. **`/api/auth/update-last-login`** ✅
+   - Clerk user auto-sync functionality
+   - First user admin assignment
+   - Background login updates
+
+9. **`/api/dashboard/overview`** ✅
+   - Role-based dashboard data
+   - Compliance rate calculations
+   - 3-minute caching for performance
+
+10. **`/api/health`** ✅
+    - System health monitoring
+    - Redis and database status checks
+    - Optional auth (accessible for monitoring)
+
+11. **`/api/patients/[id]/deactivate`** ✅
+    - Patient deactivation workflow
+    - WhatsApp notification integration
+    - Cache invalidation
+
+12. **`/api/patients/[id]/reactivate`** ✅
+    - Patient reactivation service
+    - Volunteer identification
+    - Patient service integration
+
+13. **`/api/user/session`** ✅
+    - Complex session management (partial migration)
+    - Fallback authentication logic
+    - Cache integration maintained
+
 ### 🔄 PARTIALLY MIGRATED (0 routes)
 
 None currently.
 
-### ❌ NOT YET MIGRATED (35 routes)
+### ❌ NOT YET MIGRATED (25 routes)
+
+**High Priority APIs (remaining):**
+- `/api/admin/users/[userId]` - User detail management
+- `/api/cms/articles/[id]` - Article detail operations
+- `/api/cms/videos` - Video management
+- `/api/cms/videos/[id]` - Video detail operations
+- `/api/cms/content` - General content management
+
+**Auth APIs (remaining):**
+- `/api/auth/debug` - Debug endpoint
+
+**Patient APIs (remaining):**
+- `/api/patients/with-compliance` - Compliance reporting
+- `/api/patients/[id]/manual-verification` - Manual verification
+- `/api/patients/[id]/send-verification` - Send verification
+- `/api/patients/[id]/reminders/stats` - Reminder statistics
+- `/api/patients/[id]/reminders/[reminderId]/confirm` - Confirm reminders
+- `/api/patients/[id]/verification-history` - Verification history
+
+**Admin APIs (remaining):**
+- `/api/admin/developer-contact` - Developer contact
+- `/api/admin/sync-clerk` - Clerk synchronization
+- `/api/admin/templates` - Template management
+- `/api/admin/templates/seed` - Template seeding
+- `/api/admin/templates/[id]` - Template detail operations
+- `/api/admin/verification-analytics` - Analytics
+
+**System APIs (remaining):**
+- `/api/cron/cleanup-conversations` - Conversation cleanup
+- `/api/debug/webhook` - Webhook debugging
+- `/api/upload` - File upload
+- `/api/user/status` - User status
+- `/api/webhooks/clerk` - Clerk webhooks
+- `/api/webhooks/fonnte/incoming` - Fonnte incoming messages
+- `/api/webhooks/fonnte/message-status` - Fonnte status updates
+- `/api/youtube/fetch` - YouTube integration
 
 **Admin APIs (7):**
 - `/api/admin/developer-contact`
@@ -193,10 +280,10 @@ Based on usage and criticality:
 - ✅ Type safety with Zod schemas
 
 ### Expected Total Impact
-- **API Routes**: 38 total → 38 migrated
-- **Estimated Code Reduction**: 10-15%
-- **Consistency**: 100% standardized patterns
-- **Type Safety**: 100% validation coverage
+- **API Routes**: 38 total → 13 migrated (34.2% complete)
+- **Estimated Code Reduction**: 10-15% (achieved in migrated routes)
+- **Consistency**: 34.2% standardized patterns
+- **Type Safety**: 34.2% validation coverage
 
 ---
 

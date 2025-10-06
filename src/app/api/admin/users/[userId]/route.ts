@@ -1,29 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser, type AdminUser } from '@/lib/auth-utils'
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
+import { type AdminUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/datetime'
 import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+const adminUserParamsSchema = z.object({
+  userId: z.string().uuid(),
+});
 
+const userActionQuerySchema = z.object({
+  action: z.enum(['approve', 'reject', 'toggle-role', 'toggle-status']),
+});
+
+const toggleRoleBodySchema = z.object({
+  role: z.enum(["ADMIN", "RELAWAN", "DEVELOPER"]),
+});
+
+// GET /api/admin/users/[userId] - Get user details for admin
+export const GET = createApiHandler(
+  { auth: "required", params: adminUserParamsSchema },
+  async (_, { user, params }) => {
     // Only admins and developers can access user management
-    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      )
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { userId } = await params
+    const { userId } = params!
 
     // Get user details
     const userResult = await db
@@ -50,19 +55,11 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({
-      success: true,
+    return {
       user: userResult[0]
-    })
-
-  } catch (error: unknown) {
-    logger.error("Error fetching user details:", error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error'
-    }, { status: 500 })
+    };
   }
-}
+);
 
 export async function POST(
   request: NextRequest,

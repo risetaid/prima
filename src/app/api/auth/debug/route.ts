@@ -1,27 +1,33 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { createApiHandler } from '@/lib/api-helpers'
 import { auth, currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
+import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-import { logger } from '@/lib/logger';
-export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Debug endpoint disabled in production' }, { status: 403 })
+const debugQuerySchema = z.object({
+  type: z.enum(['email', 'user']).default('user'),
+});
+
+// GET /api/auth/debug - Debug endpoint for development
+export const GET = createApiHandler(
+  { auth: "required", query: debugQuerySchema },
+  async (_, { user, query }) => {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Debug endpoint disabled in production');
+    }
+
+    const { type } = query!;
+
+    if (type === 'email') {
+      return await debugEmail();
+    } else if (type === 'user') {
+      return await debugUser();
+    }
+
+    throw new Error('Invalid debug type. Use ?type=email or ?type=user');
   }
-
-  const { searchParams } = new URL(request.url)
-  const debugType = searchParams.get('type') || 'user'
-
-  if (debugType === 'email') {
-    return await debugEmail()
-  } else if (debugType === 'user') {
-    return await debugUser()
-  }
-
-  return NextResponse.json({ 
-    error: 'Invalid debug type. Use ?type=email or ?type=user' 
-  }, { status: 400 })
-}
+);
 
 async function debugEmail() {
   try {
@@ -29,7 +35,7 @@ async function debugEmail() {
     const user = await currentUser()
     
     if (!userId || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new Error('Unauthorized');
     }
 
     const email = user.primaryEmailAddress?.emailAddress || ''
@@ -62,7 +68,7 @@ async function debugEmail() {
       .from(users)
       .where(eq(users.email, email))
 
-    return NextResponse.json({
+    return {
       currentClerkId: userId,
       currentEmail: email,
       userByClerkId,
@@ -85,7 +91,7 @@ async function debugUser() {
     const user = await currentUser()
     
     if (!userId || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      throw new Error('Unauthorized');
     }
 
     const dbUserResult = await db
@@ -102,7 +108,7 @@ async function debugUser() {
     
     const totalUsers = totalUsersResult[0]?.count || 0
 
-    return NextResponse.json({
+    return {
       clerkUserId: userId,
       userFoundInDb: !!dbUser,
       userDetails: dbUser,
