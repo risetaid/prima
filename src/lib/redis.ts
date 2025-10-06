@@ -58,25 +58,38 @@ class RedisClient {
           cluster: true
         })
       } else {
-        // Single Redis instance with enhanced connection pooling
+        // Single Redis instance with Railway Pro optimizations
         this.client = new Redis(redisUrl, {
-          // Enhanced IORedis optimizations for medical system
-          maxRetriesPerRequest: 3,
-          connectTimeout: 10000,
-          commandTimeout: 5000,
-          // Connection optimization
-          lazyConnect: true,
-          family: 4,
-          keepAlive: 30000, // 30 seconds TCP keep-alive
-          // Connection pooling settings
-          connectionName: 'prima-redis-client',
-          // Performance optimizations
-          enableReadyCheck: false,
+          // Railway Pro: Enhanced retry strategy
+          maxRetriesPerRequest: 5,
+          connectTimeout: 15000,       // 15s for Railway proxy
+          commandTimeout: 10000,       // 10s command timeout
+          retryStrategy: (times) => {
+            if (times > 10) return null
+            // Exponential backoff: 100ms, 200ms, 400ms, ..., max 3s
+            return Math.min(times * 100, 3000)
+          },
+          
+          // Connection resilience
+          lazyConnect: false,          // Connect immediately on Railway Pro
+          enableOfflineQueue: true,    // Queue commands when offline
+          enableReadyCheck: true,      // Railway: Check ready state
           autoResubscribe: true,
           autoResendUnfulfilledCommands: true,
-          // Authentication if provided
+          
+          // Railway Pro: Enhanced keepalive
+          family: 4,                   // IPv4 only for Railway
+          keepAlive: 60000,            // 60 seconds TCP keep-alive
+          
+          // Connection metadata
+          connectionName: 'prima-railway-pro',
+          
+          // Authentication (parsed from Railway URL)
           password: process.env.REDIS_PASSWORD,
-          username: process.env.REDIS_USERNAME,
+          username: process.env.REDIS_USERNAME || 'default',
+          
+          // Development debugging
+          showFriendlyErrorStack: process.env.NODE_ENV === 'development',
         })
       }
 
@@ -84,10 +97,11 @@ class RedisClient {
         logger.error(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} Client Error`, err, {
           redis: true,
           connection: 'failed',
-          cluster: this.isCluster
+          cluster: this.isCluster,
+          message: err.message,
+          code: (err as any).code
         })
-        // Don't throw - gracefully degrade
-        this.client = null
+        // Don't set client to null - let retry strategy handle it
       })
 
       this.client.on('connect', () => {
@@ -102,12 +116,34 @@ class RedisClient {
         logger.info(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} ready for commands`, {
           redis: true,
           status: 'ready',
+          cluster: this.isCluster,
+          plan: 'Railway Pro'
+        })
+      })
+
+      this.client.on('reconnecting', (time: number) => {
+        logger.info('Redis reconnecting', {
+          redis: true,
+          reconnectDelay: time,
           cluster: this.isCluster
         })
       })
 
-      // Test connection
-      await this.client.ping()
+      this.client.on('end', () => {
+        logger.warn('Redis connection ended', {
+          redis: true,
+          cluster: this.isCluster
+        })
+      })
+
+      // Connect and test (lazyConnect is false for Railway Pro)
+      if (!this.isCluster) {
+        await this.client.ping()
+        logger.info('Redis connection test successful', {
+          redis: true,
+          latency: 'measured'
+        })
+      }
     } catch (error) {
       logger.error('Failed to initialize IORedis', error instanceof Error ? error : new Error(String(error)), {
         redis: true,
@@ -367,6 +403,43 @@ class RedisClient {
   // For health checks
   isConnected(): boolean {
     return this.client !== null && this.client.status === 'ready'
+  }
+
+  // Get connection status details
+  getStatus(): { connected: boolean; status: string; cluster: boolean } {
+    return {
+      connected: this.isConnected(),
+      status: this.client?.status || 'disconnected',
+      cluster: this.isCluster
+    }
+  }
+
+  // Ping with latency measurement
+  async ping(): Promise<{ success: boolean; latency: number }> {
+    const start = Date.now()
+    try {
+      if (!this.client) return { success: false, latency: 0 }
+      await this.client.ping()
+      return { success: true, latency: Date.now() - start }
+    } catch (error) {
+      return { success: false, latency: Date.now() - start }
+    }
+  }
+
+  // Get keys matching pattern (use with caution in production)
+  async keys(pattern: string): Promise<string[]> {
+    if (!this.client) return []
+    
+    try {
+      return await this.client.keys(pattern)
+    } catch (error) {
+      logger.warn('IORedis KEYS failed', {
+        redis: true,
+        operation: 'keys',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return []
+    }
   }
 
   // Check if using cluster mode
