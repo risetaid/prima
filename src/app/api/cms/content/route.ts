@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const isPublic = searchParams.get("public") === "true";
     const isEnhanced = searchParams.get("enhanced") === "true";
+    const statsOnly = searchParams.get("stats_only") === "true";
 
     // Different authentication requirements based on access type
     let user;
@@ -59,6 +60,60 @@ export async function GET(request: NextRequest) {
       if (!user || !["ADMIN", "DEVELOPER"].includes(user.role)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+    }
+
+    // Handle stats_only parameter - return only statistics without content
+    if (statsOnly) {
+      let stats;
+      try {
+        stats = await Promise.all([
+          // Article stats (exclude deleted)
+          db.select({ count: count() }).from(cmsArticles).where(isNull(cmsArticles.deletedAt)),
+          db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, "PUBLISHED"), isNull(cmsArticles.deletedAt))),
+          db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, "DRAFT"), isNull(cmsArticles.deletedAt))),
+          // Video stats (exclude deleted)
+          db.select({ count: count() }).from(cmsVideos).where(isNull(cmsVideos.deletedAt)),
+          db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, "PUBLISHED"), isNull(cmsVideos.deletedAt))),
+          db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, "DRAFT"), isNull(cmsVideos.deletedAt))),
+        ]);
+      } catch (statsError) {
+        logger.error("CMS statistics query failed", statsError instanceof Error ? statsError : new Error(String(statsError)));
+        return NextResponse.json({
+          success: false,
+          error: "Failed to fetch statistics"
+        }, { status: 500 });
+      }
+
+      const statistics = {
+        articles: {
+          total: stats[0][0]?.count || 0,
+          published: stats[1][0]?.count || 0,
+          draft: stats[2][0]?.count || 0,
+        },
+        videos: {
+          total: stats[3][0]?.count || 0,
+          published: stats[4][0]?.count || 0,
+          draft: stats[5][0]?.count || 0,
+        },
+        total: {
+          content: (stats[0][0]?.count || 0) + (stats[3][0]?.count || 0),
+          published: (stats[1][0]?.count || 0) + (stats[4][0]?.count || 0),
+          draft: (stats[2][0]?.count || 0) + (stats[5][0]?.count || 0),
+        },
+      };
+
+      logger.info('CMS statistics retrieved successfully', {
+        api: true,
+        cms: true,
+        stats: true,
+        userRole: user?.role,
+      });
+
+      return NextResponse.json({
+        success: true,
+        statistics,
+        data: [] // Empty data array for stats_only requests
+      });
     }
 
     // For public access, only return published content
