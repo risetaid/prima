@@ -37,11 +37,23 @@ export default function AdminPanelPage() {
       const usersResponse = await fetch("/api/admin/users");
       if (usersResponse.ok) {
         const usersData = await usersResponse.json();
+        logger.info("Admin users API response", {
+          hasUsers: !!usersData.users,
+          usersCount: usersData.users?.length,
+          pagination: usersData.pagination,
+          pendingCount: usersData.pendingCount,
+          totalInPagination: usersData.pagination?.total
+        });
         setStats((prev) => ({
           ...prev,
           pendingUsers: usersData.pendingCount || 0,
-          totalUsers: usersData.count || 0,
+          totalUsers: usersData.pagination?.total || 0,
         }));
+      } else {
+        logger.error("Failed to fetch admin users", undefined, {
+          status: usersResponse.status,
+          statusText: usersResponse.statusText
+        });
       }
 
       // Fetch template stats

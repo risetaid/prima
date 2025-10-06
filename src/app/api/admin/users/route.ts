@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, users } from "@/db";
-import { eq, desc, asc, ilike, or, and } from "drizzle-orm";
+import { eq, desc, asc, ilike, and, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 
@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
     const approver = alias(users, "approver");
 
     // Build where conditions
-    const whereConditions = [];
-    
+    const whereConditions = [isNull(users.deletedAt)]; // Always exclude deleted users
+
     // Status filter
     if (status === "pending") {
       whereConditions.push(eq(users.isApproved, false));
@@ -51,11 +51,7 @@ export async function GET(request: NextRequest) {
     // Search filter
     if (search) {
       whereConditions.push(
-        or(
-          ilike(users.firstName, `%${search}%`),
-          ilike(users.lastName, `%${search}%`),
-          ilike(users.email, `%${search}%`)
-        )
+        ilike(users.email, `%${search}%`)
       );
     }
 
@@ -83,7 +79,7 @@ export async function GET(request: NextRequest) {
       .leftJoin(approver, eq(users.approvedBy, approver.id));
 
     // Apply where conditions if any
-    const finalQuery = whereConditions.length > 0 
+    const finalQuery = whereConditions.length > 0
       ? query.where(and(...whereConditions))
       : query;
 
