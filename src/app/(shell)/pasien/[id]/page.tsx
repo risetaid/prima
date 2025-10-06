@@ -18,9 +18,10 @@ import { PatientProfileTabCombined } from "@/components/patient/patient-profile-
 import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
 import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
 import PatientResponseHistoryTab from "@/components/patient/patient-response-history-tab";
+import { NavigationCard, NavigationItem } from "@/components/patient/navigation-card";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { Patient as SchemaPatient } from "@/db/schema";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, User, CheckCircle, Bell, MessageSquare } from "lucide-react";
 
 interface Patient extends SchemaPatient {
   complianceRate: number;
@@ -84,6 +85,34 @@ export default function PatientDetailPage() {
 
   // Ref to track previous verification status for toast notifications
   const prevVerificationStatus = useRef<string | null>(null);
+
+  // Navigation items for mobile
+  const navigationItems: NavigationItem[] = [
+    {
+      id: "profile",
+      icon: <User className="w-6 h-6" />,
+      label: "Profil Pasien",
+      description: "Informasi pribadi dan medis",
+    },
+    {
+      id: "verification",
+      icon: <CheckCircle className="w-6 h-6" />,
+      label: "Status Verifikasi",
+      description: "Verifikasi WhatsApp",
+    },
+    {
+      id: "reminders",
+      icon: <Bell className="w-6 h-6" />,
+      label: "Pengingat",
+      description: "Jadwal dan statistik",
+    },
+    {
+      id: "responses",
+      icon: <MessageSquare className="w-6 h-6" />,
+      label: "Riwayat Respon",
+      description: "Komunikasi pasien",
+    },
+  ];
 
   const fetchPatient = useCallback(async (id: string, isPolling = false) => {
     try {
@@ -676,11 +705,11 @@ export default function PatientDetailPage() {
             onToggleStatus={handleToggleStatus}
           />
 
-          {/* Main Content Tabs */}
+          {/* Desktop: Tabs (hidden on mobile) */}
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="space-y-6"
+            className="hidden lg:block space-y-6"
           >
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="profile">Profil</TabsTrigger>
@@ -730,6 +759,50 @@ export default function PatientDetailPage() {
               />
             </TabsContent>
           </Tabs>
+
+          {/* Mobile: Navigation Cards + Content (hidden on desktop) */}
+          <div className="lg:hidden space-y-6">
+            <NavigationCard
+              items={navigationItems}
+              activeItem={activeTab}
+              onItemClick={setActiveTab}
+            />
+            
+            {/* Content based on active item */}
+            {activeTab === "profile" && (
+              <PatientProfileTabCombined
+                patient={patient}
+                isEditingProfile={isEditingProfile}
+                setIsEditingProfile={setIsEditingProfile}
+                profileForm={profileForm}
+                setProfileForm={setProfileForm}
+                handleSaveProfile={handleSaveProfile}
+                handleCancelProfile={handleCancelProfile}
+              />
+            )}
+            {activeTab === "verification" && (
+              <PatientVerificationTab
+                patient={patient}
+                onUpdate={() => fetchPatient(params.id as string)}
+                onTabChange={setActiveTab}
+              />
+            )}
+            {activeTab === "reminders" && (
+              <PatientRemindersTab
+                patient={patient}
+                completedReminders={completedReminders}
+                reminderStats={reminderStats}
+                onAddReminder={handleAddReminder}
+                onViewReminders={handleViewReminders}
+              />
+            )}
+            {activeTab === "responses" && (
+              <PatientResponseHistoryTab
+                patientId={params.id as string}
+                patientName={patient?.name || ''}
+              />
+            )}
+          </div>
         </div>
       </main>
 
