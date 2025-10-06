@@ -17,7 +17,7 @@ import { ReminderTemplatesService } from "@/services/reminder/reminder-templates
 
 import { db, patients, reminders } from "@/db";
 import { ReminderError } from "@/services/reminder/reminder.types";
-import { requirePatientAccess } from "@/lib/patient-access-control";
+import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { eq, and, gte, lte, isNull } from "drizzle-orm";
 
 // Type definitions for reminder types
@@ -192,7 +192,7 @@ export class ReminderService {
     if (!reminder) throw new NotFoundError("Reminder not found");
 
     // Check patient access control
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       userId,
       userRole,
       reminder.patientId,
@@ -234,7 +234,7 @@ export class ReminderService {
     if (!reminder) throw new NotFoundError("Reminder not found");
 
     // Check patient access control
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       userId,
       userRole,
       reminder.patientId,
@@ -260,7 +260,7 @@ export class ReminderService {
     if (!reminder) throw new NotFoundError("Reminder not found");
 
     // Check patient access control
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       userId,
       userRole,
       reminder.patientId,
@@ -276,7 +276,7 @@ export class ReminderService {
     userRole: string
   ) {
     // Check patient access control
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       userId,
       userRole,
       patientId,
@@ -460,7 +460,7 @@ export class ReminderService {
   ) {
     // Check patient access control if userId and userRole provided
     if (userId && userRole) {
-      await requirePatientAccess(
+      await PatientAccessControl.requireAccess(
         userId,
         userRole,
         patientId,

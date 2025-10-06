@@ -359,25 +359,8 @@ export async function requireDeveloper(): Promise<DeveloperUser> {
   return user as DeveloperUser;
 }
 
-export async function requireAdminOrDeveloper(): Promise<AdminUser> {
-  const user = await requireApprovedUser();
-
-  if (user.role !== "ADMIN" && user.role !== "DEVELOPER") {
-    redirect("/unauthorized");
-  }
-
-  return user as AdminUser;
-}
-
-export async function requireDeveloperOnly(): Promise<DeveloperUser> {
-  const user = await requireApprovedUser();
-
-  if (user.role !== "DEVELOPER") {
-    redirect("/unauthorized");
-  }
-
-  return user as DeveloperUser;
-}
+// Note: requireAdminOrDeveloper() removed - use requireAdmin() instead (functionally identical)
+// Note: requireDeveloperOnly() removed - use requireDeveloper() instead (functionally identical)
 
 export async function getUserPatients(userId: string, userRole: string = "VOLUNTEER") {
   try {

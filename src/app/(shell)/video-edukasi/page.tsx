@@ -26,7 +26,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
-import { CMSContentListSkeleton } from "@/components/ui/dashboard-skeleton";
+import { VideoCardSkeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/ui/header";
 import { ThumbnailImage } from "@/components/ui/optimized-image";
 import { logger } from "@/lib/logger";
@@ -542,7 +542,11 @@ export default function VideoPage() {
   if (loading) {
     return (
       <Layout>
-        <CMSContentListSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <VideoCardSkeleton key={i} />
+          ))}
+        </div>
       </Layout>
     );
   }

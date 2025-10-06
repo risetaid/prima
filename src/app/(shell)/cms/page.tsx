@@ -14,9 +14,9 @@ import { FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  DashboardStatsCardsSkeleton,
-  CMSContentListSkeleton,
-} from "@/components/ui/dashboard-skeleton";
+  DashboardStatsSkeleton,
+  ArticleCardSkeleton,
+} from "@/components/ui/skeleton";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { CMSStatsCards } from "@/components/cms/CMSStatsCards";
 import { CMSContentItem } from "@/components/cms/CMSContentItem";
@@ -282,7 +282,7 @@ function CMSPageContent() {
         </div>
 
         {/* Stats Cards Skeleton */}
-        <DashboardStatsCardsSkeleton />
+        <DashboardStatsSkeleton />
 
         {/* Content Tabs Skeleton */}
         <Card>
@@ -301,7 +301,11 @@ function CMSPageContent() {
                 ))}
               </div>
             </div>
-            <CMSContentListSkeleton />
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <ArticleCardSkeleton key={i} />
+              ))}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -312,7 +316,7 @@ function CMSPageContent() {
     <div className="space-y-6">
       {/* Statistics Cards */}
       {statsLoading ? (
-        <DashboardStatsCardsSkeleton />
+        <DashboardStatsSkeleton />
       ) : statistics ? (
         <CMSStatsCards statistics={statistics} />
       ) : null}
@@ -350,7 +354,11 @@ function CMSPageContent() {
             <TabsContent value={activeTab} className="mt-6">
               {contentLoading ? (
                 <div className="py-6">
-                  <CMSContentListSkeleton />
+                  <div className="space-y-4">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <ArticleCardSkeleton key={i} />
+                    ))}
+                  </div>
                 </div>
               ) : content.length === 0 ? (
                 <div className="text-center py-12">

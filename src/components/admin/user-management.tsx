@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AdminUsersTableSkeleton } from "@/components/ui/dashboard-skeleton";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import {
   RefreshCw,
 } from "lucide-react";
@@ -183,7 +183,7 @@ export default function UserManagement() {
     return () => clearInterval(autoSync);
   }, [handleClerkSync, fetchUsers]);
 
-  if (loading) return <AdminUsersTableSkeleton />;
+  if (loading) return <TableSkeleton rows={10} columns={6} />;
 
   const pendingUsers = users.filter((user) => !user.isApproved);
 

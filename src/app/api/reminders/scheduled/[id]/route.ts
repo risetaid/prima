@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getWIBTime } from "@/lib/datetime";
 
 import { invalidateReminderCache } from "@/lib/cache";
-import { requirePatientAccess } from "@/lib/patient-access-control";
+import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { z } from "zod";
 
 const updateReminderBodySchema = z.object({
@@ -60,7 +60,7 @@ export const PUT = createApiHandler(
     const patientId = reminderResult[0].patientId;
 
     // Check role-based access to this patient's reminder
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       context.user!.id,
       context.user!.role,
       patientId,
@@ -125,7 +125,7 @@ export const DELETE = createApiHandler(
     const reminder = reminderResult[0];
 
     // Check role-based access to this patient's reminder
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       context.user!.id,
       context.user!.role,
       reminder.patientId,

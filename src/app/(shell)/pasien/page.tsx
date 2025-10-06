@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Plus } from 'lucide-react'
 import { Header } from '@/components/ui/header'
 import { MobileHeader } from '@/components/ui/mobile-header'
-import { ReminderPageSkeleton } from '@/components/ui/dashboard-skeleton'
+import { PatientListSkeleton, DashboardHeaderSkeleton } from '@/components/ui/skeleton'
 import Image from 'next/image'
 import { Calendar, Newspaper, Video } from 'lucide-react'
 import { logger } from '@/lib/logger'
@@ -134,7 +134,12 @@ export default function PatientPage() {
   }
 
   if (loading) {
-    return <ReminderPageSkeleton />
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <DashboardHeaderSkeleton />
+        <PatientListSkeleton count={5} />
+      </div>
+    )
   }
 
   return (

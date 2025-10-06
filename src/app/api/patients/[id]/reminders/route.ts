@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
-import { requirePatientAccess } from "@/lib/patient-access-control";
+import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations, patients } from "@/db";
 import { eq, and, isNull, or, desc, asc, gte, lte, inArray, notExists } from "drizzle-orm";
@@ -84,7 +84,7 @@ export async function GET(
     const { id: patientId } = await params;
 
     // Check patient access control
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       user.id,
       user.role,
       patientId,
@@ -553,7 +553,7 @@ export async function POST(
     const { id } = await params;
 
     // Check role-based access to this patient
-    await requirePatientAccess(
+    await PatientAccessControl.requireAccess(
       user.id,
       user.role,
       id,

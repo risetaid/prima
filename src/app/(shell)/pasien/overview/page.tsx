@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useEffect } from "react";
 import DashboardClient from "@/app/(shell)/pasien/dashboard-client";
 import { Header } from "@/components/ui/header";
-import { DashboardSkeleton } from "@/components/ui/dashboard-skeleton";
+import { DashboardHeaderSkeleton, PatientListSkeleton } from "@/components/ui/skeleton";
 
 export default function DashboardPage() {
   const { isLoaded } = useUser();
@@ -32,7 +32,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Dashboard Skeleton */}
-        <DashboardSkeleton />
+        <DashboardHeaderSkeleton />
+        <PatientListSkeleton count={5} />
       </div>
     );
   }

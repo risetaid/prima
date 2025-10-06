@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { LazyTemplateManagement } from "@/components/admin/lazy-components";
-import { TemplateManagementSkeleton } from "@/components/ui/dashboard-skeleton";
+import { FormSkeleton } from "@/components/ui/skeleton";
 import { Header } from "@/components/ui/header";
 import { ArrowLeft, MessageSquareText } from "lucide-react";
 import { toast } from "sonner";
@@ -122,7 +122,7 @@ export default function AdminTemplatesPage() {
         {/* Main Content with Skeleton */}
         <main className="relative z-10">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            <TemplateManagementSkeleton />
+            <FormSkeleton fields={6} />
           </div>
         </main>
       </div>
