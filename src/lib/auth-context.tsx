@@ -23,12 +23,12 @@ interface AuthContextState {
 
 const AuthContext = createContext<AuthContextState | undefined>(undefined);
 
-// Cache configuration
+// Cache configuration - Phase 2 optimizations
 const CACHE_KEY = "prima_user_auth_status";
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const RETRY_DELAY = 2000; // 2 seconds
-const MAX_RETRIES = 2; // Reduced to prevent infinite loops
-const BACKGROUND_FETCH_COOLDOWN = 60000; // 1 minute cooldown between background fetches
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes (was 5)
+const RETRY_DELAY = 1000; // 1 second (was 2)
+const MAX_RETRIES = 1; // 1 retry (was 2)
+const BACKGROUND_FETCH_COOLDOWN = 5 * 60 * 1000; // 5 minutes (was 1)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded: userLoaded } = useUser();
@@ -84,9 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Helper function to fetch user status with retry logic
   const fetchUserStatus = useCallback(async (attempt = 1): Promise<UserStatusData> => {
     try {
-      // Add timeout to prevent hanging requests
+      // Add timeout to prevent hanging requests - Phase 2: Reduced from 10s to 5s
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch("/api/user/status", {
         headers: {

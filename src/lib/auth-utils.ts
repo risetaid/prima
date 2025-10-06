@@ -135,8 +135,8 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
 
   // Get user from database using Clerk ID with enhanced retry logic and transaction safety
   let dbUserResult;
-  let retries = 3;
-  const baseDelay = 200;
+  let retries = 2; // Phase 2: Reduced from 3 to 2
+  const baseDelay = 100; // Phase 2: Reduced from 200ms to 100ms
 
   while (retries > 0) {
     try {
@@ -150,11 +150,12 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
           .limit(1);
 
         if (existingUser[0]) {
-          // Update last login timestamp atomically
-          await tx
-            .update(users)
-            .set({ lastLoginAt: new Date() })
-            .where(eq(users.clerkId, userId));
+          // Phase 2: Removed lastLoginAt update from hot path for performance
+          // This was causing an extra UPDATE query on every authentication request
+          // Consider implementing a periodic background job if this metric is needed
+          // 
+          // Previous code (removed):
+          // await tx.update(users).set({ lastLoginAt: new Date() }).where(eq(users.clerkId, userId));
 
           return existingUser[0];
         }
