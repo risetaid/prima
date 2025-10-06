@@ -163,6 +163,32 @@ export async function invalidateReminderCache(patientId: string): Promise<void> 
   await invalidateMultiple(keysToInvalidate);
 }
 
+/**
+ * Dashboard cache invalidation (Phase 4 optimization)
+ * Invalidates dashboard overview cache for a specific user
+ */
+export async function invalidateDashboardCache(userId: string): Promise<void> {
+  await del(`dashboard:overview:${userId}`);
+}
+
+/**
+ * Invalidate all dashboard caches (when patient data changes affect multiple users)
+ */
+export async function invalidateAllDashboardCaches(): Promise<void> {
+  try {
+    // Use Redis SCAN to find all dashboard cache keys
+    const keys = await redis.keys('dashboard:overview:*');
+    if (keys.length > 0) {
+      await Promise.all(keys.map(key => del(key)));
+      logger.info(`Invalidated ${keys.length} dashboard caches`, { cache: true });
+    }
+  } catch (error: unknown) {
+    logger.warn("Failed to invalidate all dashboard caches", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 // ===== EXPORTS =====
 
 export const simpleCache: SimpleCache = {

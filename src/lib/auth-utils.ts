@@ -135,8 +135,8 @@ async function performGetCurrentUser(userId: string): Promise<AuthUser | null> {
 
   // Get user from database using Clerk ID with enhanced retry logic and transaction safety
   let dbUserResult;
-  let retries = 2; // Phase 2: Reduced from 3 to 2
-  const baseDelay = 100; // Phase 2: Reduced from 200ms to 100ms
+  let retries = 2; // Phase 3: Optimized retry count
+  const baseDelay = 50; // Phase 3: Reduced from 100ms to 50ms for faster auth
 
   while (retries > 0) {
     try {

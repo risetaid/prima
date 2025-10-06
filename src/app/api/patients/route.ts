@@ -16,6 +16,7 @@ import { createApiHandler } from "@/lib/api-helpers";
 import { PatientService } from "@/services/patient/patient.service";
 import type { PatientFilters } from "@/services/patient/patient.types";
 import { ValidationError } from "@/services/patient/patient.types";
+import { invalidateAllDashboardCaches } from "@/lib/cache";
 
 interface CreatePatientBody {
   name: string;
@@ -73,6 +74,11 @@ export const POST = createApiHandler(
     }
 
     const service = new PatientService();
-    return await service.createPatient(body, { id: user!.id, role: user!.role });
+    const result = await service.createPatient(body, { id: user!.id, role: user!.role });
+    
+    // Invalidate dashboard caches since patient list changed (Phase 4 optimization)
+    await invalidateAllDashboardCaches();
+    
+    return result;
   }
 );

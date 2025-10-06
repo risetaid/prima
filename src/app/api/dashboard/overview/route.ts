@@ -3,7 +3,7 @@ import { db, patients } from "@/db";
 import { eq, and, isNull, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { ComplianceService } from "@/services/patient/compliance.service";
-
+import { get, set, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
 import { logger } from '@/lib/logger';
 export async function GET() {
   try {
@@ -12,6 +12,14 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Try to get from cache first (Phase 4 optimization)
+    const cacheKey = `dashboard:overview:${user.id}`;
+    const cachedData = await get<any>(cacheKey);
+    if (cachedData) {
+      logger.info("Dashboard overview cache hit", { userId: user.id, cache: true });
+      return NextResponse.json(cachedData);
     }
 
     // Combine all dashboard data in optimized Drizzle queries
@@ -119,7 +127,7 @@ export async function GET() {
           inactivePatients: 0,
         };
 
-    return NextResponse.json({
+    const responseData = {
       user: {
         id: user.id,
         role: user.role,
@@ -129,7 +137,14 @@ export async function GET() {
       },
       patients: patientsFormatted,
       stats,
-    });
+    };
+
+    // Cache the dashboard data (Phase 4 optimization)
+    // Use shorter TTL for dashboard since patient data changes frequently
+    await set(cacheKey, responseData, 180); // 3 minutes
+    logger.info("Dashboard overview cached", { userId: user.id, cache: true });
+
+    return NextResponse.json(responseData);
   } catch (error: unknown) {
     logger.error("Error fetching dashboard overview:", error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json(

@@ -19,7 +19,8 @@
     "db:studio": "drizzle-kit studio",
     "nuke-recreate-db": "bun run scripts/nuke-recreate-database.ts",
     "setup-first-user": "bun run scripts/setup-first-user.ts",
-    "start-message-worker": "bun run scripts/start-message-worker.ts"
+    "start-message-worker": "bun run scripts/start-message-worker.ts",
+    "db:apply-indexes": "bun run scripts/apply-indexes.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.63.0",
