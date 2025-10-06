@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
     const isPublic = searchParams.get("public") === "true";
     const isEnhanced = searchParams.get("enhanced") === "true";
+    const statsOnly = searchParams.get("stats_only") === "true";
 
     // Different authentication requirements based on access type
     let user;
@@ -64,6 +65,56 @@ export async function GET(request: NextRequest) {
     // For public access, only return published content
     const effectiveStatus = isPublic ? "published" : status;
     const effectivePublished = isPublic ? true : published;
+
+    // If stats_only is requested, skip content queries and return only statistics
+    logger.info('🔍 Request params check', { statsOnly, isPublic, shouldSkipContent: statsOnly && !isPublic });
+    
+    if (statsOnly && !isPublic) {
+      logger.info('Statistics-only request received');
+      
+      let stats;
+      try {
+        stats = await Promise.all([
+          // Article stats (exclude deleted)
+          db.select({ count: count() }).from(cmsArticles).where(isNull(cmsArticles.deletedAt)),
+          db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, "PUBLISHED"), isNull(cmsArticles.deletedAt))),
+          db.select({ count: count() }).from(cmsArticles).where(and(eq(cmsArticles.status, "DRAFT"), isNull(cmsArticles.deletedAt))),
+          // Video stats (exclude deleted)
+          db.select({ count: count() }).from(cmsVideos).where(isNull(cmsVideos.deletedAt)),
+          db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, "PUBLISHED"), isNull(cmsVideos.deletedAt))),
+          db.select({ count: count() }).from(cmsVideos).where(and(eq(cmsVideos.status, "DRAFT"), isNull(cmsVideos.deletedAt))),
+        ]);
+      } catch (statsError) {
+        logger.error("CMS statistics query failed", statsError instanceof Error ? statsError : new Error(String(statsError)));
+        stats = [[], [], [], [], [], []];
+      }
+
+      const statistics = {
+        articles: {
+          total: stats[0][0]?.count || 0,
+          published: stats[1][0]?.count || 0,
+          draft: stats[2][0]?.count || 0,
+        },
+        videos: {
+          total: stats[3][0]?.count || 0,
+          published: stats[4][0]?.count || 0,
+          draft: stats[5][0]?.count || 0,
+        },
+        total: {
+          content: (stats[0][0]?.count || 0) + (stats[3][0]?.count || 0),
+          published: (stats[1][0]?.count || 0) + (stats[4][0]?.count || 0),
+          draft: (stats[2][0]?.count || 0) + (stats[5][0]?.count || 0),
+        },
+      };
+
+      logger.info('Statistics-only response', { statistics });
+
+      return NextResponse.json({
+        success: true,
+        data: [],
+        statistics
+      });
+    }
 
     // Try cache for published content
     if (isPublic) {
@@ -89,8 +140,8 @@ export async function GET(request: NextRequest) {
 
       // Published filter (from effectivePublished query param)
       // NOTE: This can be redundant with effectiveStatus filter above when isPublic=true
-      // TODO: Refactor to eliminate redundancy
-      if (effectivePublished !== undefined && effectiveStatus === "all") {
+      // Only apply this filter if published param is explicitly set (not null/undefined)
+      if (effectivePublished !== undefined && effectivePublished !== null && effectiveStatus === "all") {
         const statusField = contentType === 'article' ? cmsArticles.status : cmsVideos.status;
         // Handle both boolean true and string "true"
         if (effectivePublished === true || effectivePublished === "true") {
@@ -138,8 +189,19 @@ export async function GET(request: NextRequest) {
     let articles: UnifiedContent[] = [];
     if (type === "all" || type === "articles") {
       const articleConditions = buildConditions('article');
-
-      const articleResults = await db
+      
+      logger.info('Fetching articles', { 
+        type, 
+        status, 
+        effectiveStatus, 
+        published, 
+        effectivePublished,
+        limit,
+        conditionsCount: articleConditions.length 
+      });
+      
+      try {
+        const articleResults = await db
         .select({
           id: cmsArticles.id,
           title: cmsArticles.title,
@@ -167,21 +229,36 @@ export async function GET(request: NextRequest) {
         )
         .limit(type === "articles" ? limit : Math.ceil(limit / 2))
         .offset(type === "articles" ? offset : 0);
+      
+        logger.info('Article results', { 
+          count: articleResults.length,
+          articles: articleResults.map(a => ({ id: a.id, title: a.title, status: a.status }))
+        });
 
-      articles = articleResults.map((article) => ({
-        id: article.id,
-        title: article.title,
-        slug: article.slug,
-        category: article.category,
-        status: article.status.toLowerCase() as "draft" | "published" | "archived",
-        publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
-        createdAt: article.createdAt.toISOString(),
-        updatedAt: article.updatedAt.toISOString(),
-        type: "article" as const,
-        thumbnailUrl: article.featuredImageUrl,
-        featuredImageUrl: article.featuredImageUrl,
-        authorName: article.authorName,
-      }));
+        articles = articleResults.map((article) => ({
+          id: article.id,
+          title: article.title,
+          slug: article.slug,
+          category: article.category,
+          status: article.status.toLowerCase() as "draft" | "published" | "archived",
+          publishedAt: article.publishedAt ? article.publishedAt.toISOString() : null,
+          createdAt: article.createdAt.toISOString(),
+          updatedAt: article.updatedAt.toISOString(),
+          type: "article" as const,
+          thumbnailUrl: article.featuredImageUrl,
+          featuredImageUrl: article.featuredImageUrl,
+          authorName: article.authorName,
+        }));
+      } catch (articleError) {
+        logger.error('Failed to fetch articles', articleError instanceof Error ? articleError : new Error(String(articleError)), {
+          type,
+          status,
+          effectiveStatus,
+          conditionsCount: articleConditions.length
+        });
+        // Continue with empty articles array
+        articles = [];
+      }
     }
 
     // Get videos
@@ -473,9 +550,12 @@ export async function GET(request: NextRequest) {
       isPublic,
       userRole: user?.role,
       itemCount: combinedContent.length,
+      articlesCount: articles.length,
+      videosCount: videos.length,
       type,
       status: effectiveStatus,
-      limit
+      limit,
+      responseDataLength: response.data.length
     });
 
     return NextResponse.json(response);
