@@ -65,13 +65,24 @@ class RedisClient {
           connectTimeout: 15000,       // 15s for Railway proxy
           commandTimeout: 10000,       // 10s command timeout
           retryStrategy: (times) => {
-            if (times > 10) return null
-            // Exponential backoff: 100ms, 200ms, 400ms, ..., max 3s
-            return Math.min(times * 100, 3000)
+            const delay = Math.min(times * 100, 3000)
+            logger.info(`Redis retry attempt ${times}, waiting ${delay}ms`, {
+              redis: true,
+              retry: times,
+              delay
+            })
+            if (times > 10) {
+              logger.error('Redis max retries exceeded', new Error('Max retries'), {
+                redis: true,
+                retries: times
+              })
+              return null
+            }
+            return delay
           },
           
-          // Connection resilience
-          lazyConnect: false,          // Connect immediately on Railway Pro
+          // Connection resilience  
+          lazyConnect: true,           // Use lazy connect for better error handling
           enableOfflineQueue: true,    // Queue commands when offline
           enableReadyCheck: true,      // Railway: Check ready state
           autoResubscribe: true,
@@ -94,14 +105,16 @@ class RedisClient {
       }
 
       this.client.on('error', (err: Error) => {
+        const errorCode = (err as Error & { code?: string }).code
         logger.error(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} Client Error`, err, {
           redis: true,
           connection: 'failed',
           cluster: this.isCluster,
           message: err.message,
-          code: (err as Error & { code?: string }).code
+          code: errorCode,
+          url: process.env.REDIS_URL ? 'set' : 'missing'
         })
-        // Don't set client to null - let retry strategy handle it
+        // Don't set client to null - keep trying to reconnect
       })
 
       this.client.on('connect', () => {
@@ -136,13 +149,24 @@ class RedisClient {
         })
       })
 
-      // Connect and test (lazyConnect is false for Railway Pro)
-      if (!this.isCluster) {
-        await this.client.ping()
-        logger.info('Redis connection test successful', {
-          redis: true,
-          latency: 'measured'
-        })
+      // Connect (lazyConnect is true, so connect manually)
+      if (!this.isCluster && this.client) {
+        try {
+          await this.client.connect()
+          // Test connection with ping
+          await this.client.ping()
+          logger.info('Redis connection established successfully', {
+            redis: true,
+            connected: true
+          })
+        } catch (connectError) {
+          logger.warn('Redis initial connection failed, will retry in background', {
+            redis: true,
+            error: connectError instanceof Error ? connectError.message : String(connectError),
+            willRetry: true
+          })
+          // Don't throw - let it retry in background
+        }
       }
     } catch (error) {
       logger.error('Failed to initialize IORedis', error instanceof Error ? error : new Error(String(error)), {
