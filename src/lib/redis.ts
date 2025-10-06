@@ -99,7 +99,7 @@ class RedisClient {
           connection: 'failed',
           cluster: this.isCluster,
           message: err.message,
-          code: (err as any).code
+          code: (err as Error & { code?: string }).code
         })
         // Don't set client to null - let retry strategy handle it
       })
@@ -421,7 +421,7 @@ class RedisClient {
       if (!this.client) return { success: false, latency: 0 }
       await this.client.ping()
       return { success: true, latency: Date.now() - start }
-    } catch (error) {
+    } catch {
       return { success: false, latency: Date.now() - start }
     }
   }

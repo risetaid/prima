@@ -11,8 +11,8 @@ const client = postgres(process.env.DATABASE_URL!, {
   max_lifetime: 60 * 30,       // Connection lifetime: 30 minutes
   connect_timeout: 10,         // Connection timeout: 10 seconds
   
-  // Railway Pro: TCP keepalive
-  keep_alive: true,            // Enable TCP keepalive
+  // Railway Pro: TCP keepalive (in seconds)
+  keep_alive: 60,              // TCP keepalive every 60 seconds
   
   // Connection configuration
   connection: {
