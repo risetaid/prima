@@ -1,23 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth-utils'
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
 import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 import { invalidatePatientCache } from '@/lib/cache'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
+import { logger } from '@/lib/logger'
 
-import { logger } from '@/lib/logger';
-// Deactivate patient (BERHENTI): set inactive, decline verification, deactivate reminders, send ACK
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id: patientId } = await params
+// POST /api/patients/[id]/deactivate - Deactivate patient and send confirmation
+export const POST = createApiHandler(
+  { auth: "required", params: schemas.patientIdParam },
+  async (_, { user, params }) => {
+    const { id: patientId } = params!
 
     // Load patient
     const rows = await db
@@ -52,15 +45,11 @@ export async function POST(
 
     await invalidatePatientCache(patientId)
 
-    return NextResponse.json({
-      success: true,
+    return {
       message: 'Pasien dinonaktifkan dan reminder dihentikan',
       newStatus: 'declined',
       isActive: false
-    })
-  } catch (error: unknown) {
-    logger.error('Deactivate patient error:', error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
   }
-}
+);
 

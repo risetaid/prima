@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server'
+import { createApiHandler } from '@/lib/api-helpers'
 import { redis } from '@/lib/redis'
 import { db } from '@/db'
 import { sql } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 
-export async function GET() {
-  try {
+// GET /api/health - Health check endpoint for system monitoring
+export const GET = createApiHandler(
+  { auth: "optional" }, // Health check should be accessible without auth
+  async () => {
     const checks = {
       redis: { 
         status: 'unknown' as 'healthy' | 'unhealthy' | 'unknown' | 'degraded', 
@@ -93,7 +95,7 @@ export async function GET() {
         ? 'unhealthy'
         : 'degraded'
 
-    return NextResponse.json({
+    return {
       status: overallStatus,
       timestamp: new Date().toISOString(),
       checks,
@@ -102,14 +104,6 @@ export async function GET() {
         environment: process.env.NODE_ENV || 'unknown',
         region: process.env.RAILWAY_REGION || 'unknown',
       }
-    })
-  } catch (error: unknown) {
-    logger.error('Health check error:', error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: 'Health check failed',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+    };
   }
-}
+);

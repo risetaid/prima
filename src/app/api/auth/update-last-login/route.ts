@@ -1,17 +1,18 @@
-import { NextResponse } from "next/server";
+import { createApiHandler } from "@/lib/api-helpers";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
 import { eq, count } from "drizzle-orm";
 import { logger } from '@/lib/logger';
-// DB utils temporarily inlined
 
-export async function POST() {
-  try {
+// POST /api/auth/update-last-login - Update user login and sync with Clerk
+export const POST = createApiHandler(
+  { auth: "required" },
+  async (_, { request }) => {
     const { userId } = await auth();
     const user = await currentUser();
 
     if (!userId || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      throw new Error("Unauthorized");
     }
 
     // Try to find user by Clerk ID
@@ -42,31 +43,22 @@ export async function POST() {
           approvedAt: isFirstUser ? new Date() : null,
         });
 
-        return NextResponse.json({
-          success: true,
+        return {
           message: "User synced and login updated",
-        });
+        };
       } catch (syncError: unknown) {
         logger.error("Auto-sync failed:", syncError instanceof Error ? syncError : new Error(String(syncError)));
 
         // Return success even if sync fails to prevent blocking user flow
-        return NextResponse.json({
-          success: true,
+        return {
           message: "Login successful, but user sync failed",
           warning: "User data may not be fully synchronized",
-        });
+        };
       }
     }
 
     // User login tracking removed as lastLoginAt field not needed for this system
 
-    return NextResponse.json({ success: true });
-  } catch {
-    // Return success to not block user authentication flow
-    return NextResponse.json({
-      success: true,
-      message: "Login processed with warnings",
-      warning: "Some background operations failed",
-    });
+    return { success: true };
   }
-}
+);

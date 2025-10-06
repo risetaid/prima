@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { createApiHandler } from "@/lib/api-helpers";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
@@ -12,6 +12,7 @@ import {
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/cache";
+import { NextResponse } from "next/server";
 
 interface UserSessionData {
   success: boolean;

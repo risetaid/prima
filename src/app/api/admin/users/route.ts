@@ -1,38 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
+import { createApiHandler, z } from "@/lib/api-helpers";
+import { schemas } from "@/lib/api-schemas";
 import { db, users } from "@/db";
 import { eq, desc, asc, ilike, and, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 
-export async function GET(request: NextRequest) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
+// Query schema for admin users listing
+const adminUsersQuerySchema = schemas.list.merge(
+  z.object({
+    status: z.enum(["all", "pending", "approved"]).default("all"),
+  })
+);
 
+// GET /api/admin/users - List users for admin management
+export const GET = createApiHandler(
+  { auth: "required", query: adminUsersQuerySchema },
+  async (_, { user, query }) => {
     // Only admins and developers can access user management
-    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
-      return createErrorResponse(
-        "Admin access required",
-        403,
-        undefined,
-        "AUTHORIZATION_ERROR"
-      );
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    // Parse query parameters for filtering and pagination
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || "all";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const search = searchParams.get("search");
+    const { status, page, limit, search } = query!;
     const offset = (page - 1) * limit;
 
     // Create alias for approver table to avoid naming conflicts
@@ -121,8 +109,7 @@ export async function GET(request: NextRequest) {
         : null,
     }));
 
-    return NextResponse.json({
-      success: true,
+    return {
       users: formattedUsers,
       pagination: {
         page,
@@ -132,8 +119,6 @@ export async function GET(request: NextRequest) {
         hasMore: offset + limit < totalCount.length,
       },
       pendingCount: formattedUsers.filter((u) => !u.isApproved).length,
-    });
-  } catch (error) {
-    return handleApiError(error, "fetching users for admin");
+    };
   }
-}
+);

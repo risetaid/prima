@@ -1,10 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
+import { createApiHandler, z } from "@/lib/api-helpers";
 import { db, cmsArticles } from "@/db";
 import { eq, desc, and, or, ilike, isNull } from "drizzle-orm";
-import { z } from "zod";
-
 import { logger } from '@/lib/logger';
+
 // Validation schemas
 const createArticleSchema = z.object({
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
@@ -26,6 +24,18 @@ const createArticleSchema = z.object({
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
 });
 
+const articlesQuerySchema = z.object({
+  category: z.enum([
+    "GENERAL",
+    "NUTRITION",
+    "EXERCISE",
+    "MOTIVATIONAL",
+    "MEDICAL",
+    "FAQ",
+  ]).optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+}).merge(schemas.list);
+
 // Utility function to generate slug from title
 function generateSlug(title: string): string {
   return title
@@ -36,22 +46,16 @@ function generateSlug(title: string): string {
     .trim();
 }
 
-// GET - List articles with search and pagination
-export async function GET(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// GET /api/cms/articles - List articles with search and pagination
+export const GET = createApiHandler(
+  { auth: "required", query: articlesQuerySchema },
+  async (_, { user, query }) => {
+    // Only admins and developers can access articles management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Unauthorized");
     }
 
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const search = searchParams.get("search") || "";
-    const category = searchParams.get("category") || "";
-    const status = searchParams.get("status") || "";
-
+    const { page, limit, search, category, status } = query!;
     const offset = (page - 1) * limit;
 
     // Build where conditions
@@ -111,8 +115,7 @@ export async function GET(request: NextRequest) {
     const total = totalCount.length;
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      success: true,
+    return {
       data: articles,
       pagination: {
         page,
@@ -122,29 +125,20 @@ export async function GET(request: NextRequest) {
         hasNext: page < totalPages,
         hasPrev: page > 1,
       },
-    });
-  } catch (error: unknown) {
-    logger.error("Error fetching articles:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
-// POST - Create new article
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// POST /api/cms/articles - Create new article
+export const POST = createApiHandler(
+  { auth: "required", body: createArticleSchema },
+  async (body, { user }) => {
+    // Only admins and developers can create articles
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Unauthorized");
     }
 
-    const body = await request.json();
-
-    // Validate request body
-    const validatedData = createArticleSchema.parse(body);
+    const validatedData = body;
 
     // Generate slug if not provided or auto-generate from title
     const slug = validatedData.slug || generateSlug(validatedData.title);
@@ -172,7 +166,7 @@ export async function POST(request: NextRequest) {
     const newArticle = {
       ...validatedData,
       slug: finalSlug,
-      createdBy: user.clerkId,
+      createdBy: user!.clerkId,
       publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
     };
 
@@ -181,23 +175,9 @@ export async function POST(request: NextRequest) {
       .values(newArticle)
       .returning();
 
-    return NextResponse.json({
-      success: true,
+    return {
       message: "Article created successfully",
       data: createdArticle[0],
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Error creating article:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);

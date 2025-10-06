@@ -1,31 +1,33 @@
-import { NextResponse } from "next/server";
+import { createApiHandler } from "@/lib/api-helpers";
 import { db, patients } from "@/db";
 import { eq, and, isNull, count, sql } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth-utils";
 import { ComplianceService } from "@/services/patient/compliance.service";
 import { get, set } from "@/lib/cache";
 import { logger } from '@/lib/logger';
-export async function GET() {
-  try {
-    // Since middleware with auth.protect() already handles authentication and authorization,
-    // we can directly get the user without additional checks
-    const user = await getCurrentUser();
+
+// GET /api/dashboard/overview - Get dashboard overview with caching
+export const GET = createApiHandler(
+  {
+    auth: "required",
+    cache: { ttl: 180, key: "dashboard:overview" } // 3 minutes cache
+  },
+  async (_, { user }) => {
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      throw new Error("User not found");
     }
 
     // Try to get from cache first (Phase 4 optimization)
-    const cacheKey = `dashboard:overview:${user.id}`;
+    const cacheKey = `dashboard:overview:${user!.id}`;
     const cachedData = await get(cacheKey);
     if (cachedData) {
-      logger.info("Dashboard overview cache hit", { userId: user.id, cache: true });
-      return NextResponse.json(cachedData);
+      logger.info("Dashboard overview cache hit", { userId: user!.id, cache: true });
+      return cachedData;
     }
 
     // Combine all dashboard data in optimized Drizzle queries
     let patientsData, userStats;
 
-    if (user.role === "ADMIN" || user.role === "DEVELOPER") {
+    if (user!.role === "ADMIN" || user!.role === "DEVELOPER") {
       // Admin/Developer dashboard - optimized for all patients
       [patientsData, userStats] = await Promise.all([
         // Get basic patients data first (separate from compliance calculation for better performance)
@@ -69,7 +71,7 @@ export async function GET() {
           .where(
             and(
               isNull(patients.deletedAt),
-              eq(patients.assignedVolunteerId, user.id)
+              eq(patients.assignedVolunteerId, user!.id)
             )
           )
           .orderBy(patients.isActive, patients.name)
@@ -85,7 +87,7 @@ export async function GET() {
           .where(
             and(
               isNull(patients.deletedAt),
-              eq(patients.assignedVolunteerId, user.id)
+              eq(patients.assignedVolunteerId, user!.id)
             )
           ),
       ]);
@@ -129,11 +131,11 @@ export async function GET() {
 
     const responseData = {
       user: {
-        id: user.id,
-        role: user.role,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        id: user!.id,
+        role: user!.role,
+        email: user!.email,
+        firstName: user!.firstName,
+        lastName: user!.lastName,
       },
       patients: patientsFormatted,
       stats,
@@ -142,14 +144,8 @@ export async function GET() {
     // Cache the dashboard data (Phase 4 optimization)
     // Use shorter TTL for dashboard since patient data changes frequently
     await set(cacheKey, responseData, 180); // 3 minutes
-    logger.info("Dashboard overview cached", { userId: user.id, cache: true });
+    logger.info("Dashboard overview cached", { userId: user!.id, cache: true });
 
-    return NextResponse.json(responseData);
-  } catch (error: unknown) {
-    logger.error("Error fetching dashboard overview:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return responseData;
   }
-}
+);
