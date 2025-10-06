@@ -98,25 +98,32 @@ export function PatientHeaderCard({
   onViewReminders,
   onToggleStatus,
 }: PatientHeaderCardProps) {
+  // Defensive check to prevent errors when patient is undefined
+  if (!patient) {
+    return null;
+  }
+
   return (
     <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
       <CardContent className="p-6 sm:p-8">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div className="flex items-center space-x-4">
             <Avatar className="w-16 h-16 sm:w-20 sm:h-20 border-4 border-white/20">
-              <AvatarImage src={patient.photoUrl || ""} alt={patient.name} />
+              <AvatarImage src={patient.photoUrl || ""} alt={patient.name || "Patient"} />
               <AvatarFallback className="bg-white/20 text-white text-2xl font-bold">
                 {patient.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .join("")
-                  .toUpperCase()
-                  .slice(0, 2)}
+                  ? patient.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .toUpperCase()
+                      .slice(0, 2)
+                  : "P"}
               </AvatarFallback>
             </Avatar>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold mb-1">
-                {patient.name}
+                {patient.name || "Loading..."}
               </h1>
               <div className="flex items-center space-x-2 text-blue-100 mb-2">
                 <Phone className="w-4 h-4" />

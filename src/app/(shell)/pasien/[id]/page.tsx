@@ -128,7 +128,15 @@ export default function PatientDetailPage() {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
+        const responseJson = await response.json();
+        const data = responseJson.data || responseJson; // Handle both old format and new createApiHandler format
+        logger.info("Patient data fetched successfully", {
+          patientId: id,
+          hasName: !!data.name,
+          name: data.name,
+          dataKeys: Object.keys(data),
+          responseFormat: responseJson.data ? 'new' : 'old'
+        });
 
         // Check if verification status changed and show toast notification
         if (
@@ -154,6 +162,11 @@ export default function PatientDetailPage() {
         setPatient(data);
         setError(null);
       } else {
+        logger.error("Failed to fetch patient data", undefined, {
+          patientId: id,
+          status: response.status,
+          statusText: response.statusText
+        });
         setError("Gagal memuat data pasien");
       }
     } catch (error: unknown) {
@@ -180,7 +193,8 @@ export default function PatientDetailPage() {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
+        const responseJson = await response.json();
+        const data = responseJson.data || responseJson; // Handle both formats
         setReminderStats(data);
       } else {
         logger.error("Failed to fetch reminder stats", undefined, {
@@ -202,14 +216,15 @@ export default function PatientDetailPage() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/completed`,
+        `/api/patients/${patientId}/reminders?filter=completed`,
         { signal: controller.signal }
       );
 
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const data = await response.json();
+        const responseJson = await response.json();
+        const data = responseJson.data || responseJson; // Handle both formats
 
         // Check if the endpoint is disabled
         if (data.disabled) {
@@ -274,7 +289,8 @@ export default function PatientDetailPage() {
           return;
         }
 
-        const versionData = await response.json();
+        const responseJson = await response.json();
+        const versionData = responseJson.data || responseJson;
         const currentVersion = versionData.version;
 
         // Check if version changed (patient data was updated)
@@ -698,12 +714,26 @@ export default function PatientDetailPage() {
       <main className="relative z-10 pt-4 pb-12">
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Patient Header Card */}
-          <PatientHeaderCard
-            patient={patient}
-            onAddReminder={handleAddReminder}
-            onViewReminders={handleViewReminders}
-            onToggleStatus={handleToggleStatus}
-          />
+          {loading ? (
+            <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
+              <CardContent className="p-6 sm:p-8">
+                <div className="flex items-center space-x-4">
+                  <Skeleton className="w-20 h-20 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-8 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : patient ? (
+            <PatientHeaderCard
+              patient={patient}
+              onAddReminder={handleAddReminder}
+              onViewReminders={handleViewReminders}
+              onToggleStatus={handleToggleStatus}
+            />
+          ) : null}
 
           {/* Desktop: Tabs (hidden on mobile) */}
           <Tabs
@@ -809,7 +839,7 @@ export default function PatientDetailPage() {
         isOpen={isReminderModalOpen}
         onClose={() => setIsReminderModalOpen(false)}
         onSuccess={handleReminderSuccess}
-        patientName={patient.name}
+        patientName={patient?.name || 'Pasien'}
       />
 
       {/* Status Toggle Confirmation Modal */}
@@ -820,8 +850,8 @@ export default function PatientDetailPage() {
         title={patient?.isActive ? "Nonaktifkan Pasien" : "Aktifkan Pasien"}
         description={
           patient?.isActive
-            ? `Apakah Anda yakin ingin menonaktifkan pasien ${patient.name}? Semua pengingat akan dihentikan dan pasien akan menerima pesan WhatsApp konfirmasi.`
-            : `Apakah Anda yakin ingin mengaktifkan kembali pasien ${patient.name}? Pasien akan kembali ke status verifikasi awal.`
+            ? `Apakah Anda yakin ingin menonaktifkan pasien ${patient?.name || 'pasien ini'}? Semua pengingat akan dihentikan dan pasien akan menerima pesan WhatsApp konfirmasi.`
+            : `Apakah Anda yakin ingin mengaktifkan kembali pasien ${patient?.name || 'pasien ini'}? Pasien akan kembali ke status verifikasi awal.`
         }
         confirmText={patient?.isActive ? "Nonaktifkan" : "Aktifkan"}
         variant={patient?.isActive ? "destructive" : "default"}
