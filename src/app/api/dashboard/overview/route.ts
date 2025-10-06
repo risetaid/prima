@@ -3,7 +3,7 @@ import { db, patients } from "@/db";
 import { eq, and, isNull, count, sql } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { ComplianceService } from "@/services/patient/compliance.service";
-import { get, set, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
+import { get, set } from "@/lib/cache";
 import { logger } from '@/lib/logger';
 export async function GET() {
   try {
@@ -16,7 +16,7 @@ export async function GET() {
 
     // Try to get from cache first (Phase 4 optimization)
     const cacheKey = `dashboard:overview:${user.id}`;
-    const cachedData = await get<any>(cacheKey);
+    const cachedData = await get(cacheKey);
     if (cachedData) {
       logger.info("Dashboard overview cache hit", { userId: user.id, cache: true });
       return NextResponse.json(cachedData);

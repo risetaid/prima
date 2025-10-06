@@ -736,7 +736,6 @@ export default function PatientDetailPage() {
               <PatientVerificationTab
                 patient={patient}
                 onUpdate={() => fetchPatient(params.id as string)}
-                onTabChange={setActiveTab}
               />
             </TabsContent>
 
@@ -784,7 +783,6 @@ export default function PatientDetailPage() {
               <PatientVerificationTab
                 patient={patient}
                 onUpdate={() => fetchPatient(params.id as string)}
-                onTabChange={setActiveTab}
               />
             )}
             {activeTab === "reminders" && (

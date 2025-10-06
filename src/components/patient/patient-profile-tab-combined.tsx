@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { IndonesianDateInput } from "@/components/ui/indonesian-date-input";
 import { Separator } from "@/components/ui/separator";
 
-import { User, Edit, Save, X, MapPin, FileText, Camera, Trash2, Phone, Calendar, Stethoscope, Building2, UserRound } from "lucide-react";
+import { User, Edit, Save, X, MapPin, FileText, Camera, Trash2, Stethoscope } from "lucide-react";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";

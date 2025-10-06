@@ -7,7 +7,12 @@ import { logger } from '@/lib/logger'
 export async function GET() {
   try {
     const checks = {
-      redis: { status: 'unknown' as 'healthy' | 'unhealthy' | 'unknown', latency: 0, message: '' },
+      redis: { 
+        status: 'unknown' as 'healthy' | 'unhealthy' | 'unknown' | 'degraded', 
+        latency: 0, 
+        message: '',
+        circuitBreaker: undefined as ReturnType<typeof redis.getStatus>['circuitBreaker']
+      },
       database: { status: 'unknown' as 'healthy' | 'unhealthy' | 'unknown', latency: 0, message: '' },
     }
 
@@ -17,24 +22,47 @@ export async function GET() {
       const pingResult = await redis.ping()
       const latency = Date.now() - start
       
+      // Get Redis status including circuit breaker
+      const redisStatus = redis.getStatus()
+      
       if (pingResult.success) {
+        let status: 'healthy' | 'unhealthy' | 'degraded' = 'healthy'
+        let message = 'Redis connected and responding'
+        
+        // Check circuit breaker state
+        if (redisStatus.circuitBreaker) {
+          if (redisStatus.circuitBreaker.isOpen) {
+            status = 'unhealthy'
+            message = 'Redis circuit breaker is OPEN'
+          } else if (redisStatus.circuitBreaker.isHalfOpen) {
+            status = 'degraded'
+            message = 'Redis circuit breaker is HALF-OPEN (testing recovery)'
+          } else if (redisStatus.circuitBreaker.failureCount > 0) {
+            status = 'degraded'
+            message = `Redis recovering (${redisStatus.circuitBreaker.failureCount} recent failures)`
+          }
+        }
+        
         checks.redis = {
-          status: 'healthy',
+          status,
           latency,
-          message: 'Redis connected and responding'
+          message,
+          circuitBreaker: redisStatus.circuitBreaker
         }
       } else {
         checks.redis = {
           status: 'unhealthy',
           latency,
-          message: 'Redis ping failed'
+          message: 'Redis ping failed',
+          circuitBreaker: redisStatus.circuitBreaker
         }
       }
     } catch (error) {
       checks.redis = {
         status: 'unhealthy',
         latency: 0,
-        message: error instanceof Error ? error.message : 'Redis connection failed'
+        message: error instanceof Error ? error.message : 'Redis connection failed',
+        circuitBreaker: redis.getStatus().circuitBreaker
       }
     }
 

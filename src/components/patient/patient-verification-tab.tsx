@@ -15,15 +15,13 @@ interface Patient extends SchemaPatient {
 interface PatientVerificationTabProps {
   patient: Patient;
   onUpdate: () => void;
-  onTabChange?: (tab: string) => void;
 }
 
-export function PatientVerificationTab({ patient, onUpdate, onTabChange }: PatientVerificationTabProps) {
+export function PatientVerificationTab({ patient, onUpdate }: PatientVerificationTabProps) {
   return (
     <WhatsAppVerificationSection
       patient={patient}
       onUpdate={onUpdate}
-      onTabChange={onTabChange}
     />
   );
 }

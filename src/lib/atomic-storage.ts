@@ -14,7 +14,10 @@ interface StorageLock {
 // Generate unique tab ID
 const TAB_ID = `tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 const LOCK_PREFIX = "__atomic_lock_";
-const LOCK_DURATION = 5000; // 5 seconds
+const LOCK_DURATION = 3000; // Reduced to 3 seconds to prevent long locks
+
+// Global cleanup interval reference
+let cleanupInterval: NodeJS.Timeout | null = null;
 
 /**
  * Acquire a lock for a storage key
@@ -71,13 +74,25 @@ function releaseLock(key: string): void {
 }
 
 /**
- * Atomic get operation with retry logic
+ * Atomic get operation with retry logic - FIXED to prevent infinite loops
  */
 export async function atomicGet<T>(
   key: string,
-  maxRetries = 3
+  maxRetries = 2 // Reduced from 3 to 2
 ): Promise<T | null> {
+  const startTime = Date.now();
+  const maxWaitTime = 5000; // Maximum 5 seconds total wait time
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Check if we've exceeded max wait time
+    if (Date.now() - startTime > maxWaitTime) {
+      logger.warn(`Atomic get timeout for key ${key}`, { 
+        elapsedMs: Date.now() - startTime,
+        attempts: attempt 
+      });
+      return null;
+    }
+
     if (await acquireLock(key)) {
       try {
         const value = localStorage.getItem(key);
@@ -90,27 +105,41 @@ export async function atomicGet<T>(
       }
     }
 
-    // Wait before retry
+    // Wait before retry with exponential backoff but capped
     if (attempt < maxRetries - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+      const delay = Math.min(100 * Math.pow(2, attempt), 500); // Max 500ms delay
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   logger.warn(
-    `Failed to acquire lock for atomic get of key ${key} after ${maxRetries} attempts`
+    `Failed to acquire lock for atomic get of key ${key} after ${maxRetries} attempts`,
+    { elapsedMs: Date.now() - startTime }
   );
   return null;
 }
 
 /**
- * Atomic set operation with retry logic
+ * Atomic set operation with retry logic - FIXED to prevent infinite loops
  */
 export async function atomicSet<T>(
   key: string,
   value: T,
-  maxRetries = 3
+  maxRetries = 2 // Reduced from 3 to 2
 ): Promise<boolean> {
+  const startTime = Date.now();
+  const maxWaitTime = 5000; // Maximum 5 seconds total wait time
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Check if we've exceeded max wait time
+    if (Date.now() - startTime > maxWaitTime) {
+      logger.warn(`Atomic set timeout for key ${key}`, { 
+        elapsedMs: Date.now() - startTime,
+        attempts: attempt 
+      });
+      return false;
+    }
+
     if (await acquireLock(key)) {
       try {
         localStorage.setItem(key, JSON.stringify(value));
@@ -123,14 +152,16 @@ export async function atomicSet<T>(
       }
     }
 
-    // Wait before retry
+    // Wait before retry with exponential backoff but capped
     if (attempt < maxRetries - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100 * (attempt + 1)));
+      const delay = Math.min(100 * Math.pow(2, attempt), 500); // Max 500ms delay
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
   logger.warn(
-    `Failed to acquire lock for atomic set of key ${key} after ${maxRetries} attempts`
+    `Failed to acquire lock for atomic set of key ${key} after ${maxRetries} attempts`,
+    { elapsedMs: Date.now() - startTime }
   );
   return false;
 }
@@ -258,7 +289,30 @@ if (typeof window !== "undefined") {
     }
   });
 
-  // Periodic cleanup of expired locks
-  setInterval(cleanupExpiredLocks, 30000); // Every 30 seconds
+  // Clean up any existing interval before setting a new one
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval);
+  }
+
+  // Periodic cleanup of expired locks with controlled interval
+  cleanupInterval = setInterval(() => {
+    try {
+      cleanupExpiredLocks();
+    } catch (error) {
+      logger.warn("Failed to run periodic cleanup", { error: error as Error });
+      // Clear interval if it keeps failing
+      if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = null;
+      }
+    }
+  }, 60000); // Increased to 60 seconds to reduce frequency
+
+  // Also cleanup on visibility change to handle tab switching
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      cleanupExpiredLocks();
+    }
+  });
 }
 

@@ -2,7 +2,6 @@
 
 import { MessageSquare, RefreshCw } from "lucide-react";
 import { formatDateTimeWIB } from "@/lib/datetime";
-import { Button } from "@/components/ui/button";
 import VerificationBadge, {
   getVerificationStatusTitle,
   getVerificationStatusDescription,
@@ -14,13 +13,11 @@ import { Patient } from "@/db/schema";
 interface WhatsAppVerificationSectionProps {
   patient: Patient;
   onUpdate: () => void;
-  onTabChange?: (tab: string) => void;
 }
 
 export function WhatsAppVerificationSection({
   patient,
   onUpdate,
-  onTabChange,
 }: WhatsAppVerificationSectionProps) {
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">

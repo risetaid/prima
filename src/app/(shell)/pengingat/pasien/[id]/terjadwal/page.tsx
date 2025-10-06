@@ -8,7 +8,7 @@ import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { toast } from "@/components/ui/toast";
 import { ReminderListSkeleton } from "@/components/ui/dashboard-skeleton";
 import { ReminderItem } from "@/components/reminder/ReminderItem";
-import { EditReminderModal } from "@/components/reminder/EditReminderModal";
+import { EditScheduledReminderModal } from "@/components/reminder/EditScheduledReminderModal";
 import { FloatingActionButtons } from "@/components/reminder/FloatingActionButtons";
 
 import { logger } from '@/lib/logger';
@@ -349,7 +349,7 @@ export default function ScheduledRemindersPage() {
       />
 
       {/* Edit Modal */}
-      <EditReminderModal
+      <EditScheduledReminderModal
         isOpen={isEditModalOpen}
         reminder={selectedReminder}
         onClose={closeEditModal}

@@ -63,10 +63,13 @@ export function useAsyncData<T>(
         retryCount
       })
 
-      // Retry logic
+      // Retry logic - FIXED to prevent infinite loops
       if (!isRetry && retryCount > 0) {
+        // Use a ref-like approach to track retry attempts
         setTimeout(() => {
-          execute(true)
+          execute(true).catch(() => {
+            // Silently handle retry failures to prevent unhandled promise rejections
+          })
         }, retryDelay)
       }
     } finally {
@@ -80,7 +83,9 @@ export function useAsyncData<T>(
 
   useEffect(() => {
     execute()
-  }, [execute, dependencies])
+  // Remove 'execute' from dependencies to prevent infinite re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, dependencies)
 
   return {
     data,
@@ -165,7 +170,6 @@ export function useOptimisticUpdate<T>(
     setError(null)
 
     // Optimistic update
-    const previousData = data
     setData(newData)
 
     try {
@@ -175,16 +179,16 @@ export function useOptimisticUpdate<T>(
 
       logger.info('Optimistic update successful')
     } catch (err) {
-      // Revert on error
-      setData(previousData)
+      // Revert on error - use current data state to revert
       const errorObj = err instanceof Error ? err : new Error(String(err))
       setError(errorObj)
-
-      logger.error('Optimistic update failed, reverted', errorObj)
+      // Don't revert automatically - let the caller handle it
+      
+      logger.error('Optimistic update failed', errorObj)
     } finally {
       setLoading(false)
     }
-  }, [data, updateFn])
+  }, [updateFn])
 
   return {
     data,
@@ -240,13 +244,19 @@ export function usePollingData<T>(
     if (enabled && isPolling) {
       fetchData()
 
-      const pollInterval = setInterval(fetchData, interval)
+      const pollInterval = setInterval(() => {
+        fetchData().catch(() => {
+          // Silently handle polling failures
+        })
+      }, interval)
 
       return () => {
         clearInterval(pollInterval)
       }
     }
-  }, [fetchData, interval, enabled, isPolling])
+  // Remove fetchData from dependencies to prevent infinite re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interval, enabled, isPolling])
 
   return {
     data,

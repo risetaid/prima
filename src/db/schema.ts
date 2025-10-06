@@ -9,7 +9,7 @@ export * from "@/db/reminder-schema";
 export * from "@/db/content-schema";
 
 // Import tables for relations
-import { users, patients, medicalRecords, healthNotes } from "@/db/core-schema";
+import { users, patients, medicalRecords } from "@/db/core-schema";
 import { reminders, manualConfirmations, whatsappTemplates, conversationStates, conversationMessages, volunteerNotifications } from "@/db/reminder-schema";
 import { cmsArticles, cmsVideos } from "@/db/content-schema";
 
@@ -31,8 +31,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   whatsappTemplatesCreated: many(whatsappTemplates),
   manualConfirmations: many(manualConfirmations),
   medicalRecords: many(medicalRecords),
-  // @deprecated - Health notes feature removed, kept for historical data only
-  healthNotesRecorded: many(healthNotes),
 }));
 
 export const patientsRelations = relations(patients, ({ one, many }) => ({
@@ -43,8 +41,6 @@ export const patientsRelations = relations(patients, ({ one, many }) => ({
   reminders: many(reminders),
   manualConfirmations: many(manualConfirmations),
   medicalRecords: many(medicalRecords),
-  // @deprecated - Health notes feature removed, kept for historical data only
-  healthNotes: many(healthNotes),
 }));
 
 export const remindersRelations = relations(
@@ -90,19 +86,6 @@ export const whatsappTemplatesRelations = relations(
   })
 );
 
-/**
- * @deprecated Health notes feature removed. Relations kept for historical data only.
- */
-export const healthNotesRelations = relations(healthNotes, ({ one }) => ({
-  patient: one(patients, {
-    fields: [healthNotes.patientId],
-    references: [patients.id],
-  }),
-  recordedByUser: one(users, {
-    fields: [healthNotes.recordedBy],
-    references: [users.id],
-  }),
-}));
 
 export const medicalRecordsRelations = relations(medicalRecords, ({ one }) => ({
   patient: one(patients, {
@@ -161,15 +144,7 @@ export type NewManualConfirmation = typeof manualConfirmations.$inferInsert;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type NewMedicalRecord = typeof medicalRecords.$inferInsert;
 
-/**
- * @deprecated Health notes feature removed. Type kept for historical data only.
- */
-export type HealthNote = typeof healthNotes.$inferSelect;
 
-/**
- * @deprecated Health notes feature removed. Type kept for historical data only.
- */
-export type NewHealthNote = typeof healthNotes.$inferInsert;
 
 // CMS Content Types
 export type CmsArticle = typeof cmsArticles.$inferSelect;

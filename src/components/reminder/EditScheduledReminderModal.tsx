@@ -40,7 +40,7 @@ interface EditReminderModalProps {
   formatDate: (dateString: string) => string;
 }
 
-export function EditReminderModal({
+export function EditScheduledReminderModal({
   isOpen,
   reminder,
   onClose,

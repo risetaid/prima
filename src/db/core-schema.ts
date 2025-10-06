@@ -166,45 +166,7 @@ export const medicalRecords = pgTable(
   })
 );
 
-// ===== DEPRECATED: Health Notes Table =====
-// This table is DEPRECATED and no longer used in the application.
-// It is kept for historical data preservation only.
-// DO NOT use this table in new code.
-// Feature removed: 2025-10-05 - Health notes functionality removed from UI
-export const healthNotes = pgTable(
-  "health_notes",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    patientId: uuid("patient_id")
-      .notNull()
-      .references(() => patients.id),
-    note: text("note").notNull(),
-    noteDate: timestamp("note_date", { withTimezone: true }).notNull(),
-    recordedBy: uuid("recorded_by").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  },
-  (table) => ({
-    patientIdIdx: index("health_notes_patient_id_idx").on(table.patientId),
-    patientIdNoteDateIdx: index("health_notes_patient_note_date_idx").on(
-      table.patientId,
-      table.noteDate
-    ),
-    recordedByIdx: index("health_notes_recorded_by_idx").on(table.recordedBy),
-    deletedAtIdx: index("health_notes_deleted_at_idx").on(table.deletedAt),
-    // Foreign key to users
-    recordedByFk: foreignKey({
-      columns: [table.recordedBy],
-      foreignColumns: [users.id],
-      name: "health_notes_recorded_by_users_id_fk",
-    }),
-  })
-);
+
 
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect;
@@ -214,14 +176,4 @@ export type NewPatient = typeof patients.$inferInsert;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type NewMedicalRecord = typeof medicalRecords.$inferInsert;
 
-/**
- * @deprecated This type is deprecated. The health notes feature has been removed.
- * Table kept for historical data only. Do not use in new code.
- */
-export type HealthNote = typeof healthNotes.$inferSelect;
 
-/**
- * @deprecated This type is deprecated. The health notes feature has been removed.
- * Table kept for historical data only. Do not use in new code.
- */
-export type NewHealthNote = typeof healthNotes.$inferInsert;

@@ -105,7 +105,7 @@ const generatePreviewMessage = (
   return previewMessage;
 };
 
-export function EditReminderModal({
+export function EditQuickReminderModal({
   isOpen,
   editingReminder,
   editFormData,

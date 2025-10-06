@@ -1,5 +1,6 @@
 import Redis, { Cluster } from 'ioredis'
 import { logger } from '@/lib/logger'
+import { getCircuitBreaker } from '@/lib/circuit-breaker'
 
 class RedisClient {
   private client: Redis | Cluster | null = null
@@ -8,6 +9,11 @@ class RedisClient {
   private lastConnectionErrorLog: number = 0
   private lastReconnectLog: number = 0
   private lastCloseLog: number = 0
+  private circuitBreaker = getCircuitBreaker('redis', {
+    failureThreshold: 5,    // Reduced from default to fail faster
+    resetTimeout: 15000,    // Reduced to 15 seconds
+    monitoringPeriod: 30000
+  })
 
   constructor() {
     // Only initialize Redis if URL is available
@@ -63,16 +69,16 @@ class RedisClient {
       } else {
         // Single Redis instance with Railway Pro optimizations
         this.client = new Redis(redisUrl, {
-          // Railway Pro: Enhanced retry strategy
-          maxRetriesPerRequest: 3,     // Reduced to fail faster
-          connectTimeout: 10000,       // 10s for Railway proxy
-          commandTimeout: 5000,        // 5s command timeout (reduced)
+          // Railway Pro: Enhanced retry strategy - FIXED to prevent infinite loops
+          maxRetriesPerRequest: 2,     // Further reduced from 3 to 2
+          connectTimeout: 8000,        // Reduced from 10s to 8s
+          commandTimeout: 3000,        // Reduced from 5s to 3s
           retryStrategy: (times) => {
-            // Exponential backoff with jitter
-            const delay = Math.min(times * 200 + Math.random() * 100, 3000)
+            // Exponential backoff with jitter but capped
+            const delay = Math.min(times * 150 + Math.random() * 50, 1500) // Max 1.5s
             
-            // Only log every 5th retry to reduce noise
-            if (times % 5 === 1) {
+            // Only log every 3rd retry to reduce noise
+            if (times % 3 === 1) {
               logger.info(`Redis retry attempt ${times}, waiting ${Math.round(delay)}ms`, {
                 redis: true,
                 retry: times,
@@ -80,7 +86,8 @@ class RedisClient {
               })
             }
             
-            if (times > 20) {
+            // Reduced max retries from 20 to 5 to prevent hanging
+            if (times > 5) {
               logger.error('Redis max retries exceeded', new Error('Max retries'), {
                 redis: true,
                 retries: times
@@ -235,16 +242,33 @@ class RedisClient {
   async get(key: string): Promise<string | null> {
     if (!this.client) return null
     
-    try {
-      return await this.client.get(key)
-    } catch (error) {
-      logger.warn('IORedis GET failed', {
-        redis: true,
-        operation: 'get',
-        error: error instanceof Error ? error.message : String(error)
-      })
+    return await this.circuitBreaker.execute(async () => {
+      if (!this.client) {
+        throw new Error('Redis client not initialized')
+      }
+      try {
+        return await this.client.get(key)
+      } catch (error) {
+        logger.warn('IORedis GET failed', {
+          redis: true,
+          operation: 'get',
+          error: error instanceof Error ? error.message : String(error),
+          circuitState: this.circuitBreaker.getState().state
+        })
+        throw error
+      }
+    }).catch((error) => {
+      // Return null on circuit breaker open or other errors
+      if (error.message.includes('Circuit breaker')) {
+        logger.warn('Redis circuit breaker open, using fallback', {
+          redis: true,
+          operation: 'get',
+          key
+        })
+        return null
+      }
       return null
-    }
+    })
   }
 
   async set(key: string, value: string, ttl?: number): Promise<boolean> {
@@ -483,11 +507,17 @@ class RedisClient {
   }
 
   // Get connection status details
-  getStatus(): { connected: boolean; status: string; cluster: boolean } {
+  getStatus(): { 
+    connected: boolean; 
+    status: string; 
+    cluster: boolean;
+    circuitBreaker?: ReturnType<typeof RedisClient.prototype.circuitBreaker.getState>;
+  } {
     return {
       connected: this.isConnected(),
       status: this.client?.status || 'disconnected',
-      cluster: this.isCluster
+      cluster: this.isCluster,
+      circuitBreaker: this.circuitBreaker.getState()
     }
   }
 

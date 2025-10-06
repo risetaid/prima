@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { PatientReminderHeader } from "@/components/pengingat/PatientReminderHeader";
 import { ReminderColumn } from "@/components/pengingat/ReminderColumn";
-import { EditReminderModal } from "@/components/pengingat/EditReminderModal";
+import { EditQuickReminderModal } from "@/components/pengingat/EditQuickReminderModal";
 import type { Reminder, ReminderStats, ContentItem } from "@/components/pengingat/types";
 import { logger } from '@/lib/logger';
 
@@ -537,7 +537,7 @@ export function PatientReminderDashboard({
         patientName={patientName}
       />
 
-      <EditReminderModal
+      <EditQuickReminderModal
         isOpen={isEditModalOpen}
         editingReminder={editingReminder}
         editFormData={editFormData}
