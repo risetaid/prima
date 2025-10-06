@@ -1,34 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth-utils";
-import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
+import { z } from "zod";
+import { createApiHandler } from "@/lib/api-helpers";
 import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<Record<string, string | string[]>> }
-) {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
+const paramsSchema = z.object({
+  id: z.string().min(1, "Patient ID is required"),
+});
 
-    const paramsResolved = await params;
-    const id = paramsResolved.id;
-    if (!id || typeof id !== "string") {
-      return createErrorResponse(
-        "Invalid patient ID",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
+export const GET = createApiHandler(
+  {
+    auth: "required",
+    params: paramsSchema,
+  },
+  async (_, context) => {
+    const { id } = context.params!;
 
     // Get only the updatedAt timestamp for lightweight polling
     const patientResult = await db
@@ -41,22 +26,15 @@ export async function GET(
       .limit(1);
 
     if (patientResult.length === 0) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
+      throw new Error("Patient not found");
     }
 
     const patient = patientResult[0];
 
-    return NextResponse.json({
+    return {
       version: patient.updatedAt.getTime(), // Use timestamp as version
       verificationStatus: patient.verificationStatus,
       updatedAt: patient.updatedAt,
-    });
-  } catch (error) {
-    return handleApiError(error, "fetching patient version");
+    };
   }
-}
+);

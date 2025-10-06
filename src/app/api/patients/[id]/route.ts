@@ -1,50 +1,30 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth-utils";
-
-import {
-  get,
-  set,
-  CACHE_KEYS,
-  CACHE_TTL,
-} from "@/lib/cache";
-import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
-import { withRateLimit } from "@/middleware/rate-limit";
+import { z } from "zod";
+import { get, set, CACHE_KEYS, CACHE_TTL } from "@/lib/cache";
+import { createApiHandler } from "@/lib/api-helpers";
 import { PatientService } from "@/services/patient/patient.service";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
+import type { UpdatePatientDTO } from "@/services/patient/patient.types";
 
-export const GET = withRateLimit(async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<Record<string, string | string[]>> }
-) {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
+// Validation schemas
+const paramsSchema = z.object({
+  id: z.string().min(1, "Patient ID is required"),
+});
 
-    const paramsResolved = await params;
-    const id = paramsResolved.id;
-    // Validate patient ID
-    if (!id || typeof id !== "string") {
-      return createErrorResponse(
-        "Invalid patient ID",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
+export const GET = createApiHandler(
+  {
+    auth: "required",
+    params: paramsSchema,
+  },
+  async (_, context) => {
+    const { id } = context.params!;
+    const user = context.user!;
 
     // Try to get from cache first
     const cacheKey = CACHE_KEYS.patient(id);
     const cachedPatient = await get(cacheKey);
 
     if (cachedPatient) {
-      return NextResponse.json(cachedPatient);
+      return cachedPatient;
     }
 
     // Use centralized PatientService to get complete patient data
@@ -55,101 +35,75 @@ export const GET = withRateLimit(async function GET(
     });
 
     if (!patient) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
+      throw new Error("Patient not found");
     }
 
     // Cache the patient data
     await set(cacheKey, patient, CACHE_TTL.PATIENT);
 
-    return NextResponse.json(patient);
-  } catch (error) {
-    return handleApiError(error, "fetching patient");
+    return patient;
   }
-},
-  "GENERAL");
+);
 
-export const PUT = withRateLimit(async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<Record<string, string | string[]>> }
-) {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
+const updatePatientSchema = z.object({
+  name: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  address: z.string().optional(),
+  birthDate: z.string().optional(),
+  diagnosisDate: z.string().optional(),
+  cancerStage: z.enum(["I", "II", "III", "IV"]).nullable().optional(),
+  doctorName: z.string().optional(),
+  hospitalName: z.string().optional(),
+  emergencyContactName: z.string().optional(),
+  emergencyContactPhone: z.string().optional(),
+  notes: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
 
-    const paramsResolved = await params;
-    const id = paramsResolved.id;
-    // Validate patient ID
-    if (!id || typeof id !== "string") {
-      return createErrorResponse(
-        "Invalid patient ID",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
+export const PUT = createApiHandler(
+  {
+    auth: "required",
+    params: paramsSchema,
+    body: updatePatientSchema,
+  },
+  async (body, context) => {
+    const { id } = context.params!;
+    const user = context.user!;
 
     // Check role-based access
-    await PatientAccessControl.requireAccess(user.id, user.role, id, "update this patient");
-
-    const body = await request.json();
+    await PatientAccessControl.requireAccess(
+      user.id,
+      user.role,
+      id,
+      "update this patient"
+    );
 
     const service = new PatientService();
-    const updated = await service.updatePatient(id, body);
-    return NextResponse.json(updated);
-  } catch (error) {
-    return handleApiError(error, "updating patient");
+    const updated = await service.updatePatient(id, body as UpdatePatientDTO);
+    return updated;
   }
-},
-  "GENERAL");
+);
 
-export const DELETE = withRateLimit(async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<Record<string, string | string[]>> }
-) {
-  try {
-    const user = await getAuthUser();
-    if (!user) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
-
-    const paramsResolved = await params;
-    const id = paramsResolved.id;
-    // Validate patient ID
-    if (!id || typeof id !== "string") {
-      return createErrorResponse(
-        "Invalid patient ID",
-        400,
-        undefined,
-        "VALIDATION_ERROR"
-      );
-    }
+export const DELETE = createApiHandler(
+  {
+    auth: "required",
+    params: paramsSchema,
+  },
+  async (_, context) => {
+    const { id } = context.params!;
+    const user = context.user!;
 
     // Check role-based access
-    await PatientAccessControl.requireAccess(user.id, user.role, id, "delete this patient");
+    await PatientAccessControl.requireAccess(
+      user.id,
+      user.role,
+      id,
+      "delete this patient"
+    );
 
     const service = new PatientService();
     const result = await service.deletePatient(id);
-    return NextResponse.json(result);
-  } catch (error) {
-    return handleApiError(error, "deleting patient");
+    return result;
   }
-},
-"GENERAL");
+);
 
