@@ -133,8 +133,6 @@ export default function PatientDetailPage() {
         logger.info("Patient data fetched successfully", {
           patientId: id,
           hasName: !!data.name,
-          name: data.name,
-          dataKeys: Object.keys(data),
           responseFormat: responseJson.data ? 'new' : 'old'
         });
 

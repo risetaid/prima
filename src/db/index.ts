@@ -27,7 +27,7 @@ const client = postgres(process.env.DATABASE_URL!, {
   
   // Logging
   onnotice: () => {},          // Disable notices for cleaner logs
-  debug: process.env.NODE_ENV === 'development' ? console.log : undefined,
+  debug: undefined,            // Disable SQL query logging for cleaner output
 })
 
 export const db = drizzle(client, { schema })
