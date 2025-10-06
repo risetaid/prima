@@ -77,9 +77,10 @@ class RedisClient {
             // Exponential backoff with jitter but capped
             const delay = Math.min(times * 150 + Math.random() * 50, 1500) // Max 1.5s
             
-            // Only log every 3rd retry to reduce noise
-            if (times % 3 === 1) {
-              logger.info(`Redis retry attempt ${times}, waiting ${Math.round(delay)}ms`, {
+            // Silent retry logging to reduce noise
+            // Only log if exceeding threshold
+            if (times > 3) {
+              logger.warn(`Redis retry attempt ${times}, waiting ${Math.round(delay)}ms`, {
                 redis: true,
                 retry: times,
                 delay: Math.round(delay)
@@ -160,20 +161,11 @@ class RedisClient {
       })
 
       this.client.on('connect', () => {
-        logger.info(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} connected successfully`, {
-          redis: true,
-          connection: 'established',
-          cluster: this.isCluster
-        })
+        // Connection success - silent logging to reduce noise
       })
 
       this.client.on('ready', () => {
-        logger.info(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} ready for commands`, {
-          redis: true,
-          status: 'ready',
-          cluster: this.isCluster,
-          plan: 'Railway Pro'
-        })
+        // Ready for commands - silent logging to reduce noise
       })
 
       this.client.on('reconnecting', (time: number) => {
@@ -189,12 +181,7 @@ class RedisClient {
       })
 
       this.client.on('end', () => {
-        logger.error('Redis connection ended unexpectedly', new Error('Connection ended'), {
-          redis: true,
-          cluster: this.isCluster,
-          status: this.client?.status || 'unknown',
-          willRetry: true
-        })
+        // Silenced to reduce log noise - connection will retry automatically
       })
 
       this.client.on('close', () => {

@@ -10,6 +10,8 @@ interface UserStatusData {
   role?: "DEVELOPER" | "ADMIN" | "RELAWAN";
   canAccessDashboard?: boolean;
   needsApproval?: boolean;
+  isApproved?: boolean;
+  isActive?: boolean;
 }
 
 interface AuthContextState {
@@ -84,11 +86,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Helper function to fetch user status with retry logic
   const fetchUserStatus = useCallback(async (attempt = 1): Promise<UserStatusData> => {
     try {
-      // Add timeout to prevent hanging requests - Phase 2: Reduced from 10s to 5s
+      // Add timeout to prevent hanging requests - increased to 15s for slow connections
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => {
+        logger.warn('⏱️ /api/user/status request timeout', { attempt });
+        controller.abort();
+      }, 15000); // 15 second timeout
 
-      const response = await fetch("/api/user/status", {
+      // Add cache bust parameter on first attempt to force fresh data
+      const bustCache = attempt === 1 ? '?bustCache=true' : '';
+      logger.info(`🔄 Fetching user status (attempt ${attempt})${bustCache ? ' [cache bust]' : ''}`);
+      
+      const response = await fetch(`/api/user/status${bustCache}`, {
         headers: {
           "Cache-Control": "no-cache",
           Pragma: "no-cache",
@@ -103,6 +112,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
+
+      // DEBUG: Log API response
+      logger.info('📡 API /api/user/status response:', data);
 
       if (data.error) {
         throw new Error(data.error);
@@ -190,6 +202,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isBackgroundFetchRunningRef.current) {
       fetchUserStatus()
         .then((data) => {
+          logger.info('✅ Setting auth state from fresh API data:', {
+            role: data.role,
+            canAccessDashboard: data.canAccessDashboard,
+            needsApproval: data.needsApproval,
+            isApproved: data.isApproved,
+            isActive: data.isActive
+          });
           setRole(data.role || "RELAWAN");
           setCanAccessDashboard(data.canAccessDashboard || false);
           setNeedsApproval(data.needsApproval !== false);

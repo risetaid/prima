@@ -162,7 +162,9 @@ export async function GET(request: NextRequest) {
         .from(cmsArticles)
         .leftJoin(users, eq(users.clerkId, cmsArticles.createdBy))
         .where(and(...articleConditions))
-        .orderBy(desc(cmsArticles.publishedAt))
+        .orderBy(
+          desc(sql`COALESCE(${cmsArticles.publishedAt}, ${cmsArticles.updatedAt})`)
+        )
         .limit(type === "articles" ? limit : Math.ceil(limit / 2))
         .offset(type === "articles" ? offset : 0);
 
@@ -212,7 +214,9 @@ export async function GET(request: NextRequest) {
         .from(cmsVideos)
         .leftJoin(users, eq(users.clerkId, cmsVideos.createdBy))
         .where(and(...videoConditions))
-        .orderBy(desc(cmsVideos.publishedAt))
+        .orderBy(
+          desc(sql`COALESCE(${cmsVideos.publishedAt}, ${cmsVideos.updatedAt})`)
+        )
         .limit(type === "videos" ? limit : Math.ceil(limit / 2))
         .offset(type === "videos" ? offset : 0);
 
@@ -232,11 +236,16 @@ export async function GET(request: NextRequest) {
       }));
     }
 
-    // Combine and sort by published date
+    // Combine and sort by published date (fallback to updatedAt if publishedAt is null)
     const combinedContent = [...articles, ...videos]
       .sort((a, b) => {
-        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
-        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        // Use publishedAt if available, otherwise fall back to updatedAt
+        const dateA = a.publishedAt 
+          ? new Date(a.publishedAt).getTime() 
+          : new Date(a.updatedAt).getTime();
+        const dateB = b.publishedAt 
+          ? new Date(b.publishedAt).getTime() 
+          : new Date(b.updatedAt).getTime();
         return dateB - dateA;
       })
       .slice(0, limit);

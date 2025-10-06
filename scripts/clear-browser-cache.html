@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear PRIMA Browser Cache</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2563eb;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .success {
+            background: #10b981;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        .info {
+            background: #eff6ff;
+            border-left: 4px solid #2563eb;
+            padding: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Clear PRIMA Browser Cache</h1>
+        <p>This will clear all cached authentication data from your browser's localStorage.</p>
+        
+        <div class="info">
+            <strong>Current Cache:</strong>
+            <div id="cache-info"></div>
+        </div>
+        
+        <button onclick="clearCache()">Clear Auth Cache</button>
+        
+        <div id="success" class="success">
+            ✅ Cache cleared successfully! Please close this tab and refresh your PRIMA application.
+        </div>
+    </div>
+
+    <script>
+        function displayCacheInfo() {
+            const cacheKey = 'prima_user_auth_status';
+            const cached = localStorage.getItem(cacheKey);
+            const div = document.getElementById('cache-info');
+            
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    div.innerHTML = `
+                        <pre style="background: #f9fafb; padding: 10px; border-radius: 4px; margin-top: 10px; overflow-x: auto;">
+${JSON.stringify(parsed, null, 2)}
+                        </pre>
+                    `;
+                } catch (e) {
+                    div.textContent = 'Invalid cache data';
+                }
+            } else {
+                div.textContent = 'No cache found';
+            }
+        }
+
+        function clearCache() {
+            // Clear all PRIMA-related localStorage items
+            const keysToRemove = [
+                'prima_user_auth_status',
+                'prima_last_successful_login',
+            ];
+            
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                console.log(`Cleared: ${key}`);
+            });
+            
+            // Also clear sessionStorage
+            sessionStorage.clear();
+            
+            // Show success message
+            document.getElementById('success').style.display = 'block';
+            
+            // Update cache info
+            displayCacheInfo();
+            
+            console.log('✅ All PRIMA cache cleared!');
+        }
+
+        // Display cache info on load
+        displayCacheInfo();
+    </script>
+</body>
+</html>

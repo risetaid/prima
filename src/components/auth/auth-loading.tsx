@@ -75,6 +75,17 @@ export function AuthLoading({
   useEffect(() => {
     if (!isLoaded) return; // Wait for auth to load
 
+    // DEBUG: Log auth state
+    logger.info('🔍 AuthLoading State:', {
+      isLoaded,
+      isSignedIn,
+      canAccessDashboard,
+      role,
+      requireApproval,
+      optimisticAccess,
+      pathname
+    });
+
     // Handle authentication requirements
     if (requireAuth && !isSignedIn) {
       debouncedRedirect("/sign-in");
@@ -88,6 +99,12 @@ export function AuthLoading({
       !canAccessDashboard &&
       !optimisticAccess
     ) {
+      logger.warn('❌ Redirecting to pending-approval because canAccessDashboard=false', {
+        canAccessDashboard,
+        role,
+        requireApproval,
+        optimisticAccess
+      });
       debouncedRedirect("/pending-approval");
       return;
     }
