@@ -1,5 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
+import { createApiHandler, z } from "@/lib/api-helpers";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations, patients } from "@/db";
@@ -8,8 +7,8 @@ import { getWIBTime } from "@/lib/datetime";
 import { del, CACHE_KEYS } from "@/lib/cache";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
 import { shouldSendReminderNow } from "@/lib/datetime";
-import { createErrorResponse, handleApiError } from "@/lib/api-helpers";
 import { cmsArticles, cmsVideos } from "@/db";
+import { NextResponse } from "next/server";
 
 interface CompletedReminder {
   id: string;
@@ -71,57 +70,73 @@ function createWIBDateRange(dateString: string) {
   return { startOfDay, endOfDay };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// Zod schemas for validation
+const paramsSchema = z.object({
+  id: z.string().uuid(),
+});
 
-    const { id: patientId } = await params;
+const querySchema = z.object({
+  filter: z.enum(["all", "completed", "pending", "scheduled"]).default("all"),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  date: z.string().optional(),
+  includeDeleted: z.enum(["true", "false"]).transform(val => val === "true").optional(),
+});
+
+const createReminderBodySchema = z.object({
+  message: z.string().min(1, "Message is required"),
+  time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, use HH:MM"),
+  selectedDates: z.array(z.string()).optional(),
+  customRecurrence: z.object({
+    frequency: z.enum(["day", "week", "month"]),
+    interval: z.number().int().min(1),
+    occurrences: z.number().int().min(1).max(1000).optional(),
+    endType: z.enum(["never", "on", "after"]),
+    endDate: z.string().optional(),
+    daysOfWeek: z.array(z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"])).optional(),
+  }).optional(),
+  attachedContent: z.array(z.object({
+    id: z.string(),
+    type: z.enum(["article", "video", "ARTICLE", "VIDEO"]),
+    title: z.string(),
+  })).optional(),
+});
+
+const deleteRemindersBodySchema = z.object({
+  reminderIds: z.array(z.string().uuid()).min(1, "At least one reminder ID is required"),
+});
+
+// GET /api/patients/[id]/reminders - Get patient reminders
+export const GET = createApiHandler(
+  { auth: "required", params: paramsSchema, query: querySchema },
+  async (_, { user, params, query }) => {
+    const { id: patientId } = params!;
 
     // Check patient access control
     await PatientAccessControl.requireAccess(
-      user.id,
-      user.role,
+      user!.id,
+      user!.role,
       patientId,
       "view this patient's reminders"
     );
 
-    // Parse query parameters
-    const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter") || "all";
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const dateFilter = searchParams.get("date");
-    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const { filter, page, limit, date: dateFilter, includeDeleted } = query!;
     const offset = (page - 1) * limit;
 
     // Handle different filter types
     switch (filter) {
       case "completed":
-        return await getCompletedReminders(patientId, user.id);
+        return await getCompletedReminders(patientId, user!.id);
       case "pending":
         return await getPendingReminders(patientId, page, limit, dateFilter);
       case "scheduled":
         return await getScheduledReminders(patientId, page, limit, dateFilter);
       case "all":
       default:
-        return await getAllReminders(patientId, includeDeleted, limit, offset);
+        return await getAllReminders(patientId, includeDeleted || false, limit, offset);
     }
-  } catch (error) {
-    logger.error("Error fetching reminders", error instanceof Error ? error : new Error(String(error)), {
-      operation: 'fetch_reminders'
-    });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
-}
+);
 
 async function getCompletedReminders(patientId: string, userId: string) {
   // Get completed reminders (confirmed status or manually confirmed)
@@ -535,32 +550,19 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
   return NextResponse.json(response);
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return createErrorResponse(
-        "Unauthorized",
-        401,
-        undefined,
-        "AUTHENTICATION_ERROR"
-      );
-    }
-
-    const { id } = await params;
+// POST /api/patients/[id]/reminders - Create new reminders
+export const POST = createApiHandler(
+  { auth: "required", params: paramsSchema, body: createReminderBodySchema },
+  async (body, { user, params }) => {
+    const { id } = params!;
 
     // Check role-based access to this patient
     await PatientAccessControl.requireAccess(
-      user.id,
-      user.role,
+      user!.id,
+      user!.role,
       id,
       "create reminders for this patient"
     );
-
-    const requestBody = await request.json();
 
     // Verify patient exists and get phone number
     const patientResult = await db
@@ -588,7 +590,7 @@ export async function POST(
 
     // Validate input and generate schedules data
     const { message, time, datesToSchedule, validatedContent } =
-      await validateReminderInput(requestBody, patient);
+      await validateReminderInput(body, patient);
 
     // Create reminder schedules
     const createdSchedules = await createReminderSchedules(
@@ -597,13 +599,13 @@ export async function POST(
       time,
       datesToSchedule,
       validatedContent,
-      user.id
+      user!.id
     );
 
     // Handle immediate reminders if any should be sent now
     await sendImmediateReminders(createdSchedules, patient, message, validatedContent, time);
 
-    return NextResponse.json({
+    return {
       message: "Reminders created successfully",
       count: createdSchedules.length,
       schedules: createdSchedules.map((s) => ({
@@ -612,47 +614,16 @@ export async function POST(
         scheduledTime: s.scheduledTime,
       })),
       recurrenceType: "manual", // Simplified for now
-    });
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      return createErrorResponse(
-        error.message,
-        400,
-        error.details,
-        "VALIDATION_ERROR"
-      );
-    }
-    if (error instanceof PatientVerificationError) {
-      return createErrorResponse(
-        error.message,
-        403,
-        error.details,
-        "PATIENT_NOT_VERIFIED"
-      );
-    }
-    return handleApiError(error, "creating patient reminders");
+    };
   }
-}
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id } = await params;
-    const { reminderIds } = await request.json();
-
-    if (!reminderIds || !Array.isArray(reminderIds)) {
-      return NextResponse.json(
-        { error: "Invalid reminderIds" },
-        { status: 400 }
-      );
-    }
+// DELETE /api/patients/[id]/reminders - Delete multiple reminders
+export const DELETE = createApiHandler(
+  { auth: "required", params: paramsSchema, body: deleteRemindersBodySchema },
+  async (body, { user, params }) => {
+    const { id } = params!;
+    const { reminderIds } = body;
 
     // Soft delete multiple scheduled reminders by setting deletedAt timestamp
     const deleteResult = await db
@@ -676,18 +647,13 @@ export async function DELETE(
     // Invalidate cache after bulk deletion
     await del(CACHE_KEYS.reminderStats(id));
 
-    return NextResponse.json({
+    return {
       success: true,
       message: "Reminders berhasil dihapus",
       deletedCount: deleteResult.length,
-    });
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
 class ValidationError extends Error {
   details?: Record<string, unknown>;

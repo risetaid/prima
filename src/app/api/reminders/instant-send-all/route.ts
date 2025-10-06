@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { getAuthUser } from "@/lib/auth-utils";
+import { createApiHandler, apiRateLimitError } from "@/lib/api-helpers";
+import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { db, reminders, patients } from "@/db";
 import { eq, and, isNull, sql, or, ne } from "drizzle-orm";
@@ -25,26 +25,22 @@ function createWIBDateRange(dateString: string) {
   return { startOfDay, endOfDay };
 }
 
-export async function POST() {
-  try {
+// POST /api/reminders/instant-send-all - Send all pending reminders instantly
+export const POST = createApiHandler(
+  { auth: "required" },
+  async (_, { user }) => {
     logger.debug("Instant send API called");
 
-    const user = await getAuthUser();
-    if (!user) {
-      logger.warn("User not authenticated");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     logger.debug("User authenticated", {
-      email: user.email,
-      id: user.id,
-      role: user.role,
+      email: user!.email,
+      id: user!.id,
+      role: user!.role,
     });
 
     // All authenticated users can send instant reminders to their assigned patients
 
     // Rate limiting: 5 instant send requests per hour per user
-    const rateLimitResult = await RateLimiter.checkRateLimit(`user:${user.id}`, {
+    const rateLimitResult = await RateLimiter.checkRateLimit(`user:${user!.id}`, {
       windowMs: 60 * 60 * 1000, // 1 hour
       maxRequests: 5,
       keyPrefix: 'instant_send'
@@ -52,15 +48,11 @@ export async function POST() {
 
     if (!rateLimitResult.allowed) {
       logger.warn('Rate limit exceeded for instant send', {
-        userId: user.id,
+        userId: user!.id,
         remaining: rateLimitResult.remaining,
         resetTime: new Date(rateLimitResult.resetTime).toISOString()
       });
-      return NextResponse.json({
-        error: 'Too many requests',
-        message: 'You have exceeded the rate limit for instant send operations. Please try again later.',
-        retryAfter: Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000)
-      }, {
+      throw apiRateLimitError({
         status: 429,
         headers: {
           'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
@@ -83,9 +75,9 @@ export async function POST() {
       eq(patients.isActive, true),
       eq(patients.verificationStatus, "VERIFIED"),
     ];
-    if (user.role === "ADMIN" || user.role === "RELAWAN") {
-      // Both ADMIN and MEMBER can only send to patients they manage
-      patientConditions.push(eq(patients.assignedVolunteerId, user.id));
+    if (user!.role === "ADMIN" || user!.role === "RELAWAN") {
+      // Both ADMIN and RELAWAN can only send to patients they manage
+      patientConditions.push(eq(patients.assignedVolunteerId, user!.id));
     }
     const patientFilter =
       patientConditions.length > 1
@@ -101,8 +93,8 @@ export async function POST() {
       startOfDay: startOfDay.toISOString(),
       endOfDay: endOfDay.toISOString(),
       currentTimeWIB: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
-      userRole: user.role,
-      userId: user.id,
+      userRole: user!.role,
+      userId: user!.id,
     });
 
     // Check for active reminders excluding already delivered ones
@@ -116,7 +108,7 @@ export async function POST() {
       logger.debug("Querying active reminders", {
         startOfDay: startOfDay.toISOString(),
         endOfDay: endOfDay.toISOString(),
-        userRole: user.role,
+        userRole: user!.role,
       });
 
       activeReminders = await db
@@ -345,24 +337,6 @@ export async function POST() {
       details: debugLogs,
     };
 
-    return NextResponse.json(summary);
-  } catch (error: unknown) {
-    logger.error("❌ Error in instant send all reminders:", error instanceof Error ? error : new Error(String(error)));
-    logger.error(
-      "❌ Error stack:",
-      undefined,
-      { stack: error instanceof Error ? error.stack : "No stack trace" }
-    );
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
-        wibTime: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
-      },
-      { status: 500 }
-    );
+    return summary;
   }
-}
+);
