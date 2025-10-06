@@ -480,38 +480,6 @@ class RedisClient {
   isClusterMode(): boolean {
     return this.isCluster
   }
-
-  // Force reconnect (for manual recovery)
-  async forceReconnect(): Promise<boolean> {
-    try {
-      if (this.client && this.client.status !== 'end') {
-        logger.info('Disconnecting Redis client for reconnect', {
-          redis: true,
-          status: this.client.status
-        })
-        await this.client.quit()
-      }
-      
-      this.client = null
-      this.isConnecting = false
-      
-      logger.info('Attempting to reinitialize Redis', {
-        redis: true,
-        hasUrl: !!(process.env.REDIS_URL || process.env.KV_URL)
-      })
-      
-      await this.initializeClient()
-      
-      // Test connection
-      const pingResult = await this.ping()
-      return pingResult.success
-    } catch (error) {
-      logger.error('Force reconnect failed', error instanceof Error ? error : new Error(String(error)), {
-        redis: true
-      })
-      return false
-    }
-  }
 }
 
 // Export singleton instance
