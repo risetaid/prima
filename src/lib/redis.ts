@@ -5,6 +5,9 @@ class RedisClient {
   private client: Redis | Cluster | null = null
   private isConnecting: boolean = false
   private isCluster: boolean = false
+  private lastConnectionErrorLog: number = 0
+  private lastReconnectLog: number = 0
+  private lastCloseLog: number = 0
 
   constructor() {
     // Only initialize Redis if URL is available
@@ -61,17 +64,23 @@ class RedisClient {
         // Single Redis instance with Railway Pro optimizations
         this.client = new Redis(redisUrl, {
           // Railway Pro: Enhanced retry strategy
-          maxRetriesPerRequest: 5,
-          connectTimeout: 15000,       // 15s for Railway proxy
-          commandTimeout: 10000,       // 10s command timeout
+          maxRetriesPerRequest: 3,     // Reduced to fail faster
+          connectTimeout: 10000,       // 10s for Railway proxy
+          commandTimeout: 5000,        // 5s command timeout (reduced)
           retryStrategy: (times) => {
-            const delay = Math.min(times * 100, 3000)
-            logger.info(`Redis retry attempt ${times}, waiting ${delay}ms`, {
-              redis: true,
-              retry: times,
-              delay
-            })
-            if (times > 10) {
+            // Exponential backoff with jitter
+            const delay = Math.min(times * 200 + Math.random() * 100, 3000)
+            
+            // Only log every 5th retry to reduce noise
+            if (times % 5 === 1) {
+              logger.info(`Redis retry attempt ${times}, waiting ${Math.round(delay)}ms`, {
+                redis: true,
+                retry: times,
+                delay: Math.round(delay)
+              })
+            }
+            
+            if (times > 20) {
               logger.error('Redis max retries exceeded', new Error('Max retries'), {
                 redis: true,
                 retries: times
@@ -84,13 +93,14 @@ class RedisClient {
           // Connection resilience  
           lazyConnect: true,           // Use lazy connect for better error handling
           enableOfflineQueue: true,    // Queue commands when offline
-          enableReadyCheck: true,      // Railway: Check ready state
+          enableReadyCheck: false,     // Disable ready check to reduce overhead
           autoResubscribe: true,
           autoResendUnfulfilledCommands: true,
           
-          // Railway Pro: Enhanced keepalive
+          // Railway Pro: Enhanced keepalive with shorter intervals
           family: 4,                   // IPv4 only for Railway
-          keepAlive: 60000,            // 60 seconds TCP keep-alive
+          keepAlive: 30000,            // 30 seconds TCP keep-alive (reduced from 60s)
+          noDelay: true,               // Disable Nagle's algorithm for lower latency
           
           // Connection metadata
           connectionName: 'prima-railway-pro',
@@ -101,19 +111,44 @@ class RedisClient {
           
           // Development debugging
           showFriendlyErrorStack: process.env.NODE_ENV === 'development',
+          
+          // Reconnect on error to handle ECONNRESET
+          reconnectOnError: (err) => {
+            const targetErrors = ['ECONNRESET', 'ETIMEDOUT', 'EPIPE']
+            if (targetErrors.includes(err.message)) {
+              // Reconnect on connection errors
+              return true
+            }
+            return false
+          },
         })
       }
 
       this.client.on('error', (err: Error) => {
         const errorCode = (err as Error & { code?: string }).code
-        logger.error(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} Client Error`, err, {
-          redis: true,
-          connection: 'failed',
-          cluster: this.isCluster,
-          message: err.message,
-          code: errorCode,
-          url: process.env.REDIS_URL ? 'set' : 'missing'
-        })
+        
+        // Only log connection errors once per minute to reduce noise
+        const connectionErrors = ['ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND']
+        if (connectionErrors.includes(errorCode || '')) {
+          // Suppress frequent connection reset logs
+          if (!this.lastConnectionErrorLog || Date.now() - this.lastConnectionErrorLog > 60000) {
+            logger.warn(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} connection error (${errorCode}), retrying...`, {
+              redis: true,
+              cluster: this.isCluster,
+              code: errorCode,
+            })
+            this.lastConnectionErrorLog = Date.now()
+          }
+        } else {
+          // Log non-connection errors immediately
+          logger.error(`${this.isCluster ? 'Redis Cluster' : 'IORedis'} Client Error`, err, {
+            redis: true,
+            connection: 'failed',
+            cluster: this.isCluster,
+            message: err.message,
+            code: errorCode,
+          })
+        }
         // Don't set client to null - keep trying to reconnect
       })
 
@@ -135,11 +170,15 @@ class RedisClient {
       })
 
       this.client.on('reconnecting', (time: number) => {
-        logger.info('Redis reconnecting', {
-          redis: true,
-          reconnectDelay: time,
-          cluster: this.isCluster
-        })
+        // Only log reconnection attempts every 30 seconds to reduce noise
+        if (!this.lastReconnectLog || Date.now() - this.lastReconnectLog > 30000) {
+          logger.info('Redis reconnecting', {
+            redis: true,
+            reconnectDelay: time,
+            cluster: this.isCluster
+          })
+          this.lastReconnectLog = Date.now()
+        }
       })
 
       this.client.on('end', () => {
@@ -152,11 +191,15 @@ class RedisClient {
       })
 
       this.client.on('close', () => {
-        logger.warn('Redis connection closed', {
-          redis: true,
-          cluster: this.isCluster,
-          status: this.client?.status || 'unknown'
-        })
+        // Only log close events once per minute
+        if (!this.lastCloseLog || Date.now() - this.lastCloseLog > 60000) {
+          logger.warn('Redis connection closed', {
+            redis: true,
+            cluster: this.isCluster,
+            status: 'reconnecting'
+          })
+          this.lastCloseLog = Date.now()
+        }
       })
 
       // Connect (lazyConnect is true, so connect manually)
