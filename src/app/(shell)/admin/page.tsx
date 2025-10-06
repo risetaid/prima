@@ -9,7 +9,6 @@ import {
   Settings,
   ChevronRight,
   AlertCircle,
-  Brain,
 } from "lucide-react";
 import { Header } from "@/components/ui/header";
 import { toast } from "sonner";
@@ -93,15 +92,6 @@ export default function AdminPanelPage() {
       badge: null,
       badgeType: null,
       stats: `${stats.totalTemplates} template aktif`,
-    },
-    {
-      title: "LLM Analytics",
-      description: "Pantau penggunaan dan biaya AI",
-      icon: Brain,
-      href: "/admin/llm-analytics",
-      badge: null,
-      badgeType: null,
-      stats: "AI & Cost Monitoring",
     },
   ];
 

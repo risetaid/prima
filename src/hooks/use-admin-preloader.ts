@@ -53,8 +53,6 @@ export function useAdminPreloader(userRole?: string | null) {
         break;
       case '/admin/analytics':
         break;
-      case '/admin/llm-analytics':
-        break;
       default:
         break;
     }
