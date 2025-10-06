@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { PatientHeaderCard } from "@/components/patient/patient-header-card";
-import { PatientProfileTab } from "@/components/patient/patient-profile-tab";
+import { PatientProfileTabCombined } from "@/components/patient/patient-profile-tab-combined";
 import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
 import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
 import PatientResponseHistoryTab from "@/components/patient/patient-response-history-tab";
@@ -62,20 +62,18 @@ export default function PatientDetailPage() {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
 
-  // Edit mode states
-  const [isEditingBasicInfo, setIsEditingBasicInfo] = useState(false);
-  const [isEditingMedicalInfo, setIsEditingMedicalInfo] = useState(false);
+  // Edit mode state (combined)
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  // Form data states
-  const [basicInfoForm, setBasicInfoForm] = useState({
+  // Form data state (combined)
+  const [profileForm, setProfileForm] = useState({
+    // Basic info
     name: "",
     phoneNumber: "",
     address: "",
     birthDate: "",
     diagnosisDate: "",
-  });
-
-  const [medicalInfoForm, setMedicalInfoForm] = useState({
+    // Medical info
     cancerStage: "",
     doctorName: "",
     hospitalName: "",
@@ -339,25 +337,29 @@ export default function PatientDetailPage() {
     // Could add refresh logic here if needed
   };
 
-  // Edit mode handlers
+  // Combined edit mode handlers
 
-  const handleCancelBasicInfo = () => {
+  const handleCancelProfile = () => {
     // Reset form data to original patient data
-    setBasicInfoForm({
+    setProfileForm({
+      // Basic info
       name: patient?.name || "",
       phoneNumber: patient?.phoneNumber || "",
       address: patient?.address || "",
       birthDate: patient?.birthDate ? new Date(patient.birthDate).toISOString().split('T')[0] : "",
       diagnosisDate: patient?.diagnosisDate ? new Date(patient.diagnosisDate).toISOString().split('T')[0] : "",
+      // Medical info
+      cancerStage: patient?.cancerStage || "",
+      doctorName: patient?.doctorName || "",
+      hospitalName: patient?.hospitalName || "",
+      emergencyContactName: patient?.emergencyContactName || "",
+      emergencyContactPhone: patient?.emergencyContactPhone || "",
+      notes: patient?.notes || "",
     });
-    setIsEditingBasicInfo(false);
+    setIsEditingProfile(false);
   };
 
-  const handleCancelMedicalInfo = () => {
-    setIsEditingMedicalInfo(false);
-  };
-
-  const handleSaveBasicInfo = async (photoData?: { file: File | null; shouldRemove: boolean }) => {
+  const handleSaveProfile = async (photoData?: { file: File | null; shouldRemove: boolean }) => {
     try {
       let photoUrl = patient?.photoUrl || null;
 
@@ -383,13 +385,22 @@ export default function PatientDetailPage() {
         }
       }
 
+      // Combined update data (all fields)
       const updateData = {
-        name: basicInfoForm.name,
-        phoneNumber: basicInfoForm.phoneNumber,
-        address: basicInfoForm.address || null,
-        birthDate: basicInfoForm.birthDate || null,
-        diagnosisDate: basicInfoForm.diagnosisDate || null,
+        // Basic info
+        name: profileForm.name,
+        phoneNumber: profileForm.phoneNumber,
+        address: profileForm.address || null,
+        birthDate: profileForm.birthDate || null,
+        diagnosisDate: profileForm.diagnosisDate || null,
         photoUrl: photoUrl,
+        // Medical info
+        cancerStage: profileForm.cancerStage || null,
+        doctorName: profileForm.doctorName || null,
+        hospitalName: profileForm.hospitalName || null,
+        emergencyContactName: profileForm.emergencyContactName || null,
+        emergencyContactPhone: profileForm.emergencyContactPhone || null,
+        notes: profileForm.notes || null,
       };
 
       const response = await fetch(`/api/patients/${params.id}`, {
@@ -401,45 +412,14 @@ export default function PatientDetailPage() {
       if (response.ok) {
         const updatedPatient = await response.json();
         setPatient(updatedPatient);
-        setIsEditingBasicInfo(false);
-        toast.success("Informasi dasar berhasil diperbarui");
+        setIsEditingProfile(false);
+        toast.success("Profil pasien berhasil diperbarui");
       } else {
         const error = await response.json();
-        toast.error(error.error || "Gagal memperbarui informasi dasar");
+        toast.error(error.error || "Gagal memperbarui profil pasien");
       }
     } catch {
-      toast.error("Gagal memperbarui informasi dasar");
-    }
-  };
-
-  const handleSaveMedicalInfo = async () => {
-    try {
-      const updateData = {
-        cancerStage: medicalInfoForm.cancerStage || null,
-        doctorName: medicalInfoForm.doctorName || null,
-        hospitalName: medicalInfoForm.hospitalName || null,
-        emergencyContactName: medicalInfoForm.emergencyContactName || null,
-        emergencyContactPhone: medicalInfoForm.emergencyContactPhone || null,
-        notes: medicalInfoForm.notes || null,
-      };
-
-      const response = await fetch(`/api/patients/${params.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
-      });
-
-      if (response.ok) {
-        const updatedPatient = await response.json();
-        setPatient(updatedPatient);
-        setIsEditingMedicalInfo(false);
-        toast.success("Informasi medis berhasil diperbarui");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Gagal memperbarui informasi medis");
-      }
-    } catch {
-      toast.error("Gagal memperbarui informasi medis");
+      toast.error("Gagal memperbarui profil pasien");
     }
   };
 
@@ -711,21 +691,15 @@ export default function PatientDetailPage() {
 
             {/* Profile Tab */}
             <TabsContent value="profile">
-              <PatientProfileTab
+              <PatientProfileTabCombined
                 patient={patient}
-                isEditingBasicInfo={isEditingBasicInfo}
-                setIsEditingBasicInfo={setIsEditingBasicInfo}
-                basicInfoForm={basicInfoForm}
-                setBasicInfoForm={setBasicInfoForm}
-                handleSaveBasicInfo={handleSaveBasicInfo}
-                handleCancelBasicInfo={handleCancelBasicInfo}
-                isEditingMedicalInfo={isEditingMedicalInfo}
-                setIsEditingMedicalInfo={setIsEditingMedicalInfo}
-                medicalInfoForm={medicalInfoForm}
-                setMedicalInfoForm={setMedicalInfoForm}
-                handleSaveMedicalInfo={handleSaveMedicalInfo}
-                 handleCancelMedicalInfo={handleCancelMedicalInfo}
-               />
+                isEditingProfile={isEditingProfile}
+                setIsEditingProfile={setIsEditingProfile}
+                profileForm={profileForm}
+                setProfileForm={setProfileForm}
+                handleSaveProfile={handleSaveProfile}
+                handleCancelProfile={handleCancelProfile}
+              />
             </TabsContent>
 
             {/* Verification Tab */}

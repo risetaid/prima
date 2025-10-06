@@ -136,34 +136,10 @@ export function WhatsAppVerificationSection({
         </div>
 
         {/* Actions Panel */}
-        <div className="mb-6">
-          <VerificationActionsPanel
-            patient={patient}
-            onUpdate={onUpdate}
-          />
-        </div>
-
-        {/* Response History Link */}
-        <div className="border-t border-gray-200 pt-6">
-          <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-blue-900 mb-1">
-                  📊 Riwayat Respon Pasien
-                </h3>
-                <p className="text-sm text-blue-700">
-                  Lihat semua riwayat interaksi WhatsApp pasien dengan analisis lengkap
-                </p>
-              </div>
-              <Button 
-                onClick={() => onTabChange?.('responses')}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Lihat Riwayat
-              </Button>
-            </div>
-          </div>
-        </div>
+        <VerificationActionsPanel
+          patient={patient}
+          onUpdate={onUpdate}
+        />
       </div>
     </div>
   );
