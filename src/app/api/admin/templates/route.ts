@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 const templateQuerySchema = z.object({
   category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL']).optional(),
-  active: z.enum(['true', 'false']).optional().transform(val => val === 'true')
+  active: z.string().optional()
 });
 
 const createTemplateSchema = z.object({
@@ -27,18 +27,30 @@ export const GET = createApiHandler(
 
     const { category, active } = query || {};
 
-    logger.info(`Fetching templates with filters: category=${category}, active=${active}`);
+    logger.info(`Fetching templates with filters: category=${category}, active=${active}, activeType=${typeof active}, activeIsUndefined=${active === undefined}, activeIsEmpty=${active === ''}`);
 
     // Build base query with filters - always exclude soft-deleted templates
     const conditions = [isNull(whatsappTemplates.deletedAt)]
 
     if (category) {
       conditions.push(eq(whatsappTemplates.category, category as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'))
+      logger.info('🔧 Adding category filter:', category);
     }
 
-    if (active !== undefined) {
+    if (active !== undefined && active !== '') {
       conditions.push(eq(whatsappTemplates.isActive, active === 'true'))
+      logger.info('🔧 Adding active filter:', { active, willMatch: active === 'true' });
+    } else {
+      logger.info('🔧 Skipping active filter - active is empty or undefined');
     }
+
+    logger.info('🔍 Template query conditions:', {
+      conditionsCount: conditions.length,
+      hasCategoryFilter: !!category,
+      hasActiveFilter: active !== undefined,
+      categoryFilter: category,
+      activeFilter: active
+    });
 
     // Execute query with optional filters and ordering
     const templatesData = await db
@@ -59,6 +71,16 @@ export const GET = createApiHandler(
         asc(whatsappTemplates.category),
         asc(whatsappTemplates.templateName)
       )
+
+    logger.info('📊 Template query result:', {
+      templatesFound: templatesData.length,
+      firstTemplate: templatesData[0] ? {
+        id: templatesData[0].id,
+        name: templatesData[0].templateName,
+        category: templatesData[0].category,
+        isActive: templatesData[0].isActive
+      } : null
+    });
 
     // Get creator details for all templates
     const creatorIds = [...new Set(templatesData.map(t => t.createdBy).filter(Boolean))]
@@ -92,7 +114,10 @@ export const GET = createApiHandler(
       createdByUser: creatorMap.get(template.createdBy) || null
     }))
 
-    logger.info(`Retrieved ${templates.length} templates`);
+    logger.info(`✅ Final template response:`, {
+      templatesCount: templates.length,
+      templateNames: templates.map(t => ({ id: t.id, name: t.templateName, category: t.category }))
+    });
     return { templates };
   }
 );

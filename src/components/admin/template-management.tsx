@@ -45,14 +45,26 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
       if (filterCategory !== 'all') {
         params.append('category', filterCategory)
       }
-      
+
       const response = await fetch(`/api/admin/templates?${params}`)
       const result = await response.json()
       const data = result.data || result
 
+      // Debug: Log the API response structure
+      logger.info('🔍 Templates API Response:', {
+        success: result.success,
+        hasData: !!result.data,
+        dataType: typeof data,
+        hasTemplates: !!data.templates,
+        templatesLength: data.templates?.length,
+        filterCategory
+      })
+
       if (data.templates) {
         setTemplates(data.templates)
+        logger.info(`✅ Loaded ${data.templates.length} templates`)
       } else {
+        logger.error('❌ No templates array found in response', { data, result })
         toast.error('Failed to fetch templates')
       }
     } catch (error) {
@@ -120,7 +132,10 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         body: JSON.stringify(formData)
       })
 
-      const data = await response.json()
+      const result = await response.json()
+      const data = result.data || result // Unwrap createApiHandler response
+
+      logger.info('Template creation response:', { success: result.success, hasData: !!result.data, template: data.template })
 
       if (response.ok) {
         toast.success('Template berhasil dibuat')
@@ -128,7 +143,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         resetForm()
         fetchTemplates()
       } else {
-        toast.error(data.error || 'Failed to create template')
+        toast.error(data.error || result.error || 'Failed to create template')
       }
     } catch (error) {
       logger.error('Error creating template', error as Error)
@@ -152,7 +167,10 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         body: JSON.stringify(formData)
       })
 
-      const data = await response.json()
+      const result = await response.json()
+      const data = result.data || result // Unwrap createApiHandler response
+
+      logger.info('Template update response:', { success: result.success, hasData: !!result.data, template: data.template })
 
       if (response.ok) {
         toast.success('Template berhasil diperbarui')
@@ -161,7 +179,7 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         resetForm()
         fetchTemplates()
       } else {
-        toast.error(data.error || 'Failed to update template')
+        toast.error(data.error || result.error || 'Failed to update template')
       }
     } catch (error) {
       logger.error('Error updating template', error as Error)
@@ -185,13 +203,16 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         method: 'DELETE'
       })
 
-      const data = await response.json()
+      const result = await response.json()
+      const data = result.data || result // Unwrap createApiHandler response
+
+      logger.info('Template delete response:', { success: result.success, hasData: !!result.data, message: data.message })
 
       if (response.ok) {
         toast.success('Template berhasil dinonaktifkan')
         fetchTemplates()
       } else {
-        toast.error(data.error || 'Failed to deactivate template')
+        toast.error(data.error || result.error || 'Failed to deactivate template')
       }
     } catch (error) {
       logger.error('Error deactivating template', error as Error)

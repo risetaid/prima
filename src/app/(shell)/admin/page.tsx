@@ -36,14 +36,19 @@ export default function AdminPanelPage() {
       // Fetch user stats
       const usersResponse = await fetch("/api/admin/users");
       if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
+        const usersResult = await usersResponse.json();
+        const usersData = usersResult.data || usersResult; // Unwrap createApiHandler response
+
         logger.info("Admin users API response", {
+          success: usersResult.success,
+          hasData: !!usersResult.data,
           hasUsers: !!usersData.users,
           usersCount: usersData.users?.length,
           pagination: usersData.pagination,
           pendingCount: usersData.pendingCount,
           totalInPagination: usersData.pagination?.total
         });
+
         setStats((prev) => ({
           ...prev,
           pendingUsers: usersData.pendingCount || 0,
@@ -59,7 +64,9 @@ export default function AdminPanelPage() {
       // Fetch template stats
       const templatesResponse = await fetch("/api/admin/templates");
       if (templatesResponse.ok) {
-        const templatesData = await templatesResponse.json();
+        const templatesResult = await templatesResponse.json();
+        const templatesData = templatesResult.data || templatesResult; // Unwrap createApiHandler response
+
         setStats((prev) => ({
           ...prev,
           totalTemplates: templatesData.templates?.length || 0,
@@ -69,7 +76,9 @@ export default function AdminPanelPage() {
       // Fetch patient stats
       const patientsResponse = await fetch("/api/patients");
       if (patientsResponse.ok) {
-        const patientsData = await patientsResponse.json();
+        const patientsResult = await patientsResponse.json();
+        const patientsData = patientsResult.data || patientsResult; // Unwrap createApiHandler response
+
         const activePatients =
           patientsData.patients?.filter((p: Patient) => p.isActive)?.length ||
           0;
