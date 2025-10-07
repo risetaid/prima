@@ -129,9 +129,34 @@ export default function VideoPage() {
 
       const data = await response.json();
 
+      // Debug: Log the response structure
+      logger.info('🔍 CMS API Response (Videos):', {
+        success: data.success,
+        hasData: !!data.data,
+        dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
+        dataLength: Array.isArray(data.data) ? data.data.length : 'N/A',
+        dataKeys: !Array.isArray(data.data) && typeof data.data === 'object' ? Object.keys(data.data) : 'N/A'
+      })
+
       if (data.success && data.data) {
+        // Check if data.data is an array, if not, try to find the array in the response
+        let videosArray = data.data
+
+        if (!Array.isArray(videosArray)) {
+          logger.warn('⚠️ data.data is not an array, searching for videos array...', videosArray)
+          // Try common property names that might contain the videos
+          if (videosArray.videos && Array.isArray(videosArray.videos)) {
+            videosArray = videosArray.videos
+          } else if (videosArray.data && Array.isArray(videosArray.data)) {
+            videosArray = videosArray.data
+          } else {
+            logger.error('❌ Could not find videos array in response', videosArray)
+            throw new Error('Invalid response format: videos array not found')
+          }
+        }
+
         // Videos are already filtered to published only by the API
-        const publishedVideos = data.data.filter(
+        const publishedVideos = videosArray.filter(
           (item: ApiContentItem) => item.type === "video"
         );
         setVideos(publishedVideos);

@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [dbUserLoaded, setDbUserLoaded] = useState(false);
   const isBackgroundFetchRunningRef = useRef(false);
   const lastBackgroundFetchRef = useRef(0);
+  const isFetchingRef = useRef(false); // Prevent duplicate fetches
 
   const isLoaded = userLoaded && authLoaded && dbUserLoaded;
 
@@ -111,16 +112,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const responseData = await response.json();
 
       // DEBUG: Log API response
-      logger.info('📡 API /api/user/status response:', data);
+      logger.info('📡 API /api/user/status response:', responseData);
 
-      if (data.error) {
-        throw new Error(data.error);
+      if (responseData.error) {
+        throw new Error(responseData.error);
       }
 
-      return data;
+      // Extract the actual user data from the wrapped response
+      // API returns { success: true, data: {...}, message: "...", ... }
+      return responseData.data || responseData;
     } catch (error) {
       logger.error(`Auth fetch attempt ${attempt} failed`, error instanceof Error ? error : new Error(String(error)), { attempt, maxRetries: MAX_RETRIES });
 
@@ -140,25 +143,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Don't set any state until Clerk auth is fully loaded
     if (!userLoaded || !authLoaded) {
+      logger.info('⏳ Waiting for Clerk auth to load', { userLoaded, authLoaded });
       return;
     }
 
     // If no user, mark as loaded with default values
     if (!user) {
+      logger.info('👤 No user signed in - setting default state');
       setRole(null);
       setCanAccessDashboard(false);
       setNeedsApproval(true);
       setDbUserLoaded(true);
+      isFetchingRef.current = false; // Reset fetch flag
       clearCachedUserData().catch((error) => {
         logger.warn("Failed to clear cached user data", { error: error instanceof Error ? error.message : String(error) });
       });
       return;
     }
 
+    // Prevent duplicate fetches from useEffect running multiple times
+    if (isFetchingRef.current) {
+      logger.info('⏭️ Skipping duplicate auth fetch - already in progress');
+      return;
+    }
+
+    logger.info('🔐 User signed in - checking auth state', { 
+      userId: user.id,
+      email: user.primaryEmailAddress?.emailAddress 
+    });
+
     // Try to use cached data first for faster loading
     const cachedData = getCachedUserData();
     if (cachedData) {
-      logger.info("Using cached auth data for faster loading");
+      // Force refresh if cached data shows no dashboard access (might be stale)
+      const needsForceRefresh = !cachedData.canAccessDashboard;
+
+      logger.info("Using cached auth data for faster loading", {
+        canAccessDashboard: cachedData.canAccessDashboard,
+        needsForceRefresh
+      });
+
+      // If cached data denies access, DON'T mark as loaded yet - wait for fresh data
+      if (needsForceRefresh) {
+        logger.info("🔄 Cached data denies dashboard access - fetching fresh data before marking as loaded");
+        isFetchingRef.current = true; // Mark as fetching
+        isBackgroundFetchRunningRef.current = false; // Reset flag
+        lastBackgroundFetchRef.current = 0; // Reset cooldown
+        fetchUserStatus()
+          .then((data) => {
+            logger.info("✅ Force refreshed auth data", {
+              oldCanAccess: cachedData.canAccessDashboard,
+              newCanAccess: data.canAccessDashboard,
+              role: data.role,
+              needsApproval: data.needsApproval
+            });
+            setRole(data.role || "RELAWAN");
+            setCanAccessDashboard(data.canAccessDashboard || false);
+            setNeedsApproval(data.needsApproval !== false);
+            setDbUserLoaded(true); // NOW mark as loaded with fresh data
+            logger.info("🎯 Auth state updated - dbUserLoaded set to true", {
+              canAccessDashboard: data.canAccessDashboard,
+              role: data.role
+            });
+            setCachedUserData(data).catch((error) => {
+              logger.warn("Failed to cache user data", { error: error instanceof Error ? error.message : String(error) });
+            });
+          })
+          .catch((error) => {
+            logger.warn(
+              "⚠️ Force refresh failed, using cached data",
+              { error: error instanceof Error ? error.message : String(error) }
+            );
+            // Even on error, mark as loaded so user isn't stuck
+            setRole(cachedData.role || "RELAWAN");
+            setCanAccessDashboard(cachedData.canAccessDashboard || false);
+            setNeedsApproval(cachedData.needsApproval !== false);
+            setDbUserLoaded(true);
+          })
+          .finally(() => {
+            isFetchingRef.current = false; // Reset fetch flag
+          });
+        return; // Skip the background fetch since we're doing immediate refresh
+      }
+
+      // Cached data grants access - safe to use immediately
+      logger.info("✅ Using cached data with dashboard access", {
+        canAccessDashboard: cachedData.canAccessDashboard,
+        role: cachedData.role
+      });
       setRole(cachedData.role || "RELAWAN");
       setCanAccessDashboard(cachedData.canAccessDashboard || false);
       setNeedsApproval(cachedData.needsApproval !== false);
@@ -172,14 +244,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         lastBackgroundFetchRef.current = now;
         fetchUserStatus()
           .then((data) => {
-            // Only update if data has changed and component is still mounted
-            if (JSON.stringify(cachedData) !== JSON.stringify(data)) {
-              logger.info("Updating auth state with fresh data");
+            // Always update if canAccessDashboard differs, regardless of full object comparison
+            const dashboardAccessChanged = cachedData?.canAccessDashboard !== data.canAccessDashboard;
+            const dataChanged = JSON.stringify(cachedData) !== JSON.stringify(data);
+
+            if (dashboardAccessChanged || dataChanged) {
+              logger.info("Updating auth state with fresh data", {
+                dashboardAccessChanged,
+                dataChanged,
+                oldCanAccess: cachedData?.canAccessDashboard,
+                newCanAccess: data.canAccessDashboard
+              });
               setRole(data.role || "RELAWAN");
               setCanAccessDashboard(data.canAccessDashboard || false);
               setNeedsApproval(data.needsApproval !== false);
               setCachedUserData(data).catch((error) => {
                 logger.warn("Failed to cache user data", { error: error instanceof Error ? error.message : String(error) });
+              });
+            } else {
+              logger.info("No auth state update needed - data unchanged", {
+                cachedAccess: cachedData?.canAccessDashboard,
+                newAccess: data.canAccessDashboard
               });
             }
           })
@@ -198,6 +283,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // No cached data, fetch fresh data
+    logger.info('📡 No cached data - fetching fresh user status');
+    isFetchingRef.current = true; // Mark as fetching
     // Only run main fetch if background fetch is not running
     if (!isBackgroundFetchRunningRef.current) {
       fetchUserStatus()
@@ -212,6 +299,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole(data.role || "RELAWAN");
           setCanAccessDashboard(data.canAccessDashboard || false);
           setNeedsApproval(data.needsApproval !== false);
+          setDbUserLoaded(true); // Mark as loaded after setting state
+          logger.info('🎯 Auth state updated from fresh data - dbUserLoaded set to true', {
+            canAccessDashboard: data.canAccessDashboard,
+            role: data.role
+          });
           setCachedUserData(data).catch((error) => {
             logger.warn("Failed to update cached user data", { error: error instanceof Error ? error.message : String(error) });
           });
@@ -266,11 +358,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
         })
         .finally(() => {
-          setDbUserLoaded(true);
+          isFetchingRef.current = false; // Reset fetch flag
         });
     } else {
-      // Background fetch is running, just mark as loaded
-      setDbUserLoaded(true);
+      // Background fetch is already running, don't start another one
+      logger.warn('⚠️ Background fetch already running, skipping duplicate fetch');
+      isFetchingRef.current = false;
     }
   }, [user, userLoaded, authLoaded, getCachedUserData, setCachedUserData, clearCachedUserData, fetchUserStatus]);
 

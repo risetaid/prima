@@ -47,8 +47,9 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
       }
       
       const response = await fetch(`/api/admin/templates?${params}`)
-      const data = await response.json()
-      
+      const result = await response.json()
+      const data = result.data || result
+
       if (data.templates) {
         setTemplates(data.templates)
       } else {

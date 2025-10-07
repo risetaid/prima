@@ -47,22 +47,22 @@ export default function ReminderPage() {
 
   const fetchPatients = async () => {
     try {
-      // Use optimized dashboard overview endpoint
       const response = await fetch('/api/dashboard/overview')
       if (response.ok) {
-        const data = await response.json()
-        setPatients(data.patients)
+        const result = await response.json()
+        const data = result.data || result
+        setPatients(data.patients || [])
       } else {
-        // Fallback to original endpoint if new one fails
-        logger.warn('Failed to fetch dashboard overview, falling back to patients endpoint')
         const fallbackResponse = await fetch('/api/patients')
         if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json()
-          setPatients(data)
+          const result = await fallbackResponse.json()
+          const data = result.data || result
+          setPatients(Array.isArray(data) ? data : [])
         }
       }
     } catch (error) {
       logger.error('Error fetching patients', error as Error)
+      setPatients([])
     } finally {
       setLoading(false)
     }

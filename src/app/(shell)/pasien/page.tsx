@@ -45,22 +45,22 @@ export default function PatientPage() {
 
   const fetchPatients = useCallback(async () => {
     try {
-      // Use optimized dashboard overview endpoint
       const response = await fetch('/api/dashboard/overview')
       if (response.ok) {
-        const data = await response.json()
-        setPatients(data.patients)
+        const result = await response.json()
+        const data = result.data || result
+        setPatients(data.patients || [])
       } else {
-        // Fallback to original endpoint if new one fails
-        logger.warn('Failed to fetch dashboard overview, falling back to patients endpoint')
         const fallbackResponse = await fetch('/api/patients')
         if (fallbackResponse.ok) {
-          const data = await fallbackResponse.json()
-          setPatients(data)
+          const result = await fallbackResponse.json()
+          const data = result.data || result
+          setPatients(Array.isArray(data) ? data : [])
         }
       }
     } catch (error) {
       logger.error('Error fetching patients', error as Error)
+      setPatients([])
     } finally {
       setLoading(false)
     }
@@ -207,7 +207,7 @@ export default function PatientPage() {
         {/* Mobile: Status Badge */}
         <div className="lg:hidden mx-4 bg-blue-100 border-2 border-blue-500 text-blue-600 rounded-full px-6 py-3 text-center mb-4 mt-4">
           <span className="font-medium">
-            {loading ? "Loading..." : `${filteredPatients.length} Pasien dalam Pengawasan`}
+            {loading ? "Loading..." : `${filteredPatients?.length || 0} Pasien dalam Pengawasan`}
           </span>
         </div>
 
@@ -231,7 +231,7 @@ export default function PatientPage() {
                 {/* Center: Patient Count */}
                 <div className="flex items-center space-x-4">
                   <h1 className="text-white text-3xl font-bold">
-                    {loading ? "Loading..." : `${filteredPatients.length} Pasien Dalam Pengawasan`}
+                    {loading ? "Loading..." : `${filteredPatients?.length || 0} Pasien Dalam Pengawasan`}
                   </h1>
                   <button
                     onClick={() => setShowAddPatientModal(true)}
@@ -285,7 +285,7 @@ export default function PatientPage() {
 
               {/* Table Body */}
               <div className="divide-y divide-gray-100">
-                {filteredPatients.length === 0 ? (
+                {!filteredPatients || filteredPatients.length === 0 ? (
                   <div className="px-6 py-12 text-center">
                     <p className="text-gray-500 text-lg">
                       Belum ada pasien dalam pengawasan
@@ -433,7 +433,7 @@ export default function PatientPage() {
             {/* Mobile: Patient Cards - Scrollable */}
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 420px)' }}>
               <div className="space-y-3">
-                {filteredPatients.map((patient) => {
+                {filteredPatients?.map((patient) => {
                   const complianceLabel = getComplianceLabel(patient.complianceRate)
                   const statusLabel = patient.isActive
                     ? { text: 'Aktif', bg: 'bg-blue-500', color: 'text-white' }
@@ -480,7 +480,7 @@ export default function PatientPage() {
                   )
                 })}
 
-                {filteredPatients.length === 0 && !loading && (
+                {(!filteredPatients || filteredPatients.length === 0) && !loading && (
                   <div className="text-center py-8 bg-white rounded-lg shadow-md">
                     <p className="text-gray-500">
                       {patients.length === 0 ? 'Belum ada pasien' : 'Tidak ada pasien yang sesuai dengan filter'}

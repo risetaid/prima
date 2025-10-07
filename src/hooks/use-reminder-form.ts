@@ -101,7 +101,8 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     try {
       const response = await fetch(`/api/patients/${patientId}`);
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data || result;
         setPatient({
           id: data.id,
           name: data.name,
@@ -119,7 +120,8 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
     try {
       const response = await fetch("/api/templates");
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data || result;
         setTemplates(data.templates || []);
       }
     } catch {

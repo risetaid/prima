@@ -45,7 +45,8 @@ export default function EditPatientPage() {
     try {
       const response = await fetch(`/api/patients/${id}`)
       if (response.ok) {
-        const data = await response.json()
+        const result = await response.json()
+        const data = result.data || result
         setPatient(data)
 
         // Populate form with existing data using WIB timezone

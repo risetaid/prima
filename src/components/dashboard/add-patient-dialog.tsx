@@ -105,7 +105,8 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         })
 
         if (photoResponse.ok) {
-          const photoData = await photoResponse.json()
+          const photoResult = await photoResponse.json()
+          const photoData = photoResult.data || photoResult
           photoUrl = photoData.url
         }
       }

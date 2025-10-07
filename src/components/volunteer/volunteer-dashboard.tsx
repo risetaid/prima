@@ -67,7 +67,8 @@ export function VolunteerDashboard() {
     try {
       const response = await fetch('/api/volunteer/notifications');
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data || result;
         setNotifications(data.notifications);
       }
     } catch (error: unknown) {
@@ -81,7 +82,8 @@ export function VolunteerDashboard() {
     try {
       const response = await fetch('/api/volunteer/stats');
       if (response.ok) {
-        const data = await response.json();
+        const result = await response.json();
+        const data = result.data || result;
         setStats(data.stats);
       }
     } catch (error: unknown) {

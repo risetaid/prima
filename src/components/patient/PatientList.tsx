@@ -115,7 +115,8 @@ function PatientList({
     try {
       const response = await fetch('/api/patients')
       if (response.ok) {
-        const data = await response.json()
+        const result = await response.json()
+        const data = result.data || result
         setInternalPatients(data)
       }
     } catch (error: unknown) {

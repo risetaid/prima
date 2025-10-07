@@ -91,9 +91,34 @@ export default function BeritaPage() {
 
       const data = await response.json()
 
+      // Debug: Log the response structure
+      logger.info('🔍 CMS API Response:', {
+        success: data.success,
+        hasData: !!data.data,
+        dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
+        dataLength: Array.isArray(data.data) ? data.data.length : 'N/A',
+        dataKeys: !Array.isArray(data.data) && typeof data.data === 'object' ? Object.keys(data.data) : 'N/A'
+      })
+
       if (data.success && data.data) {
+        // Check if data.data is an array, if not, try to find the array in the response
+        let articlesArray = data.data
+
+        if (!Array.isArray(articlesArray)) {
+          logger.warn('⚠️ data.data is not an array, searching for articles array...', articlesArray)
+          // Try common property names that might contain the articles
+          if (articlesArray.articles && Array.isArray(articlesArray.articles)) {
+            articlesArray = articlesArray.articles
+          } else if (articlesArray.data && Array.isArray(articlesArray.data)) {
+            articlesArray = articlesArray.data
+          } else {
+            logger.error('❌ Could not find articles array in response', articlesArray)
+            throw new Error('Invalid response format: articles array not found')
+          }
+        }
+
         // Articles are already filtered to published only by the API
-        const publishedArticles = data.data.filter((item: Article) => 'type' in item && item.type === 'article')
+        const publishedArticles = articlesArray.filter((item: Article) => 'type' in item && item.type === 'article')
         setArticles(publishedArticles)
         logger.info(`Loaded ${publishedArticles.length} published articles`)
       } else {

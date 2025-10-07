@@ -111,7 +111,8 @@ export function usePatientListState(externalPatients?: Patient[], externalLoadin
       
       const response = await fetch('/api/patients')
       if (response.ok) {
-        const data = await response.json()
+        const result = await response.json()
+        const data = result.data || result
         actions.setPatients(data)
         logger.info(`Fetched ${data.length} patients`)
       } else {

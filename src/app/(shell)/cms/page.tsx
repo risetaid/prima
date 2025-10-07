@@ -93,13 +93,41 @@ function CMSPageContent() {
         }
 
       const contentData = await contentResponse.json();
-      logger.info("Content data received", {
+
+      // Debug: Log the response structure
+      logger.info('🔍 CMS API Response (Admin):', {
         success: contentData.success,
-        contentCount: contentData.data?.length,
+        hasData: !!contentData.data,
+        dataType: Array.isArray(contentData.data) ? 'array' : typeof contentData.data,
+        dataLength: Array.isArray(contentData.data) ? contentData.data.length : 'N/A',
+        dataKeys: !Array.isArray(contentData.data) && typeof contentData.data === 'object' ? Object.keys(contentData.data) : 'N/A'
       });
 
       if (contentData.success) {
-        setContent(contentData.data || []);
+        // Check if contentData.data is an array, if not, try to find the array in the response
+        let contentArray = contentData.data
+
+        if (!Array.isArray(contentArray)) {
+          logger.warn('⚠️ contentData.data is not an array, searching for content array...', contentArray)
+          // Try common property names that might contain the content
+          if (contentArray.data && Array.isArray(contentArray.data)) {
+            contentArray = contentArray.data
+          } else if (contentArray.content && Array.isArray(contentArray.content)) {
+            contentArray = contentArray.content
+          } else if (contentArray.articles && Array.isArray(contentArray.articles)) {
+            contentArray = contentArray.articles
+          } else if (contentArray.videos && Array.isArray(contentArray.videos)) {
+            contentArray = contentArray.videos
+          } else {
+            logger.error('❌ Could not find content array in response', contentArray)
+            toast.error('Invalid response format: content array not found')
+            setContent([])
+            return
+          }
+        }
+
+        setContent(contentArray);
+        logger.info("Content loaded successfully", { count: contentArray.length });
       } else {
         logger.error("Content API returned error", new Error(contentData.error || "Unknown error"));
         toast.error(contentData.error || "Gagal memuat konten");
@@ -121,24 +149,100 @@ function CMSPageContent() {
     }
   }, [activeTab]);
 
-  // Load statistics only once on mount
+  // Load statistics only once on mount - simplified to avoid API issues
   useEffect(() => {
     const fetchStatistics = async () => {
       try {
         logger.info("Loading statistics (one-time)");
         setStatsLoading(true);
+
+        // Try to fetch a small amount of content to get basic stats
         const response = await fetch(
-          "/api/cms/content?type=all&limit=0&stats_only=true"
+          "/api/cms/content?type=all&limit=5"
         );
 
         if (response.ok) {
           const data = await response.json();
+
+          // Debug: Log the response structure
+          logger.info('🔍 CMS Statistics Response:', {
+            success: data.success,
+            hasData: !!data.data,
+            hasStatistics: !!data.statistics,
+            dataType: Array.isArray(data.data) ? 'array' : typeof data.data,
+            dataLength: Array.isArray(data.data) ? data.data.length : 'N/A'
+          });
+
           if (data.success && data.statistics) {
             setStatistics(data.statistics);
             logger.info("Statistics loaded (one-time)", { statistics: data.statistics });
+          } else if (data.success && data.data && data.data.statistics) {
+            // Handle nested response format: data.data.statistics
+            setStatistics(data.data.statistics);
+            logger.info("✅ Statistics loaded from nested response", { statistics: data.data.statistics });
+          } else if (data.success && Array.isArray(data.data)) {
+            // Calculate basic stats from the content data
+            logger.info('🔍 Processing CMS content data:', {
+              totalItems: data.data.length,
+              sampleItems: data.data.slice(0, 2).map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                type: item.type,
+                status: item.status
+              }))
+            });
+
+            const articles = data.data.filter((item: any) => item.type === 'article');
+            const videos = data.data.filter((item: any) => item.type === 'video');
+          } else if (data.success && data.data && Array.isArray(data.data.data)) {
+            // Handle nested response format: data.data.data
+            const contentArray = data.data.data;
+            logger.info('🔍 Processing nested CMS content data:', {
+              totalItems: contentArray.length,
+              sampleItems: contentArray.slice(0, 2).map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                type: item.type,
+                status: item.status
+              }))
+            });
+
+            const articles = contentArray.filter((item: any) => item.type === 'article');
+            const videos = contentArray.filter((item: any) => item.type === 'video');
+
+            logger.info('📊 Content breakdown:', {
+              articles: articles.length,
+              videos: videos.length,
+              articleStatuses: articles.map((a: any) => a.status),
+              videoStatuses: videos.map((v: any) => v.status)
+            });
+
+            const basicStats = {
+              articles: {
+                total: articles.length,
+                published: articles.filter((a: any) => a.status === 'published' || a.status === 'PUBLISHED').length,
+                draft: articles.filter((a: any) => a.status === 'draft' || a.status === 'DRAFT').length,
+              },
+              videos: {
+                total: videos.length,
+                published: videos.filter((v: any) => v.status === 'published' || v.status === 'PUBLISHED').length,
+                draft: videos.filter((v: any) => v.status === 'draft' || v.status === 'DRAFT').length,
+              },
+              total: {
+                content: contentArray.length,
+                published: contentArray.filter((item: any) => item.status === 'published' || item.status === 'PUBLISHED').length,
+                draft: contentArray.filter((item: any) => item.status === 'draft' || item.status === 'DRAFT').length,
+              }
+            };
+
+            setStatistics(basicStats);
+            logger.info("✅ Basic statistics calculated from content", {
+              stats: basicStats,
+              calculatedFrom: data.data.length + ' items'
+            });
           } else {
             // Fallback: set empty statistics so content can load
-            logger.warn("Statistics API returned success but no data, using fallback", { data });
+            logger.warn("Statistics API returned unexpected data, using fallback", { data });
             setStatistics({
               articles: { total: 0, published: 0, draft: 0 },
               videos: { total: 0, published: 0, draft: 0 },
@@ -146,19 +250,8 @@ function CMSPageContent() {
             });
           }
         } else {
-          // Handle HTTP errors
-          logger.error("Statistics API failed", new Error(`HTTP ${response.status}`), {
-            status: response.status,
-            statusText: response.statusText
-          });
-
-          if (response.status === 401) {
-            toast.error("Akses ditolak. Role Anda tidak memiliki izin CMS.");
-          } else if (response.status === 403) {
-            toast.error("Akses ditolak. Butuh role ADMIN atau DEVELOPER.");
-          } else {
-            toast.error(`Gagal memuat statistik: ${response.status}`);
-          }
+          // Handle HTTP errors - statistics are not critical, so don't show error toasts
+          logger.warn(`Statistics API returned ${response.status}, using empty statistics (non-critical)`);
 
           // Fallback: set empty statistics so content can still load
           setStatistics({
@@ -169,6 +262,12 @@ function CMSPageContent() {
         }
       } catch (error) {
         logger.error("Statistics loading error", error instanceof Error ? error : new Error(String(error)));
+        // Set fallback statistics on error
+        setStatistics({
+          articles: { total: 0, published: 0, draft: 0 },
+          videos: { total: 0, published: 0, draft: 0 },
+          total: { content: 0, published: 0, draft: 0 }
+        });
       } finally {
         setStatsLoading(false);
       }
@@ -318,7 +417,10 @@ function CMSPageContent() {
       {statsLoading ? (
         <DashboardStatsSkeleton />
       ) : statistics ? (
-        <CMSStatsCards statistics={statistics} />
+        (() => {
+          logger.info('🎯 Rendering CMSStatsCards with statistics:', statistics as any);
+          return <CMSStatsCards statistics={statistics} />;
+        })()
       ) : null}
 
       {/* Content Tabs */}
