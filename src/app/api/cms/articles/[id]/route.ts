@@ -1,54 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, cmsArticles } from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
-import { z } from "zod";
-
-import { logger } from '@/lib/logger';
-// Validation schema for updates
-const updateArticleSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(255, "Title too long")
-    .optional(),
-  slug: z
-    .string()
-    .min(1, "Slug is required")
-    .max(255, "Slug too long")
-    .optional(),
-  content: z.string().min(1, "Content is required").optional(),
-  excerpt: z.string().optional(),
-  featuredImageUrl: z.string().url().optional().or(z.literal("")),
-  category: z
-    .enum([
-      "GENERAL",
-      "NUTRITION",
-      "EXERCISE",
-      "MOTIVATIONAL",
-      "MEDICAL",
-      "FAQ",
-    ])
-    .optional(),
-  tags: z.array(z.string()).optional(),
-  seoTitle: z.string().max(255).optional(),
-  seoDescription: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
-});
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
+import { db, cmsArticles } from '@/db'
+import { eq, and, isNull } from 'drizzle-orm'
+import { logger } from '@/lib/logger'
 
 // GET - Get single article by ID
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const GET = createApiHandler(
+  { auth: "required", params: schemas.uuidParam },
+  async (_, { user, params }) => {
+    // Only admins and developers can access articles management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
 
     const article = await db
       .select()
@@ -57,39 +22,32 @@ export async function GET(
       .limit(1);
 
     if (article.length === 0) {
-      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+      throw new Error("Article not found");
     }
 
-    return NextResponse.json({
+    logger.info('Article retrieved successfully', {
+      articleId: id,
+      title: article[0].title,
+      accessedBy: user!.id
+    });
+
+    return {
       success: true,
       data: article[0],
-    });
-  } catch (error: unknown) {
-    logger.error("Error fetching article:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
 // PUT - Update article
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const PUT = createApiHandler(
+  { auth: "required", params: schemas.uuidParam, body: schemas.updateArticle },
+  async (body, { user, params }) => {
+    // Only admins and developers can update articles
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
-    const body = await request.json();
-
-    // Validate request body
-    const validatedData = updateArticleSchema.parse(body);
+    const { id } = params!;
 
     // Check if article exists and is not deleted
     const existingArticle = await db
@@ -99,41 +57,50 @@ export async function PUT(
       .limit(1);
 
     if (existingArticle.length === 0) {
-      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+      throw new Error("Article not found");
     }
 
+    // Type the body properly
+    const updateBody = body as {
+      title?: string;
+      content?: string;
+      excerpt?: string;
+      slug?: string;
+      category?: "GENERAL" | "NUTRITION" | "EXERCISE" | "MOTIVATIONAL" | "MEDICAL" | "FAQ";
+      status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+      featured?: boolean;
+      tags?: string[];
+    };
+
     // If slug is being updated, ensure it's unique
-    if (validatedData.slug) {
+    if (updateBody.slug) {
       const slugConflict = await db
         .select()
         .from(cmsArticles)
         .where(
           and(
-            eq(cmsArticles.slug, validatedData.slug),
+            eq(cmsArticles.slug, updateBody.slug),
             isNull(cmsArticles.deletedAt)
           )
         )
         .limit(1);
 
       if (slugConflict.length > 0 && slugConflict[0].id !== id) {
-        return NextResponse.json(
-          { error: "Slug already exists" },
-          { status: 400 }
-        );
+        throw new Error("Slug already exists");
       }
     }
 
     // Prepare update data
     const updateData = {
-      ...validatedData,
+      ...updateBody,
       updatedAt: new Date(),
       // Set publishedAt when status changes to published
-      ...(validatedData.status === "PUBLISHED" &&
+      ...(updateBody.status === "PUBLISHED" &&
       existingArticle[0].status !== "PUBLISHED"
         ? { publishedAt: new Date() }
         : {}),
       // Clear publishedAt when status changes from published
-      ...(validatedData.status !== "PUBLISHED" &&
+      ...(updateBody.status !== "PUBLISHED" &&
       existingArticle[0].status === "PUBLISHED"
         ? { publishedAt: null }
         : {}),
@@ -146,40 +113,30 @@ export async function PUT(
       .where(eq(cmsArticles.id, id))
       .returning();
 
-    return NextResponse.json({
+    logger.info('Article updated successfully', {
+      articleId: id,
+      title: updatedArticle[0].title,
+      updatedBy: user!.id
+    });
+
+    return {
       success: true,
       message: "Article updated successfully",
       data: updatedArticle[0],
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Error updating article:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
 // DELETE - Soft delete article
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const DELETE = createApiHandler(
+  { auth: "required", params: schemas.uuidParam },
+  async (_, { user, params }) => {
+    // Only admins and developers can delete articles
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
 
     // Check if article exists and is not already deleted
     const existingArticle = await db
@@ -189,7 +146,7 @@ export async function DELETE(
       .limit(1);
 
     if (existingArticle.length === 0) {
-      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+      throw new Error("Article not found");
     }
 
     // Soft delete article by setting deletedAt timestamp
@@ -201,15 +158,15 @@ export async function DELETE(
       })
       .where(eq(cmsArticles.id, id));
 
-    return NextResponse.json({
+    logger.info('Article deleted successfully', {
+      articleId: id,
+      title: existingArticle[0].title,
+      deletedBy: user!.id
+    });
+
+    return {
       success: true,
       message: "Article deleted successfully",
-    });
-  } catch (error: unknown) {
-    logger.error("Error deleting article:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);

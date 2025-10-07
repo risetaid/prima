@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 import { isDuplicateEvent, hashFallbackId } from "@/lib/idempotency";
@@ -12,6 +12,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { KeywordMatcherService } from "@/services/keyword-matcher.service";
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
+import { createApiHandler } from "@/lib/api-helpers";
 
 
 interface WebhookBody {
@@ -42,6 +43,15 @@ const whatsappService = new WhatsAppService();
 const conversationService = new ConversationStateService();
 const keywordMatcher = new KeywordMatcherService();
 const simpleVerificationService = new SimpleVerificationService();
+
+// Custom authentication function for webhook
+async function verifyWebhookToken(request: NextRequest) {
+  const authError = requireWebhookToken(request);
+  if (authError) {
+    throw new Error("Unauthorized webhook");
+  }
+  return null; // No user object for webhooks
+}
 
 const IncomingSchema = z.object({
   sender: z.string().min(6),
@@ -158,10 +168,7 @@ async function validateAndNormalizePayload(parsed: WebhookBody) {
   const normalized = normalizeIncoming(parsed);
   const result = IncomingSchema.safeParse(normalized);
   if (!result.success) {
-    return NextResponse.json(
-      { error: "Invalid payload", issues: result.error.flatten() },
-      { status: 400 }
-    );
+    throw new Error(`Invalid payload: ${JSON.stringify(result.error.flatten())}`);
   }
   return result.data;
 }
@@ -180,7 +187,7 @@ async function checkIdempotency(data: {
   ]);
   const idemKey = `webhook:fonnte:incoming:${fallbackId}`;
   if (await isDuplicateEvent(idemKey)) {
-    return NextResponse.json({ ok: true, duplicate: true });
+    return { ok: true, duplicate: true };
   }
   return null;
 }
@@ -201,11 +208,11 @@ async function findPatient(sender: string, parsed: WebhookBody) {
         wa_number: parsed.wa_number,
       },
     });
-    return NextResponse.json({
+    return {
       ok: true,
       ignored: true,
       reason: "no_patient_match",
-    });
+    };
   }
   return found.patient;
 }
@@ -320,117 +327,247 @@ async function handleUnrecognizedMessage(
   }
 }
 
-export async function POST(request: NextRequest) {
-  const authError = requireWebhookToken(request);
-  if (authError) return authError;
+export const POST = createApiHandler(
+  {
+    auth: "custom",
+    customAuth: verifyWebhookToken,
+    rateLimit: { enabled: false } // Disable rate limiting for webhooks
+  },
+  async (body, { request }) => {
+    // Parse webhook body with custom parsing function
+    const { parsed, contentType } = await parseWebhookBody(request);
+    logWebhookPayload(parsed, request, contentType);
 
-  const { parsed, contentType } = await parseWebhookBody(request);
-  logWebhookPayload(parsed, request, contentType);
-
-  const validationResult = await validateAndNormalizePayload(parsed);
-  if (validationResult instanceof NextResponse) return validationResult;
-
-  const { sender, message, device, id, timestamp } = validationResult;
-
-  const duplicateCheck = await checkIdempotency({
-    id,
-    sender,
-    timestamp,
-    message,
-  });
-  if (duplicateCheck) return duplicateCheck;
-
-  logger.info("Fonnte incoming webhook received", {
-    sender,
-    device,
-    hasId: Boolean(id),
-    messagePreview: message
-      ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
-      : "no message",
-  });
-
-  const patientResult = await findPatient(sender, parsed);
-  if (patientResult instanceof NextResponse) return patientResult;
-  const patient = patientResult as Patient;
-
-  logger.info("Patient found for incoming message", {
-    patientId: patient.id,
-    patientName: patient.name,
-    verificationStatus: patient.verificationStatus,
-    messagePreview: message
-      ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
-      : "no message",
-  });
-
-  // DEBUG: Log verification processing conditions
-  logger.info("Verification processing debug", {
-    patientId: patient.id,
-    verificationStatus: patient.verificationStatus,
-    message: message?.substring(0, 100),
-    hasMessage: !!message,
-  });
-
-  // Check patient response rate limiting
-  const rateLimitResult =
-    await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id);
-  if (!rateLimitResult.allowed) {
-    logger.warn("Patient response rate limit exceeded", {
-      patientId: patient.id,
-      phoneNumber: sender,
-      rateLimitResult,
-    });
-    return NextResponse.json({
-      ok: true,
-      processed: false,
-      action: "rate_limited",
-      message:
-        "Too many responses - please wait before sending another message",
-    });
-  }
-
-  
-
-  // 🔹 PRIORITY 1: Check for active context (HIGHEST PRIORITY)
-  const activeContext = await conversationService.getActiveContext(patient.id);
-
-  logger.info("Context check for patient", {
-    patientId: patient.id,
-    activeContext,
-    verificationStatus: patient.verificationStatus,
-  });
-
-  // Check if this is a verification or reminder response that should bypass LLM
-  if (activeContext) {
-    logger.info('Active context detected - using strict keyword matching', {
-      patientId: patient.id,
-      activeContext,
-      message: message?.substring(0, 100)
-    })
-
-    // Get conversation state
-    const conversationState = await conversationService.findByPhoneNumber(patient.phoneNumber)
-
-    if (!conversationState) {
-      logger.error('Conversation state not found for active context', undefined, {
-        patientId: patient.id,
-        activeContext
-      })
-      return NextResponse.json({ error: 'Invalid state' }, { status: 500 })
+    const validationResult = await validateAndNormalizePayload(parsed);
+    if (validationResult instanceof Response) {
+      throw new Error("Invalid webhook payload");
     }
 
-    // 🚫 BLOCK LLM - Use simple verification service
-    if (activeContext === 'verification') {
-      logger.info("Processing verification response via active context", {
+    const { sender, message, device, id, timestamp } = validationResult;
+
+    const duplicateCheck = await checkIdempotency({
+      id,
+      sender,
+      timestamp,
+      message,
+    });
+    if (duplicateCheck) {
+      return { ok: true, duplicate: true };
+    }
+
+    logger.info("Fonnte incoming webhook received", {
+      sender,
+      device,
+      hasId: Boolean(id),
+      messagePreview: message
+        ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
+        : "no message",
+    });
+
+    const patientResult = await findPatient(sender, parsed);
+    if (patientResult instanceof Response) {
+      return { ok: true, ignored: true, reason: "no_patient_match" };
+    }
+    const patient = patientResult as Patient;
+
+    logger.info("Patient found for incoming message", {
+      patientId: patient.id,
+      patientName: patient.name,
+      verificationStatus: patient.verificationStatus,
+      messagePreview: message
+        ? message.substring(0, 50) + (message.length > 50 ? "..." : "")
+        : "no message",
+    });
+
+    // DEBUG: Log verification processing conditions
+    logger.info("Verification processing debug", {
+      patientId: patient.id,
+      verificationStatus: patient.verificationStatus,
+      message: message?.substring(0, 100),
+      hasMessage: !!message,
+    });
+
+    // Check patient response rate limiting
+    const rateLimitResult =
+      await patientResponseRateLimiter.checkPatientResponseRateLimit(patient.id);
+    if (!rateLimitResult.allowed) {
+      logger.warn("Patient response rate limit exceeded", {
+        patientId: patient.id,
+        phoneNumber: sender,
+        rateLimitResult,
+      });
+      return {
+        ok: true,
+        processed: false,
+        action: "rate_limited",
+        message:
+          "Too many responses - please wait before sending another message",
+      };
+    }
+
+
+
+    // 🔹 PRIORITY 1: Check for active context (HIGHEST PRIORITY)
+    const activeContext = await conversationService.getActiveContext(patient.id);
+
+    logger.info("Context check for patient", {
+      patientId: patient.id,
+      activeContext,
+      verificationStatus: patient.verificationStatus,
+    });
+
+    // Check if this is a verification or reminder response that should bypass LLM
+    if (activeContext) {
+      logger.info('Active context detected - using strict keyword matching', {
+        patientId: patient.id,
+        activeContext,
+        message: message?.substring(0, 100)
+      })
+
+      // Get conversation state
+      const conversationState = await conversationService.findByPhoneNumber(patient.phoneNumber)
+
+      if (!conversationState) {
+        logger.error('Conversation state not found for active context', undefined, {
+          patientId: patient.id,
+          activeContext
+        })
+        throw new Error('Invalid state');
+      }
+
+      // 🚫 BLOCK LLM - Use simple verification service
+      if (activeContext === 'verification') {
+        logger.info("Processing verification response via active context", {
+          patientId: patient.id,
+          message: message?.substring(0, 50),
+          activeContext,
+        });
+
+        const startTime = Date.now()
+        const result = await simpleVerificationService.processResponse(message || '', patient.id)
+        const processingTimeMs = Date.now() - startTime
+
+        // Record verification response with proper context
+        await recordPatientResponse(patient, sender, message || '', {
+          source: 'verification',
+          intent: result.action === 'verified' ? 'verification_accept' : 'verification_decline',
+          confidence: 100, // Keyword matching is 100% confident
+          relatedEntityId: patient.id,
+          relatedEntityType: 'verification',
+          processingTimeMs,
+          responseClassification: result.action === 'verified' ? 'accepted' : 'declined'
+        })
+
+        logger.info("Verification response processed", {
+          patientId: patient.id,
+          action: result.action,
+          success: result.processed,
+          processingTimeMs
+        });
+
+        return {
+          ok: true,
+          processed: true,
+          action: result.action,
+          source: 'simple_verification',
+          message: result.message
+        }
+      }
+
+      if (activeContext === 'reminder_confirmation') {
+        const confirmationMatch = keywordMatcher.matchConfirmation(message || '')
+
+        if (confirmationMatch === 'done' || confirmationMatch === 'not_yet') {
+          const relatedReminderId = conversationState.relatedEntityId
+
+          if (relatedReminderId && conversationState.relatedEntityType === 'reminder') {
+            // Record reminder confirmation response
+            await recordPatientResponse(patient, sender, message || '', {
+              source: 'reminder_confirmation',
+              intent: confirmationMatch === 'done' ? 'reminder_confirmed' : 'reminder_missed',
+              confidence: 100, // Exact keyword match
+              relatedEntityId: relatedReminderId,
+              relatedEntityType: 'reminder',
+              processingTimeMs: 0, // Keyword matching is very fast
+              responseClassification: confirmationMatch === 'done' ? 'confirmed' : 'missed'
+            })
+
+            if (confirmationMatch === 'done') {
+              await db.update(reminders)
+                .set({
+                  status: 'DELIVERED',
+                  confirmationStatus: 'CONFIRMED',
+                  confirmationResponse: message,
+                  confirmationResponseAt: new Date()
+                })
+                .where(eq(reminders.id, relatedReminderId))
+
+              await whatsappService.sendAck(
+                patient.phoneNumber,
+                `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
+              )
+
+              await conversationService.clearContext(patient.id)
+
+              return {
+                ok: true,
+                processed: true,
+                action: 'confirmed',
+                source: 'reminder_confirmation'
+              }
+            } else {
+              await db.update(reminders)
+                .set({
+                  confirmationResponse: message,
+                  confirmationResponseAt: new Date()
+                })
+                .where(eq(reminders.id, relatedReminderId))
+
+              await whatsappService.sendAck(
+                patient.phoneNumber,
+                `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\n💙 Tim PRIMA`
+              )
+
+              await conversationService.clearContext(patient.id)
+
+              return {
+                ok: true,
+                processed: true,
+                action: 'not_yet',
+                source: 'reminder_confirmation'
+              }
+            }
+          }
+        }
+
+        await whatsappService.sendAck(
+          patient.phoneNumber,
+          `Halo ${patient.name}, mohon balas dengan:\n\n✅ *SUDAH* untuk konfirmasi\n❌ *BELUM* untuk belum selesai\n\n💙 Tim PRIMA`
+        )
+
+        return {
+          ok: true,
+          processed: true,
+          action: 'clarification_sent',
+          source: 'reminder_confirmation'
+        }
+      }
+    }
+
+    // 🔹 PRIORITY 2: Fallback verification service for expired context
+    // If patient is pending verification but context expired, still use simple verification service
+    if (patient.verificationStatus === 'PENDING' && !activeContext) {
+      logger.info('Fallback verification service - context expired but status pending', {
         patientId: patient.id,
         message: message?.substring(0, 50),
-        activeContext,
-      });
+        operation: 'fallback_verification'
+      })
 
       const startTime = Date.now()
       const result = await simpleVerificationService.processResponse(message || '', patient.id)
       const processingTimeMs = Date.now() - startTime
 
-      // Record verification response with proper context
+      // Record fallback verification response
       await recordPatientResponse(patient, sender, message || '', {
         source: 'verification',
         intent: result.action === 'verified' ? 'verification_accept' : 'verification_decline',
@@ -441,41 +578,70 @@ export async function POST(request: NextRequest) {
         responseClassification: result.action === 'verified' ? 'accepted' : 'declined'
       })
 
-      logger.info("Verification response processed", {
+      logger.info("Fallback verification response processed", {
         patientId: patient.id,
         action: result.action,
         success: result.processed,
         processingTimeMs
       });
 
-      return NextResponse.json({
+      return {
         ok: true,
         processed: true,
         action: result.action,
-        source: 'simple_verification',
+        source: 'fallback_verification',
         message: result.message
-      })
+      }
     }
 
-    if (activeContext === 'reminder_confirmation') {
-      const confirmationMatch = keywordMatcher.matchConfirmation(message || '')
-      
-      if (confirmationMatch === 'done' || confirmationMatch === 'not_yet') {
-        const relatedReminderId = conversationState.relatedEntityId
-        
-        if (relatedReminderId && conversationState.relatedEntityType === 'reminder') {
-          // Record reminder confirmation response
+    // 🔹 PRIORITY 3: No active context - Check for simple reminder responses
+    logger.info('No active context - checking for simple responses', {
+      patientId: patient.id,
+      message: message?.substring(0, 100),
+      verificationStatus: patient.verificationStatus
+    })
+
+    // Check if patient has pending reminders and might be responding to one
+    if (patient.verificationStatus === 'VERIFIED' && message) {
+      // Try to match simple confirmation keywords (SUDAH/BELUM)
+      const confirmationMatch = keywordMatcher.matchConfirmation(message)
+
+      if (confirmationMatch !== 'invalid') {
+        // Find the most recent pending reminder for this patient
+        const recentReminder = await db
+          .select()
+          .from(reminders)
+          .where(and(
+            eq(reminders.patientId, patient.id),
+            eq(reminders.status, 'SENT')
+          ))
+          .orderBy(desc(reminders.sentAt))
+          .limit(1)
+
+        if (recentReminder.length > 0) {
+          const reminder = recentReminder[0]
+
+          logger.info('Processing simple reminder confirmation', {
+            patientId: patient.id,
+            reminderId: reminder.id,
+            confirmationMatch,
+            message: message?.substring(0, 50)
+          })
+
+          // Record simple reminder response
           await recordPatientResponse(patient, sender, message || '', {
             source: 'reminder_confirmation',
             intent: confirmationMatch === 'done' ? 'reminder_confirmed' : 'reminder_missed',
             confidence: 100, // Exact keyword match
-            relatedEntityId: relatedReminderId,
+            relatedEntityId: reminder.id,
             relatedEntityType: 'reminder',
             processingTimeMs: 0, // Keyword matching is very fast
             responseClassification: confirmationMatch === 'done' ? 'confirmed' : 'missed'
           })
 
+          // Handle simple confirmation directly
           if (confirmationMatch === 'done') {
+            // Update reminder as confirmed
             await db.update(reminders)
               .set({
                 status: 'DELIVERED',
@@ -483,205 +649,62 @@ export async function POST(request: NextRequest) {
                 confirmationResponse: message,
                 confirmationResponseAt: new Date()
               })
-              .where(eq(reminders.id, relatedReminderId))
+              .where(eq(reminders.id, reminder.id))
+
+
 
             await whatsappService.sendAck(
               patient.phoneNumber,
-              `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
+              `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`
             )
 
-            await conversationService.clearContext(patient.id)
-
-            return NextResponse.json({
+            return {
               ok: true,
               processed: true,
               action: 'confirmed',
-              source: 'reminder_confirmation'
-            })
-          } else {
+              source: 'simple_reminder_confirmation'
+            }
+          } else if (confirmationMatch === 'not_yet') {
+            // Update reminder response but keep status as SENT
             await db.update(reminders)
               .set({
                 confirmationResponse: message,
                 confirmationResponseAt: new Date()
               })
-              .where(eq(reminders.id, relatedReminderId))
+              .where(eq(reminders.id, reminder.id))
 
             await whatsappService.sendAck(
               patient.phoneNumber,
-              `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\n💙 Tim PRIMA`
+              `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
             )
 
-            await conversationService.clearContext(patient.id)
-
-            return NextResponse.json({
+            return {
               ok: true,
               processed: true,
               action: 'not_yet',
-              source: 'reminder_confirmation'
-            })
+              source: 'simple_reminder_confirmation'
+            }
           }
         }
       }
-      
-      await whatsappService.sendAck(
-        patient.phoneNumber,
-        `Halo ${patient.name}, mohon balas dengan:\n\n✅ *SUDAH* untuk konfirmasi\n❌ *BELUM* untuk belum selesai\n\n💙 Tim PRIMA`
-      )
-      
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action: 'clarification_sent',
-        source: 'reminder_confirmation'
-      })
     }
+
+    // 🔹 PRIORITY 4: Fallback for unrecognized messages
+    await handleUnrecognizedMessage(message || '', patient)
+
+    return { ok: true, processed: true, action: 'fallback' }
   }
+);
 
-  // 🔹 PRIORITY 2: Fallback verification service for expired context
-  // If patient is pending verification but context expired, still use simple verification service
-  if (patient.verificationStatus === 'PENDING' && !activeContext) {
-    logger.info('Fallback verification service - context expired but status pending', {
-      patientId: patient.id,
-      message: message?.substring(0, 50),
-      operation: 'fallback_verification'
-    })
-
-    const startTime = Date.now()
-    const result = await simpleVerificationService.processResponse(message || '', patient.id)
-    const processingTimeMs = Date.now() - startTime
-
-    // Record fallback verification response
-    await recordPatientResponse(patient, sender, message || '', {
-      source: 'verification',
-      intent: result.action === 'verified' ? 'verification_accept' : 'verification_decline',
-      confidence: 100, // Keyword matching is 100% confident
-      relatedEntityId: patient.id,
-      relatedEntityType: 'verification',
-      processingTimeMs,
-      responseClassification: result.action === 'verified' ? 'accepted' : 'declined'
-    })
-
-    logger.info("Fallback verification response processed", {
-      patientId: patient.id,
-      action: result.action,
-      success: result.processed,
-      processingTimeMs
-    });
-
-    return NextResponse.json({
-      ok: true,
-      processed: true,
-      action: result.action,
-      source: 'fallback_verification',
-      message: result.message
-    })
+export const GET = createApiHandler(
+  {
+    auth: "custom",
+    customAuth: verifyWebhookToken,
+    rateLimit: { enabled: false } // Disable rate limiting for webhooks
+  },
+  async (body, { request }) => {
+    const { searchParams } = new URL(request.url);
+    const mode = searchParams.get("mode") || "ping";
+    return { ok: true, route: "fonnte/incoming", mode };
   }
-
-  // 🔹 PRIORITY 3: No active context - Check for simple reminder responses
-  logger.info('No active context - checking for simple responses', {
-    patientId: patient.id,
-    message: message?.substring(0, 100),
-    verificationStatus: patient.verificationStatus
-  })
-
-  // Check if patient has pending reminders and might be responding to one
-  if (patient.verificationStatus === 'VERIFIED' && message) {
-    // Try to match simple confirmation keywords (SUDAH/BELUM)
-    const confirmationMatch = keywordMatcher.matchConfirmation(message)
-
-    if (confirmationMatch !== 'invalid') {
-      // Find the most recent pending reminder for this patient
-      const recentReminder = await db
-        .select()
-        .from(reminders)
-        .where(and(
-          eq(reminders.patientId, patient.id),
-          eq(reminders.status, 'SENT')
-        ))
-        .orderBy(desc(reminders.sentAt))
-        .limit(1)
-
-      if (recentReminder.length > 0) {
-        const reminder = recentReminder[0]
-
-        logger.info('Processing simple reminder confirmation', {
-          patientId: patient.id,
-          reminderId: reminder.id,
-          confirmationMatch,
-          message: message?.substring(0, 50)
-        })
-
-        // Record simple reminder response
-        await recordPatientResponse(patient, sender, message || '', {
-          source: 'reminder_confirmation',
-          intent: confirmationMatch === 'done' ? 'reminder_confirmed' : 'reminder_missed',
-          confidence: 100, // Exact keyword match
-          relatedEntityId: reminder.id,
-          relatedEntityType: 'reminder',
-          processingTimeMs: 0, // Keyword matching is very fast
-          responseClassification: confirmationMatch === 'done' ? 'confirmed' : 'missed'
-        })
-
-        // Handle simple confirmation directly
-        if (confirmationMatch === 'done') {
-          // Update reminder as confirmed
-          await db.update(reminders)
-            .set({
-              status: 'DELIVERED',
-              confirmationStatus: 'CONFIRMED',
-              confirmationResponse: message,
-              confirmationResponseAt: new Date()
-            })
-            .where(eq(reminders.id, reminder.id))
-
-          
-
-          await whatsappService.sendAck(
-            patient.phoneNumber,
-            `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`
-          )
-
-          return NextResponse.json({
-            ok: true,
-            processed: true,
-            action: 'confirmed',
-            source: 'simple_reminder_confirmation'
-          })
-        } else if (confirmationMatch === 'not_yet') {
-          // Update reminder response but keep status as SENT
-          await db.update(reminders)
-            .set({
-              confirmationResponse: message,
-              confirmationResponseAt: new Date()
-            })
-            .where(eq(reminders.id, reminder.id))
-
-          await whatsappService.sendAck(
-            patient.phoneNumber,
-            `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
-          )
-
-          return NextResponse.json({
-            ok: true,
-            processed: true,
-            action: 'not_yet',
-            source: 'simple_reminder_confirmation'
-          })
-        }
-      }
-    }
-  }
-
-  // 🔹 PRIORITY 4: Fallback for unrecognized messages
-  await handleUnrecognizedMessage(message || '', patient)
-
-  return NextResponse.json({ ok: true, processed: true, action: 'fallback' })
-}
-
-export async function GET(request: NextRequest) {
-  const authError = requireWebhookToken(request);
-  if (authError) return authError;
-  const { searchParams } = new URL(request.url);
-  const mode = searchParams.get("mode") || "ping";
-  return NextResponse.json({ ok: true, route: "fonnte/incoming", mode });
-}
+);

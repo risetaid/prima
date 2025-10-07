@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { createApiHandler } from '@/lib/api-helpers'
 import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { db, users } from "@/db";
@@ -18,7 +18,8 @@ type WebhookEvent = {
   };
 };
 
-export async function POST(request: NextRequest) {
+// Custom auth function for Clerk webhooks with Svix verification
+async function verifyClerkWebhook(request: Request): Promise<null> {
   // Get the headers
   const headerPayload = await headers();
   const svix_id = headerPayload.get("svix-id");
@@ -27,9 +28,7 @@ export async function POST(request: NextRequest) {
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error occured -- no svix headers", {
-      status: 400,
-    });
+    throw new Error("No svix headers found");
   }
 
   // Get the body
@@ -39,26 +38,41 @@ export async function POST(request: NextRequest) {
   // Create a new Svix instance with your secret.
   const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
 
-  let evt: WebhookEvent;
-
   // Verify the payload with the headers
   try {
-    evt = wh.verify(body, {
+    const evt = wh.verify(body, {
       "svix-id": svix_id,
       "svix-timestamp": svix_timestamp,
       "svix-signature": svix_signature,
     }) as WebhookEvent;
-   } catch {
-     return new Response("Error occured", {
-       status: 400,
-     });
-   }
+    // Store the event globally for later use
+    (global as unknown as { webhookEvent: WebhookEvent }).webhookEvent = evt;
+    return null; // No user object for webhooks
+  } catch (error) {
+    logger.error("Webhook verification failed", error as Error);
+    throw new Error("Invalid webhook signature");
+  }
+}
 
-  // Handle the webhook
-  if (evt.type === "user.created") {
-    const { id, email_addresses, first_name, last_name } = evt.data;
+// POST /api/webhooks/clerk - Handle Clerk webhooks
+export const POST = createApiHandler(
+  {
+    auth: "custom",
+    customAuth: verifyClerkWebhook,
+    rateLimit: { enabled: false } // Disable rate limiting for webhooks
+  },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { request: _ }) => {
+    // Get the webhook event from global storage
+    const evt = (global as unknown as { webhookEvent: WebhookEvent }).webhookEvent;
+    if (!evt) {
+      throw new Error("Webhook event not found");
+    }
 
-    try {
+    // Handle the webhook
+    if (evt.type === "user.created") {
+      const { id, email_addresses, first_name, last_name } = evt.data;
+
       // Use transaction for idempotent user creation
       await db.transaction(async (tx) => {
         // First, check if user already exists (idempotency check)
@@ -100,15 +114,28 @@ export async function POST(request: NextRequest) {
         });
       });
 
-      return NextResponse.json({ success: true });
-    } catch (error) {
-      logger.error("Failed to create user via webhook", error as Error, { webhook: true, userId: id });
-      return NextResponse.json(
-        { error: "Failed to create user" },
-        { status: 500 }
-      );
-    }
-  }
+      logger.info('Clerk webhook processed successfully', {
+        eventType: evt.type,
+        userId: id,
+        timestamp: new Date().toISOString()
+      });
 
-  return NextResponse.json({ success: true });
-}
+      return {
+        success: true,
+        eventType: evt.type,
+        userId: id
+      };
+    }
+
+    logger.info('Clerk webhook processed successfully', {
+      eventType: evt.type,
+      timestamp: new Date().toISOString()
+    });
+
+    return {
+      success: true,
+      eventType: evt.type,
+      message: "Webhook processed successfully"
+    };
+  }
+);

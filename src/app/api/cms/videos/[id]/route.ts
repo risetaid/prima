@@ -1,26 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, cmsVideos } from "@/db";
-import { eq, and, isNull } from "drizzle-orm";
-import { z } from "zod";
-
-import { logger } from '@/lib/logger';
-// Validation schema for updates
-const updateVideoSchema = z.object({
-  title: z
-    .string()
-    .min(1, "Title is required")
-    .max(255, "Title too long")
-    .optional(),
-  slug: z
-    .string()
-    .min(1, "Slug is required")
-    .max(255, "Slug too long")
-    .optional(),
-  description: z.string().optional(),
-  videoUrl: z.string().url("Invalid video URL").optional(),
-  thumbnailUrl: z.string().url().optional().or(z.literal("")),
-  durationMinutes: z.string().optional(),
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
+import { db, cmsVideos } from '@/db'
+import { eq, and, isNull } from 'drizzle-orm'
+import { z } from 'zod'
+import { logger } from '@/lib/logger'
+// Extended validation schema for video updates
+const updateVideoSchema = schemas.updateVideo.extend({
   category: z
     .enum([
       "GENERAL",
@@ -31,10 +16,6 @@ const updateVideoSchema = z.object({
       "FAQ",
     ])
     .optional(),
-  tags: z.array(z.string()).optional(),
-  seoTitle: z.string().max(255).optional(),
-  seoDescription: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
 });
 
 // Utility function to extract YouTube/Vimeo video ID and generate embed URL
@@ -70,19 +51,16 @@ function processVideoUrl(url: string): {
   return { embedUrl: url };
 }
 
-// GET - Get single video by ID
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// GET /api/cms/videos/[id] - Get single video by ID
+export const GET = createApiHandler(
+  { auth: "required", params: schemas.uuidParam },
+  async (_, { user, params }) => {
+    // Only admins and developers can access video management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
 
     const video = await db
       .select()
@@ -91,39 +69,26 @@ export async function GET(
       .limit(1);
 
     if (video.length === 0) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+      throw new Error("Video not found");
     }
 
-    return NextResponse.json({
+    return {
       success: true,
       data: video[0],
-    });
-  } catch (error: unknown) {
-    logger.error("Error fetching video:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
-// PUT - Update video
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// PUT /api/cms/videos/[id] - Update video
+export const PUT = createApiHandler(
+  { auth: "required", params: schemas.uuidParam, body: updateVideoSchema },
+  async (body, { user, params }) => {
+    // Only admins and developers can update videos
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
-    const body = await request.json();
-
-    // Validate request body
-    const validatedData = updateVideoSchema.parse(body);
+    const { id } = params!;
 
     // Check if video exists and is not deleted
     const existingVideo = await db
@@ -133,40 +98,50 @@ export async function PUT(
       .limit(1);
 
     if (existingVideo.length === 0) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+      throw new Error("Video not found");
     }
 
+    // Type the body properly
+    const updateBody = body as {
+      title?: string;
+      videoUrl?: string;
+      description?: string;
+      slug?: string;
+      category?: string;
+      status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+      featured?: boolean;
+      tags?: string[];
+      thumbnailUrl?: string;
+    };
+
     // If slug is being updated, ensure it's unique
-    if (validatedData.slug) {
+    if (updateBody.slug) {
       const slugConflict = await db
         .select()
         .from(cmsVideos)
         .where(
           and(
-            eq(cmsVideos.slug, validatedData.slug),
+            eq(cmsVideos.slug, updateBody.slug),
             isNull(cmsVideos.deletedAt)
           )
         )
         .limit(1);
 
       if (slugConflict.length > 0 && slugConflict[0].id !== id) {
-        return NextResponse.json(
-          { error: "Slug already exists" },
-          { status: 400 }
-        );
+        throw new Error("Slug already exists");
       }
     }
 
     // Process video URL if provided
     let processedVideoData = {};
-    if (validatedData.videoUrl) {
+    if (updateBody.videoUrl) {
       const { embedUrl, thumbnailUrl: autoThumbnail } = processVideoUrl(
-        validatedData.videoUrl
+        updateBody.videoUrl
       );
       processedVideoData = {
         videoUrl: embedUrl,
         // Only update thumbnail if it's not explicitly provided and we have an auto-generated one
-        ...(!validatedData.thumbnailUrl && autoThumbnail
+        ...(!updateBody.thumbnailUrl && autoThumbnail
           ? { thumbnailUrl: autoThumbnail }
           : {}),
       };
@@ -174,16 +149,17 @@ export async function PUT(
 
     // Prepare update data
     const updateData = {
-      ...validatedData,
+      ...updateBody,
       ...processedVideoData,
+      category: updateBody.category as "GENERAL" | "NUTRITION" | "EXERCISE" | "MOTIVATIONAL" | "MEDICAL" | "FAQ" | undefined,
       updatedAt: new Date(),
       // Set publishedAt when status changes to published
-      ...(validatedData.status === "PUBLISHED" &&
+      ...(updateBody.status === "PUBLISHED" &&
       existingVideo[0].status !== "PUBLISHED"
         ? { publishedAt: new Date() }
         : {}),
       // Clear publishedAt when status changes from published
-      ...(validatedData.status !== "PUBLISHED" &&
+      ...(updateBody.status !== "PUBLISHED" &&
       existingVideo[0].status === "PUBLISHED"
         ? { publishedAt: null }
         : {}),
@@ -196,40 +172,30 @@ export async function PUT(
       .where(eq(cmsVideos.id, id))
       .returning();
 
-    return NextResponse.json({
+    logger.info('Video updated successfully', {
+      videoId: id,
+      title: updatedVideo[0].title,
+      updatedBy: user!.id
+    });
+
+    return {
       success: true,
       message: "Video updated successfully",
       data: updatedVideo[0],
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Error updating video:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
-// DELETE - Soft delete video
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// DELETE /api/cms/videos/[id] - Soft delete video
+export const DELETE = createApiHandler(
+  { auth: "required", params: schemas.uuidParam },
+  async (_, { user, params }) => {
+    // Only admins and developers can delete videos
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
 
     // Check if video exists and is not already deleted
     const existingVideo = await db
@@ -239,7 +205,7 @@ export async function DELETE(
       .limit(1);
 
     if (existingVideo.length === 0) {
-      return NextResponse.json({ error: "Video not found" }, { status: 404 });
+      throw new Error("Video not found");
     }
 
     // Soft delete video by setting deletedAt timestamp
@@ -251,15 +217,15 @@ export async function DELETE(
       })
       .where(eq(cmsVideos.id, id));
 
-    return NextResponse.json({
+    logger.info('Video deleted successfully', {
+      videoId: id,
+      title: existingVideo[0].title,
+      deletedBy: user!.id
+    });
+
+    return {
       success: true,
       message: "Video deleted successfully",
-    });
-  } catch (error: unknown) {
-    logger.error("Error deleting video:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);

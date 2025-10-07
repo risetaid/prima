@@ -21,8 +21,8 @@ export const GET = createApiHandler(
       throw new Error("Admin access required");
     }
 
-    const { status, page, limit, search } = query!;
-    const offset = (page - 1) * limit;
+    const { status, page = 1, limit = 10, search } = query!;
+    const offset = (Number(page) - 1) * Number(limit);
 
     // Create alias for approver table to avoid naming conflicts
     const approver = alias(users, "approver");
@@ -45,7 +45,7 @@ export const GET = createApiHandler(
     }
 
     // Get users with approval info using Drizzle
-    const query = db
+    const usersQuery = db
       .select({
         // User fields
         id: users.id,
@@ -69,8 +69,8 @@ export const GET = createApiHandler(
 
     // Apply where conditions if any
     const finalQuery = whereConditions.length > 0
-      ? query.where(and(...whereConditions))
-      : query;
+      ? usersQuery.where(and(...whereConditions))
+      : usersQuery;
 
     // Get total count for pagination
     const countQuery = db
@@ -84,7 +84,7 @@ export const GET = createApiHandler(
           asc(users.isApproved), // Pending approvals first
           desc(users.createdAt)
         )
-        .limit(limit)
+        .limit(Number(limit))
         .offset(offset),
       countQuery
     ]);
@@ -113,11 +113,11 @@ export const GET = createApiHandler(
     return {
       users: formattedUsers,
       pagination: {
-        page,
-        limit,
+        page: Number(page),
+        limit: Number(limit),
         total: totalCount.length,
-        totalPages: Math.ceil(totalCount.length / limit),
-        hasMore: offset + limit < totalCount.length,
+        totalPages: Math.ceil(totalCount.length / Number(limit)),
+        hasMore: offset + Number(limit) < totalCount.length,
       },
       pendingCount: formattedUsers.filter((u) => !u.isApproved).length,
     };

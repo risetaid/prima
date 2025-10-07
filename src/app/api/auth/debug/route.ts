@@ -4,6 +4,7 @@ import { db, users } from '@/db'
 import { eq, count } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
+import { NextResponse } from 'next/server'
 
 const debugQuerySchema = z.object({
   type: z.enum(['email', 'user']).default('user'),
@@ -12,7 +13,7 @@ const debugQuerySchema = z.object({
 // GET /api/auth/debug - Debug endpoint for development
 export const GET = createApiHandler(
   { auth: "required", query: debugQuerySchema },
-  async (_, { user, query }) => {
+  async (_, { query }) => {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Debug endpoint disabled in production');
     }
@@ -75,7 +76,7 @@ async function debugEmail() {
       userByEmail,
       allUsersWithEmail,
       conflict: userByEmail && userByEmail.clerkId !== userId
-    })
+    };
   } catch (error: unknown) {
     logger.error('Debug email error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
@@ -113,7 +114,7 @@ async function debugUser() {
       userFoundInDb: !!dbUser,
       userDetails: dbUser,
       totalUsersInDb: totalUsers
-    })
+    };
   } catch (error: unknown) {
     logger.error('Debug user error:', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(

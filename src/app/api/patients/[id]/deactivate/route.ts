@@ -4,12 +4,12 @@ import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 import { invalidatePatientCache } from '@/lib/cache'
 import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
-import { logger } from '@/lib/logger'
 
 // POST /api/patients/[id]/deactivate - Deactivate patient and send confirmation
 export const POST = createApiHandler(
   { auth: "required", params: schemas.patientIdParam },
-  async (_, { user, params }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { user: _, params }) => {
     const { id: patientId } = params!
 
     // Load patient
@@ -20,7 +20,7 @@ export const POST = createApiHandler(
       .limit(1)
 
     if (rows.length === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      throw new Error('Patient not found');
     }
 
     const patient = rows[0]

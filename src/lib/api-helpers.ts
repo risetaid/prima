@@ -507,7 +507,9 @@ export function errorResponse(
 // ===== API HANDLER WRAPPER =====
 
 export interface ApiHandlerOptions {
-  auth?: "required" | "optional";
+  auth?: "required" | "optional" | "custom";
+  customAuth?: (request: NextRequest) => Promise<AuthUser | null>;
+  rateLimit?: { enabled: boolean };
   cache?: { ttl: number; key: string };
   body?: z.ZodSchema;
   params?: z.ZodSchema;
@@ -555,13 +557,49 @@ export function createApiHandler<T = unknown, R = unknown>(
           });
         }
         context.user = user;
+      } else if (options.auth === "optional") {
+        const { getAuthUser } = await import("@/lib/auth-utils");
+        const user = await getAuthUser();
+        if (user) {
+          context.user = user;
+        }
+      } else if (options.auth === "custom") {
+        if (!options.customAuth) {
+          throw new Error("Custom auth function is required when auth='custom'");
+        }
+        const user = await options.customAuth(request);
+        if (user) {
+          context.user = user;
+        }
+        // Note: Custom auth doesn't throw errors - it's up to the custom function
+        // to return null if authentication fails, and the handler can decide what to do
       }
 
       // Parse body
       let body: T;
       if (request.method !== "GET" && request.method !== "DELETE") {
+        const contentType = request.headers.get("content-type") || "";
         try {
-          body = await request.json();
+          if (contentType.includes("application/json")) {
+            body = await request.json();
+          } else if (
+            contentType.includes("application/x-www-form-urlencoded") ||
+            contentType.includes("multipart/form-data")
+          ) {
+            const form = await request.formData();
+            const formData: Record<string, unknown> = {};
+            form.forEach((v, k) => {
+              formData[k] = v;
+            });
+            body = formData as T;
+          } else {
+            // Try JSON first, then fallback to empty object
+            try {
+              body = await request.json();
+            } catch {
+              body = {} as T;
+            }
+          }
         } catch {
           body = {} as T;
         }

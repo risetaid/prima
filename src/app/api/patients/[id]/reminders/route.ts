@@ -1,4 +1,5 @@
-import { createApiHandler, z } from "@/lib/api-helpers";
+import { createApiHandler } from "@/lib/api-helpers";
+import { z } from "zod";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations, patients } from "@/db";
@@ -80,7 +81,7 @@ const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   date: z.string().optional(),
-  includeDeleted: z.enum(["true", "false"]).transform(val => val === "true").optional(),
+  includeDeleted: z.enum(["true", "false"]).transform((val: string) => val === "true").optional(),
 });
 
 const createReminderBodySchema = z.object({
@@ -121,19 +122,19 @@ export const GET = createApiHandler(
     );
 
     const { filter, page, limit, date: dateFilter, includeDeleted } = query!;
-    const offset = (page - 1) * limit;
+    const offset = (Number(page) - 1) * Number(limit);
 
     // Handle different filter types
     switch (filter) {
       case "completed":
         return await getCompletedReminders(patientId, user!.id);
       case "pending":
-        return await getPendingReminders(patientId, page, limit, dateFilter);
+        return await getPendingReminders(patientId, Number(page), Number(limit), dateFilter);
       case "scheduled":
-        return await getScheduledReminders(patientId, page, limit, dateFilter);
+        return await getScheduledReminders(patientId, Number(page), Number(limit), dateFilter);
       case "all":
       default:
-        return await getAllReminders(patientId, includeDeleted || false, limit, offset);
+        return await getAllReminders(patientId, Boolean(includeDeleted), Number(limit), offset);
     }
   }
 );
@@ -214,7 +215,7 @@ async function getCompletedReminders(patientId: string, userId: string) {
 }
 
 async function getPendingReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
-  const offset = (page - 1) * limit;
+  const offset = (Number(page) - 1) * Number(limit);
 
   // Build where conditions with proper logic - match stats API criteria
   const whereConditions = [
@@ -296,7 +297,7 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
 }
 
 async function getScheduledReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
-  const offset = (page - 1) * limit;
+  const offset = (Number(page) - 1) * Number(limit);
 
   // Build conditions array with soft delete filter
   const conditions = [
@@ -578,19 +579,33 @@ export const POST = createApiHandler(
       .limit(1);
 
     if (patientResult.length === 0) {
-      return createErrorResponse(
-        "Patient not found",
-        404,
-        undefined,
-        "NOT_FOUND_ERROR"
-      );
+      throw new Error("Patient not found");
     }
 
     const patient = patientResult[0];
 
+    // Type the body properly
+    const reminderBody = body as {
+      message: string;
+      time: string;
+      selectedDates?: string[];
+      customRecurrence?: {
+        frequency: string;
+        interval: number;
+        daysOfWeek?: string[];
+        endDate?: string;
+      };
+      attachedContent?: {
+        id: string;
+        type: 'article' | 'video' | 'ARTICLE' | 'VIDEO';
+        title: string;
+        url?: string;
+      }[];
+    };
+
     // Validate input and generate schedules data
     const { message, time, datesToSchedule, validatedContent } =
-      await validateReminderInput(body, patient);
+      await validateReminderInput(reminderBody, patient);
 
     // Create reminder schedules
     const createdSchedules = await createReminderSchedules(
@@ -621,9 +636,10 @@ export const POST = createApiHandler(
 // DELETE /api/patients/[id]/reminders - Delete multiple reminders
 export const DELETE = createApiHandler(
   { auth: "required", params: paramsSchema, body: deleteRemindersBodySchema },
-  async (body, { user, params }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (body, { user: _, params }) => {
     const { id } = params!;
-    const { reminderIds } = body;
+    const { reminderIds } = body as { reminderIds: string[] };
 
     // Soft delete multiple scheduled reminders by setting deletedAt timestamp
     const deleteResult = await db

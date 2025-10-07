@@ -1,11 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser, getAuthUser } from "@/lib/auth-utils";
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
 import { db, cmsArticles, cmsVideos, users } from "@/db";
 import { contentCategoryEnum } from "@/db/enums";
 import { eq, desc, and, count, isNull, sql, or, ilike } from "drizzle-orm";
 import { get, set, CACHE_TTL } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { NextRequest } from 'next/server';
 
 // Interface for unified content response - matches frontend ContentItem interface
 interface UnifiedContent {
@@ -23,6 +24,20 @@ interface UnifiedContent {
   authorName: string;
 }
 
+// Query schema for content listing
+const contentQuerySchema = z.object({
+  type: z.enum(["all", "articles", "videos"]).default("all"),
+  status: z.enum(["all", "draft", "published", "archived"]).default("all"),
+  published: z.string().optional(),
+  limit: schemas.pagination.shape.limit.default(20),
+  page: schemas.pagination.shape.page.default(1),
+  search: z.string().default(""),
+  category: z.string().default(""),
+  public: z.enum(["true", "false"]).optional(),
+  enhanced: z.enum(["true", "false"]).optional(),
+  stats_only: z.enum(["true", "false"]).optional(),
+});
+
 // Schema for template creation request
 const createTemplateSchema = z.object({
   templateId: z.string(),
@@ -31,34 +46,35 @@ const createTemplateSchema = z.object({
   patientData: z.record(z.string(), z.string()).optional(),
 });
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const type = searchParams.get("type") || "all"; // all, articles, videos
-    const status = searchParams.get("status") || "all"; // all, draft, published, archived
-    const published = searchParams.get("published"); // true, false, or undefined
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const page = parseInt(searchParams.get("page") || "1");
-    const search = searchParams.get("search") || "";
-    const category = searchParams.get("category") || "";
-    const offset = (page - 1) * limit;
-    const isPublic = searchParams.get("public") === "true";
-    const isEnhanced = searchParams.get("enhanced") === "true";
-    const statsOnly = searchParams.get("stats_only") === "true";
+// GET /api/cms/content - Get unified content (articles and videos)
+export const GET = createApiHandler(
+  { auth: "optional", query: contentQuerySchema },
+  async (_, { user, query }) => {
+    const {
+      type,
+      status,
+      published,
+      limit,
+      page,
+      search,
+      category,
+      public: isPublic,
+      enhanced: isEnhanced,
+      stats_only: statsOnly
+    } = query!;
+
+    const offset = (Number(page) - 1) * Number(limit);
 
     // Different authentication requirements based on access type
-    let user;
-    if (isPublic) {
+    if (isPublic === "true") {
       // Public endpoint - any authenticated user can access published content
-      user = await getAuthUser();
       if (!user) {
-        return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+        throw new Error("Authentication required");
       }
     } else {
       // Admin endpoint - only admins and developers can access
-      user = await getCurrentUser();
       if (!user || !["ADMIN", "DEVELOPER"].includes(user.role)) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        throw new Error("Admin access required");
       }
     }
 
@@ -109,11 +125,11 @@ export async function GET(request: NextRequest) {
 
       logger.info('Statistics-only response', { statistics });
 
-      return NextResponse.json({
+      return {
         success: true,
         data: [],
         statistics
-      });
+      };
     }
 
     // Try cache for published content
@@ -121,7 +137,7 @@ export async function GET(request: NextRequest) {
       const cacheKey = `published-content:${page}:${limit}:${search}:${category}:${type}`;
       const cachedContent = await get(cacheKey);
       if (cachedContent) {
-        return NextResponse.json(cachedContent);
+        return cachedContent;
       }
     }
 
@@ -227,7 +243,7 @@ export async function GET(request: NextRequest) {
         .orderBy(
           desc(sql`COALESCE(${cmsArticles.publishedAt}, ${cmsArticles.updatedAt})`)
         )
-        .limit(type === "articles" ? limit : Math.ceil(limit / 2))
+        .limit(type === "articles" ? Number(limit) : Math.ceil(Number(limit) / 2))
         .offset(type === "articles" ? offset : 0);
       
         logger.info('Article results', { 
@@ -294,7 +310,7 @@ export async function GET(request: NextRequest) {
         .orderBy(
           desc(sql`COALESCE(${cmsVideos.publishedAt}, ${cmsVideos.updatedAt})`)
         )
-        .limit(type === "videos" ? limit : Math.ceil(limit / 2))
+        .limit(type === "videos" ? Number(limit) : Math.ceil(Number(limit) / 2))
         .offset(type === "videos" ? offset : 0);
 
       videos = videoResults.map((video) => ({
@@ -325,7 +341,7 @@ export async function GET(request: NextRequest) {
           : new Date(b.updatedAt).getTime();
         return dateB - dateA;
       })
-      .slice(0, limit);
+      .slice(0, Number(limit));
 
     // Build response
     interface EnhancedResponse {
@@ -485,7 +501,7 @@ export async function GET(request: NextRequest) {
       ]);
 
       const totalCount = (totalArticlesResult[0]?.count || 0) + (totalVideosResult[0]?.count || 0);
-      const hasMore = offset + limit < totalCount;
+      const hasMore = offset + Number(limit) < Number(totalCount);
 
       response = {
         ...response,
@@ -494,7 +510,7 @@ export async function GET(request: NextRequest) {
           limit,
           total: totalCount,
           hasMore,
-          totalPages: Math.ceil(totalCount / limit)
+          totalPages: Math.ceil(Number(totalCount) / Number(limit))
         },
         filters: {
           search,
@@ -558,35 +574,18 @@ export async function GET(request: NextRequest) {
       responseDataLength: response.data.length
     });
 
-    return NextResponse.json(response);
+    return response;
 
-  } catch (error) {
-    logger.error("CMS content retrieval failed", error instanceof Error ? error : new Error(String(error)), {
-      api: true,
-      cms: true,
-      content: true,
-      operation: "get_cms_content",
-    });
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "CMS content loading failed",
-        details: process.env.NODE_ENV === "development"
-          ? (error instanceof Error ? error.message : "Unknown error")
-          : "Server error",
-      },
-      { status: 500 }
-    );
   }
-}
+);
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || user.role !== "ADMIN") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// POST /api/cms/content - Create content or templates
+export const POST = createApiHandler(
+  { auth: "required" },
+  async (_, { user, request }) => {
+    // Only admins can create content
+    if (user!.role !== "ADMIN") {
+      throw new Error("Admin access required");
     }
 
     const { searchParams } = new URL(request.url);
@@ -598,19 +597,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle content creation (placeholder for future implementation)
-    return NextResponse.json({
-      success: false,
-      error: "Invalid action. Use: template"
-    }, { status: 400 });
-
-  } catch (error: unknown) {
-    logger.error("CMS content POST error:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    throw new Error("Invalid action. Use: template");
   }
-}
+);
 
 async function handleTemplateCreation(request: NextRequest) {
   const body = await request.json();
@@ -648,10 +637,7 @@ async function handleTemplateCreation(request: NextRequest) {
 
   const selectedTemplate = enhancedTemplates.find((t) => t.id === templateId);
   if (!selectedTemplate) {
-    return NextResponse.json(
-      { error: "Template not found" },
-      { status: 404 }
-    );
+    throw new Error("Template not found");
   }
 
   // Get content URL
@@ -700,12 +686,12 @@ async function handleTemplateCreation(request: NextRequest) {
   finalMessage = finalMessage.replaceAll(/{artikel_url}/g, contentUrl);
   finalMessage = finalMessage.replaceAll(/{video_url}/g, contentUrl);
 
-  return NextResponse.json({
+  return {
     success: true,
     data: {
       message: finalMessage,
       contentUrl,
       template: selectedTemplate,
     },
-  });
+  };
 }

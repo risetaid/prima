@@ -1,5 +1,4 @@
 import { createApiHandler, apiRateLimitError } from "@/lib/api-helpers";
-import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { db, reminders, patients } from "@/db";
 import { eq, and, isNull, sql, or, ne } from "drizzle-orm";
@@ -52,15 +51,7 @@ export const POST = createApiHandler(
         remaining: rateLimitResult.remaining,
         resetTime: new Date(rateLimitResult.resetTime).toISOString()
       });
-      throw apiRateLimitError({
-        status: 429,
-        headers: {
-          'Retry-After': Math.ceil((rateLimitResult.resetTime - Date.now()) / 1000).toString(),
-          'X-RateLimit-Limit': '5',
-          'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
-          'X-RateLimit-Reset': Math.ceil(rateLimitResult.resetTime / 1000).toString()
-        }
-      });
+      throw apiRateLimitError({ message: 'Rate limit exceeded' });
     }
 
     const startTime = Date.now();
@@ -99,7 +90,7 @@ export const POST = createApiHandler(
 
     // Check for active reminders excluding already delivered ones
     logger.debug("Checking active reminders for user", {
-      userId: user.id,
+      userId: user!.id,
       excludeDeliveredToday: true,
     });
 
@@ -156,17 +147,11 @@ export const POST = createApiHandler(
       }
     } catch (dbError: unknown) {
       logger.error("❌ Database query error:", dbError instanceof Error ? dbError : new Error(String(dbError)));
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Database query failed",
-          details:
-            dbError instanceof Error
-              ? dbError.message
-              : "Unknown database error",
-        },
-        { status: 500 }
-      );
+      throw new Error(`Database query failed: ${
+        dbError instanceof Error
+          ? dbError.message
+          : "Unknown database error"
+      }`);
     }
 
     logger.info(
@@ -321,7 +306,7 @@ export const POST = createApiHandler(
         wibTime: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
         duration: `${duration}ms`,
         provider: "FONNTE",
-        triggeredBy: user.email || user.id,
+        triggeredBy: user!.email || user!.id,
         note: "Instant send includes only today's reminders that haven't been delivered yet",
       },
       results: {

@@ -1,24 +1,33 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, whatsappTemplates, users } from "@/db";
-import { eq } from "drizzle-orm";
+import { createApiHandler } from '@/lib/api-helpers'
+import { db, whatsappTemplates, users } from '@/db'
+import { eq } from 'drizzle-orm'
+import { getWIBTime } from '@/lib/datetime'
+import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-import { logger } from '@/lib/logger';
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
+const templateIdParamSchema = z.object({
+  id: z.string().uuid(),
+});
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 401 }
-      );
+const updateTemplateSchema = z.object({
+  templateName: z.string().min(1, 'Template name is required').optional(),
+  templateText: z.string().min(1, 'Template text is required').optional(),
+  variables: z.array(z.string()).optional(),
+  category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL']).optional(),
+  isActive: z.boolean().optional()
+});
+// GET /api/admin/templates/[id] - Get specific template
+export const GET = createApiHandler(
+  { auth: "required", params: templateIdParamSchema },
+  async (_, { user, params }) => {
+    // Only admins and developers can access template management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
+
+    logger.info(`Fetching template ${id} by user ${user!.id}`);
 
     // Get template with creator details using separate queries
     const templateResult = await db
@@ -38,10 +47,7 @@ export async function GET(
       .limit(1);
 
     if (templateResult.length === 0) {
-      return NextResponse.json(
-        { error: "Template not found" },
-        { status: 404 }
-      );
+      throw new Error("Template not found");
     }
 
     const templateData = templateResult[0];
@@ -68,33 +74,30 @@ export async function GET(
       createdByUser,
     };
 
-    return NextResponse.json({ template });
-  } catch (error: unknown) {
-    logger.error("Template fetch error:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Failed to fetch template" },
-      { status: 500 }
-    );
+    logger.info(`Template ${id} retrieved successfully`);
+    return { template };
   }
-}
+);
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 401 }
-      );
+// PUT /api/admin/templates/[id] - Update template
+export const PUT = createApiHandler(
+  { auth: "required", params: templateIdParamSchema, body: updateTemplateSchema },
+  async (body, { user, params }) => {
+    // Only admins and developers can update templates
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
-    const body = await request.json();
-    const { templateName, templateText, variables, category, isActive } = body;
+    const { id } = params!;
+    const { templateName, templateText, variables, category, isActive } = body as {
+      templateName?: string;
+      templateText?: string;
+      variables?: string[];
+      category?: 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL';
+      isActive?: boolean;
+    };
+
+    logger.info(`Updating template ${id} by user ${user!.id}`);
 
     // Check if template exists
     const existingTemplateResult = await db
@@ -108,10 +111,7 @@ export async function PUT(
       .limit(1);
 
     if (existingTemplateResult.length === 0) {
-      return NextResponse.json(
-        { error: "Template not found" },
-        { status: 404 }
-      );
+      throw new Error("Template not found");
     }
 
     const existingTemplate = existingTemplateResult[0];
@@ -125,25 +125,13 @@ export async function PUT(
         .limit(1);
 
       if (duplicateResult.length > 0) {
-        return NextResponse.json(
-          { error: "Template with this name already exists" },
-          { status: 400 }
-        );
+        throw new Error("Template with this name already exists");
       }
     }
 
-    // Validation
-    if (
-      category &&
-      !["REMINDER", "APPOINTMENT", "EDUCATIONAL"].includes(category)
-    ) {
-      return NextResponse.json(
-        { error: "Invalid template category" },
-        { status: 400 }
-      );
-    }
-
-    const updateData: Record<string, unknown> = {};
+    const updateData: Record<string, unknown> = {
+      updatedAt: getWIBTime()
+    };
 
     if (templateName !== undefined) updateData.templateName = templateName;
     if (templateText !== undefined) updateData.templateText = templateText;
@@ -192,31 +180,23 @@ export async function PUT(
       createdByUser,
     };
 
-    return NextResponse.json({ template });
-  } catch (error: unknown) {
-    logger.error("Template update error:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Failed to update template" },
-      { status: 500 }
-    );
+    logger.info(`Template ${id} updated successfully`);
+    return { template };
   }
-}
+);
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 401 }
-      );
+// DELETE /api/admin/templates/[id] - Delete template (soft delete)
+export const DELETE = createApiHandler(
+  { auth: "required", params: templateIdParamSchema },
+  async (_, { user, params }) => {
+    // Only admins and developers can delete templates
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { id } = await params;
+    const { id } = params!;
+
+    logger.info(`Deleting template ${id} by user ${user!.id}`);
 
     // Check if template exists
     const existingTemplateResult = await db
@@ -226,34 +206,26 @@ export async function DELETE(
       .limit(1);
 
     if (existingTemplateResult.length === 0) {
-      return NextResponse.json(
-        { error: "Template not found" },
-        { status: 404 }
-      );
+      throw new Error("Template not found");
     }
 
     // Soft delete by setting deletedAt timestamp
     const templateResult = await db
       .update(whatsappTemplates)
       .set({
-        deletedAt: new Date(),
+        deletedAt: getWIBTime(),
         isActive: false,
-        updatedAt: new Date(),
+        updatedAt: getWIBTime(),
       })
       .where(eq(whatsappTemplates.id, id))
       .returning();
 
     const template = templateResult[0];
 
-    return NextResponse.json({
+    logger.info(`Template ${id} deleted successfully`);
+    return {
       message: "Template deactivated successfully",
       template,
-    });
-  } catch (error: unknown) {
-    logger.error("Template deletion error:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Failed to delete template" },
-      { status: 500 }
-    );
+    };
   }
-}
+);

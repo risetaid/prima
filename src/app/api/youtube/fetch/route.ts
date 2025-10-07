@@ -1,24 +1,25 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { extractYouTubeVideoId } from '@/lib/youtube-utils'
+import { createApiHandler } from '@/lib/api-helpers'
+import { z } from 'zod'
 
 import { logger } from '@/lib/logger';
-export async function POST(request: NextRequest) {
-  try {
-    const { url } = await request.json()
 
-    if (!url) {
-      return NextResponse.json(
-        { success: false, error: 'URL YouTube diperlukan' },
-        { status: 400 }
-      )
-    }
+// Validation schema for YouTube fetch request
+const youtubeFetchSchema = z.object({
+  url: z.string().url("Invalid YouTube URL")
+});
+export const POST = createApiHandler(
+  {
+    auth: "optional", // No authentication required for YouTube fetching
+    body: youtubeFetchSchema
+  },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+async function (body: { url: string }, _: any): Promise<{ success: boolean; data: { videoId: string; title?: string; description?: string; thumbnailUrl?: string } }> {
+    const { url } = body
 
     const videoId = extractYouTubeVideoId(url)
     if (!videoId) {
-      return NextResponse.json(
-        { success: false, error: 'URL YouTube tidak valid' },
-        { status: 400 }
-      )
+      throw new Error('Invalid YouTube URL')
     }
 
     // Try oEmbed API first (no auth required, reliable)
@@ -84,10 +85,10 @@ export async function POST(request: NextRequest) {
 
         logger.info('YouTube data extracted via oEmbed:', { value: videoData })
 
-        return NextResponse.json({
+        return {
           success: true,
           data: videoData
-        })
+        }
       }
     } catch {
       logger.warn('oEmbed failed, falling back to HTML scraping')
@@ -102,10 +103,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!response.ok) {
-      return NextResponse.json(
-        { success: false, error: `Gagal mengambil data: HTTP ${response.status}` },
-        { status: response.status }
-      )
+      throw new Error(`Failed to fetch YouTube data: HTTP ${response.status}`)
     }
 
     const html = await response.text()
@@ -170,20 +168,10 @@ export async function POST(request: NextRequest) {
 
     logger.info('YouTube data extracted via scraping:', { value: videoData })
 
-    return NextResponse.json({
+    return {
       success: true,
       data: videoData
-    })
-
-  } catch (error: unknown) {
-    logger.error('Error fetching YouTube data:', error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Terjadi kesalahan saat mengambil data video'
-      },
-      { status: 500 }
-    )
+    }
   }
-}
+);
 

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, whatsappTemplates } from "@/db";
-import { eq } from "drizzle-orm";
-import { logger } from "@/lib/logger";
+import { createApiHandler } from '@/lib/api-helpers'
+import { db, whatsappTemplates } from '@/db'
+import { eq } from 'drizzle-orm'
+import { getWIBTime } from '@/lib/datetime'
+import { logger } from '@/lib/logger'
 
 // Template data (same as in seed script)
 interface TemplateData {
@@ -178,18 +178,16 @@ async function templateExists(templateName: string): Promise<boolean> {
   }
 }
 
-export async function POST() {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json(
-        { error: "Unauthorized. Admin access required." },
-        { status: 401 }
-      );
+// POST /api/admin/templates/seed - Seed default templates
+export const POST = createApiHandler(
+  { auth: "required" },
+  async (_, { user }) => {
+    // Only admins and developers can seed templates
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    logger.info("🚀 Starting template seeding via API...");
+    logger.info(`🚀 Starting template seeding via API by user ${user!.id}...`);
 
     const createdTemplates = [];
     const skippedTemplates = [];
@@ -216,7 +214,9 @@ export async function POST() {
             variables: template.variables,
             category: template.category,
             isActive: true,
-            createdBy: user.id,
+            createdBy: user!.id,
+            createdAt: getWIBTime(),
+            updatedAt: getWIBTime()
           })
           .returning();
 
@@ -238,7 +238,7 @@ export async function POST() {
 
     logger.info("✅ Template seeding completed via API!");
 
-    return NextResponse.json({
+    return {
       success: true,
       message: "Template seeding completed successfully!",
       stats: {
@@ -256,15 +256,6 @@ export async function POST() {
           (t) => t.category === "EDUCATIONAL"
         ).length,
       },
-    });
-  } catch (error) {
-    logger.error("💥 Template seeding failed", error as Error);
-    return NextResponse.json(
-      {
-        error: "Failed to seed templates",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    };
   }
-}
+);

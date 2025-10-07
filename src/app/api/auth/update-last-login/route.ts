@@ -7,7 +7,8 @@ import { logger } from '@/lib/logger';
 // POST /api/auth/update-last-login - Update user login and sync with Clerk
 export const POST = createApiHandler(
   { auth: "required" },
-  async (_, { request }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { request: _ }) => {
     const { userId } = await auth();
     const user = await currentUser();
 

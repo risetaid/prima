@@ -1,4 +1,4 @@
-import { createApiHandler, apiError } from "@/lib/api-helpers";
+import { createApiHandler } from "@/lib/api-helpers";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db, users } from "@/db";
@@ -6,18 +6,11 @@ import { count } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 
-// Custom error for unapproved users
-class UnapprovedUserError extends Error {
-  constructor() {
-    super("Not approved");
-    this.name = "UnapprovedUserError";
-  }
-}
-
 // GET /api/user/profile - Get current user profile with auto-sync from Clerk
 export const GET = createApiHandler(
   { auth: "optional" },
-  async (_, { user, request }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { user, request: _ }) => {
     logger.info("Profile API: Getting current user", { api: true });
 
     let authUser = user;
@@ -66,7 +59,7 @@ export const GET = createApiHandler(
         // Get user again after creation with retry logic
         let retries = 3;
         while (retries > 0 && !authUser) {
-          authUser = await getCurrentUser();
+          authUser = await getCurrentUser() || undefined;
           if (!authUser && retries > 1) {
             await new Promise((resolve) => setTimeout(resolve, 200));
           }
@@ -85,7 +78,7 @@ export const GET = createApiHandler(
           error.message?.includes("unique constraint")
         ) {
           logger.info("Profile API: User already exists, fetching", { api: true, userId });
-          authUser = await getCurrentUser();
+          authUser = await getCurrentUser() || undefined;
         } else {
           throw dbError;
         }

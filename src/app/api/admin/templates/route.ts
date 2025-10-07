@@ -1,33 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUser } from '@/lib/auth-utils'
+import { createApiHandler } from '@/lib/api-helpers'
 import { db, whatsappTemplates, users } from '@/db'
 import { eq, and, asc, inArray, isNull } from 'drizzle-orm'
+import { getWIBTime } from '@/lib/datetime'
+import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-import { logger } from '@/lib/logger';
-export async function GET(request: NextRequest) {
-  try {
-    const user = await getCurrentUser()
+const templateQuerySchema = z.object({
+  category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL']).optional(),
+  active: z.enum(['true', 'false']).optional().transform(val => val === 'true')
+});
 
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Admin access required.' },
-        { status: 401 }
-      )
+const createTemplateSchema = z.object({
+  templateName: z.string().min(1, 'Template name is required'),
+  templateText: z.string().min(1, 'Template text is required'),
+  variables: z.array(z.string()).optional().default([]),
+  category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'])
+});
+// GET /api/admin/templates - Get all templates with filters
+export const GET = createApiHandler(
+  { auth: "required", query: templateQuerySchema },
+  async (_, { user, query }) => {
+    // Only admins and developers can access template management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { searchParams } = new URL(request.url)
-    const category = searchParams.get('category') as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL' | null
-    const isActive = searchParams.get('active')
+    const { category, active } = query || {};
+
+    logger.info(`Fetching templates with filters: category=${category}, active=${active}`);
 
     // Build base query with filters - always exclude soft-deleted templates
     const conditions = [isNull(whatsappTemplates.deletedAt)]
-    
+
     if (category) {
-      conditions.push(eq(whatsappTemplates.category, category))
+      conditions.push(eq(whatsappTemplates.category, category as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'))
     }
-    
-    if (isActive !== null) {
-      conditions.push(eq(whatsappTemplates.isActive, isActive === 'true'))
+
+    if (active !== undefined) {
+      conditions.push(eq(whatsappTemplates.isActive, active === 'true'))
     }
 
     // Execute query with optional filters and ordering
@@ -82,44 +92,28 @@ export async function GET(request: NextRequest) {
       createdByUser: creatorMap.get(template.createdBy) || null
     }))
 
-    return NextResponse.json({ templates })
-  } catch (error: unknown) {
-    logger.error('Template fetch error:', error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json(
-      { error: 'Failed to fetch templates' },
-      { status: 500 }
-    )
+    logger.info(`Retrieved ${templates.length} templates`);
+    return { templates };
   }
-}
+);
 
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser()
-
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'DEVELOPER')) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Admin access required.' },
-        { status: 401 }
-      )
+// POST /api/admin/templates - Create new template
+export const POST = createApiHandler(
+  { auth: "required", body: createTemplateSchema },
+  async (body, { user }) => {
+    // Only admins and developers can create templates
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const body = await request.json()
-    const { templateName, templateText, variables, category } = body
+    const { templateName, templateText, variables, category } = body as {
+      templateName: string;
+      templateText: string;
+      variables: string[];
+      category: 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL';
+    };
 
-    // Validation
-    if (!templateName || !templateText) {
-      return NextResponse.json(
-        { error: 'Template name and text are required' },
-        { status: 400 }
-      )
-    }
-
-    if (!['REMINDER', 'APPOINTMENT', 'EDUCATIONAL'].includes(category)) {
-      return NextResponse.json(
-        { error: 'Invalid template category' },
-        { status: 400 }
-      )
-    }
+    logger.info(`Creating template: ${templateName} by user ${user!.id}`);
 
     // Check for duplicate template name
     const existingTemplate = await db
@@ -132,10 +126,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     if (existingTemplate.length > 0) {
-      return NextResponse.json(
-        { error: 'Template with this name already exists' },
-        { status: 400 }
-      )
+      throw new Error('Template with this name already exists')
     }
 
     // Create template
@@ -146,8 +137,10 @@ export async function POST(request: NextRequest) {
         templateText,
         variables: variables || [],
         category,
-        createdBy: user.id,
-        isActive: true
+        createdBy: user!.id,
+        isActive: true,
+        createdAt: getWIBTime(),
+        updatedAt: getWIBTime()
       })
       .returning({
         id: whatsappTemplates.id,
@@ -172,7 +165,7 @@ export async function POST(request: NextRequest) {
         email: users.email
       })
       .from(users)
-      .where(eq(users.id, user.id))
+      .where(eq(users.id, user!.id))
       .limit(1)
 
     // Format response to match Prisma structure
@@ -181,12 +174,7 @@ export async function POST(request: NextRequest) {
       createdByUser: creatorDetails.length > 0 ? creatorDetails[0] : null
     }
 
-    return NextResponse.json({ template }, { status: 201 })
-  } catch (error: unknown) {
-    logger.error('Template creation error:', error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json(
-      { error: 'Failed to create template' },
-      { status: 500 }
-    )
+    logger.info(`Template ${templateName} created successfully`);
+    return { template };
   }
-}
+);

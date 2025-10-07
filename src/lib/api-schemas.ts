@@ -185,6 +185,45 @@ export const createVideoBodySchema = z.object({
   publishedAt: isoDateTimeSchema.optional(),
 });
 
+export const updateArticleBodySchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  slug: z.string().min(1, "Slug is required").optional(),
+  content: z.string().min(1, "Content is required").optional(),
+  excerpt: z.string().optional(),
+  status: contentStatusSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  featuredImageUrl: z.string().url().optional().or(z.literal("")),
+  seoTitle: z.string().max(255).optional(),
+  seoDescription: z.string().optional(),
+  category: z.enum([
+    "GENERAL",
+    "NUTRITION",
+    "EXERCISE",
+    "MOTIVATIONAL",
+    "MEDICAL",
+    "FAQ",
+  ]).optional(),
+});
+
+export const updateVideoBodySchema = z.object({
+  title: z.string().min(1, "Title is required").optional(),
+  slug: z.string().min(1, "Slug is required").optional(),
+  videoUrl: z.string().url("Invalid video URL").optional(),
+  thumbnailUrl: z.string().url().optional(),
+  description: z.string().optional(),
+  status: contentStatusSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  durationMinutes: z.number().int().min(1).optional(),
+  category: z.enum([
+    "GENERAL",
+    "NUTRITION",
+    "EXERCISE",
+    "MOTIVATIONAL",
+    "MEDICAL",
+    "FAQ",
+  ]).optional(),
+});
+
 /**
  * Template-related schemas
  */
@@ -235,6 +274,13 @@ export const contentIdParamSchema = z.object({
  */
 export const templateIdParamSchema = z.object({
   templateId: uuidSchema,
+});
+
+/**
+ * UUID parameter schema (generic)
+ */
+export const uuidParamSchema = z.object({
+  id: uuidSchema,
 });
 
 /**
@@ -303,7 +349,9 @@ export const schemas = {
 
   // Content
   createArticle: createArticleBodySchema,
+  updateArticle: updateArticleBodySchema,
   createVideo: createVideoBodySchema,
+  updateVideo: updateVideoBodySchema,
   contentType: contentTypeSchema,
   contentStatus: contentStatusSchema,
   contentIdParam: contentIdParamSchema,
@@ -315,6 +363,7 @@ export const schemas = {
 
   // User
   userIdParam: userIdParamSchema,
+  uuidParam: uuidParamSchema,
 
   // Query
   list: listQuerySchema,

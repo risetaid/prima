@@ -1,24 +1,16 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, users } from "@/db";
-import { eq } from "drizzle-orm";
-import { getWIBTime } from "@/lib/datetime";
-import { clerkClient } from "@clerk/nextjs/server";
-
-import { logger } from '@/lib/logger';
-export async function POST() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+import { createApiHandler } from '@/lib/api-helpers'
+import { db, users } from '@/db'
+import { eq } from 'drizzle-orm'
+import { getWIBTime } from '@/lib/datetime'
+import { clerkClient } from '@clerk/nextjs/server'
+import { logger } from '@/lib/logger'
+// POST /api/admin/sync-clerk - Sync users from Clerk to database
+export const POST = createApiHandler(
+  { auth: "required" },
+  async (_, { user }) => {
     // Only admins and developers can sync users
-    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      );
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
     // Get all users from Clerk using await clerkClient()
@@ -169,19 +161,15 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({
+    logger.info('Clerk sync completed successfully', {
+      requestedBy: user!.id,
+      results: syncResults
+    });
+
+    return {
       success: true,
       message: "Clerk sync completed successfully",
       results: syncResults,
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Clerk sync failed",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    };
   }
-}
+);

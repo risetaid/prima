@@ -2,7 +2,6 @@ import { createApiHandler } from '@/lib/api-helpers'
 import { redis } from '@/lib/redis'
 import { db } from '@/db'
 import { sql } from 'drizzle-orm'
-import { logger } from '@/lib/logger'
 
 // GET /api/health - Health check endpoint for system monitoring
 export const GET = createApiHandler(

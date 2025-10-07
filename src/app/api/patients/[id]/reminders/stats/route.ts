@@ -1,37 +1,47 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, reminders, manualConfirmations } from "@/db";
-import { eq, and, isNull, inArray } from "drizzle-orm";
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
+import { PatientAccessControl } from '@/services/patient/patient-access-control'
+import { db, reminders, manualConfirmations } from '@/db'
+import { eq, and, isNull, inArray } from 'drizzle-orm'
 import {
   get,
   set,
   del,
   CACHE_KEYS,
   CACHE_TTL,
-} from "@/lib/cache";
+} from '@/lib/cache'
+import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// Query schema for cache invalidation
+const reminderStatsQuerySchema = z.object({
+  invalidate: z.enum(["true", "false"]).optional(),
+});
 
-    const { id } = await params;
+// GET /api/patients/[id]/reminders/stats - Get patient reminder statistics
+export const GET = createApiHandler(
+  { auth: "required", params: schemas.uuidParam, query: reminderStatsQuerySchema },
+  async (_, { user, params, query }) => {
+    const { id } = params!;
+    const { invalidate } = query!;
+
+    // Require patient access control
+    await PatientAccessControl.requireAccess(
+      user!.id,
+      user!.role,
+      id,
+      "view reminder statistics"
+    );
 
     // Check for cache invalidation request
-    const { searchParams } = new URL(request.url);
-    const invalidate = searchParams.get("invalidate") === "true";
+    const shouldInvalidate = invalidate === "true";
 
     // Try to get from cache first (unless invalidating)
     const cacheKey = CACHE_KEYS.reminderStats(id);
-    if (!invalidate) {
+    if (!shouldInvalidate) {
       const cachedStats = await get(cacheKey);
       if (cachedStats) {
-        return NextResponse.json(cachedStats);
+        return cachedStats;
       }
     } else {
       // Invalidate cache when requested
@@ -104,11 +114,12 @@ export async function GET(
     // Cache the stats with shorter TTL since they change more frequently
     await set(cacheKey, stats, CACHE_TTL.REMINDER_STATS);
 
-    return NextResponse.json(stats);
-  } catch {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    logger.info('Patient reminder statistics retrieved', {
+      patientId: id,
+      userId: user!.id,
+      stats
+    });
+
+    return stats;
   }
-}
+);

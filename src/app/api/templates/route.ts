@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { db, whatsappTemplates } from '@/db'
 import { eq, and, asc } from 'drizzle-orm'
 import { get, set, CACHE_KEYS, CACHE_TTL } from '@/lib/cache'
-import { logger } from '@/lib/logger'
 
 const templatesQuerySchema = z.object({
   category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL']).optional(),
@@ -16,7 +15,8 @@ export const GET = createApiHandler(
     query: templatesQuerySchema,
     cache: { ttl: CACHE_TTL.TEMPLATES, key: CACHE_KEYS.templates }
   },
-  async (_, { user, query }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { user: _, query }) => {
     const { category } = query!
 
     // Create cache key based on category filter
@@ -41,8 +41,8 @@ export const GET = createApiHandler(
       })
       .from(whatsappTemplates)
       .where(
-        category 
-          ? and(eq(whatsappTemplates.isActive, true), eq(whatsappTemplates.category, category))
+        category
+          ? and(eq(whatsappTemplates.isActive, true), eq(whatsappTemplates.category, category as 'REMINDER' | 'APPOINTMENT' | 'MEDICATION' | 'EDUCATIONAL'))
           : eq(whatsappTemplates.isActive, true)
       )
       .orderBy(asc(whatsappTemplates.category), asc(whatsappTemplates.templateName))

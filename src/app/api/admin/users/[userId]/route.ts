@@ -1,5 +1,4 @@
 import { createApiHandler } from '@/lib/api-helpers'
-import { schemas } from '@/lib/api-schemas'
 import { type AdminUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
 import { eq } from 'drizzle-orm'
@@ -52,7 +51,7 @@ export const GET = createApiHandler(
       .limit(1)
 
     if (userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      throw new Error('User not found')
     }
 
     return {
@@ -61,33 +60,24 @@ export const GET = createApiHandler(
   }
 );
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const currentUser = await getCurrentUser()
-    if (!currentUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+// POST /api/admin/users/[userId] - Perform user management actions
+export const POST = createApiHandler(
+  {
+    auth: "required",
+    params: adminUserParamsSchema,
+    query: userActionQuerySchema,
+    body: toggleRoleBodySchema.optional()
+  },
+  async (body, { user, params, query }) => {
     // Only admins and developers can manage users
-    if (currentUser.role !== "ADMIN" && currentUser.role !== "DEVELOPER") {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      )
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { userId } = await params
-    const { searchParams } = new URL(request.url)
-    const action = searchParams.get('action')
+    const { userId } = params!
+    const { action } = query!
 
-    if (!action || !['approve', 'reject', 'toggle-role', 'toggle-status'].includes(action)) {
-      return NextResponse.json({ 
-        error: 'Invalid or missing action. Use: approve, reject, toggle-role, toggle-status' 
-      }, { status: 400 })
-    }
+    logger.info(`User management action: ${action} for user ${userId} by ${user!.id}`);
 
     // Check if user exists
     const userResult = await db
@@ -106,40 +96,36 @@ export async function POST(
       .limit(1)
 
     if (userResult.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      throw new Error('User not found')
     }
 
-    const user = userResult[0]
+    const targetUser = userResult[0]
 
     switch (action) {
       case 'approve':
-        return await handleApprove(userId, user, currentUser as AdminUser)
-      
+        return await handleApprove(userId, targetUser, user! as AdminUser)
+
       case 'reject':
         return await handleReject(userId)
-      
-      case 'toggle-role':
-        return await handleToggleRole(userId, user, request)
-      
-      case 'toggle-status':
-        return await handleToggleStatus(userId, user)
-      
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-    }
 
-  } catch (error: unknown) {
-    logger.error("Error in user management action:", error instanceof Error ? error : new Error(String(error)))
-    return NextResponse.json({
-      success: false,
-      error: 'Internal server error'
-    }, { status: 500 })
+      case 'toggle-role':
+        if (!body) {
+          throw new Error('Role is required for toggle-role action')
+        }
+        return await handleToggleRole(userId, targetUser, (body as { role: string }).role)
+
+      case 'toggle-status':
+        return await handleToggleStatus(userId, targetUser)
+
+      default:
+        throw new Error('Invalid action')
+    }
   }
-}
+);
 
 async function handleApprove(userId: string, user: { isApproved: boolean }, admin: AdminUser) {
   if (user.isApproved) {
-    return NextResponse.json({ error: 'User is already approved' }, { status: 400 })
+    throw new Error('User is already approved')
   }
 
   // Approve the user
@@ -162,12 +148,13 @@ async function handleApprove(userId: string, user: { isApproved: boolean }, admi
     })
 
   const updatedUser = updatedUserResult[0]
+  logger.info(`User ${userId} approved by admin ${admin.id}`)
 
-  return NextResponse.json({
+  return {
     success: true,
     message: 'User approved successfully',
     user: updatedUser
-  })
+  }
 }
 
 async function handleReject(userId: string) {
@@ -182,21 +169,17 @@ async function handleReject(userId: string) {
     })
     .where(eq(users.id, userId))
 
-  return NextResponse.json({
+  logger.info(`User ${userId} rejected and removed from system`)
+
+  return {
     success: true,
     message: 'User rejected and removed from system'
-  })
+  }
 }
 
-async function handleToggleRole(userId: string, user: { id: string; email: string; role: string }, request: NextRequest) {
-  const { role } = await request.json()
-
-  if (!role || !["ADMIN", "RELAWAN", "DEVELOPER"].includes(role)) {
-    return NextResponse.json({ error: "Invalid role" }, { status: 400 })
-  }
-
+async function handleToggleRole(userId: string, user: { id: string; email: string; role: string }, role: string) {
   // Prevent demoting the last admin/developer
-  if ((user.role === "ADMIN" || user.role === "DEVELOPER") && 
+  if ((user.role === "ADMIN" || user.role === "DEVELOPER") &&
       role !== "ADMIN" && role !== "DEVELOPER") {
     const adminCount = await db
       .select({ count: users.id })
@@ -209,12 +192,7 @@ async function handleToggleRole(userId: string, user: { id: string; email: strin
       .where(eq(users.role, "DEVELOPER"))
 
     if (adminCount.length + developerCount.length <= 1) {
-      return NextResponse.json(
-        {
-          error: "Cannot demote the last admin/developer",
-        },
-        { status: 400 }
-      )
+      throw new Error("Cannot demote the last admin/developer")
     }
   }
 
@@ -227,7 +205,9 @@ async function handleToggleRole(userId: string, user: { id: string; email: strin
     })
     .where(eq(users.id, userId))
 
-  return NextResponse.json({
+  logger.info(`User ${userId} role updated to ${role}`)
+
+  return {
     success: true,
     message: `User role updated to ${role} successfully`,
     user: {
@@ -235,15 +215,13 @@ async function handleToggleRole(userId: string, user: { id: string; email: strin
       email: user.email,
       newRole: role,
     },
-  })
+  }
 }
 
 async function handleToggleStatus(userId: string, user: { id: string; email: string; role: string; isActive: boolean }) {
   // Prevent admin from deactivating themselves or other admins
   if (user.role === 'ADMIN') {
-    return NextResponse.json({ 
-      error: 'Cannot modify admin user status' 
-    }, { status: 400 })
+    throw new Error('Cannot modify admin user status')
   }
 
   // Toggle user status
@@ -263,10 +241,11 @@ async function handleToggleStatus(userId: string, user: { id: string; email: str
     })
 
   const updatedUser = updatedUserResult[0]
+  logger.info(`User ${userId} status ${updatedUser.isActive ? 'activated' : 'deactivated'}`)
 
-  return NextResponse.json({
+  return {
     success: true,
     message: `User ${updatedUser.isActive ? 'activated' : 'deactivated'} successfully`,
     user: updatedUser
-  })
+  }
 }

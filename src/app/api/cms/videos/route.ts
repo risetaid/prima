@@ -1,18 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, cmsVideos } from "@/db";
-import { eq, desc, and, or, ilike, isNull } from "drizzle-orm";
-import { z } from "zod";
-
-import { logger } from '@/lib/logger';
-// Validation schemas
-const createVideoSchema = z.object({
-  title: z.string().min(1, "Title is required").max(255, "Title too long"),
-  slug: z.string().min(1, "Slug is required").max(255, "Slug too long"),
-  description: z.string().optional(),
-  videoUrl: z.string().url("Invalid video URL"),
-  thumbnailUrl: z.string().url().optional().or(z.literal("")),
-  durationMinutes: z.string().optional(),
+import { createApiHandler } from '@/lib/api-helpers'
+import { schemas } from '@/lib/api-schemas'
+import { db, cmsVideos } from '@/db'
+import { eq, desc, and, or, ilike, isNull } from 'drizzle-orm'
+import { z } from 'zod'
+import { logger } from '@/lib/logger'
+// Extended validation schema for video creation
+const createVideoSchema = schemas.createVideo.extend({
   category: z.enum([
     "GENERAL",
     "NUTRITION",
@@ -21,10 +14,6 @@ const createVideoSchema = z.object({
     "MEDICAL",
     "FAQ",
   ]),
-  tags: z.array(z.string()).default([]),
-  seoTitle: z.string().max(255).optional(),
-  seoDescription: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
 });
 
 // Utility function to generate slug from title
@@ -70,23 +59,26 @@ function processVideoUrl(url: string): {
   return { embedUrl: url };
 }
 
-// GET - List videos with search and pagination
-export async function GET(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
+// Query schema for video listing
+const videosQuerySchema = z.object({
+  page: schemas.pagination.shape.page.default(1),
+  limit: schemas.pagination.shape.limit.default(10),
+  search: z.string().default(""),
+  category: z.string().default(""),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("DRAFT"),
+});
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// GET /api/cms/videos - List videos with search and pagination
+export const GET = createApiHandler(
+  { auth: "required", query: videosQuerySchema },
+  async (_, { user, query }) => {
+    // Only admins and developers can access video management
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-    const search = searchParams.get("search") || "";
-    const category = searchParams.get("category") || "";
-    const status = searchParams.get("status") || "";
-
-    const offset = (page - 1) * limit;
+    const { page, limit, search, category, status } = query!;
+    const offset = (Number(page) - 1) * Number(limit);
 
     // Build where conditions
     const whereConditions = [
@@ -132,7 +124,7 @@ export async function GET(request: NextRequest) {
       .from(cmsVideos)
       .where(whereClause)
       .orderBy(desc(cmsVideos.updatedAt))
-      .limit(limit)
+      .limit(Number(limit))
       .offset(offset);
 
     // Get total count for pagination
@@ -142,50 +134,52 @@ export async function GET(request: NextRequest) {
       .where(whereClause);
 
     const total = totalCount.length;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / Number(limit));
 
-    return NextResponse.json({
+    return {
       success: true,
       data: videos,
       pagination: {
-        page,
-        limit,
+        page: Number(page),
+        limit: Number(limit),
         total,
         totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
+        hasNext: Number(page) < totalPages,
+        hasPrev: Number(page) > 1,
       },
-    });
-  } catch (error: unknown) {
-    logger.error("Error fetching videos:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 
-// POST - Create new video
-export async function POST(request: NextRequest) {
-  try {
-    const user = await getCurrentUser();
-
-    if (!user || (user.role !== "ADMIN" && user.role !== "DEVELOPER")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// POST /api/cms/videos - Create new video
+export const POST = createApiHandler(
+  { auth: "required", body: createVideoSchema },
+  async (body, { user }) => {
+    // Only admins and developers can create videos
+    if (user!.role !== "ADMIN" && user!.role !== "DEVELOPER") {
+      throw new Error("Admin access required");
     }
 
-    const body = await request.json();
-
-    // Validate request body
-    const validatedData = createVideoSchema.parse(body);
+    // Type the body properly
+    const videoBody = body as {
+      title: string;
+      videoUrl: string;
+      description?: string;
+      slug?: string;
+      category?: string;
+      status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+      featured?: boolean;
+      tags?: string[];
+      thumbnailUrl?: string;
+    };
 
     // Process video URL to get embed URL and auto thumbnail
     const { embedUrl, thumbnailUrl: autoThumbnail } = processVideoUrl(
-      validatedData.videoUrl
+      videoBody.videoUrl
     );
 
     // Generate slug if not provided or auto-generate from title
-    const slug = validatedData.slug || generateSlug(validatedData.title);
+    const slug = videoBody.slug || generateSlug(videoBody.title);
 
     // Ensure slug is unique
     let slugSuffix = 0;
@@ -206,12 +200,19 @@ export async function POST(request: NextRequest) {
 
     // Create video
     const newVideo = {
-      ...validatedData,
+      title: videoBody.title,
       slug: finalSlug,
       videoUrl: embedUrl,
-      thumbnailUrl: validatedData.thumbnailUrl || autoThumbnail || null,
-      createdBy: user.clerkId,
-      publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
+      description: videoBody.description || null,
+      thumbnailUrl: videoBody.thumbnailUrl || autoThumbnail || null,
+      category: (videoBody.category || "GENERAL") as "GENERAL" | "NUTRITION" | "EXERCISE" | "MOTIVATIONAL" | "MEDICAL" | "FAQ",
+      status: (videoBody.status || "DRAFT") as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+      featured: videoBody.featured || false,
+      tags: videoBody.tags || [],
+      createdBy: user!.clerkId,
+      publishedAt: videoBody.status === "PUBLISHED" ? new Date() : null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const createdVideo = await db
@@ -219,24 +220,17 @@ export async function POST(request: NextRequest) {
       .values(newVideo)
       .returning();
 
-    return NextResponse.json({
+    logger.info('Video created successfully', {
+      videoId: createdVideo[0].id,
+      title: createdVideo[0].title,
+      createdBy: user!.id
+    });
+
+    return {
       success: true,
       message: "Video created successfully",
       data: createdVideo[0],
-    });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: "Validation error", details: error.issues },
-        { status: 400 }
-      );
-    }
-
-    logger.error("Error creating video:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    };
   }
-}
+);
 

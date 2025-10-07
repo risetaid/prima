@@ -6,6 +6,7 @@
 import { logger } from '@/lib/logger'
 import { redis } from '@/lib/redis'
 import { resetAllCircuitBreakers } from '@/lib/circuit-breaker'
+import { NextRequest } from 'next/server'
 
 export interface RecoveryOptions {
   maxRetries?: number
@@ -346,7 +347,8 @@ export async function performHealthCheckWithRecovery(): Promise<{
   try {
     // Import health check
     const { GET: healthCheck } = await import('@/app/api/health/route')
-    const response = await healthCheck()
+    const mockRequest = {} as NextRequest;
+    const response = await healthCheck(mockRequest, { params: Promise.resolve({}) })
     const healthData = await response.json()
 
     if (healthData.status === 'healthy') {
@@ -361,7 +363,7 @@ export async function performHealthCheckWithRecovery(): Promise<{
     await SystemRecovery.performSystemRecovery('health_check_failure')
 
     // Re-check after recovery
-    const recoveryResponse = await healthCheck()
+    const recoveryResponse = await healthCheck(mockRequest, { params: Promise.resolve({}) })
     const recoveryData = await recoveryResponse.json()
 
     return {

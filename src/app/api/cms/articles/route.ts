@@ -3,7 +3,6 @@ import { z } from "zod";
 import { schemas } from "@/lib/api-schemas";
 import { db, cmsArticles } from "@/db";
 import { eq, desc, and, or, ilike, isNull } from "drizzle-orm";
-import { logger } from '@/lib/logger';
 
 // Validation schemas
 const createArticleSchema = z.object({
@@ -57,8 +56,8 @@ export const GET = createApiHandler(
       throw new Error("Unauthorized");
     }
 
-    const { page, limit, search, category, status } = query!;
-    const offset = (page - 1) * limit;
+    const { page = 1, limit = 10, search, category, status } = query!;
+    const offset = (Number(page) - 1) * Number(limit);
 
     // Build where conditions
     const whereConditions = [
@@ -105,7 +104,7 @@ export const GET = createApiHandler(
       .from(cmsArticles)
       .where(whereClause)
       .orderBy(desc(cmsArticles.updatedAt))
-      .limit(limit)
+      .limit(Number(limit))
       .offset(offset);
 
     // Get total count for pagination
@@ -115,7 +114,7 @@ export const GET = createApiHandler(
       .where(whereClause);
 
     const total = totalCount.length;
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / Number(limit));
 
     return {
       data: articles,
@@ -124,8 +123,8 @@ export const GET = createApiHandler(
         limit,
         total,
         totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
+        hasNext: Number(page) < totalPages,
+        hasPrev: Number(page) > 1,
       },
     };
   }
@@ -140,7 +139,16 @@ export const POST = createApiHandler(
       throw new Error("Unauthorized");
     }
 
-    const validatedData = body;
+    const validatedData = body as {
+      title: string;
+      content: string;
+      excerpt?: string;
+      slug?: string;
+      category?: string;
+      status?: string;
+      featured?: boolean;
+      tags?: string[];
+    };
 
     // Generate slug if not provided or auto-generate from title
     const slug = validatedData.slug || generateSlug(validatedData.title);
@@ -168,6 +176,8 @@ export const POST = createApiHandler(
     const newArticle = {
       ...validatedData,
       slug: finalSlug,
+      category: (validatedData.category || "GENERAL") as "GENERAL" | "NUTRITION" | "EXERCISE" | "MOTIVATIONAL" | "MEDICAL" | "FAQ",
+      status: (validatedData.status || "DRAFT") as "DRAFT" | "PUBLISHED" | "ARCHIVED",
       createdBy: user!.clerkId,
       publishedAt: validatedData.status === "PUBLISHED" ? new Date() : null,
     };

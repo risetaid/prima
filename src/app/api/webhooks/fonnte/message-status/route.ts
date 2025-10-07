@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { requireWebhookToken } from '@/lib/webhook-auth'
 import { isDuplicateEvent, hashFallbackId } from '@/lib/idempotency'
@@ -6,6 +6,7 @@ import { db, reminders } from '@/db'
 import { eq } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { del, CACHE_KEYS } from '@/lib/cache'
+import { createApiHandler } from '@/lib/api-helpers'
 
 const StatusSchema = z.object({
   id: z.string().min(1), // message id
@@ -32,90 +33,96 @@ function mapStatusToEnum(status?: string): 'PENDING' | 'SENT' | 'DELIVERED' | 'F
   return null
 }
 
-export async function POST(request: NextRequest) {
-  // Re-enabled webhook authentication
-  const authError = requireWebhookToken(request)
-  if (authError) return authError
+// Custom authentication function for webhook
+async function verifyWebhookToken(request: NextRequest) {
+  const authError = requireWebhookToken(request);
+  if (authError) {
+    throw new Error("Unauthorized webhook");
+  }
+  return null; // No user object for webhooks
+}
 
-  let parsed: Record<string, unknown> = {}
-  const contentType = request.headers.get('content-type') || ''
-  try {
-    if (contentType.includes('application/json')) {
-      parsed = await request.json()
-    } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-      const form = await request.formData()
-      form.forEach((v, k) => { parsed[k] = v })
-    } else {
-      const text = await request.text()
-      try { parsed = JSON.parse(text) } catch { parsed = {} }
-    }
-  } catch {}
+export const POST = createApiHandler(
+  {
+    auth: "custom",
+    customAuth: verifyWebhookToken,
+    rateLimit: { enabled: false } // Disable rate limiting for webhooks
+  },
+  async (body, { request }) => {
+    // The body is already parsed by createApiHandler with support for different content types
+    const parsed = body as Record<string, unknown>
+    const contentType = request.headers.get('content-type') || ''
 
-  // Add debug logging for message status
-  logger.info('Message status webhook payload received', {
-    contentType,
-    rawPayload: parsed,
-    payloadKeys: Object.keys(parsed || {})
-  })
-
-  const normalized = normalizeStatus(parsed)
-  logger.info('Message status normalized', { normalized })
-  
-  const result = StatusSchema.safeParse(normalized)
-  if (!result.success) {
-    logger.error('Message status validation failed', new Error('Validation failed'), {
+    // Add debug logging for message status
+    logger.info('Message status webhook payload received', {
+      contentType,
       rawPayload: parsed,
-      normalized,
-      validationErrors: result.error.flatten()
+      payloadKeys: Object.keys(parsed || {})
     })
-    return NextResponse.json({ error: 'Invalid payload', issues: result.error.flatten() }, { status: 400 })
-  }
 
-  const { id, status, reason, timestamp } = result.data
+    const normalized = normalizeStatus(parsed)
+    logger.info('Message status normalized', { normalized })
 
-  const idemKey = `webhook:fonnte:message-status:${hashFallbackId([id, String(timestamp || '')])}`
-  if (await isDuplicateEvent(idemKey)) {
-    return NextResponse.json({ ok: true, duplicate: true })
-  }
-
-  const mapped = mapStatusToEnum(status)
-  if (!mapped) return NextResponse.json({ ok: true, ignored: true })
-
-  try {
-    // First get the patientId for cache invalidation
-    const logData = await db
-      .select({ patientId: reminders.patientId })
-      .from(reminders)
-      .where(eq(reminders.fonnteMessageId, id))
-      .limit(1)
-
-    const updates = { status: mapped! }
-    // optional: could add deliveredAt/failedAt if columns exist; schema not defined for those explicitly
-    if (mapped === 'FAILED' && reason) {
-      // store reason in confirmationResponse temporarily? Skip; just log.
-      logger.warn('Fonnte message failed', { id, reason })
+    const result = StatusSchema.safeParse(normalized)
+    if (!result.success) {
+      logger.error('Message status validation failed', new Error('Validation failed'), {
+        rawPayload: parsed,
+        normalized,
+        validationErrors: result.error.flatten()
+      })
+      throw new Error(`Invalid payload: ${JSON.stringify(result.error.flatten())}`)
     }
 
-    await db.update(reminders).set(updates).where(eq(reminders.fonnteMessageId, id))
-    logger.info('Updated reminder log status from webhook', { id, mapped })
+    const { id, status, reason, timestamp } = result.data
 
-    // Invalidate cache if we have patientId
-    if (logData.length > 0) {
-      await del(CACHE_KEYS.reminderStats(logData[0].patientId))
+    const idemKey = `webhook:fonnte:message-status:${hashFallbackId([id, String(timestamp || '')])}`
+    if (await isDuplicateEvent(idemKey)) {
+      return { ok: true, duplicate: true }
     }
-  } catch (error) {
-    logger.error('Failed to update message status', error as Error, { id, status })
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+
+    const mapped = mapStatusToEnum(status)
+    if (!mapped) return { ok: true, ignored: true }
+
+    try {
+      // First get the patientId for cache invalidation
+      const logData = await db
+        .select({ patientId: reminders.patientId })
+        .from(reminders)
+        .where(eq(reminders.fonnteMessageId, id))
+        .limit(1)
+
+      const updates = { status: mapped! }
+      // optional: could add deliveredAt/failedAt if columns exist; schema not defined for those explicitly
+      if (mapped === 'FAILED' && reason) {
+        // store reason in confirmationResponse temporarily? Skip; just log.
+        logger.warn('Fonnte message failed', { id, reason })
+      }
+
+      await db.update(reminders).set(updates).where(eq(reminders.fonnteMessageId, id))
+      logger.info('Updated reminder log status from webhook', { id, mapped })
+
+      // Invalidate cache if we have patientId
+      if (logData.length > 0) {
+        await del(CACHE_KEYS.reminderStats(logData[0].patientId))
+      }
+    } catch (error) {
+      logger.error('Failed to update message status', error as Error, { id, status })
+      throw new Error('Failed to update message status')
+    }
+
+    return { ok: true, processed: true }
   }
+);
 
-  return NextResponse.json({ ok: true, processed: true })
-}
-
-export async function GET(request: NextRequest) {
-  // Re-enabled webhook authentication
-  const authError = requireWebhookToken(request)
-  if (authError) return authError
-  const { searchParams } = new URL(request.url)
-  const mode = searchParams.get('mode') || 'ping'
-  return NextResponse.json({ ok: true, route: 'fonnte/message-status', mode })
-}
+export const GET = createApiHandler(
+  {
+    auth: "custom",
+    customAuth: verifyWebhookToken,
+    rateLimit: { enabled: false } // Disable rate limiting for webhooks
+  },
+  async (body, { request }) => {
+    const { searchParams } = new URL(request.url)
+    const mode = searchParams.get('mode') || 'ping'
+    return { ok: true, route: 'fonnte/message-status', mode }
+  }
+);

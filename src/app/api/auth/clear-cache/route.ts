@@ -9,7 +9,8 @@ import { logger } from "@/lib/logger";
  */
 export const POST = createApiHandler(
   { auth: "required" },
-  async (_, { request }) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async (_req, { request: _ }) => {
     // Get userId directly from Clerk auth
     const { userId } = await auth();
 

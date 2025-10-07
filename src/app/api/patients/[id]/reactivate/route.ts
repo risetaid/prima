@@ -1,7 +1,6 @@
 import { createApiHandler } from '@/lib/api-helpers'
 import { schemas } from '@/lib/api-schemas'
 import { PatientService } from '@/services/patient/patient.service'
-import { logger } from '@/lib/logger'
 
 // POST /api/patients/[id]/reactivate - Reactivate patient after BERHENTI (unsubscribe)
 export const POST = createApiHandler(

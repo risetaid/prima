@@ -1,56 +1,48 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth-utils";
-import { db, manualConfirmations, reminders } from "@/db";
-import { eq, and } from "drizzle-orm";
-import { del, CACHE_KEYS } from "@/lib/cache";
+import { createApiHandler } from '@/lib/api-helpers'
+import { PatientAccessControl } from '@/services/patient/patient-access-control'
+import { db, manualConfirmations, reminders } from '@/db'
+import { eq, and } from 'drizzle-orm'
+import { del, CACHE_KEYS } from '@/lib/cache'
+import { logger } from '@/lib/logger'
+import { z } from 'zod'
 
-import { logger } from '@/lib/logger';
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; reminderId: string }> }
-) {
-  try {
+// Schema for reminder confirmation request
+const confirmReminderSchema = z.object({
+  confirmed: z.boolean(),
+  reminderLogId: z.string().uuid().optional(),
+});
+
+// Schema for double UUID parameters
+const confirmReminderParamsSchema = z.object({
+  id: z.string().uuid("Invalid patient ID format"),
+  reminderId: z.string().uuid("Invalid reminder ID format"),
+});
+export const PUT = createApiHandler(
+  { auth: "required", params: confirmReminderParamsSchema, body: confirmReminderSchema },
+  async (body, { user, params }) => {
     logger.info("=== REMINDER CONFIRMATION API CALLED ===");
 
-    const user = await getCurrentUser();
-    if (!user) {
-      logger.error("❌ AUTH ERROR: User not authenticated");
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    logger.info("✅ User authenticated:", { userId: user.id });
+    logger.info("✅ User authenticated:", { userId: user!.id });
 
-    let requestBody;
-    try {
-      requestBody = await request.json();
-    } catch (parseError: unknown) {
-      logger.error("❌ JSON PARSE ERROR:", parseError instanceof Error ? parseError : new Error(String(parseError)));
-      return NextResponse.json(
-        { error: "Invalid JSON in request body" },
-        { status: 400 }
-      );
-    }
+    // Patient access control
+    await PatientAccessControl.requireAccess(
+      user!.id,
+      user!.role,
+      params!.id,
+      "confirm reminder"
+    );
 
     // Handle confirmed parameter
-    const confirmed = requestBody.confirmed;
-    const { reminderLogId } = requestBody;
+    const { confirmed, reminderLogId } = body as {
+      confirmed: boolean;
+      reminderLogId?: string;
+    };
     logger.info("📥 Request body:", {
       confirmed,
       reminderLogId,
     });
 
-    if (typeof confirmed !== "boolean") {
-      logger.error(
-        "❌ VALIDATION ERROR: confirmed is not boolean:",
-        undefined,
-        { confirmedType: typeof confirmed }
-      );
-      return NextResponse.json(
-        { error: "confirmed must be boolean" },
-        { status: 400 }
-      );
-    }
-
-    const { id, reminderId: rawReminderId } = await params;
+    const { id, reminderId: rawReminderId } = params!;
     logger.info("📋 URL params:", { patientId: id, rawReminderId });
 
     // The reminderId is already a clean UUID from the pending reminders API
@@ -88,10 +80,7 @@ export async function PUT(
 
     if (reminderData.length === 0) {
       logger.error("❌ REMINDER NOT FOUND:", undefined, { reminderId: logId, patientId: id });
-      return NextResponse.json(
-        { error: "Reminder not found" },
-        { status: 404 }
-      );
+      throw new Error("Reminder not found");
     }
 
     const reminderInfo = reminderData[0];
@@ -120,10 +109,7 @@ export async function PUT(
         logId,
         existingId: existingManualConfirmation[0].id,
       });
-      return NextResponse.json(
-        { error: "Reminder already manually confirmed by volunteer" },
-        { status: 409 }
-      );
+      throw new Error("Reminder already manually confirmed by volunteer");
     }
 
     // Check for automated confirmation conflict
@@ -154,15 +140,7 @@ export async function PUT(
         automatedStatus: automatedConfirmation.confirmationStatus,
         automatedResponse: automatedConfirmation.confirmationResponse,
       });
-      return NextResponse.json(
-        {
-          error: "Automated confirmation already exists",
-          automatedStatus: automatedConfirmation.confirmationStatus,
-          automatedResponse: automatedConfirmation.confirmationResponse,
-          conflictType: "automated_confirmation_exists",
-        },
-        { status: 409 }
-      );
+      throw new Error(`Automated confirmation already exists with status: ${automatedConfirmation.confirmationStatus}`);
     }
 
     logger.info(
@@ -172,7 +150,7 @@ export async function PUT(
     // Create manual confirmation with proper relations
     logger.info("💾 Creating manual confirmation:", {
       patientId: id,
-      volunteerId: user.id,
+      volunteerId: user!.id,
       reminderLogId: logId,
       confirmed,
     });
@@ -182,7 +160,7 @@ export async function PUT(
         .insert(manualConfirmations)
         .values({
           patientId: id,
-          volunteerId: user.id,
+          volunteerId: user!.id,
           reminderId: logId, // Link to specific Reminder
           visitDate: new Date(),
           visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
@@ -218,16 +196,10 @@ export async function PUT(
       logger.info("🗑️ Cache invalidated for patient:", { patientId: id });
 
       logger.info("🎉 REMINDER CONFIRMATION COMPLETED SUCCESSFULLY");
-      return NextResponse.json(newManualConfirmation[0]);
+      return newManualConfirmation[0];
     } catch (dbError: unknown) {
       logger.error("❌ DATABASE INSERTION ERROR:", dbError instanceof Error ? dbError : new Error(String(dbError)));
-      throw dbError; // Re-throw to be caught by outer catch
+      throw dbError;
     }
-  } catch (error: unknown) {
-    logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
-}
+);
