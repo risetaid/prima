@@ -1,33 +1,3 @@
 {
-  "mcpServers": {
-    "sequentialthinking": {
-      "command": "bunx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
-      "alwaysAllow": [
-        "sequentialthinking"
-      ]
-    },
-    "filesystem": {
-      "command": "bunx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "E:/Portfolio/Web/prima"
-      ]
-    },
-    "postgres": {
-      "command": "bunx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://postgres:eVBMjcVNugdOgeXoMdCMoaQxTDalGkoN@switchyard.proxy.rlwy.net:23431/railway"
-      ],
-      "alwaysAllow": [
-        "query"
-      ]
-    }
-  }
+    "mcpServers": {}
 }
