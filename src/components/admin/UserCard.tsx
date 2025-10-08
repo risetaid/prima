@@ -2,23 +2,16 @@
 
 import { Badge } from "@/components/ui/badge";
 import {
-  User,
+  User as UserIcon,
   Mail,
   Calendar,
 } from "lucide-react";
 import UserActions from "@/components/admin/UserActions";
+import type { User, UserRole } from "@/types/api";
 
-interface User {
-  id: string;
-  clerkId: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: "DEVELOPER" | "ADMIN" | "RELAWAN";
-  isActive: boolean;
-  isApproved: boolean;
-  createdAt: string;
-  approvedAt: string | null;
+// Extended User type for display
+interface UserDisplay extends Omit<User, 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'deletedAt'> {
+  createdAt: string | Date;
   approver?: {
     firstName: string | null;
     lastName: string | null;
@@ -27,13 +20,13 @@ interface User {
 }
 
 interface UserCardProps {
-  user: User;
-  currentUser: User | null;
+  user: UserDisplay;
+  currentUser: UserDisplay | null;
   actionLoading: string | null;
   onApproval: (userId: string, action: "approve" | "reject") => void;
   onStatusToggle: (userId: string, currentStatus: boolean) => void;
-  onRoleToggle: (user: User, currentRole: User["role"]) => void;
-  onDemote: (user: User, targetRole: "ADMIN" | "RELAWAN") => void;
+  onRoleToggle: (user: UserDisplay, currentRole: UserRole) => void;
+  onDemote: (user: UserDisplay, targetRole: "ADMIN" | "RELAWAN") => void;
   showApprovalActions?: boolean;
 }
 
@@ -47,7 +40,7 @@ const UserCard: React.FC<UserCardProps> = ({
   onDemote,
   showApprovalActions = false,
 }) => {
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     return new Date(dateString).toLocaleDateString("id-ID", {
       day: "2-digit",
       month: "short",
@@ -57,7 +50,7 @@ const UserCard: React.FC<UserCardProps> = ({
     });
   };
 
-  const getStatusBadge = (user: User) => {
+  const getStatusBadge = (user: UserDisplay) => {
     if (!user.isApproved) {
       return (
         <Badge
@@ -133,7 +126,7 @@ const UserCard: React.FC<UserCardProps> = ({
     <div className={cardClass}>
       <div className="flex items-center space-x-3 flex-1 min-w-0">
         <div className={avatarClass}>
-          <User className={avatarIconClass} />
+          <UserIcon className={avatarIconClass} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-medium text-sm sm:text-base text-gray-900 truncate">

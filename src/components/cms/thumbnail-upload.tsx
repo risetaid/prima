@@ -44,8 +44,9 @@ export function ThumbnailUpload({
 
         const uploadResult = await uploadResponse.json();
 
-        if (uploadResult.success && uploadResult.url) {
-          onImageChange(uploadResult.url);
+        // Handle standardized response format
+        if (uploadResult.success && uploadResult.data?.url) {
+          onImageChange(uploadResult.data.url);
           toast.success("Gambar berhasil diupload");
         } else {
           throw new Error(uploadResult.error || "Upload failed");

@@ -1,13 +1,15 @@
 import { createApiHandler } from '@/lib/api-helpers'
 import { db, whatsappTemplates, users } from '@/db'
-import { eq, and, asc, inArray, isNull } from 'drizzle-orm'
+import { eq, and, asc, inArray, isNull, count } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/datetime'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
 
 const templateQuerySchema = z.object({
   category: z.enum(['REMINDER', 'APPOINTMENT', 'EDUCATIONAL']).optional(),
-  active: z.string().optional()
+  active: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20)
 });
 
 const createTemplateSchema = z.object({
@@ -25,11 +27,17 @@ export const GET = createApiHandler(
       throw new Error("Admin access required");
     }
 
-    const { category, active } = query || {};
+    const { category, active, page = 1, limit = 20 } = query || {};
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const offset = (pageNum - 1) * limitNum;
 
-    logger.info(`Fetching templates with filters: category=${category}, active=${active}, activeType=${typeof active}, activeIsUndefined=${active === undefined}, activeIsEmpty=${active === ''}`, {
+    logger.info(`Fetching templates with filters: category=${category}, active=${active}, page=${page}, limit=${limit}`, {
       category,
       active,
+      page,
+      limit,
+      offset,
       activeType: typeof active,
       activeIsUndefined: active === undefined,
       activeIsEmpty: active === ''
@@ -58,7 +66,15 @@ export const GET = createApiHandler(
       activeFilter: active
     });
 
-    // Execute query with optional filters and ordering
+    // Get total count for pagination
+    const totalCountResult = await db
+      .select({ count: count() })
+      .from(whatsappTemplates)
+      .where(and(...conditions));
+    
+    const totalCount = totalCountResult[0]?.count || 0;
+
+    // Execute query with optional filters, ordering, and pagination
     const templatesData = await db
       .select({
         id: whatsappTemplates.id,
@@ -77,6 +93,8 @@ export const GET = createApiHandler(
         asc(whatsappTemplates.category),
         asc(whatsappTemplates.templateName)
       )
+      .limit(limitNum)
+      .offset(offset)
 
     logger.info('📊 Template query result', {
       templatesFound: templatesData.length,
@@ -122,9 +140,24 @@ export const GET = createApiHandler(
 
     logger.info(`✅ Final template response`, {
       templatesCount: templates.length,
+      totalCount,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(totalCount / limitNum),
       templateNames: templates.map(t => ({ id: t.id, name: t.templateName, category: t.category }))
     });
-    return { templates };
+    
+    return {
+      templates,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limitNum),
+        hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+        hasPrevPage: pageNum > 1
+      }
+    };
   }
 );
 

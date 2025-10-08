@@ -3,6 +3,7 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { getCurrentTimeWIB, isTimeValidForSelectedDates } from "@/lib/datetime";
 
+// Simplified patient type for form usage
 interface Patient {
   id: string;
   name: string;
@@ -34,11 +35,12 @@ interface ContentItem {
   durationMinutes?: string;
 }
 
-interface CustomRecurrence {
+// Extended CustomRecurrence for form state
+interface CustomRecurrenceWithEnabled {
   enabled: boolean;
   frequency: "day" | "week" | "month";
   interval: number;
-  daysOfWeek: number[];
+  daysOfWeek: number[]; // Different from API type which uses string[]
   daysOfMonth: number[];
   endType: "never" | "on" | "after";
   endDate: string;
@@ -61,7 +63,7 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem[]>([]);
 
-  const [customRecurrence, setCustomRecurrence] = useState<CustomRecurrence>({
+  const [customRecurrence, setCustomRecurrence] = useState<CustomRecurrenceWithEnabled>({
     enabled: false,
     frequency: "week",
     interval: 1,

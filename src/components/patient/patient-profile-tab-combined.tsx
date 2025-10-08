@@ -102,7 +102,15 @@ export function PatientProfileTabCombined({
           });
 
           if (photoResponse.ok) {
-            toast.success("Foto profil berhasil diunggah");
+            const photoResult = await photoResponse.json();
+            // Use standardized response format
+            if (photoResult.success && photoResult.data?.url) {
+              toast.success("Foto profil berhasil diunggah");
+            } else {
+              toast.error("Format respons tidak valid");
+              setPhotoPreview(null);
+              setPhotoFile(null);
+            }
           } else {
             toast.error("Gagal mengunggah foto profil");
             setPhotoPreview(null);

@@ -21,6 +21,12 @@ async function handleUploadRequest(request: NextRequest): Promise<NextResponse> 
       const uploadType = sp.get("type") || "general";
       const filename = sp.get("filename");
 
+      // Validate Content-Type for FormData uploads
+      const contentTypeHeader = req.headers.get("content-type");
+      if (uploadType !== "general" && contentTypeHeader && !contentTypeHeader.includes("multipart/form-data")) {
+        throw new Error("Invalid Content-Type. Expected multipart/form-data for file uploads.");
+      }
+
       // Custom authentication logic for upload API
       if (uploadType === "general") {
         if (!user) {
@@ -245,21 +251,18 @@ async function handleUploadRequest(request: NextRequest): Promise<NextResponse> 
         ""
       )}/${bucketName}/${finalFilename}`;
 
-      // Return appropriate response format
-      if (uploadType === "quill-image") {
-        return {
-          __isQuillResponse: true,
-          location: publicUrl,
-        };
-      } else if (uploadType === "general") {
-        return { url: publicUrl };
-      } else {
-        return {
-          success: true,
+      // Return standardized response format
+      return {
+        __isQuillResponse: uploadType === "quill-image",
+        success: true,
+        data: {
           url: publicUrl,
           filename: finalFilename,
-        };
-      }
+          type: uploadType,
+          size: buffer.length,
+          contentType: contentType,
+        },
+      };
     }
   );
 
@@ -274,8 +277,9 @@ async function handleUploadRequest(request: NextRequest): Promise<NextResponse> 
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     };
+    // Return quill-expected format: { location: url }
     return NextResponse.json(
-      { location: result.data.location },
+      { location: result.data.data.url },
       { headers: corsHeaders }
     );
   }
