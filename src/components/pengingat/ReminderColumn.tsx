@@ -28,6 +28,7 @@ interface Reminder {
   sentAt?: string;
   confirmedAt?: string;
   attachedContent?: ContentItem[];
+  manuallyConfirmed?: boolean;
 }
 
 interface ReminderColumnProps {
@@ -105,6 +106,10 @@ const renderReminderCard = (
     : "bg-blue-600";
   const textColor = isPending ? "text-gray-900" : "text-white";
   const timeColor = isPending ? "text-gray-600" : "text-white/90";
+  const hasAutomatedConfirmation =
+    reminder.confirmationStatus && reminder.confirmationStatus !== "PENDING";
+  const isManuallyConfirmed = Boolean(reminder.manuallyConfirmed);
+  const isLocked = isPending && (hasAutomatedConfirmation || isManuallyConfirmed);
 
   return (
     <div key={reminder.id} className="flex items-start space-x-3">
@@ -158,22 +163,41 @@ const renderReminderCard = (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onPendingAction?.(reminder.id, "ya");
+                if (!isLocked) {
+                  onPendingAction?.(reminder.id, "ya");
+                }
               }}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+              className={`flex-1 text-white py-2 px-3 rounded text-sm font-medium transition-colors ${
+                isLocked
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-green-500 hover:bg-green-600 cursor-pointer"
+              }`}
+              disabled={isLocked}
             >
               Ya
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onPendingAction?.(reminder.id, "tidak");
+                if (!isLocked) {
+                  onPendingAction?.(reminder.id, "tidak");
+                }
               }}
-              className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded text-sm font-medium transition-colors cursor-pointer"
+              className={`flex-1 text-white py-2 px-3 rounded text-sm font-medium transition-colors ${
+                isLocked
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-red-500 hover:bg-red-600 cursor-pointer"
+              }`}
+              disabled={isLocked}
             >
               Tidak
             </button>
           </div>
+        )}
+        {showActions && isLocked && (
+          <p className="mt-2 text-xs text-yellow-600">
+            Pengingat sudah dikonfirmasi. Tidak perlu tindakan manual.
+          </p>
         )}
       </div>
     </div>

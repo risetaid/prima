@@ -26,6 +26,7 @@ export interface Reminder {
   sentAt?: string;
   confirmedAt?: string;
   attachedContent?: ContentItem[];
+  manuallyConfirmed?: boolean;
 }
 
 export interface ReminderStats {

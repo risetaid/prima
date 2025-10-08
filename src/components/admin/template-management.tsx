@@ -64,7 +64,10 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
         setTemplates(data.templates)
         logger.info(`✅ Loaded ${data.templates.length} templates`)
       } else {
-        logger.error('❌ No templates array found in response', { data, result })
+        logger.error('❌ No templates array found in response', new Error('No templates array found'), {
+          responseData: data,
+          apiResponse: result
+        })
         toast.error('Failed to fetch templates')
       }
     } catch (error) {

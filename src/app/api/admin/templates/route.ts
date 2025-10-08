@@ -27,24 +27,30 @@ export const GET = createApiHandler(
 
     const { category, active } = query || {};
 
-    logger.info(`Fetching templates with filters: category=${category}, active=${active}, activeType=${typeof active}, activeIsUndefined=${active === undefined}, activeIsEmpty=${active === ''}`);
+    logger.info(`Fetching templates with filters: category=${category}, active=${active}, activeType=${typeof active}, activeIsUndefined=${active === undefined}, activeIsEmpty=${active === ''}`, {
+      category,
+      active,
+      activeType: typeof active,
+      activeIsUndefined: active === undefined,
+      activeIsEmpty: active === ''
+    });
 
     // Build base query with filters - always exclude soft-deleted templates
     const conditions = [isNull(whatsappTemplates.deletedAt)]
 
     if (category) {
       conditions.push(eq(whatsappTemplates.category, category as 'REMINDER' | 'APPOINTMENT' | 'EDUCATIONAL'))
-      logger.info('🔧 Adding category filter:', category);
+      logger.info('🔧 Adding category filter', { category });
     }
 
     if (active !== undefined && active !== '') {
       conditions.push(eq(whatsappTemplates.isActive, active === 'true'))
-      logger.info('🔧 Adding active filter:', { active, willMatch: active === 'true' });
+      logger.info('🔧 Adding active filter', { active, willMatch: active === 'true' });
     } else {
-      logger.info('🔧 Skipping active filter - active is empty or undefined');
+      logger.info('🔧 Skipping active filter - active is empty or undefined', { active });
     }
 
-    logger.info('🔍 Template query conditions:', {
+    logger.info('🔍 Template query conditions', {
       conditionsCount: conditions.length,
       hasCategoryFilter: !!category,
       hasActiveFilter: active !== undefined,
@@ -72,7 +78,7 @@ export const GET = createApiHandler(
         asc(whatsappTemplates.templateName)
       )
 
-    logger.info('📊 Template query result:', {
+    logger.info('📊 Template query result', {
       templatesFound: templatesData.length,
       firstTemplate: templatesData[0] ? {
         id: templatesData[0].id,
@@ -114,7 +120,7 @@ export const GET = createApiHandler(
       createdByUser: creatorMap.get(template.createdBy) || null
     }))
 
-    logger.info(`✅ Final template response:`, {
+    logger.info(`✅ Final template response`, {
       templatesCount: templates.length,
       templateNames: templates.map(t => ({ id: t.id, name: t.templateName, category: t.category }))
     });

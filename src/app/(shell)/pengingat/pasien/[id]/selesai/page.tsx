@@ -14,6 +14,7 @@ interface CompletedReminder {
   confirmationStatus?: string
   confirmedAt: string
   sentAt?: string
+  manuallyConfirmed?: boolean
 }
 
 export default function CompletedRemindersPage() {
@@ -32,8 +33,16 @@ export default function CompletedRemindersPage() {
     try {
       const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed`)
       if (response.ok) {
-        const data = await response.json()
-        setReminders(data)
+        const result = await response.json()
+        const data = result.data || result // Unwrap createApiHandler response
+        logger.info('✅ Completed reminders response:', { success: result.success, hasData: !!result.data, count: Array.isArray(data) ? data.length : 'not-array' })
+        const normalized = Array.isArray(data)
+          ? data.map((item) => ({
+              ...item,
+              manuallyConfirmed: Boolean(item.manuallyConfirmed),
+            }))
+          : []
+        setReminders(normalized as CompletedReminder[])
       } else {
         logger.error('Failed to fetch completed reminders')
         setReminders([])
@@ -115,11 +124,16 @@ export default function CompletedRemindersPage() {
                    <p className="text-gray-600 text-sm mb-1">
                      Dikirim pada: {formatShortDateTime(reminder.sentAt || reminder.reminderDate)}
                    </p>
-                   <p className="text-gray-600 text-sm">
-                     Diperbarui pada: {formatShortDateTime(reminder.confirmedAt)}
-                   </p>
-                 </div>
-               </div>
+                  <p className="text-gray-600 text-sm">
+                    Diperbarui pada: {formatShortDateTime(reminder.confirmedAt)}
+                  </p>
+                  {reminder.manuallyConfirmed && (
+                    <p className="text-xs text-green-600 mt-1">
+                      Dikonfirmasi secara manual oleh relawan
+                    </p>
+                  )}
+                </div>
+              </div>
 
               {/* Status Button */}
               <div className="p-0">

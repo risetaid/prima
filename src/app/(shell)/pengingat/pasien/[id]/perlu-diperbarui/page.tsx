@@ -18,6 +18,7 @@ interface PendingReminder {
   confirmationResponse?: string;
   confirmationResponseAt?: string;
   confirmationSentAt?: string;
+  manuallyConfirmed?: boolean;
 }
 
 export default function PendingUpdatePage() {
@@ -38,8 +39,29 @@ export default function PendingUpdatePage() {
         `/api/patients/${patientId}/reminders?filter=pending`
       );
       if (response.ok) {
-        const data = await response.json();
-        setReminders(data);
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+        logger.info('⏰ Pending reminders response (mobile):', {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          count: Array.isArray(data) ? data.length : 'not-array',
+          sampleData: Array.isArray(data) ? data.slice(0, 2).map(item => ({
+            id: item.id,
+            hasReminderDate: !!item.reminderDate,
+            hasScheduledTime: !!item.scheduledTime,
+            hasCustomMessage: !!item.customMessage,
+            confirmationStatus: item.confirmationStatus
+          })) : null
+        });
+        const normalized = Array.isArray(data)
+          ? data.map((item) => ({
+              ...item,
+              manuallyConfirmed: Boolean(item.manuallyConfirmed),
+            }))
+          : [];
+        setReminders(normalized as PendingReminder[]);
       } else {
         logger.error("Failed to fetch pending reminders");
         setReminders([]);
@@ -185,6 +207,8 @@ export default function PendingUpdatePage() {
               reminder.confirmationStatus &&
                 reminder.confirmationStatus !== "PENDING"
             );
+            const isManuallyConfirmed = Boolean(reminder.manuallyConfirmed);
+            const isLocked = hasAutomatedConfirmation || isManuallyConfirmed;
             const automatedStatusText = hasAutomatedConfirmation
               ? reminder.confirmationStatus === "CONFIRMED"
                 ? "Sudah Dikonfirmasi (Otomatis)"
@@ -230,6 +254,13 @@ export default function PendingUpdatePage() {
                           )}
                         </div>
                       )}
+                      {isManuallyConfirmed && (
+                        <div className="mt-2">
+                          <div className="px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-600 border border-green-400/30">
+                            ✅ Sudah Dikonfirmasi (Manual)
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center space-x-1 text-gray-600">
                       <Clock className="w-4 h-4" />
@@ -244,9 +275,9 @@ export default function PendingUpdatePage() {
                 <div className="flex">
                   <button
                     onClick={() => handleConfirmation(reminder.id, true)}
-                    disabled={hasAutomatedConfirmation}
+                    disabled={isLocked}
                     className={`flex-1 py-4 font-semibold transition-colors ${
-                      hasAutomatedConfirmation
+                      isLocked
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : "bg-green-500 text-white hover:bg-green-600 cursor-pointer"
                     }`}
@@ -255,9 +286,9 @@ export default function PendingUpdatePage() {
                   </button>
                   <button
                     onClick={() => handleConfirmation(reminder.id, false)}
-                    disabled={hasAutomatedConfirmation}
+                    disabled={isLocked}
                     className={`flex-1 py-4 font-semibold transition-colors ${
-                      hasAutomatedConfirmation
+                      isLocked
                         ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                         : "bg-red-500 text-white hover:bg-red-600 cursor-pointer"
                     }`}
@@ -267,11 +298,11 @@ export default function PendingUpdatePage() {
                 </div>
 
                 {/* Conflict Notice */}
-                {hasAutomatedConfirmation && (
+                {(hasAutomatedConfirmation || isManuallyConfirmed) && (
                   <div className="bg-yellow-50 border-t border-yellow-200 p-3">
                     <p className="text-xs text-yellow-700 text-center">
-                      ⚠️ Sudah ada konfirmasi otomatis dari WhatsApp. Tidak
-                      perlu konfirmasi manual.
+                      ⚠️ Sudah ada konfirmasi untuk pengingat ini. Tidak perlu
+                      konfirmasi manual.
                     </p>
                   </div>
                 )}

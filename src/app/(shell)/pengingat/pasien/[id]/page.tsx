@@ -40,6 +40,7 @@ export default function PatientReminderPage() {
   const [patientName, setPatientName] = useState("");
   const [canAddReminders, setCanAddReminders] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
 
   const patientId = params.id as string;
@@ -56,7 +57,9 @@ export default function PatientReminderPage() {
       );
 
       if (response.ok) {
-        const statsData = await response.json();
+        const result = await response.json();
+        const statsData = result.data || result; // Unwrap createApiHandler response
+        logger.info('📊 Reminder stats response:', { success: result.success, hasData: !!result.data, stats: statsData });
         setStats(statsData);
       } else {
         // Fallback to empty stats if API fails
@@ -93,7 +96,9 @@ export default function PatientReminderPage() {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const patient = await response.json();
+        const result = await response.json();
+        const patient = result.data || result; // Unwrap createApiHandler response
+        logger.info('👤 Patient data response:', { success: result.success, hasData: !!result.data, name: patient.name });
         setPatientName(patient.name);
         const allowed =
           patient.verificationStatus === "VERIFIED" &&
@@ -118,8 +123,21 @@ export default function PatientReminderPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setCompletedReminders(data);
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+
+        // Ensure data is an array, handle empty objects or invalid responses
+        const remindersArray = Array.isArray(data) ? data : [];
+
+        logger.info('✅ Completed reminders response:', {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          count: remindersArray.length
+        });
+
+        setCompletedReminders(remindersArray);
       } else {
         setCompletedReminders([]);
       }
@@ -317,19 +335,15 @@ export default function PatientReminderPage() {
 
           {/* Statistics Section */}
           {(() => {
-            // Calculate compliance stats from completed reminders
-            const taken = completedReminders.filter(
-              (r: CompletedReminder) => r.confirmationStatus === 'CONFIRMED'
-            ).length;
-            const notTaken = completedReminders.filter(
-              (r: CompletedReminder) => r.confirmationStatus !== 'CONFIRMED'
-            ).length;
-            const total = taken + notTaken;
+            // Use stats to calculate compliance and factor in manual confirmations
+            const taken = stats.selesai || 0;
+            const notTaken = stats.perluDiperbarui || 0;
+            const denominator = taken + notTaken;
             const complianceRate =
-              total > 0 ? Math.round((taken / total) * 100) : 0;
+              denominator > 0 ? Math.round((taken / denominator) * 100) : 0;
 
             return (
-              total > 0 && (
+              denominator > 0 && (
                 <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
                   <h3 className="font-semibold text-gray-900 mb-3">
                     Statistik Kepatuhan

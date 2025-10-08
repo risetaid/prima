@@ -6,6 +6,14 @@ import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
 import { logger } from '@/lib/logger';
+interface ReminderData {
+  id: string;
+  manuallyConfirmed?: boolean;
+  confirmationStatus?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
 interface AllReminder {
   id: string;
   scheduledTime: string;
@@ -13,6 +21,8 @@ interface AllReminder {
   customMessage?: string;
   status: "scheduled" | "pending" | "completed_taken" | "completed_not_taken";
   confirmationStatus?: "CONFIRMED" | "MISSED" | "PENDING";
+  manuallyConfirmed?: boolean;
+  originalStatus?: string;
 }
 
 
@@ -37,25 +47,62 @@ export default function AllRemindersPage() {
       const allResponse = await fetch(
         `/api/patients/${patientId}/reminders?filter=all`
       );
-      const allData = allResponse.ok
+      const allResult = allResponse.ok
         ? await allResponse.json()
-        : { reminders: [] };
+        : { success: false, data: { reminders: [] } };
 
-      // Extract reminders array from the response
+      // Unwrap createApiHandler response and extract reminders array
+      const allData = allResult.data || allResult;
       const remindersData = allData.reminders || [];
 
-      // Transform to unified format
-      const allReminders = remindersData.map((r: AllReminder) => {
-        // Determine status based on reminder properties
-        if (r.confirmationStatus) {
-          return {
-            ...r,
-            status: r.confirmationStatus === 'CONFIRMED' ? "completed_taken" :
-                    r.confirmationStatus === 'MISSED' ? "completed_not_taken" :
-                    r.confirmationStatus === 'PENDING' ? "completed_not_taken" : "completed_not_taken",
-          };
+      logger.info('📋 All reminders response:', {
+        success: allResult.success,
+        hasData: !!allResult.data,
+        remindersCount: Array.isArray(remindersData) ? remindersData.length : 'not-array'
+      });
+
+      const allReminders = remindersData.map((reminder: ReminderData) => {
+        const manuallyConfirmed = Boolean(reminder.manuallyConfirmed);
+        const confirmationStatus = reminder.confirmationStatus as AllReminder["confirmationStatus"] | undefined;
+        const status = reminder.status as string | undefined;
+
+        let mappedStatus: AllReminder["status"] = "scheduled";
+
+        if (confirmationStatus === 'CONFIRMED' || manuallyConfirmed) {
+          mappedStatus = "completed_taken";
+        } else if (confirmationStatus === 'MISSED') {
+          mappedStatus = "completed_not_taken";
+        } else if (status && ['SENT', 'DELIVERED'].includes(status) && !manuallyConfirmed) {
+          mappedStatus = "pending";
+        } else if (status && ['PENDING', 'FAILED'].includes(status)) {
+          mappedStatus = "scheduled";
         }
-        return { ...r, status: "all" };
+
+        const rawDate =
+          reminder.reminderDate ||
+          reminder.sentAt ||
+          reminder.startDate ||
+          null;
+
+        const normalizedDate = (() => {
+          if (!rawDate) return "";
+          if (typeof rawDate === "string") {
+            return rawDate.includes("T") ? rawDate.split("T")[0] : rawDate;
+          }
+          if (rawDate instanceof Date) {
+            return rawDate.toISOString().split("T")[0];
+          }
+          return "";
+        })();
+
+        return {
+          ...reminder,
+          status: mappedStatus,
+          confirmationStatus,
+          manuallyConfirmed,
+          originalStatus: status,
+          reminderDate: normalizedDate,
+        } as AllReminder;
       });
 
       setReminders(allReminders);

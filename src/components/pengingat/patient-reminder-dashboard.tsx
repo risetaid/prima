@@ -26,6 +26,12 @@ interface PendingReminderResponse {
   scheduledTime?: string;
   reminderDate?: string;
   customMessage?: string;
+  status?: string;
+  confirmationStatus?: string;
+  confirmationResponse?: string;
+  confirmationResponseAt?: string;
+  confirmationSentAt?: string;
+  manuallyConfirmed?: boolean;
 }
 
 interface CompletedReminderResponse {
@@ -35,6 +41,7 @@ interface CompletedReminderResponse {
   customMessage?: string;
   confirmationStatus?: string;
   confirmedAt?: string;
+  manuallyConfirmed?: boolean;
 }
 
 interface PatientReminderDashboardProps {
@@ -82,7 +89,9 @@ export function PatientReminderDashboard({
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        const statsData = await response.json();
+        const result = await response.json();
+        const statsData = result.data || result; // Unwrap createApiHandler response
+        logger.info('📊 Dashboard stats response:', { success: result.success, hasData: !!result.data, stats: statsData });
         setStats(statsData);
       } else {
         logger.error("Stats API error", undefined, {
@@ -109,9 +118,21 @@ export function PatientReminderDashboard({
       );
 
       if (response.ok) {
-        const data = await response.json();
-        logger.info("Scheduled reminders data:", data);
-        const mappedData = data.map((item: ScheduledReminderResponse) => ({
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+
+        // Ensure data is an array, handle empty objects or invalid responses
+        const dataArray = Array.isArray(data) ? data : [];
+
+        logger.info("Scheduled reminders data:", {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          count: dataArray.length
+        });
+
+        const mappedData = dataArray.map((item: ScheduledReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate: item.reminderDate || item.nextReminderDate || new Date().toISOString().split("T")[0],
@@ -147,14 +168,38 @@ export function PatientReminderDashboard({
       );
 
       if (response.ok) {
-        const data = await response.json();
-        logger.info("Pending reminders data:", data);
-        const mappedData = data.map((item: PendingReminderResponse) => ({
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+
+        // Ensure data is an array, handle empty objects or invalid responses
+        const dataArray = Array.isArray(data) ? data : [];
+
+        logger.info("Pending reminders data:", {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          count: dataArray.length,
+          sampleData: dataArray.slice(0, 2).map(item => ({
+            id: item.id,
+            hasReminderDate: !!item.reminderDate,
+            hasScheduledTime: !!item.scheduledTime,
+            hasCustomMessage: !!item.customMessage,
+            confirmationStatus: item.confirmationStatus
+          }))
+        });
+
+        const mappedData = dataArray.map((item: PendingReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate: item.reminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "pending",
+          confirmationStatus: item.confirmationStatus,
+          confirmationResponse: item.confirmationResponse,
+          confirmationResponseAt: item.confirmationResponseAt,
+          confirmationSentAt: item.confirmationSentAt,
+          manuallyConfirmed: Boolean(item.manuallyConfirmed),
         }));
         setPerluDiperbaruiReminders(mappedData);
       } else {
@@ -184,9 +229,21 @@ export function PatientReminderDashboard({
       );
 
       if (response.ok) {
-        const data = await response.json();
-        logger.info("Completed reminders data:", data);
-        const mappedData = data.map((item: CompletedReminderResponse) => ({
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+
+        // Ensure data is an array, handle empty objects or invalid responses
+        const dataArray = Array.isArray(data) ? data : [];
+
+        logger.info("Completed reminders data:", {
+          success: result.success,
+          hasData: !!result.data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          count: dataArray.length
+        });
+
+        const mappedData = dataArray.map((item: CompletedReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
           reminderDate:
@@ -195,6 +252,7 @@ export function PatientReminderDashboard({
           status: "completed",
           confirmationStatus: item.confirmationStatus,
           confirmedAt: item.confirmedAt,
+          manuallyConfirmed: Boolean((item as { manuallyConfirmed?: boolean }).manuallyConfirmed),
         }));
         setSelesaiReminders(mappedData);
       } else {

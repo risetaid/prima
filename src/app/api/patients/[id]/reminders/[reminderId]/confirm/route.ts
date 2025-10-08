@@ -45,23 +45,18 @@ export const PUT = createApiHandler(
     const { id, reminderId: rawReminderId } = params!;
     logger.info("📋 URL params:", { patientId: id, rawReminderId });
 
-    // The reminderId is already a clean UUID from the pending reminders API
     const reminderId = rawReminderId;
+    const effectiveReminderId = reminderLogId || reminderId;
 
-    // The reminderLogId should already be a clean UUID
-    const extractedLogId = reminderLogId || reminderId;
-
-    const logId = extractedLogId;
     logger.info("🔍 Processed IDs:", {
       patientId: id,
-      rawReminderId,
       reminderId,
-      logId,
+      effectiveReminderId,
       confirmed,
     });
 
     // Get the reminder using separate queries
-    logger.info("🔍 Querying reminder:", { reminderId: logId, patientId: id });
+    logger.info("🔍 Querying reminder:", { reminderId: effectiveReminderId, patientId: id });
     const reminderData = await db
       .select({
         id: reminders.id,
@@ -70,7 +65,7 @@ export const PUT = createApiHandler(
         status: reminders.status,
       })
       .from(reminders)
-      .where(and(eq(reminders.id, logId), eq(reminders.patientId, id)))
+      .where(and(eq(reminders.id, effectiveReminderId), eq(reminders.patientId, id)))
       .limit(1);
 
     logger.info("📊 Reminder query result:", {
@@ -79,7 +74,7 @@ export const PUT = createApiHandler(
     });
 
     if (reminderData.length === 0) {
-      logger.error("❌ REMINDER NOT FOUND:", undefined, { reminderId: logId, patientId: id });
+      logger.error("❌ REMINDER NOT FOUND:", undefined, { reminderId: effectiveReminderId, patientId: id });
       throw new Error("Reminder not found");
     }
 
@@ -90,13 +85,13 @@ export const PUT = createApiHandler(
     // Reminder schedule details not needed for confirmation
 
     // Check if this Reminder is already manually confirmed
-    logger.info("🔍 Checking for existing manual confirmation:", { reminderId: logId });
+    logger.info("🔍 Checking for existing manual confirmation:", { reminderId: effectiveReminderId });
     const existingManualConfirmation = await db
       .select({
         id: manualConfirmations.id,
       })
       .from(manualConfirmations)
-      .where(eq(manualConfirmations.reminderId, logId))
+      .where(eq(manualConfirmations.reminderId, effectiveReminderId))
       .limit(1);
 
     logger.info("📊 Existing manual confirmation check:", {
@@ -106,14 +101,14 @@ export const PUT = createApiHandler(
 
     if (existingManualConfirmation.length > 0) {
       logger.error("❌ REMINDER ALREADY MANUALLY CONFIRMED:", undefined, {
-        logId,
+        reminderId: effectiveReminderId,
         existingId: existingManualConfirmation[0].id,
       });
       throw new Error("Reminder already manually confirmed by volunteer");
     }
 
     // Check for automated confirmation conflict
-    logger.info("🔍 Checking for automated confirmation conflict:", { reminderId: logId });
+    logger.info("🔍 Checking for automated confirmation conflict:", { reminderId: effectiveReminderId });
     const confirmationData = await db
       .select({
         confirmationStatus: reminders.confirmationStatus,
@@ -121,7 +116,7 @@ export const PUT = createApiHandler(
         confirmationResponseAt: reminders.confirmationResponseAt,
       })
       .from(reminders)
-      .where(eq(reminders.id, logId))
+      .where(eq(reminders.id, effectiveReminderId))
       .limit(1);
 
     const automatedConfirmation = confirmationData[0];
@@ -136,7 +131,7 @@ export const PUT = createApiHandler(
       automatedConfirmation.confirmationStatus !== "PENDING"
     ) {
       logger.error("❌ AUTOMATED CONFIRMATION CONFLICT:", undefined, {
-        logId,
+        reminderId: effectiveReminderId,
         automatedStatus: automatedConfirmation.confirmationStatus,
         automatedResponse: automatedConfirmation.confirmationResponse,
       });
@@ -151,7 +146,7 @@ export const PUT = createApiHandler(
     logger.info("💾 Creating manual confirmation:", {
       patientId: id,
       volunteerId: user!.id,
-      reminderLogId: logId,
+      reminderLogId: effectiveReminderId,
       confirmed,
     });
 
@@ -161,7 +156,7 @@ export const PUT = createApiHandler(
         .values({
           patientId: id,
           volunteerId: user!.id,
-          reminderId: logId, // Link to specific Reminder
+          reminderId: effectiveReminderId, // Link to specific Reminder
           visitDate: new Date(),
           visitTime: new Date().toTimeString().slice(0, 5), // HH:MM format
           patientCondition: "FAIR", // Default, could be made dynamic

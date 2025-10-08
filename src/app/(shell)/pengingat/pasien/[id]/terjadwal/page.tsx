@@ -77,8 +77,11 @@ export default function ScheduledRemindersPage() {
         `/api/patients/${patientId}/reminders?filter=scheduled`
       );
       if (response.ok) {
-        const data = await response.json();
-        setReminders(data);
+        const result = await response.json();
+        const data = result.data || result; // Unwrap createApiHandler response
+        logger.info('📅 Scheduled reminders response:', { success: result.success, hasData: !!result.data, count: Array.isArray(data) ? data.length : 'not-array' });
+        const normalized = Array.isArray(data) ? data : [];
+        setReminders(normalized);
       } else {
         logger.error("Failed to fetch scheduled reminders");
         setReminders([]);

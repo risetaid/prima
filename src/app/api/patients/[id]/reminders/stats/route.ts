@@ -50,6 +50,11 @@ export const GET = createApiHandler(
 
 
 
+    // Status contract (aligned with UI lists):
+    // - Selesai      : confirmationStatus === 'CONFIRMED' OR manual confirmation exists
+    // - Perlu Update : status in ('SENT','DELIVERED') AND confirmationStatus in ('PENDING','MISSED', null) AND no manual confirmation
+    // - Terjadwal    : everything else (includes 'PENDING', 'FAILED' until we introduce a dedicated "Gagal" column)
+
     // Get all active reminders for patient
     const allReminders = await db
       .select({
@@ -67,16 +72,20 @@ export const GET = createApiHandler(
         )
       );
 
-    // Get manual confirmations
-    const reminderIds = allReminders.map(r => r.id);
-    const confirmations = reminderIds.length > 0
-      ? await db
-          .select({ reminderId: manualConfirmations.reminderId })
-          .from(manualConfirmations)
-          .where(inArray(manualConfirmations.reminderId, reminderIds))
-      : [];
+    // Fetch manual confirmations for the same reminder ids so they can be
+    // considered part of the "completed" bucket without mutating reminder rows
+    const reminderIds = allReminders.map((reminder) => reminder.id)
+    const manualConfirmationsByReminder =
+      reminderIds.length > 0
+        ? await db
+            .select({ reminderId: manualConfirmations.reminderId })
+            .from(manualConfirmations)
+            .where(inArray(manualConfirmations.reminderId, reminderIds))
+        : []
 
-    const confirmedReminderIds = new Set(confirmations.map(c => c.reminderId));
+    const manuallyConfirmedIds = new Set(
+      manualConfirmationsByReminder.map((entry) => entry.reminderId)
+    )
 
     // Simple categorization logic
     let terjadwal = 0;
@@ -84,17 +93,17 @@ export const GET = createApiHandler(
     let selesai = 0;
 
     for (const reminder of allReminders) {
-      // Selesai: confirmed OR manually confirmed
-      if (
-        reminder.confirmationStatus === 'CONFIRMED' ||
-        confirmedReminderIds.has(reminder.id)
-      ) {
+      const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id)
+
+      // Selesai: automated confirmation or manual confirmation entry
+      if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
         selesai++;
       }
-      // Perlu Diperbarui: sent but no confirmation
+      // Perlu Diperbarui: sent/delivered but not confirmed
       else if (
-        reminder.status === 'SENT' ||
-        reminder.status === 'DELIVERED'
+        (reminder.status === 'SENT' || reminder.status === 'DELIVERED') &&
+        (reminder.confirmationStatus === 'PENDING' || reminder.confirmationStatus === 'MISSED' || reminder.confirmationStatus === null) &&
+        !isManuallyConfirmed
       ) {
         perluDiperbarui++;
       }
