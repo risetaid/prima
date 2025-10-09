@@ -81,13 +81,33 @@ export function ContentSelector({
 
       const data = await response.json()
       if (data.success) {
+        // Handle the double-wrapped response structure
+        let contentArray = data.data
+        
+        // Check if data.data is an array, if not, try to find the array in the response
+        if (!Array.isArray(contentArray)) {
+          // The response is double-wrapped, so we need to access data.data.data
+          if (data.data && Array.isArray(data.data.data)) {
+            contentArray = data.data.data
+          } else {
+            logger.error('ContentSelector: Invalid response format - could not find content array', new Error('Invalid response format'), { data })
+            setError('Invalid response format: content array not found')
+            return
+          }
+        }
+        
         if (reset) {
-          setContent(data.data)
+          setContent(contentArray)
           setPage(1)
         } else {
-          setContent(prev => [...prev, ...data.data])
+          setContent(prev => [...prev, ...contentArray])
         }
-        setHasMore(data.pagination.hasMore)
+        
+        // Handle pagination - it might be in data.pagination or data.data.pagination
+        const pagination = data.pagination || (data.data && data.data.pagination)
+        if (pagination && pagination.hasMore !== undefined) {
+          setHasMore(pagination.hasMore)
+        }
       } else {
         setError(data.error || 'Failed to fetch content')
       }

@@ -126,7 +126,6 @@ export const GET = createApiHandler(
       logger.info('Statistics-only response', { statistics });
 
       return {
-        success: true,
         data: [],
         statistics
       };
@@ -343,42 +342,6 @@ export const GET = createApiHandler(
       })
       .slice(0, Number(limit));
 
-    // Build response
-    interface EnhancedResponse {
-      success: boolean;
-      data: UnifiedContent[];
-      statistics?: object;
-      pagination?: object;
-      filters?: object;
-      enhancedTemplates?: {
-        id: string;
-        name: string;
-        category: string;
-        template: string;
-        variables: string[];
-        description: string;
-      }[];
-      availableArticles?: {
-        id: string;
-        title: string;
-        slug: string;
-        category: string;
-        url: string;
-        type: 'article';
-        excerpt: string;
-      }[];
-      availableVideos?: {
-        id: string;
-        title: string;
-        slug: string;
-        category: string;
-        url: string;
-        type: 'video';
-        description: string;
-      }[];
-    }
-
-    let response: EnhancedResponse;
 
     if (isEnhanced) {
       // For enhanced templates, return data in ContentSelector expected format
@@ -474,21 +437,15 @@ export const GET = createApiHandler(
         description: video.description || ''
       }));
 
-      response = {
-        success: true,
+      return {
         data: combinedContent,
         enhancedTemplates,
         availableArticles,
         availableVideos
       };
-    } else {
-      response = {
-        success: true,
-        data: combinedContent,
-      };
     }
 
-    // Add pagination for non-admin requests
+    // Add pagination for public requests
     if (isPublic) {
       // Get total counts for pagination
       const [totalArticlesResult, totalVideosResult] = await Promise.all([
@@ -503,8 +460,8 @@ export const GET = createApiHandler(
       const totalCount = (totalArticlesResult[0]?.count || 0) + (totalVideosResult[0]?.count || 0);
       const hasMore = offset + Number(limit) < Number(totalCount);
 
-      response = {
-        ...response,
+      const response = {
+        data: combinedContent,
         pagination: {
           page,
           limit,
@@ -521,6 +478,23 @@ export const GET = createApiHandler(
 
       // Cache the response for 15 minutes
       await set(`published-content:${page}:${limit}:${search}:${category}:${type}`, response, CACHE_TTL.PATIENT);
+
+      logger.info('CMS content retrieved successfully', {
+        api: true,
+        cms: true,
+        content: true,
+        isPublic,
+        userRole: user?.role,
+        itemCount: combinedContent.length,
+        articlesCount: articles.length,
+        videosCount: videos.length,
+        type,
+        status: effectiveStatus,
+        limit,
+        responseDataLength: response.data.length
+      });
+
+      return response;
     } else {
       // Add statistics for admin requests
       let stats;
@@ -540,7 +514,7 @@ export const GET = createApiHandler(
         stats = [[], [], [], [], [], []];
       }
 
-      response.statistics = {
+      const statistics = {
         articles: {
           total: stats[0][0]?.count || 0,
           published: stats[1][0]?.count || 0,
@@ -557,24 +531,27 @@ export const GET = createApiHandler(
           draft: (stats[2][0]?.count || 0) + (stats[5][0]?.count || 0),
         },
       };
+
+      logger.info('CMS content retrieved successfully', {
+        api: true,
+        cms: true,
+        content: true,
+        isPublic,
+        userRole: user?.role,
+        itemCount: combinedContent.length,
+        articlesCount: articles.length,
+        videosCount: videos.length,
+        type,
+        status: effectiveStatus,
+        limit,
+        responseDataLength: combinedContent.length
+      });
+
+      return {
+        data: combinedContent,
+        statistics
+      };
     }
-
-    logger.info('CMS content retrieved successfully', {
-      api: true,
-      cms: true,
-      content: true,
-      isPublic,
-      userRole: user?.role,
-      itemCount: combinedContent.length,
-      articlesCount: articles.length,
-      videosCount: videos.length,
-      type,
-      status: effectiveStatus,
-      limit,
-      responseDataLength: response.data.length
-    });
-
-    return response;
 
   }
 );
