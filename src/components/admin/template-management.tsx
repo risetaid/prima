@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { logger } from '@/lib/logger'
+import { handleApiError, handleApiSuccess } from '@/lib/error-handler'
 import { ConfirmationModal } from '@/components/ui/confirmation-modal'
 import { TemplateActions } from '@/components/admin/TemplateActions'
 import { TemplateList } from '@/components/admin/TemplateList'
@@ -68,11 +69,10 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
           responseData: data,
           apiResponse: result
         })
-        toast.error('Failed to fetch templates')
+        handleApiError(result, 'Failed to fetch templates')
       }
     } catch (error) {
-      logger.error('Error fetching templates', error as Error)
-      toast.error('Failed to fetch templates')
+      handleApiError(error instanceof Error ? error : new Error(String(error)), 'Failed to fetch templates')
     } finally {
       setLoading(false)
     }
@@ -140,17 +140,16 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
 
       logger.info('Template creation response:', { success: result.success, hasData: !!result.data, template: data.template })
 
-      if (response.ok) {
-        toast.success('Template berhasil dibuat')
+      if (response.ok && result.success) {
+        handleApiSuccess('Template berhasil dibuat')
         setIsCreateDialogOpen(false)
         resetForm()
         fetchTemplates()
       } else {
-        toast.error(data.error || result.error || 'Failed to create template')
+        handleApiError(result, 'Failed to create template')
       }
     } catch (error) {
-      logger.error('Error creating template', error as Error)
-      toast.error('Failed to create template')
+      handleApiError(error instanceof Error ? error : new Error(String(error)), 'Failed to create template')
     } finally {
       setActionLoading(null)
     }
@@ -175,18 +174,17 @@ export default function TemplateManagement({ onSeedTemplates, seeding }: Templat
 
       logger.info('Template update response:', { success: result.success, hasData: !!result.data, template: data.template })
 
-      if (response.ok) {
-        toast.success('Template berhasil diperbarui')
+      if (response.ok && result.success) {
+        handleApiSuccess('Template berhasil diperbarui')
         setIsEditDialogOpen(false)
         setSelectedTemplate(null)
         resetForm()
         fetchTemplates()
       } else {
-        toast.error(data.error || result.error || 'Failed to update template')
+        handleApiError(result, 'Failed to update template')
       }
     } catch (error) {
-      logger.error('Error updating template', error as Error)
-      toast.error('Failed to update template')
+      handleApiError(error instanceof Error ? error : new Error(String(error)), 'Failed to update template')
     } finally {
       setActionLoading(null)
     }

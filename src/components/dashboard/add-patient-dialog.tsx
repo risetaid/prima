@@ -6,35 +6,9 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { logger } from '@/lib/logger'
 import { IndonesianDateInput } from '@/components/ui/indonesian-date-input'
-
-type CancerStageOption = '' | 'I' | 'II' | 'III' | 'IV'
-
-interface PatientFormData {
-  name: string
-  phoneNumber: string
-  address: string
-  birthDate: string
-  diagnosisDate: string
-  cancerStage: CancerStageOption
-  emergencyContactName: string
-  emergencyContactPhone: string
-  notes: string
-}
-
-interface CreatePatientPayload {
-  name: string
-  phoneNumber: string
-  address?: string
-  birthDate?: string
-  diagnosisDate?: string
-  cancerStage?: 'I' | 'II' | 'III' | 'IV'
-  emergencyContactName?: string
-  emergencyContactPhone?: string
-  notes?: string
-  photoUrl?: string
-}
+import { apiClient, getApiErrorMessage } from '@/lib/api-client'
+import type { CancerStage, CreatePatientDTO, PatientFormData } from '@/types/api'
 
 interface AddPatientDialogProps {
   isOpen: boolean
@@ -50,6 +24,8 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
     birthDate: '',
     diagnosisDate: '',
     cancerStage: '',
+    doctorName: '',
+    hospitalName: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
     notes: '',
@@ -99,6 +75,7 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         const photoFormData = new FormData()
         photoFormData.append('photo', photoFile)
         
+        // Use fetch directly for FormData upload (apiClient is for JSON)
         const photoResponse = await fetch('/api/upload?type=patient-photo', {
           method: 'POST',
           body: photoFormData,
@@ -106,20 +83,22 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
 
         if (photoResponse.ok) {
           const photoResult = await photoResponse.json()
-          const photoData = photoResult.data || photoResult
-          photoUrl = photoData.url
+          // Handle both wrapped and unwrapped responses
+          photoUrl = photoResult.data?.url || photoResult.url
+        } else {
+          toast.error('Gagal mengunggah foto')
         }
       }
 
-      const payload: CreatePatientPayload = {
+      const payload: CreatePatientDTO = {
         name: trimmedName,
         phoneNumber: trimmedPhone,
       }
 
       if (formData.address.trim()) payload.address = formData.address.trim()
-      if (formData.birthDate) payload.birthDate = formData.birthDate
-      if (formData.diagnosisDate) payload.diagnosisDate = formData.diagnosisDate
-      if (formData.cancerStage) payload.cancerStage = formData.cancerStage
+      if (formData.birthDate) payload.birthDate = new Date(formData.birthDate)
+      if (formData.diagnosisDate) payload.diagnosisDate = new Date(formData.diagnosisDate)
+      if (formData.cancerStage) payload.cancerStage = formData.cancerStage as CancerStage
       if (formData.emergencyContactName.trim())
         payload.emergencyContactName = formData.emergencyContactName.trim()
       if (formData.emergencyContactPhone.trim())
@@ -127,7 +106,8 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
       if (formData.notes.trim()) payload.notes = formData.notes.trim()
       if (photoUrl) payload.photoUrl = photoUrl
 
-      const response = await fetch('/api/patients', {
+      // Use new apiClient for type-safe API calls
+      const result = await apiClient('/api/patients', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -135,20 +115,18 @@ export default function AddPatientDialog({ isOpen, onClose, onSuccess }: AddPati
         body: JSON.stringify(payload),
       })
 
-      if (response.ok) {
+      if (result.success) {
         toast.success('Pasien berhasil ditambahkan')
         resetForm()
         onClose()
         if (onSuccess) onSuccess()
       } else {
-        const errorBody = await response.json().catch(() => ({ error: 'Terjadi kesalahan' }))
+        const errorMessage = getApiErrorMessage(result)
         toast.error('Gagal menambahkan pasien', {
-          description: errorBody?.error || 'Terjadi kesalahan pada server',
+          description: errorMessage,
         })
-        logger.warn('Failed to add patient via modal', { status: response.status })
       }
-    } catch (error) {
-      logger.error('Error adding patient via modal', error as Error)
+    } catch {
       toast.error('Kesalahan jaringan', {
         description: 'Tidak dapat menambahkan pasien. Periksa koneksi internet Anda.',
       })

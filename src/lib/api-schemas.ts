@@ -83,7 +83,22 @@ export const updateUserBodySchema = z.object({
  */
 export const createPatientBodySchema = z.object({
   name: z.string().min(1, "Name is required"),
-  phoneNumber: z.string().regex(/^62\d{9,12}$/, "Invalid Indonesian phone number"),
+  phoneNumber: z.string()
+    .min(1, "Phone number is required")
+    .transform((val) => {
+      // Normalize phone number: 0xxx -> 62xxx
+      let normalized = val.replace(/\D/g, ''); // Remove non-digits
+      if (normalized.startsWith('0')) {
+        normalized = '62' + normalized.slice(1);
+      } else if (normalized.startsWith('+62')) {
+        normalized = normalized.slice(1);
+      }
+      return normalized;
+    })
+    .refine(
+      (val) => /^62\d{9,12}$/.test(val),
+      "Invalid Indonesian phone number format"
+    ),
   address: z.string().optional(),
   birthDate: dateStringSchema.optional(),
   diagnosisDate: dateStringSchema.optional(),
@@ -97,7 +112,22 @@ export const createPatientBodySchema = z.object({
 
 export const updatePatientBodySchema = z.object({
   name: z.string().min(1, "Name is required").optional(),
-  phoneNumber: z.string().regex(/^62\d{9,12}$/, "Invalid Indonesian phone number").optional(),
+  phoneNumber: z.string()
+    .transform((val) => {
+      // Normalize phone number: 0xxx -> 62xxx
+      let normalized = val.replace(/\D/g, ''); // Remove non-digits
+      if (normalized.startsWith('0')) {
+        normalized = '62' + normalized.slice(1);
+      } else if (normalized.startsWith('+62')) {
+        normalized = normalized.slice(1);
+      }
+      return normalized;
+    })
+    .refine(
+      (val) => /^62\d{9,12}$/.test(val),
+      "Invalid Indonesian phone number format"
+    )
+    .optional(),
   address: z.string().optional(),
   birthDate: dateStringSchema.optional(),
   diagnosisDate: dateStringSchema.optional(),
@@ -372,3 +402,30 @@ export const schemas = {
 };
 
 export default schemas;
+
+// ===== INFERRED TYPES FROM SCHEMAS =====
+// Export types inferred from Zod schemas for use in components and services
+
+export type CreatePatientInput = z.infer<typeof createPatientBodySchema>;
+export type UpdatePatientInput = z.infer<typeof updatePatientBodySchema>;
+
+export type CreateReminderInput = z.infer<typeof createReminderBodySchema>;
+export type UpdateReminderInput = z.infer<typeof updateReminderBodySchema>;
+export type DeleteRemindersInput = z.infer<typeof deleteRemindersBodySchema>;
+export type ConfirmReminderInput = z.infer<typeof confirmReminderBodySchema>;
+
+export type CreateArticleInput = z.infer<typeof createArticleBodySchema>;
+export type UpdateArticleInput = z.infer<typeof updateArticleBodySchema>;
+
+export type CreateVideoInput = z.infer<typeof createVideoBodySchema>;
+export type UpdateVideoInput = z.infer<typeof updateVideoBodySchema>;
+
+export type CreateTemplateInput = z.infer<typeof createTemplateBodySchema>;
+export type UpdateTemplateInput = z.infer<typeof updateTemplateBodySchema>;
+
+export type CreateUserInput = z.infer<typeof createUserBodySchema>;
+export type UpdateUserInput = z.infer<typeof updateUserBodySchema>;
+
+export type PaginationInput = z.infer<typeof paginationSchema>;
+export type PatientListQuery = z.infer<typeof patientListQuerySchema>;
+export type ReminderListQuery = z.infer<typeof reminderListQuerySchema>;

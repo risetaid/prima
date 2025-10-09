@@ -64,6 +64,13 @@
       "when": 1759449636253,
       "tag": "0008_funny_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1759940019217,
+      "tag": "0009_wet_iron_lad",
+      "breakpoints": true
     }
   ]
 }

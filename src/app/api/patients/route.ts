@@ -15,22 +15,9 @@
 import { createApiHandler } from "@/lib/api-helpers";
 import { PatientService } from "@/services/patient/patient.service";
 import type { PatientFilters } from "@/services/patient/patient.types";
-import { ValidationError } from "@/services/patient/patient.types";
 import { invalidateAllDashboardCaches } from "@/lib/cache";
+import { schemas } from "@/lib/api-schemas";
 
-interface CreatePatientBody {
-  name: string;
-  phoneNumber: string;
-  address?: string;
-  birthDate?: string;
-  diagnosisDate?: string;
-  cancerStage?: 'I' | 'II' | 'III' | 'IV' | null;
-  emergencyContactName?: string;
-  emergencyContactPhone?: string;
-  notes?: string;
-  photoUrl?: string;
-  assignedVolunteerId?: string;
-}
 
 // GET /api/patients - List patients with compliance rates
 export const GET = createApiHandler(
@@ -63,18 +50,16 @@ export const GET = createApiHandler(
 export const POST = createApiHandler(
   {
     auth: "required",
+    body: schemas.createPatient, // Use centralized Zod schema for validation
   },
-  async (body: CreatePatientBody, { user }) => {
-    // Validate required fields
-    if (!body.name || body.name.trim() === "") {
-      throw new ValidationError("Name is required");
-    }
-    if (!body.phoneNumber || body.phoneNumber.trim() === "") {
-      throw new ValidationError("Phone number is required");
-    }
-
+  async (body, { user }) => {
+    // Validation is handled automatically by createApiHandler
+    // Body is typed as the validated schema output
     const service = new PatientService();
-    const result = await service.createPatient(body, { id: user!.id, role: user!.role });
+    const result = await service.createPatient(body as Parameters<typeof service.createPatient>[0], { 
+      id: user!.id, 
+      role: user!.role 
+    });
     
     // Invalidate dashboard caches since patient list changed (Phase 4 optimization)
     await invalidateAllDashboardCaches();

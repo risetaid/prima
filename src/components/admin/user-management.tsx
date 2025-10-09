@@ -8,20 +8,13 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
-import { logger } from "@/lib/logger";
+import { apiClient, getApiErrorMessage } from "@/lib/api-client";
 import UserList from "@/components/admin/UserList";
+import type { User, UserRole } from "@/types/api";
 
-interface User {
-  id: string;
-  clerkId: string;
-  email: string;
-  firstName: string | null;
-  lastName: string | null;
-  role: "DEVELOPER" | "ADMIN" | "RELAWAN";
-  isActive: boolean;
-  isApproved: boolean;
-  createdAt: string;
-  approvedAt: string | null;
+// Extended User type for admin display with approver info
+interface UserWithApprover extends Omit<User, 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'deletedAt'> {
+  createdAt: string | Date;
   approver?: {
     firstName: string | null;
     lastName: string | null;
@@ -32,8 +25,8 @@ interface User {
 
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<UserWithApprover[]>([]);
+  const [currentUser, setCurrentUser] = useState<UserWithApprover | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -41,21 +34,26 @@ export default function UserManagement() {
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const [usersResponse, profileResponse] = await Promise.all([
-        fetch("/api/admin/users"),
-        fetch("/api/user/profile"),
+      const [usersResult, profileResult] = await Promise.all([
+        apiClient<{ users: UserWithApprover[]; pagination: unknown; pendingCount: number }>("/api/admin/users"),
+        apiClient<UserWithApprover>("/api/user/profile"),
       ]);
 
-      const usersData = await usersResponse.json();
-      const profileData = await profileResponse.json();
+      if (usersResult.success && usersResult.data) {
+        setUsers(usersResult.data.users);
+      } else {
+        toast.error("Failed to fetch users", {
+          description: getApiErrorMessage(usersResult)
+        });
+      }
 
-      if (usersData.success) setUsers(usersData.users);
-      else toast.error("Failed to fetch users");
-
-      if (profileResponse.ok && profileData.id) setCurrentUser(profileData);
-    } catch (error) {
-      logger.error("Error fetching users", error as Error);
-      toast.error("Failed to fetch users");
+      if (profileResult.success && profileResult.data) {
+        setCurrentUser(profileResult.data);
+      }
+    } catch {
+      toast.error("Failed to fetch users", {
+        description: "Network error occurred"
+      });
     } finally {
       setLoading(false);
     }
@@ -70,22 +68,24 @@ export default function UserManagement() {
   ) => {
     try {
       setActionLoading(userId);
-      const response = await fetch(endpoint, {
+      const result = await apiClient<{ success: boolean; error?: string }>(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: body ? JSON.stringify(body) : undefined,
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (result.success) {
         toast.success(successMessage);
         fetchUsers();
       } else {
-        toast.error(data.error || errorMessage);
+        toast.error(errorMessage, {
+          description: getApiErrorMessage(result)
+        });
       }
-    } catch (error) {
-      logger.error(`Error: ${errorMessage}`, error as Error);
-      toast.error(errorMessage);
+    } catch {
+      toast.error(errorMessage, {
+        description: "Network error occurred"
+      });
     } finally {
       setActionLoading(null);
     }
@@ -107,13 +107,13 @@ export default function UserManagement() {
       "Failed to update user status"
     ), [performUserAction]);
 
-  const toggleUserRole = useCallback((user: User, currentRole: User["role"]) => {
+  const toggleUserRole = useCallback((user: UserWithApprover, currentRole: UserRole) => {
     if (currentUser?.id === user.id && currentRole === "DEVELOPER") {
       toast.error("Tidak dapat demote diri sendiri sebagai Developer");
       return;
     }
 
-    const roleHierarchy: Record<User["role"], User["role"]> = {
+    const roleHierarchy: Record<UserRole, UserRole> = {
       RELAWAN: "ADMIN",
       ADMIN: "DEVELOPER",
       DEVELOPER: "ADMIN",
@@ -129,7 +129,7 @@ export default function UserManagement() {
     );
   }, [currentUser, performUserAction]);
 
-  const demoteUserRole = useCallback((user: User, targetRole: "ADMIN" | "RELAWAN") => {
+  const demoteUserRole = useCallback((user: UserWithApprover, targetRole: "ADMIN" | "RELAWAN") => {
     if (currentUser?.id === user.id && user.role === "DEVELOPER") {
       toast.error("Tidak dapat demote diri sendiri sebagai Developer");
       return;
@@ -149,14 +149,15 @@ export default function UserManagement() {
 
     try {
       setSyncing(true);
-      const response = await fetch("/api/admin/sync-clerk", {
+      const result = await apiClient<{ 
+        results: { created: number; updated: number; reactivated: number; deactivated: number } 
+      }>("/api/admin/sync-clerk", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
 
-      const data = await response.json();
-      if (data.success) {
-        const { results } = data;
+      if (result.success && result.data) {
+        const { results } = result.data;
         const messages = [];
         if (results.created > 0) messages.push(`${results.created} user baru`);
         if (results.updated > 0) messages.push(`${results.updated} user diperbarui`);
@@ -167,10 +168,11 @@ export default function UserManagement() {
         toast.success("Sync Clerk berhasil", { description: `Sinkronisasi selesai: ${summary}` });
         fetchUsers();
       } else {
-        toast.error("Sync Clerk gagal", { description: data.error || "Terjadi kesalahan pada server" });
+        toast.error("Sync Clerk gagal", { 
+          description: getApiErrorMessage(result) 
+        });
       }
-    } catch (error) {
-      logger.error("Error syncing with Clerk", error as Error);
+    } catch {
       toast.error("Sync Clerk gagal", { description: "Terjadi kesalahan jaringan" });
     } finally {
       setSyncing(false);
