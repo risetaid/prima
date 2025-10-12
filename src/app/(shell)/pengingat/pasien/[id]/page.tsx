@@ -172,8 +172,9 @@ export default function PatientReminderPage() {
   };
 
   const handleModalSuccess = async () => {
-    // Refresh stats after successful reminder creation
+    // Refresh stats and reminders after successful reminder creation
     await fetchReminderStats();
+    await fetchCompletedReminders();
   };
 
   const handleStatusClick = (status: string) => {
