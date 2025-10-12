@@ -2,7 +2,7 @@
 // No complex conversation states - direct database lookup approach
 
 import { db, reminders } from "@/db";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc, gte, or } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
@@ -87,7 +87,12 @@ export class SimpleConfirmationService {
         .where(
           and(
             eq(reminders.patientId, patient.id),
-            eq(reminders.status, 'SENT'),
+            // Allow both SENT and DELIVERED status
+            // Fonnte may update status to DELIVERED before patient responds
+            or(
+              eq(reminders.status, 'SENT'),
+              eq(reminders.status, 'DELIVERED')
+            ),
             eq(reminders.confirmationStatus, 'PENDING'),
             gte(reminders.sentAt, yesterday)
           )
