@@ -59,7 +59,7 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
 
   const [formData, setFormData] = useState({
     message: "",
-    time: getCurrentTimeWIB(),
+    time: getCurrentTimeWIB().split(':')[0] + ':00',
   });
   const [selectedContent, setSelectedContent] = useState<ContentItem[]>([]);
 
@@ -81,7 +81,7 @@ export function useReminderForm(onSuccess: () => void, onClose: () => void) {
       // Reset form when opened
       setFormData({
         message: "",
-        time: getCurrentTimeWIB(),
+        time: getCurrentTimeWIB().split(':')[0] + ':00',
       });
       setSelectedDates([]);
       setCustomRecurrence({

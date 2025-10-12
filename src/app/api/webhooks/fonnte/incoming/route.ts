@@ -495,7 +495,6 @@ export const POST = createApiHandler(
             if (confirmationMatch === 'done') {
               await db.update(reminders)
                 .set({
-                  status: 'DELIVERED',
                   confirmationStatus: 'CONFIRMED',
                   confirmationResponse: message,
                   confirmationResponseAt: new Date()
@@ -644,7 +643,6 @@ export const POST = createApiHandler(
             // Update reminder as confirmed
             await db.update(reminders)
               .set({
-                status: 'DELIVERED',
                 confirmationStatus: 'CONFIRMED',
                 confirmationResponse: message,
                 confirmationResponseAt: new Date()
