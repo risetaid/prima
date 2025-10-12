@@ -18,6 +18,7 @@ interface AllReminder {
   id: string;
   scheduledTime: string;
   reminderDate: string;
+  message?: string;
   customMessage?: string;
   status: "scheduled" | "pending" | "completed_taken" | "completed_not_taken";
   confirmationStatus?: "CONFIRMED" | "MISSED" | "PENDING";
@@ -240,7 +241,7 @@ export default function AllRemindersPage() {
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h3 className="font-semibold mb-1">
-                              {reminder.customMessage ||
+                              {reminder.message || reminder.customMessage ||
                                 `Minum obat`}
                             </h3>
                             <p className="text-sm opacity-90">
@@ -295,7 +296,7 @@ export default function AllRemindersPage() {
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <h3 className="font-semibold mb-1">
-                                {reminder.customMessage ||
+                                {reminder.message || reminder.customMessage ||
                                   `Minum obat`}
                               </h3>
                               <p className="text-sm opacity-90">
@@ -357,7 +358,7 @@ export default function AllRemindersPage() {
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <h3 className="font-semibold mb-1">
-                                  {reminder.customMessage ||
+                                  {reminder.message || reminder.customMessage ||
                                     `Minum obat`}
                                 </h3>
                                 <p className="text-sm opacity-90">
