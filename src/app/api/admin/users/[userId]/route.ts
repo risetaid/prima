@@ -66,7 +66,7 @@ export const POST = createApiHandler(
     auth: "required",
     params: adminUserParamsSchema,
     query: userActionQuerySchema,
-    body: toggleRoleBodySchema.optional()
+    // Don't validate body at handler level - we'll do it conditionally
   },
   async (body, { user, params, query }) => {
     // Only admins and developers can manage users
@@ -109,10 +109,9 @@ export const POST = createApiHandler(
         return await handleReject(userId)
 
       case 'toggle-role':
-        if (!body) {
-          throw new Error('Role is required for toggle-role action')
-        }
-        return await handleToggleRole(userId, targetUser, (body as { role: string }).role)
+        // Validate role body only for toggle-role action
+        const parsedBody = toggleRoleBodySchema.parse(body);
+        return await handleToggleRole(userId, targetUser, parsedBody.role)
 
       case 'toggle-status':
         return await handleToggleStatus(userId, targetUser)

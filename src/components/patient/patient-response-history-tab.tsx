@@ -368,14 +368,7 @@ export default function PatientResponseHistoryTab({
 
       {/* History List */}
       {loading ? (
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
-              <span className="ml-2 text-gray-500">Memuat riwayat respon...</span>
-            </div>
-          </CardContent>
-        </Card>
+        null
       ) : error ? (
         <Card>
           <CardContent className="p-8">

@@ -113,7 +113,7 @@ export default function AdminTemplatesPage() {
           <header className="bg-white shadow-sm">
             <div className="flex items-center justify-between p-4">
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push('/admin')}
                 className="flex items-center text-gray-600 hover:text-gray-900"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
@@ -130,9 +130,6 @@ export default function AdminTemplatesPage() {
         {/* Main Content */}
         <main className="relative z-10">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            <div className="text-center py-12">
-              <p className="text-gray-500">Memuat...</p>
-            </div>
           </div>
         </main>
       </div>

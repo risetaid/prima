@@ -54,7 +54,7 @@ interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 
 export function LoadingButton({
   isLoading,
-  loadingText = 'Memuat...',
+  loadingText = '',
   children,
   disabled,
   className,
@@ -70,7 +70,6 @@ export function LoadingButton({
         className
       )}
     >
-      {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       {isLoading ? loadingText : children}
     </button>
   )

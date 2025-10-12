@@ -3,24 +3,12 @@
 import dynamic from "next/dynamic";
 import { ComponentType } from "react";
 
-// Loading components for admin pages
-const AdminPageSkeleton = () => (
-  <div className="text-center py-12">
-    <p className="text-gray-500">Memuat...</p>
-  </div>
-);
+// No loading components needed - Railway is fast
+const AdminPageSkeleton = () => null;
 
-const UserManagementSkeleton = () => (
-  <div className="text-center py-12">
-    <p className="text-gray-500">Memuat...</p>
-  </div>
-);
+const UserManagementSkeleton = () => null;
 
-const TemplateManagementSkeleton = () => (
-  <div className="text-center py-12">
-    <p className="text-gray-500">Memuat...</p>
-  </div>
-);
+const TemplateManagementSkeleton = () => null;
 
 // Lazy loaded admin pages with route-based code splitting
 export const LazyAdminUsersPage = dynamic(

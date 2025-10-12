@@ -261,13 +261,7 @@ export default function ArticlesPage() {
           )}
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="py-6">
-              <div className="text-center py-12">
-                <p className="text-gray-500">Memuat...</p>
-              </div>
-            </div>
-          ) : articles.length === 0 ? (
+          {loading ? null : articles.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-4 text-lg font-medium text-gray-900">

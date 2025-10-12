@@ -3,18 +3,10 @@
 import dynamic from "next/dynamic";
 import { ComponentType } from "react";
 
-// Loading components for better UX
-const DashboardSkeleton = () => (
-  <div className="text-center py-12">
-    <p className="text-gray-500">Memuat...</p>
-  </div>
-);
+// No loading components needed - Railway is fast
+const DashboardSkeleton = () => null;
 
-const EditorSkeleton = () => (
-  <div className="text-center py-12">
-    <p className="text-gray-500">Memuat editor...</p>
-  </div>
-);
+const EditorSkeleton = () => null;
 
 // Lazy loaded components with proper types
 

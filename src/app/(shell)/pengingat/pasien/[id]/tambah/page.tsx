@@ -218,9 +218,6 @@ export default function AddReminderPage() {
 
         {/* Main Content */}
         <main className="px-4 py-6">
-          <div className="text-center py-12">
-            <p className="text-gray-500">Memuat...</p>
-          </div>
         </main>
       </div>
     );

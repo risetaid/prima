@@ -184,11 +184,7 @@ export default function UserManagement() {
     return () => clearInterval(autoSync);
   }, [handleClerkSync, fetchUsers]);
 
-  if (loading) return (
-    <div className="text-center py-12">
-      <p className="text-gray-500">Memuat...</p>
-    </div>
-  );
+  if (loading) return null;
 
   const pendingUsers = users.filter((user) => !user.isApproved);
 

@@ -5,7 +5,6 @@ import { Header } from "@/components/ui/header";
 import { RoleGuard } from "@/components/auth/role-guard";
 
 import { Users } from "lucide-react";
-import { BackButton } from '@/components/ui/back-button';
 
 export default function AdminUsersPage() {
   return (
@@ -31,7 +30,12 @@ export default function AdminUsersPage() {
         <header className="bg-white shadow-sm">
           <div className="flex items-center px-4 py-4">
             <div className="mr-4">
-              <BackButton variant="simple" className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600" text="" />
+              <button
+                onClick={() => window.location.href = '/admin'}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+              </button>
             </div>
             <div className="flex items-center space-x-2">
               <Users className="w-5 h-5 text-purple-600" />

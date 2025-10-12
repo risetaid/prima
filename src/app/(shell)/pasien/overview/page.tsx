@@ -30,10 +30,7 @@ export default function DashboardPage() {
           />
         </div>
 
-        {/* Loading */}
-        <div className="text-center py-12">
-          <p className="text-gray-500">Memuat...</p>
-        </div>
+
       </div>
     );
   }

@@ -139,11 +139,7 @@ export function PatientListSection({
 
       {/* Mobile: Card View */}
       <div className="lg:hidden">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        ) : (
+        {loading ? null : (
           <div className="space-y-4">
             {filteredPatients.slice(0, 8).map((patient) => {
               const complianceLabel = getComplianceLabel(

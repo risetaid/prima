@@ -497,9 +497,6 @@ export default function PatientDetailPage() {
 
         <main className="relative z-10 pt-4 pb-12">
           <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
-            <div className="text-center py-12">
-              <p className="text-gray-500">Memuat...</p>
-            </div>
           </div>
         </main>
       </div>
@@ -596,9 +593,7 @@ export default function PatientDetailPage() {
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Patient Header Card */}
           {loading ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Memuat...</p>
-            </div>
+            null
           ) : patient ? (
             <PatientHeaderCard
               patient={patient}

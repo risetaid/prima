@@ -2,7 +2,6 @@
 
 import { ReactNode } from 'react'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { Toaster } from 'sonner'
 
 interface AppProvidersProps {
@@ -31,21 +30,13 @@ export function AppProviders({ children }: AppProvidersProps) {
 }
 
 // Loading component for page transitions
-export function PageLoading({ message = 'Memuat...' }: { message?: string }) {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <LoadingSpinner size="lg" text={message} />
-    </div>
-  )
+export function PageLoading() {
+  return null;
 }
 
 // Loading component for data fetching
-export function DataLoading({ message = 'Memuat data...' }: { message?: string }) {
-  return (
-    <div className="flex items-center justify-center p-8">
-      <LoadingSpinner text={message} />
-    </div>
-  )
+export function DataLoading() {
+  return null;
 }
 
 // Error component for data fetching failures

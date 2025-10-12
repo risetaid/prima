@@ -175,11 +175,7 @@ function PatientList({
   }, [onPatientClick, router])
 
   if (loading) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Memuat...</p>
-      </div>
-    )
+    return null;
   }
 
   return (

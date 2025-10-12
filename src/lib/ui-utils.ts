@@ -123,7 +123,7 @@ export interface LoadingState {
 
 export function createLoadingState(
   isLoading: boolean,
-  message = "Memuat data..."
+  message = ""
 ): LoadingState {
   return { isLoading, message };
 }

@@ -564,13 +564,7 @@ export default function VideoPage() {
   );
 
   if (loading) {
-    return (
-      <Layout>
-        <div className="text-center py-12">
-          <p className="text-gray-500">Memuat...</p>
-        </div>
-      </Layout>
-    );
+    return <Layout><div></div></Layout>;
   }
 
   if (error) {

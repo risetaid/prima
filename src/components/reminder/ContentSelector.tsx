@@ -319,14 +319,6 @@ export function ContentSelector({
 
         {/* Content List */}
         <div className="max-h-96 overflow-y-auto">
-          {loading && content.length === 0 && (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                <p className="mt-2 text-sm text-gray-600">Memuat konten...</p>
-              </div>
-            </div>
-          )}
 
           {error && (
             <div className="p-4 text-center text-red-600">

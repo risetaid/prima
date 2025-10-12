@@ -115,13 +115,7 @@ export default function ReminderPage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="text-center py-12">
-          <p className="text-gray-500">Memuat...</p>
-        </div>
-      </div>
-    )
+    return null;
   }
 
   return (
