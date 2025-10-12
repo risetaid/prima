@@ -635,8 +635,21 @@ export const POST = createApiHandler(
 
     // Check if patient has pending reminders and might be responding to one
     if (patient.verificationStatus === 'VERIFIED' && message) {
+      logger.info('Patient is VERIFIED, attempting keyword match', {
+        patientId: patient.id,
+        message: message,
+        messageLength: message.length
+      })
+
       // Try to match simple confirmation keywords (SUDAH/BELUM)
       const confirmationMatch = keywordMatcher.matchConfirmation(message)
+
+      logger.info('Keyword match result', {
+        patientId: patient.id,
+        message: message,
+        confirmationMatch,
+        isValid: confirmationMatch !== 'invalid'
+      })
 
       if (confirmationMatch !== 'invalid') {
         // Find the most recent pending reminder for this patient
@@ -649,6 +662,14 @@ export const POST = createApiHandler(
           ))
           .orderBy(desc(reminders.sentAt))
           .limit(1)
+
+        logger.info('Database query for recent reminder', {
+          patientId: patient.id,
+          foundReminders: recentReminder.length,
+          reminderIds: recentReminder.map(r => r.id),
+          reminderStatuses: recentReminder.map(r => r.status),
+          sentAts: recentReminder.map(r => r.sentAt)
+        })
 
         if (recentReminder.length > 0) {
           const reminder = recentReminder[0]
