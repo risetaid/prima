@@ -122,6 +122,13 @@ export const POST = createApiHandler(
     // Parse webhook body
     const { parsed, contentType } = await parseWebhookBody(request);
 
+    // Check if this is a message status update (no sender, but has id and status)
+    if (!parsed.sender && !parsed.phone && !parsed.from && parsed.id && (parsed.status || parsed.state)) {
+      // Handle message status update
+      return await handleMessageStatusUpdate(parsed, request);
+    }
+
+    // Handle incoming message (patient response)
     const normalized = normalizeIncoming(parsed);
     const validationResult = IncomingSchema.safeParse(normalized);
     if (!validationResult.success) {
@@ -211,6 +218,79 @@ export const POST = createApiHandler(
     return { ok: true, processed: false, action: 'ignored' };
   }
 );
+
+// Handle message status updates (sent/delivered/failed)
+async function handleMessageStatusUpdate(parsed: Record<string, unknown>, request: NextRequest) {
+  const contentType = request.headers.get('content-type') || '';
+
+  // Normalize status data
+  const id = String((parsed.id as string) || (parsed.message_id as string) || (parsed.msgId as string) || '');
+  const status = (parsed.status as string) || (parsed.state as string);
+  const reason = parsed.reason as string;
+  const timestamp = (parsed.timestamp as string | number) || (parsed.time as string | number) || (parsed.updated_at as string | number);
+
+  logger.info('Message status update received', {
+    id,
+    status,
+    reason,
+    timestamp,
+    contentType
+  });
+
+  // Check for duplicate status updates
+  const idemKey = `webhook:fonnte:message-status:${hashFallbackId([id, String(timestamp || '')])}`;
+  if (await isDuplicateEvent(idemKey)) {
+    return { ok: true, duplicate: true, type: 'message_status' };
+  }
+
+  // Map status to enum
+  const mapped = mapStatusToEnum(status);
+  if (!mapped) {
+    return { ok: true, ignored: true, type: 'message_status', reason: 'unmapped_status' };
+  }
+
+  try {
+    // Update reminder status
+    const { reminders } = await import("@/db");
+    const { eq } = await import("drizzle-orm");
+    const { del, CACHE_KEYS } = await import("@/lib/cache");
+
+    // First get the patientId for cache invalidation
+    const logData = await db
+      .select({ patientId: reminders.patientId })
+      .from(reminders)
+      .where(eq(reminders.fonnteMessageId, id))
+      .limit(1);
+
+    const updates = { status: mapped! };
+    if (mapped === 'FAILED' && reason) {
+      logger.warn('Fonnte message failed', { id, reason });
+    }
+
+    await db.update(reminders).set(updates).where(eq(reminders.fonnteMessageId, id));
+    logger.info('Updated reminder log status from webhook', { id, mapped });
+
+    // Invalidate cache if we have patientId
+    if (logData.length > 0) {
+      await del(CACHE_KEYS.reminderStats(logData[0].patientId));
+    }
+
+    return { ok: true, processed: true, type: 'message_status' };
+
+  } catch (error) {
+    logger.error('Failed to update message status', error as Error, { id, status });
+    throw new Error('Failed to update message status');
+  }
+}
+
+function mapStatusToEnum(status?: string): 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null {
+  const s = (status || '').toLowerCase()
+  if (!s) return null
+  if (['sent', 'queued'].includes(s)) return 'SENT'
+  if (['delivered', 'read', 'opened', 'received'].includes(s)) return 'DELIVERED'
+  if (['failed', 'error', 'undelivered'].includes(s)) return 'FAILED'
+  return null
+}
 
 export const GET = createApiHandler(
   {
