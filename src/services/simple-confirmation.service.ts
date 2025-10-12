@@ -26,27 +26,47 @@ export class SimpleConfirmationService {
     error?: string;
   }> {
     try {
+      logger.info('🔍 Processing reminder response', {
+        sender,
+        message: message.substring(0, 50),
+        messageLength: message.length
+      });
+
       // 1. Find patient by phone number
       const patientResult = await this.patientLookup.findPatientByPhone(sender);
       if (!patientResult.found || !patientResult.patient) {
-        logger.info('No patient found for message', { sender, message: message.substring(0, 50) });
+        logger.info('❌ No patient found for message', { sender, message: message.substring(0, 50) });
         return { success: true, action: 'no_reminder' };
       }
 
       const patient = patientResult.patient;
+      logger.info('✅ Patient found', {
+        patientId: patient.id,
+        patientName: patient.name,
+        verificationStatus: patient.verificationStatus
+      });
 
       // 2. Check for simple keyword matches
       const normalizedMessage = message.toLowerCase().trim();
+      logger.info('🔤 Normalized message for matching', {
+        original: message,
+        normalized: normalizedMessage,
+        patientId: patient.id
+      });
+
       let confirmationType: 'confirmed' | 'missed' | null = null;
 
       if (['sudah', 'selesai'].includes(normalizedMessage)) {
         confirmationType = 'confirmed';
+        logger.info('✅ Matched CONFIRMED keyword', { normalizedMessage, patientId: patient.id });
       } else if (['belum'].includes(normalizedMessage)) {
         confirmationType = 'missed';
+        logger.info('⏰ Matched MISSED keyword', { normalizedMessage, patientId: patient.id });
       } else {
-        logger.info('Not a confirmation keyword', {
+        logger.info('❌ Not a confirmation keyword', {
           patientId: patient.id,
-          message: message.substring(0, 50)
+          normalizedMessage,
+          original: message.substring(0, 50)
         });
         return { success: true, action: 'invalid_response' };
       }
@@ -54,6 +74,12 @@ export class SimpleConfirmationService {
       // 3. Find most recent pending reminder (last 24 hours)
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
+
+      logger.info('🔍 Searching for pending reminders', {
+        patientId: patient.id,
+        since: yesterday.toISOString(),
+        confirmationType
+      });
 
       const recentReminders = await db
         .select()
@@ -69,8 +95,14 @@ export class SimpleConfirmationService {
         .orderBy(desc(reminders.sentAt))
         .limit(1);
 
+      logger.info('📊 Reminder search results', {
+        patientId: patient.id,
+        foundCount: recentReminders.length,
+        confirmationType
+      });
+
       if (recentReminders.length === 0) {
-        logger.info('No pending reminders found', {
+        logger.warn('⚠️ No pending reminders found', {
           patientId: patient.id,
           confirmationType,
           message: message.substring(0, 50)
@@ -79,6 +111,15 @@ export class SimpleConfirmationService {
       }
 
       const reminder = recentReminders[0];
+
+      logger.info('📝 Found reminder to update', {
+        reminderId: reminder.id,
+        patientId: patient.id,
+        reminderStatus: reminder.status,
+        reminderConfirmationStatus: reminder.confirmationStatus,
+        sentAt: reminder.sentAt,
+        confirmationType
+      });
 
       // 4. Update reminder based on confirmation
       const updateData: {
@@ -95,12 +136,18 @@ export class SimpleConfirmationService {
         )
       };
 
+      logger.info('💾 Updating reminder with data', {
+        reminderId: reminder.id,
+        updateData,
+        patientId: patient.id
+      });
+
       await db
         .update(reminders)
         .set(updateData)
         .where(eq(reminders.id, reminder.id));
 
-      logger.info('Reminder updated successfully', {
+      logger.info('✅ Reminder updated successfully', {
         patientId: patient.id,
         reminderId: reminder.id,
         confirmationType,
