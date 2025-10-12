@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { requireWebhookToken } from "@/lib/webhook-auth";
 import { isDuplicateEvent, hashFallbackId } from "@/lib/idempotency";
+import { db } from "@/db";
 import { SimpleConfirmationService } from "@/services/simple-confirmation.service";
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
@@ -120,12 +121,12 @@ export const POST = createApiHandler(
   },
   async (body, { request }) => {
     // Parse webhook body
-    const { parsed, contentType } = await parseWebhookBody(request);
+    const { parsed } = await parseWebhookBody(request);
 
     // Check if this is a message status update (no sender, but has id and status)
     if (!parsed.sender && !parsed.phone && !parsed.from && parsed.id && (parsed.status || parsed.state)) {
       // Handle message status update
-      return await handleMessageStatusUpdate(parsed, request);
+      return await handleMessageStatusUpdate(parsed);
     }
 
     // Handle incoming message (patient response)
@@ -220,9 +221,7 @@ export const POST = createApiHandler(
 );
 
 // Handle message status updates (sent/delivered/failed)
-async function handleMessageStatusUpdate(parsed: Record<string, unknown>, request: NextRequest) {
-  const contentType = request.headers.get('content-type') || '';
-
+async function handleMessageStatusUpdate(parsed: Record<string, unknown>) {
   // Normalize status data
   const id = String((parsed.id as string) || (parsed.message_id as string) || (parsed.msgId as string) || '');
   const status = (parsed.status as string) || (parsed.state as string);
@@ -233,8 +232,7 @@ async function handleMessageStatusUpdate(parsed: Record<string, unknown>, reques
     id,
     status,
     reason,
-    timestamp,
-    contentType
+    timestamp
   });
 
   // Check for duplicate status updates

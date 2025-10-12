@@ -1,7 +1,7 @@
 // Simple Reminder Confirmation Service
 // No complex conversation states - direct database lookup approach
 
-import { db, reminders, patients } from "@/db";
+import { db, reminders } from "@/db";
 import { eq, and, desc, gte } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
@@ -81,18 +81,19 @@ export class SimpleConfirmationService {
       const reminder = recentReminders[0];
 
       // 4. Update reminder based on confirmation
-      const updateData: any = {
+      const updateData: {
+        confirmationResponse: string;
+        confirmationResponseAt: Date;
+        status: 'DELIVERED' | 'SENT';
+        confirmationStatus: 'CONFIRMED' | 'MISSED';
+      } = {
         confirmationResponse: message,
         confirmationResponseAt: new Date(),
+        ...(confirmationType === 'confirmed'
+          ? { status: 'DELIVERED', confirmationStatus: 'CONFIRMED' }
+          : { status: 'SENT', confirmationStatus: 'MISSED' }
+        )
       };
-
-      if (confirmationType === 'confirmed') {
-        updateData.status = 'DELIVERED';
-        updateData.confirmationStatus = 'CONFIRMED';
-      } else {
-        updateData.status = 'SENT';
-        updateData.confirmationStatus = 'MISSED';
-      }
 
       await db
         .update(reminders)
@@ -107,7 +108,11 @@ export class SimpleConfirmationService {
       });
 
       // 5. Send acknowledgment
-      await this.sendAcknowledgment(patient, confirmationType);
+      await this.sendAcknowledgment({
+        id: patient.id,
+        name: patient.name,
+        phoneNumber: patient.phoneNumber
+      }, confirmationType);
 
       return {
         success: true,
@@ -130,7 +135,11 @@ export class SimpleConfirmationService {
   /**
    * Send acknowledgment message to patient
    */
-  private async sendAcknowledgment(patient: any, confirmationType: 'confirmed' | 'missed'): Promise<void> {
+  private async sendAcknowledgment(patient: {
+    id: string;
+    name: string;
+    phoneNumber: string;
+  }, confirmationType: 'confirmed' | 'missed'): Promise<void> {
     try {
       let message: string;
 
