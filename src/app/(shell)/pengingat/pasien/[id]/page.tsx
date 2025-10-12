@@ -329,12 +329,22 @@ export default function PatientReminderPage() {
 
           {/* Statistics Section */}
           {(() => {
-            // Use stats to calculate compliance and factor in manual confirmations
-            const taken = stats.selesai || 0;
-            const notTaken = stats.perluDiperbarui || 0;
-            const denominator = taken + notTaken;
-            const complianceRate =
-              denominator > 0 ? Math.round((taken / denominator) * 100) : 0;
+            // NOTE: Currently the API only returns completed reminders that are CONFIRMED.
+            // Manual confirmations with "Tidak" (not taken) are marked in manual_confirmations
+            // table but not exposed via the completed reminders API endpoint.
+            // 
+            // For now, we hide the compliance statistics section because:
+            // 1. "Perlu Diperbarui" are NOT completed - they're pending confirmation
+            // 2. The completed API doesn't return "Tidak Dipatuhi" reminders
+            // 
+            // TODO: Update stats API to return { dipatuhi, tidakDipatuhi } counts
+            // so we can show accurate compliance statistics.
+            
+            // Don't show statistics - data is incomplete
+            const denominator = 0;
+            const complianceRate = 0;
+            const taken = 0;
+            const notTaken = 0;
 
             return (
               denominator > 0 && (
