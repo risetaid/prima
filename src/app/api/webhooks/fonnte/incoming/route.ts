@@ -68,32 +68,6 @@ function normalizeIncoming(body: WebhookBody) {
   };
 }
 
-async function parseWebhookBody(request: NextRequest) {
-  let parsed: Record<string, unknown> = {};
-  const contentType = request.headers.get("content-type") || "";
-  try {
-    if (contentType.includes("application/json")) {
-      parsed = await request.json();
-    } else if (
-      contentType.includes("application/x-www-form-urlencoded") ||
-      contentType.includes("multipart/form-data")
-    ) {
-      const form = await request.formData();
-      form.forEach((v, k) => {
-        parsed[k] = v;
-      });
-    } else {
-      const text = await request.text();
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        parsed = {};
-      }
-    }
-  } catch { }
-  return { parsed, contentType };
-}
-
 async function checkIdempotency(data: {
   id?: string;
   sender: string;
