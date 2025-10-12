@@ -1,7 +1,6 @@
 // Reminder Service - Core business logic for reminder management
 import { ReminderRepository } from "@/services/reminder/reminder.repository";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
-import { ConversationStateService } from "@/services/conversation-state.service";
 import {
   CreateReminderDTO,
   UpdateReminderDTO,
@@ -44,13 +43,11 @@ export class ReminderService {
   private repository: ReminderRepository;
   private whatsappService: WhatsAppService;
   private templateService: ReminderTemplatesService;
-  private conversationService: ConversationStateService;
 
   constructor() {
     this.repository = new ReminderRepository();
     this.whatsappService = new WhatsAppService();
     this.templateService = new ReminderTemplatesService();
-    this.conversationService = new ConversationStateService();
   }
 
   /**
@@ -362,32 +359,8 @@ export class ReminderService {
         fonnteMessageId: result.messageId,
       });
 
-      // Set reminder confirmation context after successful send
-      if (result.success && result.messageId) {
-        try {
-          await this.conversationService.setReminderConfirmationContext(
-            params.patientId,
-            params.phoneNumber,
-            params.reminderId,
-            result.messageId
-          );
-
-          logger.info('Reminder confirmation context set', {
-            patientId: params.patientId,
-            reminderId: params.reminderId,
-            messageId: result.messageId,
-            contextType: 'reminder_confirmation',
-            expiresIn: '2 hours'
-          });
-        } catch (contextError) {
-          logger.warn('Failed to set reminder confirmation context', {
-            error: contextError instanceof Error ? contextError.message : String(contextError),
-            patientId: params.patientId,
-            reminderId: params.reminderId
-          });
-          // Don't fail the reminder send if context setting fails
-        }
-      }
+      // Reminder confirmation now handled by simple direct lookup
+      // No complex conversation state management needed
 
   
 
