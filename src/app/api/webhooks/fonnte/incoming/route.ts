@@ -495,16 +495,32 @@ export const POST = createApiHandler(
             if (confirmationMatch === 'done') {
               await db.update(reminders)
                 .set({
+                  status: 'DELIVERED',
                   confirmationStatus: 'CONFIRMED',
                   confirmationResponse: message,
                   confirmationResponseAt: new Date()
                 })
                 .where(eq(reminders.id, relatedReminderId))
 
-              await whatsappService.sendAck(
-                patient.phoneNumber,
-                `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
-              )
+              try {
+                await whatsappService.sendAck(
+                  patient.phoneNumber,
+                  `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
+                )
+
+                logger.info('Confirmation acknowledgment sent', {
+                  patientId: patient.id,
+                  reminderId: relatedReminderId,
+                  source: 'active_context_reminder_confirmation'
+                })
+              } catch (error) {
+                logger.error('Failed to send confirmation acknowledgment', error as Error, {
+                  patientId: patient.id,
+                  reminderId: relatedReminderId,
+                  phoneNumber: patient.phoneNumber
+                })
+                // Don't fail the whole operation if ACK fails
+              }
 
               await conversationService.clearContext(patient.id)
 
@@ -517,15 +533,32 @@ export const POST = createApiHandler(
             } else {
               await db.update(reminders)
                 .set({
+                  status: 'SENT',
+                  confirmationStatus: 'MISSED',
                   confirmationResponse: message,
                   confirmationResponseAt: new Date()
                 })
                 .where(eq(reminders.id, relatedReminderId))
 
-              await whatsappService.sendAck(
-                patient.phoneNumber,
-                `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\n💙 Tim PRIMA`
-              )
+              try {
+                await whatsappService.sendAck(
+                  patient.phoneNumber,
+                  `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\n💙 Tim PRIMA`
+                )
+
+                logger.info('Not-yet acknowledgment sent', {
+                  patientId: patient.id,
+                  reminderId: relatedReminderId,
+                  source: 'active_context_reminder_confirmation'
+                })
+              } catch (error) {
+                logger.error('Failed to send not-yet acknowledgment', error as Error, {
+                  patientId: patient.id,
+                  reminderId: relatedReminderId,
+                  phoneNumber: patient.phoneNumber
+                })
+                // Don't fail the whole operation if ACK fails
+              }
 
               await conversationService.clearContext(patient.id)
 
@@ -643,18 +676,32 @@ export const POST = createApiHandler(
             // Update reminder as confirmed
             await db.update(reminders)
               .set({
+                status: 'DELIVERED',
                 confirmationStatus: 'CONFIRMED',
                 confirmationResponse: message,
                 confirmationResponseAt: new Date()
               })
               .where(eq(reminders.id, reminder.id))
 
+            try {
+              await whatsappService.sendAck(
+                patient.phoneNumber,
+                `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai.\n\n💙 Tim PRIMA`
+              )
 
-
-            await whatsappService.sendAck(
-              patient.phoneNumber,
-              `Terima kasih ${patient.name}! ✅\n\nPengingat sudah dikonfirmasi selesai pada ${new Date().toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })}\n\n💙 Tim PRIMA`
-            )
+              logger.info('Confirmation acknowledgment sent', {
+                patientId: patient.id,
+                reminderId: reminder.id,
+                source: 'simple_reminder_confirmation'
+              })
+            } catch (error) {
+              logger.error('Failed to send confirmation acknowledgment', error as Error, {
+                patientId: patient.id,
+                reminderId: reminder.id,
+                phoneNumber: patient.phoneNumber
+              })
+              // Don't fail the whole operation if ACK fails
+            }
 
             return {
               ok: true,
@@ -666,15 +713,32 @@ export const POST = createApiHandler(
             // Update reminder response but keep status as SENT
             await db.update(reminders)
               .set({
+                status: 'SENT',
+                confirmationStatus: 'MISSED',
                 confirmationResponse: message,
                 confirmationResponseAt: new Date()
               })
               .where(eq(reminders.id, reminder.id))
 
-            await whatsappService.sendAck(
-              patient.phoneNumber,
-              `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
-            )
+            try {
+              await whatsappService.sendAck(
+                patient.phoneNumber,
+                `Baik ${patient.name}, jangan lupa selesaikan pengingat Anda ya! 📝\n\nKami akan mengingatkan lagi nanti.\n\n💙 Tim PRIMA`
+              )
+
+              logger.info('Not-yet acknowledgment sent', {
+                patientId: patient.id,
+                reminderId: reminder.id,
+                source: 'simple_reminder_confirmation'
+              })
+            } catch (error) {
+              logger.error('Failed to send not-yet acknowledgment', error as Error, {
+                patientId: patient.id,
+                reminderId: reminder.id,
+                phoneNumber: patient.phoneNumber
+              })
+              // Don't fail the whole operation if ACK fails
+            }
 
             return {
               ok: true,
