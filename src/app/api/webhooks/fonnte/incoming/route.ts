@@ -120,8 +120,16 @@ export const POST = createApiHandler(
     rateLimit: { enabled: false }
   },
   async (body, { request }) => {
-    // Parse webhook body
-    const { parsed } = await parseWebhookBody(request);
+    // Body is already parsed by createApiHandler
+    const parsed = (body || {}) as Record<string, unknown>;
+    
+    // Log raw payload for debugging
+    logger.info('📥 Webhook payload received', {
+      contentType: request.headers.get('content-type'),
+      hasData: Object.keys(parsed).length > 0,
+      keys: Object.keys(parsed),
+      senderPreview: parsed.sender || parsed.phone || parsed.from || 'no sender'
+    });
 
     // Check if this is a message status update (no sender, but has id and status)
     if (!parsed.sender && !parsed.phone && !parsed.from && parsed.id && (parsed.status || parsed.state)) {
