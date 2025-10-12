@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { getCurrentTimeWIB } from "@/lib/datetime";
 import { toast } from "@/components/ui/toast";
-import { FormSkeleton } from "@/components/ui/skeleton";
 import { ContentSelector } from "@/components/reminder/ContentSelector";
 import { CustomRecurrenceModal } from "@/components/reminder/CustomRecurrenceModal";
 import { MessageInput } from "@/components/reminder/MessageInput";
@@ -217,9 +216,11 @@ export default function AddReminderPage() {
           </div>
         </header>
 
-        {/* Main Content with Skeleton */}
+        {/* Main Content */}
         <main className="px-4 py-6">
-          <FormSkeleton fields={5} />
+          <div className="text-center py-12">
+            <p className="text-gray-500">Memuat...</p>
+          </div>
         </main>
       </div>
     );

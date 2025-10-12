@@ -6,10 +6,8 @@ import { ArrowLeft } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { Header } from "@/components/ui/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
@@ -499,124 +497,9 @@ export default function PatientDetailPage() {
 
         <main className="relative z-10 pt-4 pb-12">
           <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
-            {/* Patient Header Card Skeleton */}
-            <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div className="flex items-center space-x-4">
-                    <Skeleton className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-6 w-48 bg-white/20" />
-                      <Skeleton className="h-4 w-32 bg-white/20" />
-                      <div className="flex items-center space-x-2">
-                        <Skeleton className="h-5 w-16 rounded-full bg-white/20" />
-                        <Skeleton className="h-5 w-20 rounded-full bg-white/20" />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Skeleton className="h-10 w-32 rounded bg-white/10" />
-                    <Skeleton className="h-10 w-36 rounded bg-white/10" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Main Content Tabs Skeleton */}
-            <Tabs value="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile" disabled>
-                  Profil
-                </TabsTrigger>
-                <TabsTrigger value="verification" disabled>
-                  Verifikasi
-                </TabsTrigger>
-                <TabsTrigger value="reminders" disabled>
-                  Pengingat
-                </TabsTrigger>
-                <TabsTrigger value="responses" disabled>
-                  Riwayat Respon
-                </TabsTrigger>
-              </TabsList>
-
-              {/* Profile Tab Skeleton */}
-              <TabsContent value="profile" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Basic Information Card Skeleton */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <Skeleton className="w-5 h-5 rounded mr-2" />
-                          <Skeleton className="h-5 w-32" />
-                        </div>
-                        <Skeleton className="h-8 w-16 rounded" />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div key={i} className="space-y-2">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-10 w-full" />
-                          </div>
-                        ))}
-                      </div>
-                      <Separator />
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-10 w-full" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Medical Information Card Skeleton */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <Skeleton className="w-5 h-5 rounded mr-2" />
-                          <Skeleton className="h-5 w-40" />
-                        </div>
-                        <Skeleton className="h-8 w-16 rounded" />
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                          <div key={i} className="space-y-2">
-                            <Skeleton className="h-4 w-20" />
-                            <Skeleton className="h-10 w-full" />
-                          </div>
-                        ))}
-                      </div>
-                      <Separator />
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-24 w-full" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Patient Variables Skeleton */}
-                <Card>
-                  <CardHeader>
-                    <Skeleton className="h-6 w-40" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="space-y-2">
-                          <Skeleton className="h-4 w-20" />
-                          <Skeleton className="h-8 w-full" />
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+            <div className="text-center py-12">
+              <p className="text-gray-500">Memuat...</p>
+            </div>
           </div>
         </main>
       </div>
@@ -713,17 +596,9 @@ export default function PatientDetailPage() {
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Patient Header Card */}
           {loading ? (
-            <Card className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white border-0">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex items-center space-x-4">
-                  <Skeleton className="w-20 h-20 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-32" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="text-center py-12">
+              <p className="text-gray-500">Memuat...</p>
+            </div>
           ) : patient ? (
             <PatientHeaderCard
               patient={patient}

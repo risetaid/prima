@@ -6,7 +6,6 @@ import { ArrowLeft, Calendar } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { toast } from "@/components/ui/toast";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { ReminderItem } from "@/components/reminder/ReminderItem";
 import { EditScheduledReminderModal } from "@/components/reminder/EditScheduledReminderModal";
 import { FloatingActionButtons } from "@/components/reminder/FloatingActionButtons";
@@ -275,9 +274,11 @@ export default function ScheduledRemindersPage() {
           </div>
         </header>
 
-        {/* Main Content with Skeleton */}
+        {/* Main Content */}
         <main className="px-4 py-6">
-          <TableSkeleton rows={5} columns={3} />
+          <div className="text-center py-12">
+            <p className="text-gray-500">Memuat...</p>
+          </div>
         </main>
       </div>
     );

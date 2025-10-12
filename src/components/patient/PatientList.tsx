@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { VirtualPatientList } from '@/components/ui/virtual-list'
-import { PatientListSkeleton } from '@/components/ui/skeleton'
 import { logger } from '@/lib/logger';
 
 interface Patient {
@@ -176,7 +175,11 @@ function PatientList({
   }, [onPatientClick, router])
 
   if (loading) {
-    return <PatientListSkeleton count={5} />
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Memuat...</p>
+      </div>
+    )
   }
 
   return (

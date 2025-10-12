@@ -11,7 +11,6 @@ import { Plus, Search, FileText, Eye, Edit, Trash2, Filter } from 'lucide-react'
 import { BackButton } from '@/components/ui/back-button'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { ArticleCardSkeleton } from '@/components/ui/skeleton'
 import { CMSBreadcrumb } from '@/components/ui/breadcrumb'
 
 import { logger } from '@/lib/logger';
@@ -264,10 +263,8 @@ export default function ArticlesPage() {
         <CardContent>
           {loading ? (
             <div className="py-6">
-              <div className="space-y-4">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <ArticleCardSkeleton key={i} />
-                ))}
+              <div className="text-center py-12">
+                <p className="text-gray-500">Memuat...</p>
               </div>
             </div>
           ) : articles.length === 0 ? (

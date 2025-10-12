@@ -6,7 +6,6 @@ import { ArrowLeft, Search } from 'lucide-react'
 import { UserButton } from '@clerk/nextjs'
 import { Header } from '@/components/ui/header'
 import { ReminderListTable } from '@/components/pengingat/reminder-list-table'
-import { PatientListSkeleton, DashboardHeaderSkeleton } from '@/components/ui/skeleton'
 import Image from 'next/image'
 import { logger } from '@/lib/logger'
 
@@ -118,8 +117,9 @@ export default function ReminderPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <DashboardHeaderSkeleton />
-        <PatientListSkeleton count={5} />
+        <div className="text-center py-12">
+          <p className="text-gray-500">Memuat...</p>
+        </div>
       </div>
     )
   }

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { Search, Plus } from 'lucide-react'
 import { Header } from '@/components/ui/header'
 import { MobileHeader } from '@/components/ui/mobile-header'
-import { PatientListSkeleton, DashboardHeaderSkeleton } from '@/components/ui/skeleton'
 import Image from 'next/image'
 import { Calendar, Newspaper, Video } from 'lucide-react'
 import { logger } from '@/lib/logger'
@@ -136,8 +135,9 @@ export default function PatientPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <DashboardHeaderSkeleton />
-        <PatientListSkeleton count={5} />
+        <div className="text-center py-12">
+          <p className="text-gray-500">Memuat...</p>
+        </div>
       </div>
     )
   }

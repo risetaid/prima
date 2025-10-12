@@ -147,8 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // If no user, mark as loaded with default values
-    if (!user) {
+    // If no user, mark as loaded with default values and RETURN EARLY
+    // This prevents fetching /api/user/status when user is not signed in
+    if (!user || !isSignedIn) {
       logger.info('👤 No user signed in - setting default state');
       setRole(null);
       setCanAccessDashboard(false);
@@ -365,7 +366,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logger.warn('⚠️ Background fetch already running, skipping duplicate fetch');
       isFetchingRef.current = false;
     }
-  }, [user, userLoaded, authLoaded, getCachedUserData, setCachedUserData, clearCachedUserData, fetchUserStatus]);
+  }, [user, userLoaded, authLoaded, isSignedIn, getCachedUserData, setCachedUserData, clearCachedUserData, fetchUserStatus]);
 
   const value: AuthContextState = {
     user: user ?? null,

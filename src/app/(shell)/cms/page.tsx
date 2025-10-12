@@ -13,10 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  DashboardStatsSkeleton,
-  ArticleCardSkeleton,
-} from "@/components/ui/skeleton";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { CMSStatsCards } from "@/components/cms/CMSStatsCards";
 import { CMSContentItem } from "@/components/cms/CMSContentItem";
@@ -377,8 +373,10 @@ function CMSPageContent() {
           </div>
         </div>
 
-        {/* Stats Cards Skeleton */}
-        <DashboardStatsSkeleton />
+        {/* Loading */}
+        <div className="text-center py-12">
+          <p className="text-gray-500">Memuat...</p>
+        </div>
 
         {/* Content Tabs Skeleton */}
         <Card>
@@ -397,10 +395,8 @@ function CMSPageContent() {
                 ))}
               </div>
             </div>
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <ArticleCardSkeleton key={i} />
-              ))}
+            <div className="text-center py-12">
+              <p className="text-gray-500">Memuat...</p>
             </div>
           </CardContent>
         </Card>
@@ -412,7 +408,9 @@ function CMSPageContent() {
     <div className="space-y-6">
       {/* Statistics Cards */}
       {statsLoading ? (
-        <DashboardStatsSkeleton />
+        <div className="text-center py-12">
+          <p className="text-gray-500">Memuat...</p>
+        </div>
       ) : statistics ? (
         (() => {
           // @ts-expect-error - logger accepts any object for context
@@ -454,10 +452,8 @@ function CMSPageContent() {
             <TabsContent value={activeTab} className="mt-6">
               {contentLoading ? (
                 <div className="py-6">
-                  <div className="space-y-4">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <ArticleCardSkeleton key={i} />
-                    ))}
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">Memuat...</p>
                   </div>
                 </div>
               ) : content.length === 0 ? (

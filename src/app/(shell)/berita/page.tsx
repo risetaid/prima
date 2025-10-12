@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FileText, Calendar, User, Eye, ExternalLink, Search, Filter, Grid, List, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArticleCardSkeleton } from '@/components/ui/skeleton'
 import { Header } from '@/components/ui/header'
 import { logger } from '@/lib/logger'
 import { useRouter } from 'next/navigation'
@@ -191,10 +190,8 @@ export default function BeritaPage() {
         <Header showNavigation={true} className="relative z-10" />
 
         <main className="relative z-10 px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <ArticleCardSkeleton key={i} />
-            ))}
+          <div className="text-center py-12">
+            <p className="text-gray-500">Memuat...</p>
           </div>
         </main>
       </div>

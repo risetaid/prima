@@ -7,7 +7,6 @@ import { UserButton } from "@clerk/nextjs";
 import { Header } from "@/components/ui/header";
 
 import { toast } from "sonner";
-import { TableSkeleton } from "@/components/ui/skeleton";
 
 import { logger } from '@/lib/logger';
 interface Patient {
@@ -294,7 +293,9 @@ export default function PatientSymptomsPage() {
         </div>
         <main className="relative z-10">
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            <TableSkeleton rows={5} columns={3} />
+            <div className="text-center py-12">
+              <p className="text-gray-500">Memuat...</p>
+            </div>
           </div>
         </main>
       </div>
