@@ -6,12 +6,11 @@ import AddPatientDialog from "@/components/dashboard/add-patient-dialog";
 import { MobileNavigationButtons } from "@/components/dashboard/mobile-navigation-buttons";
 import { DesktopHeader } from "@/components/dashboard/desktop-header";
 import { MobileStatusBadge } from "@/components/dashboard/mobile-status-badge";
-import { InstantSendSection } from "@/components/dashboard/instant-send-section";
+// Instant send feature removed
 import { PatientListSection } from "@/components/dashboard/patient-list-section";
-import { InstantSendDialog } from "@/components/dashboard/instant-send-dialog";
 import { useDashboardState } from "@/hooks/use-dashboard-state";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 function DashboardClient() {
   const router = useRouter();
   const { state, actions, filterPatients } = useDashboardState();
@@ -24,7 +23,10 @@ function DashboardClient() {
         actions.setUserRole(data.role);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching user role:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching user role:",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }, [actions]);
 
@@ -36,7 +38,10 @@ function DashboardClient() {
         actions.setPatients(data);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching patients:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching patients:",
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
   }, [actions]);
 
@@ -58,7 +63,10 @@ function DashboardClient() {
         await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching dashboard data:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching dashboard data:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       // Try legacy methods as fallback
       await Promise.all([fetchPatientsLegacy(), fetchUserRoleLegacy()]);
     } finally {
@@ -91,59 +99,14 @@ function DashboardClient() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const handleInstantSendAll = useCallback(async () => {
-    actions.setIsInstantSending(true);
-    actions.setInstantSendResult(null);
-    
-    try {
-      const response = await fetch('/api/reminders/instant-send-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-       const result = await response.json();
-       actions.setInstantSendResult(result);
+  // Instant send handlers removed with feature
 
-       if (!response.ok) {
-         // Handle specific error types
-         if (result.error?.includes('Database query failed')) {
-           throw new Error('Database error occurred. Please try again.');
-         } else if (result.error?.includes('Unauthorized')) {
-           throw new Error('Authentication failed. Please refresh the page.');
-         } else {
-           throw new Error(result.error || result.details || 'Failed to send reminders');
-         }
-       }
-
-       // Handle successful response but no reminders sent
-       if (result.success && result.results && result.results.messagesSent === 0) {
-         actions.setInstantSendResult({
-           success: true,
-           message: result.message || 'No active reminders found to send',
-           results: result.results
-         });
-         return;
-       }
-    } catch (error: unknown) {
-      logger.error('Error sending instant reminders:', error instanceof Error ? error : new Error(String(error)));
-      actions.setInstantSendResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
-    } finally {
-      actions.setIsInstantSending(false);
-    }
-  }, [actions]);
-
-  const handleInstantSendClose = useCallback(() => {
-    actions.resetInstantSend();
-  }, [actions]);
-
-  const toggleFilter = useCallback((filterType: string) => {
-    actions.toggleFilter(filterType);
-  }, [actions]);
+  const toggleFilter = useCallback(
+    (filterType: string) => {
+      actions.toggleFilter(filterType);
+    },
+    [actions]
+  );
 
   const handlePatientClick = useCallback(
     (patientId: string) => {
@@ -179,10 +142,7 @@ function DashboardClient() {
         loading={state.loading}
       />
 
-      <InstantSendSection
-        userRole={state.userRole}
-        onOpenDialog={() => actions.setShowInstantSendDialog(true)}
-      />
+      {/* Instant send section removed */}
 
       <PatientListSection
         patients={state.patients}
@@ -202,17 +162,9 @@ function DashboardClient() {
         onSuccess={handleAddPatientSuccess}
       />
 
-      <InstantSendDialog
-        isOpen={state.showInstantSendDialog}
-        onOpenChange={actions.setShowInstantSendDialog}
-        isSending={state.isInstantSending}
-        result={state.instantSendResult}
-        onSendAll={handleInstantSendAll}
-        onClose={handleInstantSendClose}
-      />
+      {/* Instant send dialog removed */}
     </>
   );
 }
 
 export default memo(DashboardClient);
-
