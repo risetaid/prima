@@ -107,6 +107,7 @@ export const manualConfirmations = pgTable(
     visitTime: text("visit_time"),
     patientCondition: patientConditionEnum("patient_condition"),
     symptomsReported: text("symptoms_reported").array().default([]),
+    medicationsTaken: text("medications_taken").array().default([]),
     notes: text("notes"),
     followUpNeeded: boolean("follow_up_needed").notNull().default(false),
     followUpNotes: text("follow_up_notes"),

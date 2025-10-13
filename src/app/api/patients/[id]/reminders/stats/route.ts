@@ -91,6 +91,8 @@ export const GET = createApiHandler(
     let terjadwal = 0;
     let perluDiperbarui = 0;
     let selesai = 0;
+    let dipatuhi = 0;
+    let tidakDipatuhi = 0;
 
     for (const reminder of allReminders) {
       const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id)
@@ -98,6 +100,8 @@ export const GET = createApiHandler(
       // Selesai: automated confirmation or manual confirmation entry
       if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
         selesai++;
+        // Count as complied (dipatuhi) if confirmed
+        dipatuhi++;
       }
       // Perlu Diperbarui: sent/delivered but not confirmed
       else if (
@@ -113,11 +117,62 @@ export const GET = createApiHandler(
       }
     }
 
+    // Fetch manual confirmations to get medications_taken for compliance calculation
+    // Manual confirmations with empty/null medications_taken indicate non-compliance
+    const manualConfirmationsWithMeds =
+      reminderIds.length > 0
+        ? await db
+            .select({
+              reminderId: manualConfirmations.reminderId,
+              medicationsTaken: manualConfirmations.medicationsTaken,
+            })
+            .from(manualConfirmations)
+            .where(inArray(manualConfirmations.reminderId, reminderIds))
+        : [];
+
+    // Build a map of reminder_id -> medications_taken for efficient lookup
+    const medsMap = new Map<string, string[] | null>();
+    for (const mc of manualConfirmationsWithMeds) {
+      medsMap.set(mc.reminderId!, mc.medicationsTaken);
+    }
+
+    // Re-calculate dipatuhi and tidakDipatuhi based on medications_taken
+    // Reset counters
+    dipatuhi = 0;
+    tidakDipatuhi = 0;
+
+    for (const reminder of allReminders) {
+      const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
+      const medicationsTaken = medsMap.get(reminder.id);
+
+      // Only count completed reminders for compliance
+      if (reminder.confirmationStatus === 'CONFIRMED') {
+        // Automated confirmation - assume complied
+        dipatuhi++;
+      } else if (isManuallyConfirmed) {
+        // Manual confirmation - check medications_taken
+        if (medicationsTaken && medicationsTaken.length > 0) {
+          dipatuhi++;
+        } else {
+          // Empty or null medications_taken means not complied
+          tidakDipatuhi++;
+        }
+      }
+    }
+
     const stats = {
       terjadwal,
       perluDiperbarui,
       selesai,
       semua: terjadwal + perluDiperbarui + selesai,
+      compliance: {
+        dipatuhi,
+        tidakDipatuhi,
+        total: dipatuhi + tidakDipatuhi,
+        rate: dipatuhi + tidakDipatuhi > 0 
+          ? Math.round((dipatuhi / (dipatuhi + tidakDipatuhi)) * 100) 
+          : 0,
+      },
     };
 
     // Cache the stats with shorter TTL since they change more frequently

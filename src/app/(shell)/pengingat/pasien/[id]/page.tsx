@@ -21,6 +21,12 @@ interface ReminderStats {
   perluDiperbarui: number;
   selesai: number;
   semua: number;
+  compliance?: {
+    dipatuhi: number;
+    tidakDipatuhi: number;
+    total: number;
+    rate: number;
+  };
 }
 
 interface CompletedReminder {
@@ -52,7 +58,7 @@ export default function PatientReminderPage() {
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders/stats`,
+        `/api/patients/${patientId}/reminders/stats?invalidate=true`,
         { signal: controller.signal }
       );
 
@@ -329,25 +335,12 @@ export default function PatientReminderPage() {
 
           {/* Statistics Section */}
           {(() => {
-            // NOTE: Currently the API only returns completed reminders that are CONFIRMED.
-            // Manual confirmations with "Tidak" (not taken) are marked in manual_confirmations
-            // table but not exposed via the completed reminders API endpoint.
-            // 
-            // For now, we hide the compliance statistics section because:
-            // 1. "Perlu Diperbarui" are NOT completed - they're pending confirmation
-            // 2. The completed API doesn't return "Tidak Dipatuhi" reminders
-            // 
-            // TODO: Update stats API to return { dipatuhi, tidakDipatuhi } counts
-            // so we can show accurate compliance statistics.
-            
-            // Don't show statistics - data is incomplete
-            const denominator = 0;
-            const complianceRate = 0;
-            const taken = 0;
-            const notTaken = 0;
+            // Get compliance data from stats API
+            const compliance = stats.compliance;
+            const hasComplianceData = compliance && compliance.total > 0;
 
             return (
-              denominator > 0 && (
+              hasComplianceData && (
                 <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
                   <h3 className="font-semibold text-gray-900 mb-3">
                     Statistik Kepatuhan
@@ -355,13 +348,13 @@ export default function PatientReminderPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">
-                        {taken}
+                        {compliance!.dipatuhi}
                       </div>
                       <div className="text-sm text-gray-600">Dipatuhi</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-red-600">
-                        {notTaken}
+                        {compliance!.tidakDipatuhi}
                       </div>
                       <div className="text-sm text-gray-600">
                         Tidak Dipatuhi
@@ -371,7 +364,7 @@ export default function PatientReminderPage() {
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <div className="text-center">
                       <div className="text-lg font-bold text-blue-600">
-                        {complianceRate}%
+                        {compliance!.rate}%
                       </div>
                       <div className="text-sm text-gray-600">
                         Tingkat Kepatuhan
