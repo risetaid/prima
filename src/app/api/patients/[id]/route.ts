@@ -7,7 +7,7 @@ import type { UpdatePatientDTO } from "@/services/patient/patient.types";
 
 // Validation schemas
 const paramsSchema = z.object({
-  id: z.string().min(1, "Patient ID is required"),
+  id: z.string().uuid("Invalid patient ID format"),
 });
 
 export const GET = createApiHandler(

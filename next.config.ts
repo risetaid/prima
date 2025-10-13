@@ -22,6 +22,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: "/pasien/test-whatsapp",
+        destination: "/pasien",
+        permanent: true,
+      },
+      {
         source: "/dashboard/pengingat/:path*",
         destination: "/pengingat/:path*",
         permanent: true,

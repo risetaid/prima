@@ -16,10 +16,19 @@ import { PatientProfileTabCombined } from "@/components/patient/patient-profile-
 import { PatientRemindersTab } from "@/components/patient/patient-reminders-tab";
 import { PatientVerificationTab } from "@/components/patient/patient-verification-tab";
 import PatientResponseHistoryTab from "@/components/patient/patient-response-history-tab";
-import { NavigationCard, NavigationItem } from "@/components/patient/navigation-card";
+import {
+  NavigationCard,
+  NavigationItem,
+} from "@/components/patient/navigation-card";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { Patient as SchemaPatient } from "@/db/schema";
-import { AlertTriangle, User, CheckCircle, Bell, MessageSquare } from "lucide-react";
+import {
+  AlertTriangle,
+  User,
+  CheckCircle,
+  Bell,
+  MessageSquare,
+} from "lucide-react";
 
 interface Patient extends SchemaPatient {
   complianceRate: number;
@@ -112,69 +121,83 @@ export default function PatientDetailPage() {
     },
   ];
 
-  const fetchPatient = useCallback(async (id: string, isPolling = false) => {
-    try {
-      logger.info(`Fetching patient ${id}`, { isPolling, timestamp: new Date().toISOString() });
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-
-      const response = await fetch(`/api/patients/${id}`, {
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const responseJson = await response.json();
-        const data = responseJson.data || responseJson; // Handle both old format and new createApiHandler format
-        logger.info("Patient data fetched successfully", {
-          patientId: id,
-          hasName: !!data.name,
-          responseFormat: responseJson.data ? 'new' : 'old'
+  const fetchPatient = useCallback(
+    async (id: string, isPolling = false) => {
+      try {
+        logger.info(`Fetching patient ${id}`, {
+          isPolling,
+          timestamp: new Date().toISOString(),
         });
 
-        // Check if verification status changed and show toast notification
-        if (
-          isPolling &&
-          prevVerificationStatus.current &&
-          prevVerificationStatus.current !== data.verificationStatus
-        ) {
-          const statusMessages: Record<string, string> = {
-            verified: "✅ Pasien telah memverifikasi WhatsApp!",
-            declined: "❌ Pasien menolak verifikasi WhatsApp",
-            unsubscribed: "🛑 Pasien berhenti dari layanan",
-          };
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-          const message =
-            statusMessages[data.verificationStatus] ||
-            `Status verifikasi diubah menjadi: ${data.verificationStatus}`;
-          toast.success(message);
+        const response = await fetch(`/api/patients/${id}`, {
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const responseJson = await response.json();
+          const data = responseJson.data || responseJson; // Handle both old format and new createApiHandler format
+          logger.info("Patient data fetched successfully", {
+            patientId: id,
+            hasName: !!data.name,
+            responseFormat: responseJson.data ? "new" : "old",
+          });
+
+          // Check if verification status changed and show toast notification
+          if (
+            isPolling &&
+            prevVerificationStatus.current &&
+            prevVerificationStatus.current !== data.verificationStatus
+          ) {
+            const statusMessages: Record<string, string> = {
+              verified: "✅ Pasien telah memverifikasi WhatsApp!",
+              declined: "❌ Pasien menolak verifikasi WhatsApp",
+              unsubscribed: "🛑 Pasien berhenti dari layanan",
+            };
+
+            const message =
+              statusMessages[data.verificationStatus] ||
+              `Status verifikasi diubah menjadi: ${data.verificationStatus}`;
+            toast.success(message);
+          }
+
+          // Update previous status reference
+          prevVerificationStatus.current = data.verificationStatus;
+
+          setPatient(data);
+          setError(null);
+        } else if (response.status === 404 || response.status === 400) {
+          // Invalid patient ID - redirect to 404
+          if (!isPolling) {
+            router.push("/404");
+          }
+          return;
+        } else {
+          logger.error("Failed to fetch patient data", undefined, {
+            patientId: id,
+            status: response.status,
+            statusText: response.statusText,
+          });
+          setError("Gagal memuat data pasien");
         }
-
-        // Update previous status reference
-        prevVerificationStatus.current = data.verificationStatus;
-
-        setPatient(data);
-        setError(null);
-      } else {
-        logger.error("Failed to fetch patient data", undefined, {
-          patientId: id,
-          status: response.status,
-          statusText: response.statusText
-        });
-        setError("Gagal memuat data pasien");
+      } catch (error: unknown) {
+        logger.error(
+          "Error fetching patient:",
+          error instanceof Error ? error : new Error(String(error))
+        );
+        setError("Terjadi kesalahan saat memuat data pasien");
+      } finally {
+        if (!isPolling) {
+          setLoading(false);
+        }
       }
-    } catch (error: unknown) {
-      logger.error("Error fetching patient:", error instanceof Error ? error : new Error(String(error)));
-      setError("Terjadi kesalahan saat memuat data pasien");
-    } finally {
-      if (!isPolling) {
-        setLoading(false);
-      }
-    }
-  }, []);
-
+    },
+    [router]
+  );
 
   const fetchReminderStats = useCallback(async (patientId: string) => {
     try {
@@ -196,12 +219,16 @@ export default function PatientDetailPage() {
         logger.error("Failed to fetch reminder stats", undefined, {
           patientId,
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         setReminderStats(null);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching reminder stats", error instanceof Error ? error : new Error(String(error)), { patientId });
+      logger.error(
+        "Error fetching reminder stats",
+        error instanceof Error ? error : new Error(String(error)),
+        { patientId }
+      );
       setReminderStats(null);
     }
   }, []);
@@ -224,7 +251,10 @@ export default function PatientDetailPage() {
 
         // Check if the endpoint is disabled
         if (data.disabled) {
-          logger.warn("Completed reminders endpoint disabled", { patientId, reason: data.reason });
+          logger.warn("Completed reminders endpoint disabled", {
+            patientId,
+            reason: data.reason,
+          });
           setCompletedReminders([]);
           return;
         }
@@ -233,23 +263,31 @@ export default function PatientDetailPage() {
         if (Array.isArray(data)) {
           setCompletedReminders(data);
         } else {
-          logger.error("Invalid response format for completed reminders", undefined, {
-            patientId,
-            dataType: typeof data,
-            dataKeys: Object.keys(data || {})
-          });
+          logger.error(
+            "Invalid response format for completed reminders",
+            undefined,
+            {
+              patientId,
+              dataType: typeof data,
+              dataKeys: Object.keys(data || {}),
+            }
+          );
           setCompletedReminders([]);
         }
       } else {
         logger.error("Failed to fetch completed reminders", undefined, {
           patientId,
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         setCompletedReminders([]);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching completed reminders", error instanceof Error ? error : new Error(String(error)), { patientId });
+      logger.error(
+        "Error fetching completed reminders",
+        error instanceof Error ? error : new Error(String(error)),
+        { patientId }
+      );
       setCompletedReminders([]);
     }
   }, []);
@@ -295,7 +333,7 @@ export default function PatientDetailPage() {
             oldVersion: lastVersion,
             newVersion: currentVersion,
             oldStatus: patient?.verificationStatus,
-            newStatus: versionData.verificationStatus
+            newStatus: versionData.verificationStatus,
           });
 
           // Immediately fetch full patient data
@@ -303,9 +341,11 @@ export default function PatientDetailPage() {
         }
 
         lastVersion = currentVersion;
-
       } catch (error) {
-        logger.error("Version polling error:", error instanceof Error ? error : new Error(String(error)));
+        logger.error(
+          "Version polling error:",
+          error instanceof Error ? error : new Error(String(error))
+        );
       } finally {
         isPolling = false;
       }
@@ -316,14 +356,16 @@ export default function PatientDetailPage() {
 
     // Poll every 15 seconds when page is visible
     const pollInterval = setInterval(() => {
-      if (document.visibilityState === "visible" && pollCount < maxPollsPerSession) {
+      if (
+        document.visibilityState === "visible" &&
+        pollCount < maxPollsPerSession
+      ) {
         pollVersion();
       }
     }, 15000); // 15 seconds - much more responsive than 5 minutes
 
     return () => clearInterval(pollInterval);
   }, [params.id, fetchPatient, patient?.verificationStatus]);
-
 
   const handleAddReminder = () => {
     if (!patient) return;
@@ -387,8 +429,12 @@ export default function PatientDetailPage() {
       name: patient?.name || "",
       phoneNumber: patient?.phoneNumber || "",
       address: patient?.address || "",
-      birthDate: patient?.birthDate ? new Date(patient.birthDate).toISOString().split('T')[0] : "",
-      diagnosisDate: patient?.diagnosisDate ? new Date(patient.diagnosisDate).toISOString().split('T')[0] : "",
+      birthDate: patient?.birthDate
+        ? new Date(patient.birthDate).toISOString().split("T")[0]
+        : "",
+      diagnosisDate: patient?.diagnosisDate
+        ? new Date(patient.diagnosisDate).toISOString().split("T")[0]
+        : "",
       // Medical info
       cancerStage: patient?.cancerStage || "",
       doctorName: patient?.doctorName || "",
@@ -400,7 +446,10 @@ export default function PatientDetailPage() {
     setIsEditingProfile(false);
   };
 
-  const handleSaveProfile = async (photoData?: { file: File | null; shouldRemove: boolean }) => {
+  const handleSaveProfile = async (photoData?: {
+    file: File | null;
+    shouldRemove: boolean;
+  }) => {
     try {
       let photoUrl = patient?.photoUrl || null;
 
@@ -410,10 +459,10 @@ export default function PatientDetailPage() {
       } else if (photoData?.file) {
         // Upload new photo
         const photoFormData = new FormData();
-        photoFormData.append('photo', photoData.file);
+        photoFormData.append("photo", photoData.file);
 
-        const photoResponse = await fetch('/api/upload?type=patient-photo', {
-          method: 'POST',
+        const photoResponse = await fetch("/api/upload?type=patient-photo", {
+          method: "POST",
           body: photoFormData,
         });
 
@@ -421,7 +470,7 @@ export default function PatientDetailPage() {
           const photoDataResponse = await photoResponse.json();
           photoUrl = photoDataResponse.url;
         } else {
-          toast.error('Gagal mengunggah foto profil');
+          toast.error("Gagal mengunggah foto profil");
           return;
         }
       }
@@ -484,7 +533,7 @@ export default function PatientDetailPage() {
           <header className="bg-white">
             <div className="flex justify-between items-center px-4 py-4">
               <button
-                onClick={() => router.push('/pasien')}
+                onClick={() => router.push("/pasien")}
                 className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
               >
                 <ArrowLeft className="w-6 h-6 text-blue-600" />
@@ -496,8 +545,7 @@ export default function PatientDetailPage() {
         </div>
 
         <main className="relative z-10 pt-4 pb-12">
-          <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
-          </div>
+          <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8"></div>
         </main>
       </div>
     );
@@ -523,7 +571,7 @@ export default function PatientDetailPage() {
           <header className="bg-white">
             <div className="flex justify-between items-center px-4 py-4">
               <button
-                onClick={() => router.push('/pasien')}
+                onClick={() => router.push("/pasien")}
                 className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
               >
                 <ArrowLeft className="w-6 h-6 text-blue-600" />
@@ -578,7 +626,7 @@ export default function PatientDetailPage() {
         <header className="bg-white">
           <div className="flex justify-between items-center px-4 py-4">
             <button
-              onClick={() => router.push('/pasien')}
+              onClick={() => router.push("/pasien")}
               className="p-1 hover:bg-gray-100 rounded-full cursor-pointer"
             >
               <ArrowLeft className="w-6 h-6 text-blue-600" />
@@ -592,9 +640,7 @@ export default function PatientDetailPage() {
       <main className="relative z-10 pt-4 pb-12">
         <div className="w-full px-4 sm:px-6 lg:px-8 space-y-8">
           {/* Patient Header Card */}
-          {loading ? (
-            null
-          ) : patient ? (
+          {loading ? null : patient ? (
             <PatientHeaderCard
               patient={patient}
               onAddReminder={handleAddReminder}
@@ -650,9 +696,9 @@ export default function PatientDetailPage() {
 
             {/* Response History Tab */}
             <TabsContent value="responses">
-              <PatientResponseHistoryTab 
+              <PatientResponseHistoryTab
                 patientId={params.id as string}
-                patientName={patient?.name || ''}
+                patientName={patient?.name || ""}
               />
             </TabsContent>
           </Tabs>
@@ -664,7 +710,7 @@ export default function PatientDetailPage() {
               activeItem={activeTab}
               onItemClick={setActiveTab}
             />
-            
+
             {/* Content based on active item */}
             {activeTab === "profile" && (
               <PatientProfileTabCombined
@@ -695,7 +741,7 @@ export default function PatientDetailPage() {
             {activeTab === "responses" && (
               <PatientResponseHistoryTab
                 patientId={params.id as string}
-                patientName={patient?.name || ''}
+                patientName={patient?.name || ""}
               />
             )}
           </div>
@@ -707,7 +753,7 @@ export default function PatientDetailPage() {
         isOpen={isReminderModalOpen}
         onClose={() => setIsReminderModalOpen(false)}
         onSuccess={handleReminderSuccess}
-        patientName={patient?.name || 'Pasien'}
+        patientName={patient?.name || "Pasien"}
       />
 
       {/* Status Toggle Confirmation Modal */}
@@ -718,8 +764,12 @@ export default function PatientDetailPage() {
         title={patient?.isActive ? "Nonaktifkan Pasien" : "Aktifkan Pasien"}
         description={
           patient?.isActive
-            ? `Apakah Anda yakin ingin menonaktifkan pasien ${patient?.name || 'pasien ini'}? Semua pengingat akan dihentikan dan pasien akan menerima pesan WhatsApp konfirmasi.`
-            : `Apakah Anda yakin ingin mengaktifkan kembali pasien ${patient?.name || 'pasien ini'}? Pasien akan kembali ke status verifikasi awal.`
+            ? `Apakah Anda yakin ingin menonaktifkan pasien ${
+                patient?.name || "pasien ini"
+              }? Semua pengingat akan dihentikan dan pasien akan menerima pesan WhatsApp konfirmasi.`
+            : `Apakah Anda yakin ingin mengaktifkan kembali pasien ${
+                patient?.name || "pasien ini"
+              }? Pasien akan kembali ke status verifikasi awal.`
         }
         confirmText={patient?.isActive ? "Nonaktifkan" : "Aktifkan"}
         variant={patient?.isActive ? "destructive" : "default"}

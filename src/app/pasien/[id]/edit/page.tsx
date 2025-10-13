@@ -1,123 +1,144 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { ArrowLeft, Save } from 'lucide-react'
-import { UserButton } from '@clerk/nextjs'
-import { formatDateInputWIB } from '@/lib/datetime'
-import { toast } from 'sonner'
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, Save } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
+import { formatDateInputWIB } from "@/lib/datetime";
+import { toast } from "sonner";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 interface Patient {
-  id: string
-  name: string
-  phoneNumber: string
-  address?: string
-  birthDate?: string
-  diagnosisDate?: string
-  cancerStage?: string
-  emergencyContactName?: string
-  emergencyContactPhone?: string
-  notes?: string
-  isActive: boolean
+  id: string;
+  name: string;
+  phoneNumber: string;
+  address?: string;
+  birthDate?: string;
+  diagnosisDate?: string;
+  cancerStage?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  notes?: string;
+  isActive: boolean;
 }
 
 export default function EditPatientPage() {
-  const router = useRouter()
-  const params = useParams()
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [patient, setPatient] = useState<Patient | null>(null)
+  const router = useRouter();
+  const params = useParams();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    phoneNumber: '',
-    address: '',
-    birthDate: '',
-    diagnosisDate: '',
-    cancerStage: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-    notes: '',
-    isActive: true
-  })
+    name: "",
+    phoneNumber: "",
+    address: "",
+    birthDate: "",
+    diagnosisDate: "",
+    cancerStage: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    notes: "",
+    isActive: true,
+  });
 
-  const fetchPatient = useCallback(async (id: string) => {
-    try {
-      const response = await fetch(`/api/patients/${id}`)
-      if (response.ok) {
-        const result = await response.json()
-        const data = result.data || result
-        setPatient(data)
+  const fetchPatient = useCallback(
+    async (id: string) => {
+      try {
+        const response = await fetch(`/api/patients/${id}`);
+        if (response.status === 404 || response.status === 400) {
+          router.push("/404");
+          return;
+        }
+        if (response.ok) {
+          const result = await response.json();
+          const data = result.data || result;
+          setPatient(data);
 
-        // Populate form with existing data using WIB timezone
-        setFormData({
-          name: data.name || '',
-          phoneNumber: data.phoneNumber || '',
-          address: data.address || '',
-          birthDate: formatDateInputWIB(data.birthDate),
-          diagnosisDate: formatDateInputWIB(data.diagnosisDate),
-          cancerStage: data.cancerStage || '',
-          emergencyContactName: data.emergencyContactName || '',
-          emergencyContactPhone: data.emergencyContactPhone || '',
-          notes: data.notes || '',
-          isActive: data.isActive
-        })
-      } else {
-        logger.error('Patient not found')
-        router.push('/pasien')
+          // Populate form with existing data using WIB timezone
+          setFormData({
+            name: data.name || "",
+            phoneNumber: data.phoneNumber || "",
+            address: data.address || "",
+            birthDate: formatDateInputWIB(data.birthDate),
+            diagnosisDate: formatDateInputWIB(data.diagnosisDate),
+            cancerStage: data.cancerStage || "",
+            emergencyContactName: data.emergencyContactName || "",
+            emergencyContactPhone: data.emergencyContactPhone || "",
+            notes: data.notes || "",
+            isActive: data.isActive,
+          });
+        } else {
+          logger.error("Patient not found");
+          router.push("/pasien");
+        }
+      } catch (error: unknown) {
+        logger.error(
+          "Error fetching patient:",
+          error instanceof Error ? error : new Error(String(error))
+        );
+        router.push("/pasien");
+      } finally {
+        setLoading(false);
       }
-    } catch (error: unknown) {
-      logger.error('Error fetching patient:', error instanceof Error ? error : new Error(String(error)))
-      router.push('/pasien')
-    } finally {
-      setLoading(false)
-    }
-  }, [router])
+    },
+    [router]
+  );
 
   useEffect(() => {
     if (params.id) {
-      fetchPatient(params.id as string)
+      fetchPatient(params.id as string);
     }
-  }, [params.id, fetchPatient])
+  }, [params.id, fetchPatient]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target
-    setFormData(prev => ({
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
-  }
+      [name]:
+        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
+    e.preventDefault();
+    setSaving(true);
 
     try {
       const response = await fetch(`/api/patients/${params.id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(formData),
-      })
+      });
 
       if (response.ok) {
-        router.push(`/pasien/${params.id}`)
+        router.push(`/pasien/${params.id}`);
       } else {
-        const error = await response.json()
-        toast.error('Gagal Update Pasien', {
-          description: `Error: ${error.error || 'Terjadi kesalahan pada server'}`
-        })
+        const error = await response.json();
+        toast.error("Gagal Update Pasien", {
+          description: `Error: ${
+            error.error || "Terjadi kesalahan pada server"
+          }`,
+        });
       }
     } catch (error: unknown) {
-      logger.error('Error updating patient:', error instanceof Error ? error : new Error(String(error)))
-      toast.error('Kesalahan Jaringan', {
-        description: 'Tidak dapat memperbarui data pasien. Periksa koneksi internet Anda.'
-      })
+      logger.error(
+        "Error updating patient:",
+        error instanceof Error ? error : new Error(String(error))
+      );
+      toast.error("Kesalahan Jaringan", {
+        description:
+          "Tidak dapat memperbarui data pasien. Periksa koneksi internet Anda.",
+      });
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   if (loading) {
     return null;
@@ -130,7 +151,7 @@ export default function EditPatientPage() {
           <p className="text-gray-600">Patient not found</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -139,7 +160,7 @@ export default function EditPatientPage() {
       <header className="bg-white shadow-sm">
         <div className="flex justify-between items-center px-4 py-4">
           <div className="flex items-center space-x-3">
-            <button 
+            <button
               onClick={() => router.back()}
               className="p-2 hover:bg-gray-100 rounded-full cursor-pointer"
             >
@@ -153,7 +174,10 @@ export default function EditPatientPage() {
 
       {/* Main Content */}
       <main className="px-4 py-6">
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg p-6 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white rounded-lg p-6 shadow-sm"
+        >
           {/* Nama Pasien */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -314,10 +338,10 @@ export default function EditPatientPage() {
             ) : (
               <Save className="w-5 h-5 mr-2" />
             )}
-            {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+            {saving ? "Menyimpan..." : "Simpan Perubahan"}
           </button>
         </form>
       </main>
     </div>
-  )
+  );
 }
