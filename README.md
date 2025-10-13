@@ -10,12 +10,14 @@ A comprehensive medical patient management system designed to streamline healthc
 ## 🌟 Features
 
 ### Patient Management
+
 - Comprehensive patient records with medical history
 - Indonesian phone number validation and formatting
 - WhatsApp verification system
 - Patient activity tracking and compliance monitoring
 
 ### Automated Reminders
+
 - Schedule one-time or recurring WhatsApp reminders
 - Support for daily, weekly, and monthly recurrence
 - Link educational content to reminders
@@ -23,6 +25,7 @@ A comprehensive medical patient management system designed to streamline healthc
 - Confirmation tracking system
 
 ### Content Management System
+
 - Create and manage health education articles
 - YouTube video integration with auto-fetching
 - Rich text editing with Quill editor
@@ -30,6 +33,7 @@ A comprehensive medical patient management system designed to streamline healthc
 - Draft/publish workflow
 
 ### WhatsApp Integration
+
 - Two-way communication with patients
 - Webhook support for incoming messages
 - Context-aware conversation handling
@@ -37,6 +41,7 @@ A comprehensive medical patient management system designed to streamline healthc
 - Message delivery and read receipts
 
 ### Admin Features
+
 - User management with role-based access control
 - Message template management
 - System analytics and reporting
@@ -47,7 +52,7 @@ A comprehensive medical patient management system designed to streamline healthc
 
 ### Prerequisites
 
-- **Bun** v1.0+ or **Node.js** 18+
+- **Bun** v1.0+ (required)
 - **PostgreSQL** database (Neon recommended)
 - **Clerk** account for authentication
 - **Fonnte** account for WhatsApp integration
@@ -55,35 +60,36 @@ A comprehensive medical patient management system designed to streamline healthc
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/your-org/prima.git
    cd prima
    ```
 
 2. **Install dependencies**
+
    ```bash
    bun install
-   # or
-   npm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Fill in your environment variables (see [Configuration](#configuration))
 
 4. **Set up the database**
+
    ```bash
    bunx drizzle-kit push
    ```
 
 5. **Run the development server**
+
    ```bash
-   bun dev
-   # or
-   npm run dev
+   bun run dev
    ```
 
 6. **Open your browser**
@@ -164,30 +170,36 @@ bun test tests/lib/api-client.test.ts
 ### Test Coverage
 
 Current test coverage:
+
 - **API Client**: 67% statement coverage, 68% branch coverage
-- **Error Handler**: 69% statement coverage, 81% branch coverage  
+- **Error Handler**: 69% statement coverage, 81% branch coverage
 - **API Schemas**: 99% statement coverage, 75% branch coverage
 
 ## 🛠️ Tech Stack
 
 ### Core
+
 - **Next.js 15** - React framework with App Router
 - **React 19** - UI library
 - **TypeScript** - Type-safe JavaScript
 
 ### Database
+
 - **Neon PostgreSQL** - Serverless PostgreSQL
 - **Drizzle ORM** - Type-safe database toolkit
 
 ### Authentication
+
 - **Clerk** - Complete auth solution
 
 ### UI
+
 - **Tailwind CSS** - Utility-first CSS
 - **Shadcn/ui** - React component library
 - **Radix UI** - Headless UI primitives
 
 ### Validation & Testing
+
 - **Zod** - Schema validation
 - **Vitest** - Unit testing framework
 
@@ -237,6 +249,7 @@ bun start
 ### Commit Convention
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
+
 - `feat:` New feature
 - `fix:` Bug fix
 - `docs:` Documentation changes
@@ -277,6 +290,7 @@ Developed and maintained by the PRIMA development team.
 ## 📞 Support
 
 For questions or issues:
+
 1. Check the [documentation](./docs/)
 2. Review [API Analysis Plan](./API_ANALYSIS_PLAN.md)
 3. Contact the development team
