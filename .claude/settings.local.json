@@ -35,7 +35,15 @@
       "mcp__filesystem__read_text_file",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "mcp__sequentialthinking__sequentialthinking"
+      "mcp__sequentialthinking__sequentialthinking",
+      "Bash(powershell:*)",
+      "mcp__filesystem__create_directory",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:vercel.com)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(git rev-parse:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

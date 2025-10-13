@@ -18,8 +18,8 @@ const preloadAdminChunks = () => {
 const preloadAdminPages = () => {
   if (typeof window !== 'undefined') {
     Promise.all([
-      import('@/app/(shell)/admin/users/page'),
-      import('@/app/(shell)/admin/templates/page'),
+      import('@/app/admin/users/page'),
+      import('@/app/admin/templates/page'),
     ]).catch(() => {
       // Silently fail if preloading fails
     });

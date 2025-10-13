@@ -57,3 +57,7 @@ _archive/
 
 convo.tmp
 public/sw.js
+
+.claude/commands
+.specify
+specs
