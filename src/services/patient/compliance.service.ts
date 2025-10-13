@@ -24,10 +24,13 @@ export interface ComplianceStats {
 export class ComplianceService {
   /**
    * Calculate compliance rate
+   * Based on completed reminders only: dipatuhi / (dipatuhi + tidakDipatuhi)
+   * This matches the logic in stats API
    */
-  private computeRate(totalReminders: number, completedReminders: number): number {
-    if (!totalReminders || totalReminders <= 0) return 0;
-    const rate = Math.round((completedReminders / totalReminders) * 100);
+  private computeRate(dipatuhi: number, tidakDipatuhi: number): number {
+    const total = dipatuhi + tidakDipatuhi;
+    if (!total || total <= 0) return 0;
+    const rate = Math.round((dipatuhi / total) * 100);
     return Math.max(0, Math.min(100, rate));
   }
 
@@ -68,12 +71,15 @@ export class ComplianceService {
     let failed = 0;
     let automated = 0;
     let manual = 0;
+    let dipatuhi = 0;
+    let tidakDipatuhi = 0;
 
     for (const reminder of allReminders) {
       const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
 
       if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
         completed++;
+        dipatuhi++;  // All completed reminders are considered complied
         if (isManuallyConfirmed) manual++;
         else automated++;
       } else if (reminder.status === 'FAILED') {
@@ -83,8 +89,12 @@ export class ComplianceService {
       }
     }
 
+    // Currently no explicit "tidakDipatuhi" tracking
+    // In future: track explicit non-compliance from volunteer reports
+    tidakDipatuhi = 0;
+
     const total = allReminders.length;
-    const complianceRate = this.computeRate(total, completed);
+    const complianceRate = this.computeRate(dipatuhi, tidakDipatuhi);
 
     return {
       totalReminders: total,
