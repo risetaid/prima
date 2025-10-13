@@ -12,6 +12,8 @@
     "analyze-bundle": "webpack-bundle-analyzer bundle-stats.json",
     "start": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "ci:check": "bun run lint && bun run typecheck",
     "postinstall": "bun run drizzle-kit generate",
     "db:generate": "bun run drizzle-kit generate",
     "db:migrate": "bun run drizzle-kit migrate",
