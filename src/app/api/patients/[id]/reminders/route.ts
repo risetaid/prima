@@ -143,9 +143,7 @@ async function getCompletedReminders(patientId: string, userId: string) {
         isNull(reminders.deletedAt),
         inArray(reminders.status, ['DELIVERED', 'SENT', 'PENDING', 'FAILED'] as const)
       )
-    )
-    .orderBy(desc(reminders.confirmationResponseAt))
-    .limit(50);
+    );
 
   // Get manual confirmations for these reminders
   const reminderIds = allReminders.map(r => r.id);
@@ -184,7 +182,14 @@ async function getCompletedReminders(patientId: string, userId: string) {
         responseSource: (isManual ? 'MANUAL_ENTRY' : 'PATIENT_TEXT') as 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM',
         manuallyConfirmed: isManual,
       };
-    });
+    })
+    .sort((a, b) => {
+      // Sort by confirmedAt descending (most recent first)
+      const dateA = new Date(a.confirmedAt).getTime();
+      const dateB = new Date(b.confirmedAt).getTime();
+      return dateB - dateA;
+    })
+    .slice(0, 5); // Return only 5 most recent
 
   logger.info('Completed reminders fetched', {
     patientId,
