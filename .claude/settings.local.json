@@ -43,7 +43,8 @@
       "mcp__context7__resolve-library-id",
       "mcp__context7__get-library-docs",
       "Bash(git rev-parse:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "mcp__filesystem__edit_file"
     ],
     "deny": [],
     "ask": []

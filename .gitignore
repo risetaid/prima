@@ -40,24 +40,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-DOCS.md
-ERD.md
-
-prima_backup.sql
-# clerk configuration (can include secrets)
-/.clerk/
-
-# archived files
-_archive/
-
-convo.tmp
 public/sw.js
-
-.claude/commands
-.specify
-specs
