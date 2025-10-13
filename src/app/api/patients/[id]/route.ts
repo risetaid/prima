@@ -106,4 +106,3 @@ export const DELETE = createApiHandler(
     return result;
   }
 );
-

@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: "/pasien/overview",
+        destination: "/pasien",
+        permanent: true,
+      },
+      {
         source: "/dashboard/pengingat/:path*",
         destination: "/pengingat/:path*",
         permanent: true,
