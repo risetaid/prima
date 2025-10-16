@@ -1,0 +1,13 @@
+[test]
+preload = ["./tests/setup.ts"]
+timeout = 30000
+
+[bundle]
+splitting = false
+
+[require]
+root = "."
+
+[[alias]]
+name = "@"
+path = "./src"
