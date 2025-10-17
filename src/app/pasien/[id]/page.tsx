@@ -239,7 +239,7 @@ export default function PatientDetailPage() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=completed`,
+        `/api/patients/${patientId}/reminders?filter=completed&page=1&limit=5`,
         { signal: controller.signal }
       );
 
@@ -247,39 +247,85 @@ export default function PatientDetailPage() {
 
       if (response.ok) {
         const responseJson = await response.json();
-        const data = responseJson.data || responseJson; // Handle both formats
+
+        // Response structure: { success: true, data: { data: [...], pagination: {...} } }
+        logger.info("Completed reminders raw response:", {
+          patientId,
+          hasData: !!responseJson.data,
+          hasPagination: !!responseJson.pagination,
+          isDataArray: Array.isArray(responseJson.data),
+          isResponseArray: Array.isArray(responseJson),
+          responseType: typeof responseJson,
+          topLevelKeys: Object.keys(responseJson || {}),
+        });
+
+        // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
+        if (
+          responseJson.data &&
+          responseJson.data.data &&
+          responseJson.data.pagination &&
+          Array.isArray(responseJson.data.data)
+        ) {
+          logger.info("Using apiSuccess paginated format", { patientId });
+          setCompletedReminders(responseJson.data.data);
+          return;
+        }
+
+        // Handle paginated response format { data: [...], pagination: {...} }
+        if (
+          responseJson.data &&
+          responseJson.pagination &&
+          Array.isArray(responseJson.data)
+        ) {
+          logger.info("Using paginated format", { patientId });
+          setCompletedReminders(responseJson.data);
+          return;
+        }
+
+        // Handle old format where response.data is the reminders array
+        if (Array.isArray(responseJson.data)) {
+          logger.info("Using data array format", { patientId });
+          setCompletedReminders(responseJson.data);
+          return;
+        }
+
+        // Handle direct array response (legacy)
+        if (Array.isArray(responseJson)) {
+          logger.info("Using direct array format", { patientId });
+          setCompletedReminders(responseJson);
+          return;
+        }
 
         // Check if the endpoint is disabled
-        if (data.disabled) {
+        if (responseJson.disabled) {
           logger.warn("Completed reminders endpoint disabled", {
             patientId,
-            reason: data.reason,
+            reason: responseJson.reason,
           });
           setCompletedReminders([]);
           return;
         }
 
-        // Process the data if it's valid
-        if (Array.isArray(data)) {
-          setCompletedReminders(data);
-        } else {
-          logger.error(
-            "Invalid response format for completed reminders",
-            undefined,
-            {
-              patientId,
-              dataType: typeof data,
-              dataKeys: Object.keys(data || {}),
-            }
-          );
-          setCompletedReminders([]);
-        }
+        // If none of the above, log error with more details
+        logger.error(
+          "Invalid response format for completed reminders",
+          new Error("Response structure not recognized"),
+          {
+            patientId,
+            operation: "fetch-completed-reminders",
+          }
+        );
+        setCompletedReminders([]);
       } else {
-        logger.error("Failed to fetch completed reminders", undefined, {
-          patientId,
-          status: response.status,
-          statusText: response.statusText,
-        });
+        logger.error(
+          "Failed to fetch completed reminders",
+          new Error(`HTTP ${response.status}`),
+          {
+            patientId,
+            status: response.status,
+            statusText: response.statusText,
+          }
+        );
         setCompletedReminders([]);
       }
     } catch (error: unknown) {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Calendar } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { ConfirmationModal } from "@/components/ui/confirmation-modal";
 import { toast } from "@/components/ui/toast";
@@ -10,7 +10,7 @@ import { ReminderItem } from "@/components/reminder/ReminderItem";
 import { EditScheduledReminderModal } from "@/components/reminder/EditScheduledReminderModal";
 import { FloatingActionButtons } from "@/components/reminder/FloatingActionButtons";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 interface ContentItem {
   id: string;
   title: string;
@@ -37,6 +37,15 @@ interface ScheduledReminder {
   attachedContent?: ContentItem[];
 }
 
+interface PaginationMetadata {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function ScheduledRemindersPage() {
   const router = useRouter();
   const params = useParams();
@@ -47,6 +56,8 @@ export default function ScheduledRemindersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedReminder, setSelectedReminder] =
     useState<ScheduledReminder | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMetadata | null>(null);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -62,37 +73,89 @@ export default function ScheduledRemindersPage() {
     onConfirm: () => {},
   });
 
-
-
   useEffect(() => {
     if (params.id) {
-      fetchScheduledReminders(params.id as string);
+      fetchScheduledReminders(params.id as string, currentPage);
     }
-  }, [params.id]);
+  }, [params.id, currentPage]);
 
-  const fetchScheduledReminders = async (patientId: string) => {
+  const fetchScheduledReminders = async (patientId: string, page: number) => {
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=scheduled`
+        `/api/patients/${patientId}/reminders?filter=scheduled&page=${page}&limit=10`
       );
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
-        logger.info('📅 Scheduled reminders response:', { success: result.success, hasData: !!result.data, count: Array.isArray(data) ? data.length : 'not-array' });
-        const normalized = Array.isArray(data) ? data : [];
-        setReminders(normalized);
-      } else {
-        logger.error("Failed to fetch scheduled reminders");
+
+        // Response structure: { success: true, data: { data: [...], pagination: {...} } }
+        logger.info("📅 Scheduled reminders raw response:", {
+          patientId,
+          hasData: !!result.data,
+          hasPagination: !!result.pagination,
+        });
+
+        // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
+        if (
+          result.data &&
+          result.data.data &&
+          result.data.pagination &&
+          Array.isArray(result.data.data)
+        ) {
+          logger.info("📅 Scheduled reminders response (paginated):", {
+            page,
+            operation: "fetch-scheduled",
+          });
+          setReminders(result.data.data);
+          setPagination(result.data.pagination);
+          return;
+        }
+
+        // Handle direct paginated format { data: [...], pagination: {...} }
+        if (result.data && result.pagination && Array.isArray(result.data)) {
+          logger.info("📅 Scheduled reminders response (direct paginated):", {
+            page,
+            operation: "fetch-scheduled",
+          });
+          setReminders(result.data);
+          setPagination(result.pagination);
+          return;
+        }
+
+        // If neither format matches, log error
+        logger.error(
+          "Invalid response format for scheduled reminders",
+          new Error("Validation failed"),
+          {
+            patientId,
+            operation: "fetch-scheduled",
+          }
+        );
         setReminders([]);
+        setPagination(null);
+      } else {
+        logger.error(
+          "Failed to fetch scheduled reminders",
+          new Error(`HTTP ${response.status}`),
+          {
+            patientId,
+            operation: "fetch-scheduled",
+          }
+        );
+        setReminders([]);
+        setPagination(null);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching scheduled reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching scheduled reminders:",
+        error instanceof Error ? error : new Error(String(error)),
+        { patientId, operation: "fetch-scheduled" }
+      );
       setReminders([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
   };
-
   const toggleReminderSelection = (reminderId: string) => {
     setSelectedReminders((prev) =>
       prev.includes(reminderId)
@@ -147,7 +210,10 @@ export default function ScheduledRemindersPage() {
             });
           }
         } catch (error: unknown) {
-          logger.error("Error deleting reminders:", error instanceof Error ? error : new Error(String(error)));
+          logger.error(
+            "Error deleting reminders:",
+            error instanceof Error ? error : new Error(String(error))
+          );
           toast.error("Gagal menghapus pengingat", {
             description: "Terjadi kesalahan jaringan",
           });
@@ -167,7 +233,11 @@ export default function ScheduledRemindersPage() {
     setSelectedReminder(null);
   };
 
-  const handleEditReminder = async (time: string, message: string, content: ContentItem[]) => {
+  const handleEditReminder = async (
+    time: string,
+    message: string,
+    content: ContentItem[]
+  ) => {
     if (!selectedReminder) return;
 
     try {
@@ -196,7 +266,7 @@ export default function ScheduledRemindersPage() {
         toast.success("Pengingat berhasil diperbarui");
         // Refresh the reminders
         if (params.id) {
-          fetchScheduledReminders(params.id as string);
+          fetchScheduledReminders(params.id as string, currentPage);
         }
       } else {
         const error = await response.json();
@@ -205,10 +275,25 @@ export default function ScheduledRemindersPage() {
         });
       }
     } catch (error: unknown) {
-      logger.error("Error updating reminder:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error updating reminder:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memperbarui pengingat", {
         description: "Terjadi kesalahan jaringan",
       });
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination?.hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (pagination?.hasPreviousPage) {
+      setCurrentPage(currentPage - 1);
     }
   };
 
@@ -275,8 +360,7 @@ export default function ScheduledRemindersPage() {
         </header>
 
         {/* Main Content */}
-        <main className="px-4 py-6">
-        </main>
+        <main className="px-4 py-6"></main>
       </div>
     );
   }
@@ -334,6 +418,39 @@ export default function ScheduledRemindersPage() {
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {pagination && pagination.total > 0 && (
+          <div className="mt-8 flex items-center justify-between">
+            <button
+              onClick={handlePreviousPage}
+              disabled={!pagination.hasPreviousPage || loading}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                pagination.hasPreviousPage && !loading
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="text-sm font-medium text-gray-700">
+              Halaman {pagination.page} dari {pagination.totalPages}
+            </div>
+
+            <button
+              onClick={handleNextPage}
+              disabled={!pagination.hasNextPage || loading}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                pagination.hasNextPage && !loading
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Floating Action Buttons */}

@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Download, Clock } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 interface PendingReminder {
   id: string;
   scheduledTime: string;
@@ -21,54 +27,110 @@ interface PendingReminder {
   manuallyConfirmed?: boolean;
 }
 
+interface PaginationMetadata {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export default function PendingUpdatePage() {
   const router = useRouter();
   const params = useParams();
   const [reminders, setReminders] = useState<PendingReminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<PaginationMetadata | null>(null);
 
   useEffect(() => {
     if (params.id) {
-      fetchPendingReminders(params.id as string);
+      fetchPendingReminders(params.id as string, currentPage);
     }
-  }, [params.id]);
+  }, [params.id, currentPage]);
 
-  const fetchPendingReminders = async (patientId: string) => {
+  const fetchPendingReminders = async (patientId: string, page: number) => {
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=pending`
+        `/api/patients/${patientId}/reminders?filter=pending&page=${page}&limit=10`
       );
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
-        logger.info('⏰ Pending reminders response (mobile):', {
-          success: result.success,
+
+        // Response structure: { success: true, data: { data: [...], pagination: {...} } }
+        logger.info("⏰ Pending reminders raw response:", {
+          patientId,
           hasData: !!result.data,
-          dataType: typeof data,
-          isArray: Array.isArray(data),
-          count: Array.isArray(data) ? data.length : 'not-array',
-          sampleData: Array.isArray(data) ? data.slice(0, 2).map(item => ({
-            id: item.id,
-            hasReminderDate: !!item.reminderDate,
-            hasScheduledTime: !!item.scheduledTime,
-            hasCustomMessage: !!item.customMessage,
-            confirmationStatus: item.confirmationStatus
-          })) : null
+          hasPagination: !!result.pagination,
         });
-        const normalized = Array.isArray(data)
-          ? data.map((item) => ({
-              ...item,
-              manuallyConfirmed: Boolean(item.manuallyConfirmed),
-            }))
-          : [];
-        setReminders(normalized as PendingReminder[]);
-      } else {
-        logger.error("Failed to fetch pending reminders");
+
+        // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
+        if (
+          result.data &&
+          result.data.data &&
+          result.data.pagination &&
+          Array.isArray(result.data.data)
+        ) {
+          logger.info("⏰ Pending reminders response (paginated):", {
+            page,
+            operation: "fetch-pending",
+          });
+          const normalized = result.data.data.map((item: PendingReminder) => ({
+            ...item,
+            manuallyConfirmed: Boolean(item.manuallyConfirmed),
+          }));
+          setReminders(normalized);
+          setPagination(result.data.pagination);
+          return;
+        }
+
+        // Handle direct paginated format { data: [...], pagination: {...} }
+        if (result.data && result.pagination && Array.isArray(result.data)) {
+          logger.info("⏰ Pending reminders response (direct paginated):", {
+            page,
+            operation: "fetch-pending",
+          });
+          const normalized = result.data.map((item: PendingReminder) => ({
+            ...item,
+            manuallyConfirmed: Boolean(item.manuallyConfirmed),
+          }));
+          setReminders(normalized);
+          setPagination(result.pagination);
+          return;
+        }
+
+        // If neither format matches, log error
+        logger.error(
+          "Invalid response format for pending reminders",
+          new Error("Validation failed"),
+          {
+            patientId,
+            operation: "fetch-pending",
+          }
+        );
         setReminders([]);
+        setPagination(null);
+      } else {
+        logger.error(
+          "Failed to fetch pending reminders",
+          new Error(`HTTP ${response.status}`),
+          {
+            patientId,
+            operation: "fetch-pending",
+          }
+        );
+        setReminders([]);
+        setPagination(null);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching pending reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching pending reminders:",
+        error instanceof Error ? error : new Error(String(error)),
+        { patientId, operation: "fetch-pending" }
+      );
       setReminders([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -113,12 +175,27 @@ export default function PendingUpdatePage() {
         });
       }
     } catch (error: unknown) {
-      logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error confirming reminder:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("❌ Kesalahan Jaringan", {
         description:
           "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
         duration: 5000,
       });
+    }
+  };
+
+  const handleNextPage = () => {
+    if (pagination?.hasNextPage) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (pagination?.hasPreviousPage) {
+      setCurrentPage(currentPage - 1);
     }
   };
 
@@ -220,12 +297,11 @@ export default function PendingUpdatePage() {
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-900 mb-1">
-                        {reminder.customMessage ||
-                          `Minum obat`}
+                        {reminder.customMessage || `Minum obat`}
                       </h3>
-                       <p className="text-gray-600 text-sm">
-                         {formatDate(reminder.reminderDate)}
-                       </p>
+                      <p className="text-gray-600 text-sm">
+                        {formatDate(reminder.reminderDate)}
+                      </p>
                       {/* Automated Confirmation Status */}
                       {hasAutomatedConfirmation && (
                         <div className="mt-2 flex items-center space-x-2">
@@ -242,7 +318,8 @@ export default function PendingUpdatePage() {
                           </div>
                           {reminder.confirmationResponse && (
                             <span className="text-xs text-blue-200">
-                              Response: &quot;{reminder.confirmationResponse}&quot;
+                              Response: &quot;{reminder.confirmationResponse}
+                              &quot;
                             </span>
                           )}
                         </div>
@@ -312,13 +389,47 @@ export default function PendingUpdatePage() {
           )}
         </div>
 
+        {/* Pagination Controls */}
+        {pagination && pagination.total > 0 && (
+          <div className="mt-8 flex items-center justify-between">
+            <button
+              onClick={handlePreviousPage}
+              disabled={!pagination.hasPreviousPage || loading}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                pagination.hasPreviousPage && !loading
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="text-sm font-medium text-gray-700">
+              Halaman {pagination.page} dari {pagination.totalPages}
+            </div>
+
+            <button
+              onClick={handleNextPage}
+              disabled={!pagination.hasNextPage || loading}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                pagination.hasNextPage && !loading
+                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+              }`}
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* Info Text */}
         {reminders.length > 0 && (
           <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
             <p className="text-sm text-gray-600">
-              <strong>Petunjuk:</strong> Tekan &quot;Ya&quot; jika pasien sudah minum obat
-              setelah dikunjungi, atau &quot;Tidak&quot; jika pasien belum minum obat.
-              Status ini akan membantu menghitung tingkat kepatuhan pasien.
+              <strong>Petunjuk:</strong> Tekan &quot;Ya&quot; jika pasien sudah
+              minum obat setelah dikunjungi, atau &quot;Tidak&quot; jika pasien
+              belum minum obat. Status ini akan membantu menghitung tingkat
+              kepatuhan pasien.
             </p>
           </div>
         )}

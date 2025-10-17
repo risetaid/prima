@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, MessageSquare, Clock } from "lucide-react";
+import { ArrowLeft, MessageSquare, Clock, ChevronUp } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 interface ReminderData {
   id: string;
   manuallyConfirmed?: boolean;
@@ -26,21 +26,37 @@ interface AllReminder {
   originalStatus?: string;
 }
 
-
-
-
-
 export default function AllRemindersPage() {
   const router = useRouter();
   const params = useParams();
   const [reminders, setReminders] = useState<AllReminder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     if (params.id) {
       fetchAllReminders(params.id as string);
     }
   }, [params.id]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show button after scrolling 100vh (approximately 100% of viewport height)
+      const scrolledDistance = window.scrollY;
+      const viewportHeight = window.innerHeight;
+      setShowBackToTop(scrolledDistance > viewportHeight);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
 
   const fetchAllReminders = async (patientId: string) => {
     try {
@@ -56,26 +72,34 @@ export default function AllRemindersPage() {
       const allData = allResult.data || allResult;
       const remindersData = allData.reminders || [];
 
-      logger.info('📋 All reminders response:', {
+      logger.info("📋 All reminders response:", {
         success: allResult.success,
         hasData: !!allResult.data,
-        remindersCount: Array.isArray(remindersData) ? remindersData.length : 'not-array'
+        remindersCount: Array.isArray(remindersData)
+          ? remindersData.length
+          : "not-array",
       });
 
       const allReminders = remindersData.map((reminder: ReminderData) => {
         const manuallyConfirmed = Boolean(reminder.manuallyConfirmed);
-        const confirmationStatus = reminder.confirmationStatus as AllReminder["confirmationStatus"] | undefined;
+        const confirmationStatus = reminder.confirmationStatus as
+          | AllReminder["confirmationStatus"]
+          | undefined;
         const status = reminder.status as string | undefined;
 
         let mappedStatus: AllReminder["status"] = "scheduled";
 
-        if (confirmationStatus === 'CONFIRMED' || manuallyConfirmed) {
+        if (confirmationStatus === "CONFIRMED" || manuallyConfirmed) {
           mappedStatus = "completed_taken";
-        } else if (confirmationStatus === 'MISSED') {
+        } else if (confirmationStatus === "MISSED") {
           mappedStatus = "completed_not_taken";
-        } else if (status && ['SENT', 'DELIVERED'].includes(status) && !manuallyConfirmed) {
+        } else if (
+          status &&
+          ["SENT", "DELIVERED"].includes(status) &&
+          !manuallyConfirmed
+        ) {
           mappedStatus = "pending";
-        } else if (status && ['PENDING', 'FAILED'].includes(status)) {
+        } else if (status && ["PENDING", "FAILED"].includes(status)) {
           mappedStatus = "scheduled";
         }
 
@@ -108,7 +132,10 @@ export default function AllRemindersPage() {
 
       setReminders(allReminders);
     } catch (error: unknown) {
-      logger.error("Error fetching all reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching all reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       setReminders([]);
     } finally {
       setLoading(false);
@@ -194,7 +221,7 @@ export default function AllRemindersPage() {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-white">
+      <header className="bg-white sticky top-0 z-10">
         <div className="flex justify-between items-center px-4 py-4">
           <button
             onClick={() => router.back()}
@@ -241,7 +268,8 @@ export default function AllRemindersPage() {
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <h3 className="font-semibold mb-1">
-                              {reminder.message || reminder.customMessage ||
+                              {reminder.message ||
+                                reminder.customMessage ||
                                 `Minum obat`}
                             </h3>
                             <p className="text-sm opacity-90">
@@ -296,7 +324,8 @@ export default function AllRemindersPage() {
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <h3 className="font-semibold mb-1">
-                                {reminder.message || reminder.customMessage ||
+                                {reminder.message ||
+                                  reminder.customMessage ||
                                   `Minum obat`}
                               </h3>
                               <p className="text-sm opacity-90">
@@ -358,7 +387,8 @@ export default function AllRemindersPage() {
                             <div className="flex justify-between items-start">
                               <div className="flex-1">
                                 <h3 className="font-semibold mb-1">
-                                  {reminder.message || reminder.customMessage ||
+                                  {reminder.message ||
+                                    reminder.customMessage ||
                                     `Minum obat`}
                                 </h3>
                                 <p className="text-sm opacity-90">
@@ -431,6 +461,17 @@ export default function AllRemindersPage() {
           </div>
         )}
       </main>
+
+      {/* Back to Top Button - Mobile Only */}
+      {showBackToTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 md:hidden bg-blue-600 hover:bg-blue-700 text-white rounded-full p-3 shadow-lg transition-all duration-300 hover:scale-110"
+          aria-label="Back to top"
+        >
+          <ChevronUp className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
 }
