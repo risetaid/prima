@@ -8,11 +8,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 
 // Export test utilities globally
-global.describe = describe;
-global.it = it;
-global.expect = expect;
-global.beforeEach = beforeEach;
-global.afterEach = afterEach;
+(globalThis as any).describe = describe;
+(globalThis as any).it = it;
+(globalThis as any).expect = expect;
+(globalThis as any).beforeEach = beforeEach;
+(globalThis as any).afterEach = afterEach;
 
 // Test fixtures - these are dummy values used only for unit testing
 // DO NOT use these values in production
@@ -34,4 +34,3 @@ if (!process.env.FONNTE_DEVICE_ID) {
 if (!process.env.WEBHOOK_SECRET) {
   process.env.WEBHOOK_SECRET = "FIXTURE_WEBHOOK_SECRET";
 }
-process.env.NODE_ENV = "test";

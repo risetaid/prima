@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";
-import { buildGetRequest, buildPostRequest, getResponseStatus } from "../../helpers/request-builder";
+import { buildGetRequest, buildPostRequest, buildPatchRequest, getResponseStatus } from "../../helpers/request-builder";
 import { createMockPatient, mockCreatePatientInput } from "../../fixtures/patient.fixtures";
 import { mockAuthToken } from "../../fixtures/user.fixtures";
 
@@ -125,8 +125,7 @@ describe("Patients API", () => {
         name: "Updated Name",
         age: 50,
       };
-      const request = buildPostRequest("/api/patients/patient-123", updateData, {
-        method: "PATCH",
+      const request = buildPatchRequest("/api/patients/patient-123", updateData, {
         token: mockAuthToken,
       });
       expect(request).toBeDefined();

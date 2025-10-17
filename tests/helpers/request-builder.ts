@@ -162,7 +162,7 @@ export function buildWebhookRequest(
   path: string,
   body: Record<string, unknown>,
   webhookSecret?: string
-): NextRequest {
+): any {
   return buildPostRequest(path, body, {
     headers: {
       "x-webhook-secret": webhookSecret || process.env.WEBHOOK_SECRET || "test_secret",
@@ -178,7 +178,7 @@ export function buildAuthRequest(
   method: string = "GET",
   token: string = "test_token_123",
   body?: Record<string, unknown>
-): NextRequest {
+): any {
   return buildRequest(path, {
     method,
     body,
