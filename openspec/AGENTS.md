@@ -411,6 +411,64 @@ Only add complexity with:
 | Read specific files | Read | Direct file access |
 | Explore unknown scope | Task | Multi-step investigation |
 
+## Git & GitHub Workflow with gh CLI
+
+For all agentic AI git operations, use `gh` CLI instead of legacy `git` commands:
+
+### Creating Pull Requests
+```bash
+# GOOD - Use gh CLI
+gh pr create --title "Feature: Add two-factor auth" --body "Description..." --base main
+gh pr create --draft  # Create as draft PR
+
+# BAD - Don't use git push for PRs
+git push origin feature-branch  # ❌
+```
+
+### Branch Management
+```bash
+# GOOD - Use gh CLI
+gh repo clone                # Clone repository
+gh pr checkout [number]      # Switch to PR branch
+gh pr merge [number]         # Merge PR
+
+# Current branch
+git branch --show-current    # ✅ OK for info
+git status                   # ✅ OK for status
+git diff                     # ✅ OK for review changes
+```
+
+### Issue Management
+```bash
+# Create and manage issues with gh
+gh issue create --title "Bug: Auth fails" --body "Description"
+gh issue list
+gh issue close [number]
+```
+
+### Key Rules for Agentic AI
+- **Never use `git push`** - Always use `gh pr create` for submitting changes
+- **Always review changes** - Run `git status` and `git diff` before any operations
+- **Never use `--force`** flags - Protect repository history
+- **Always check branch** - Confirm you're on correct branch before operations
+- **Document env vars** - If adding new env variables, update `.env.example` and `README.md`
+
+### Example Workflow
+```bash
+# 1. Review current state
+git status                          # See what changed
+git diff --cached                   # See staged changes
+git log --oneline -5                # See recent commits
+
+# 2. Create PR (not push)
+gh pr create --title "fix: resolve auth issue" \
+  --body "Fixes #123. Changes include..." \
+  --base main
+
+# 3. Verify success
+gh pr view [number]
+```
+
 ## Error Recovery
 
 ### Change Conflicts

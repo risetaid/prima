@@ -406,3 +406,34 @@ When triaging a bug or understanding a feature:
 - **No secrets in code** — All credentials from `.env.local`.
 - **Clerk auth required** — Most routes protected by middleware.
 - **Tests required** — New features must include Vitest tests.
+
+---
+
+## Git & GitHub Workflow (AI Agents)
+
+Use `gh` CLI for all Git operations instead of legacy `git` commands:
+
+### Creating Pull Requests
+```bash
+# GOOD - Use gh CLI to create PRs
+gh pr create --title "fix: resolve auth issue" \
+  --body "Fixes #123. Changes include..." \
+  --base main
+
+# BAD - Never use git push
+git push origin feature-branch  # ❌
+```
+
+### Before Any Operation
+```bash
+git status                      # Review what changed
+git diff --cached               # See staged changes
+git log --oneline -5            # Check recent commits
+```
+
+### Key Rules for AI Agents
+- **Never use `git push`** → Always use `gh pr create`
+- **Always review** → Run `git status` and `git diff` before operations
+- **Never use `--force`** → Protect repository history
+- **Check branch** → Confirm current branch with `git branch --show-current`
+- **Document changes** → Update `.env.example`, `README.md`, and specs when needed
