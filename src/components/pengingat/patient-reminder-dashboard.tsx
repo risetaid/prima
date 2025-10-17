@@ -224,13 +224,13 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=completed`,
+        `/api/patients/${patientId}/reminders?filter=completed&page=1&limit=100`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
+        const data = result.data || []; // Extract data from pagination wrapper
 
         // Ensure data is an array, handle empty objects or invalid responses
         const dataArray = Array.isArray(data) ? data : [];
@@ -240,7 +240,8 @@ export function PatientReminderDashboard({
           hasData: !!result.data,
           dataType: typeof data,
           isArray: Array.isArray(data),
-          count: dataArray.length
+          count: dataArray.length,
+          total: result.pagination?.total
         });
 
         const mappedData = dataArray.map((item: CompletedReminderResponse) => ({

@@ -190,52 +190,35 @@ async function getCompletedReminders(patientId: string, userId: string, page?: n
       return dateB - dateA;
     });
 
-  // Check if pagination parameters are provided
-  const hasPageOrLimit = page !== undefined || limit !== undefined;
-  
-  if (hasPageOrLimit) {
-    // Apply pagination with metadata
-    const pageNum = Math.max(1, Number(page) || 1);
-    const limitNum = Math.max(1, Number(limit) || 20);
-    const offset = (pageNum - 1) * limitNum;
-    const total = transformedReminders.length;
-    const totalPages = Math.ceil(total / limitNum);
-    const paginatedReminders = transformedReminders.slice(offset, offset + limitNum);
+  // Always use pagination for consistency
+  const pageNum = Math.max(1, Number(page) || 1);
+  const limitNum = Math.max(1, Number(limit) || 20);
+  const offset = (pageNum - 1) * limitNum;
+  const total = transformedReminders.length;
+  const totalPages = Math.ceil(total / limitNum);
+  const paginatedReminders = transformedReminders.slice(offset, offset + limitNum);
 
-    logger.info('Completed reminders fetched with pagination', {
-      patientId,
-      userId,
-      count: paginatedReminders.length,
-      page: pageNum,
-      limit: limitNum,
-      total,
-      operation: 'fetch_completed_reminders'
-    });
-
-    return {
-      data: paginatedReminders,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages,
-        hasNextPage: pageNum < totalPages,
-        hasPreviousPage: pageNum > 1,
-      }
-    };
-  }
-
-  // Legacy behavior: return only top 5 most recent without pagination metadata
-  const legacyReminders = transformedReminders.slice(0, 5);
-
-  logger.info('Completed reminders fetched (legacy)', {
+  logger.info('Completed reminders fetched', {
     patientId,
     userId,
-    count: legacyReminders.length,
+    count: paginatedReminders.length,
+    page: pageNum,
+    limit: limitNum,
+    total,
     operation: 'fetch_completed_reminders'
   });
 
-  return legacyReminders;
+  return {
+    data: paginatedReminders,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages,
+      hasNextPage: pageNum < totalPages,
+      hasPreviousPage: pageNum > 1,
+    }
+  };
 }
 
 async function getPendingReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {

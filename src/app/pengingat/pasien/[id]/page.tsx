@@ -124,13 +124,13 @@ export default function PatientReminderPage() {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed`, {
+      const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed&page=1&limit=100`, {
         signal: controller.signal
       });
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
+        const data = result.data || []; // Extract data from pagination wrapper
 
         // Ensure data is an array, handle empty objects or invalid responses
         const remindersArray = Array.isArray(data) ? data : [];
@@ -140,7 +140,8 @@ export default function PatientReminderPage() {
           hasData: !!result.data,
           dataType: typeof data,
           isArray: Array.isArray(data),
-          count: remindersArray.length
+          count: remindersArray.length,
+          total: result.pagination?.total
         });
 
         setCompletedReminders(remindersArray);
