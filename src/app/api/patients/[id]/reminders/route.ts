@@ -3,7 +3,7 @@ import { z } from "zod";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations, patients } from "@/db";
-import { eq, and, isNull, desc, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, isNull, desc, asc, gte, lte, inArray, count } from "drizzle-orm";
 import { getWIBTime, shouldSendReminderNow, createWIBDateRange } from "@/lib/datetime";
 import { del, CACHE_KEYS } from "@/lib/cache";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
@@ -330,7 +330,7 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
 
   // Get total count first
   const countResult = await db
-    .select({ count: db.fn.count(reminders.id) })
+    .select({ count: count() })
     .from(reminders)
     .where(and(...conditions));
   const total = Number(countResult[0]?.count || 0);
