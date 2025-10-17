@@ -3,16 +3,19 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 <!-- OPENSPEC:START -->
+
 # OpenSpec Instructions
 
 These instructions are for AI assistants working in this project.
 
 Always open `@/openspec/AGENTS.md` when the request:
+
 - Mentions planning or proposals (words like proposal, spec, change, plan)
 - Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
 - Sounds ambiguous and you need the authoritative spec before coding
 
 Use `@/openspec/AGENTS.md` to learn:
+
 - How to create and apply change proposals
 - Spec format and conventions
 - Project structure and guidelines
@@ -34,6 +37,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 ## Essential Commands
 
 ### Development
+
 ```bash
 bun install              # Install dependencies
 bun dev                  # Start dev server (with Turbopack)
@@ -45,6 +49,7 @@ bun test                 # Run Vitest tests
 ```
 
 ### Database (Drizzle ORM)
+
 ```bash
 bunx drizzle-kit generate    # Generate new migrations from schema changes
 bunx drizzle-kit push        # Apply migrations to database
@@ -53,6 +58,7 @@ bun run nuke-recreate-db     # Full database reset
 ```
 
 ### Single Test Execution
+
 ```bash
 bun test [filename]          # Run specific test file
 ```
@@ -66,11 +72,13 @@ bun test [filename]          # Run specific test file
 The codebase follows a **strict three-layer architecture**:
 
 1. **API Controllers** (`src/app/api/`) — Thin route handlers
+
    - Parse input, validate with Zod schemas
    - Delegate to service layer
    - Return formatted responses
 
 2. **Service Layer** (`src/services/`) — Business logic
+
    - Domain-specific services with methods
    - Repository pattern for data access
    - Type definitions per service
@@ -104,20 +112,20 @@ openspec/            # Spec-driven development
 
 ### Key Technologies
 
-| Layer | Tech | Purpose |
-|-------|------|---------|
-| **Frontend** | Next.js 15 (App Router), React 19, TypeScript | Server & client-side rendering |
-| **Styling** | Tailwind CSS 4, Shadcn/ui, Radix UI | Responsive UI components |
-| **Database** | PostgreSQL (Neon), Drizzle ORM | Type-safe data layer |
-| **Auth** | Clerk 6.31 | User authentication & roles |
-| **Validation** | Zod 4.0 | Runtime schema validation |
-| **Form Handling** | React Hook Form 7.62 | Efficient form state |
-| **WhatsApp** | Fonnte API | Message delivery & webhooks |
-| **Caching** | Redis (ioredis) | Sessions & rate limiting |
-| **File Storage** | MinIO | S3-compatible object storage |
-| **AI** | Anthropic SDK 0.63 | Claude integration |
-| **Testing** | Vitest | Unit tests |
-| **Notifications** | Sonner | Toast UI |
+| Layer             | Tech                                          | Purpose                        |
+| ----------------- | --------------------------------------------- | ------------------------------ |
+| **Frontend**      | Next.js 15 (App Router), React 19, TypeScript | Server & client-side rendering |
+| **Styling**       | Tailwind CSS 4, Shadcn/ui, Radix UI           | Responsive UI components       |
+| **Database**      | PostgreSQL (Neon), Drizzle ORM                | Type-safe data layer           |
+| **Auth**          | Clerk 6.31                                    | User authentication & roles    |
+| **Validation**    | Zod 4.0                                       | Runtime schema validation      |
+| **Form Handling** | React Hook Form 7.62                          | Efficient form state           |
+| **WhatsApp**      | Fonnte API                                    | Message delivery & webhooks    |
+| **Caching**       | Redis (ioredis)                               | Sessions & rate limiting       |
+| **File Storage**  | MinIO                                         | S3-compatible object storage   |
+| **AI**            | Anthropic SDK 0.63                            | Claude integration             |
+| **Testing**       | Vitest                                        | Unit tests                     |
+| **Notifications** | Sonner                                        | Toast UI                       |
 
 ---
 
@@ -219,16 +227,16 @@ src/components/
 
 ### Core Tables
 
-| Table | Purpose |
-|-------|---------|
-| `users` | Volunteers & admins (with Clerk sync) |
-| `patients` | Cancer patients (phone, verification status) |
-| `reminders` | Medication/appointment reminders (recurrence patterns) |
-| `whatsapp_templates` | Message templates with variables |
-| `manual_confirmations` | Volunteer confirmation responses |
-| `medical_records` | Patient medical history |
-| `cms_articles` | Educational content |
-| `conversation_states` | Multi-turn WhatsApp conversation tracking |
+| Table                  | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `users`                | Volunteers & admins (with Clerk sync)                  |
+| `patients`             | Cancer patients (phone, verification status)           |
+| `reminders`            | Medication/appointment reminders (recurrence patterns) |
+| `whatsapp_templates`   | Message templates with variables                       |
+| `manual_confirmations` | Volunteer confirmation responses                       |
+| `medical_records`      | Patient medical history                                |
+| `cms_articles`         | Educational content                                    |
+| `conversation_states`  | Multi-turn WhatsApp conversation tracking              |
 
 ### Key Relations
 
@@ -240,6 +248,7 @@ src/components/
 ### Indexes
 
 Strategic indexes on frequent queries:
+
 - `users.clerkId`, `users.role`, `users.isActive`
 - `patients.phoneNumber`, `patients.verificationStatus`
 - `reminders.patientId`, `reminders.status`, `reminders.scheduledTime`
@@ -277,6 +286,7 @@ export class ReminderService {
 ### Caching Strategy
 
 Multi-layered:
+
 - Redis for sessions & rate limits
 - Response cache for expensive queries
 - Client-side browser cache for static data
@@ -284,6 +294,7 @@ Multi-layered:
 ### Conversation State
 
 `src/services/conversation-state.service.ts` — Manages multi-turn WhatsApp flows:
+
 - Tracks intent extraction
 - Manages confirmation workflows
 - Persists conversation context
@@ -294,15 +305,15 @@ Multi-layered:
 
 ### External Services
 
-| Service | Use | Env Vars |
-|---------|-----|----------|
-| **Clerk** | User auth & webhooks | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` |
-| **Fonnte** | WhatsApp send & incoming | `FONNTE_API_KEY`, `FONNTE_DEVICE_ID` |
-| **YouTube API** | Video metadata | `YOUTUBE_API_KEY` |
-| **MinIO** | File storage | `MINIO_*` credentials |
-| **PostgreSQL** (Neon) | Primary database | `DATABASE_URL` |
-| **Redis** | Caching & sessions | `REDIS_URL` |
-| **Anthropic Claude** | AI responses | `ANTHROPIC_API_KEY` |
+| Service               | Use                      | Env Vars                                    |
+| --------------------- | ------------------------ | ------------------------------------------- |
+| **Clerk**             | User auth & webhooks     | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` |
+| **Fonnte**            | WhatsApp send & incoming | `FONNTE_API_KEY`, `FONNTE_DEVICE_ID`        |
+| **YouTube API**       | Video metadata           | `YOUTUBE_API_KEY`                           |
+| **MinIO**             | File storage             | `MINIO_*` credentials                       |
+| **PostgreSQL** (Neon) | Primary database         | `DATABASE_URL`                              |
+| **Redis**             | Caching & sessions       | `REDIS_URL`                                 |
+| **Anthropic Claude**  | AI responses             | `ANTHROPIC_API_KEY`                         |
 
 ### Webhook Handlers
 
@@ -332,6 +343,7 @@ bun test reminder.test.ts   # Single file
 ### Next.js Configuration
 
 **Output Mode**: Standalone (optimized for Docker)
+
 - Turbopack enabled for fast dev builds
 - PWA support with offline capability
 - Image optimization (AVIF/WebP)
@@ -414,26 +426,50 @@ When triaging a bug or understanding a feature:
 Use `gh` CLI for all Git operations instead of legacy `git` commands:
 
 ### Creating Pull Requests
+
 ```bash
 # GOOD - Use gh CLI to create PRs
 gh pr create --title "fix: resolve auth issue" \
   --body "Fixes #123. Changes include..." \
   --base main
 
+# Create as draft
+gh pr create --draft --title "WIP: feature" --body "Work in progress"
+
 # BAD - Never use git push
 git push origin feature-branch  # ❌
 ```
 
 ### Before Any Operation
+
 ```bash
 git status                      # Review what changed
 git diff --cached               # See staged changes
 git log --oneline -5            # Check recent commits
 ```
 
+### Branch Management with gh CLI
+
+```bash
+# Create and switch to new branch
+gh repo clone                   # Clone repository
+gh pr checkout [number]         # Switch to PR branch
+gh pr merge [number]            # Merge PR
+```
+
+### Issue Management with gh CLI
+
+```bash
+# Create and manage issues
+gh issue create --title "Bug: Auth fails" --body "Description"
+gh issue list
+gh issue close [number]
+```
+
 ### Key Rules for AI Agents
+
 - **Never use `git push`** → Always use `gh pr create`
+- **Never use `git pull`** → Use `gh pr checkout` for PRs
 - **Always review** → Run `git status` and `git diff` before operations
 - **Never use `--force`** → Protect repository history
-- **Check branch** → Confirm current branch with `git branch --show-current`
 - **Document changes** → Update `.env.example`, `README.md`, and specs when needed
