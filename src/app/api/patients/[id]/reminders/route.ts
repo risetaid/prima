@@ -109,7 +109,7 @@ export const GET = createApiHandler(
     // Handle different filter types
     switch (filter) {
       case "completed":
-        return await getCompletedReminders(patientId, user!.id);
+        return await getCompletedReminders(patientId, user!.id, page, limit);
       case "pending":
         return await getPendingReminders(patientId, Number(page), Number(limit), dateFilter);
       case "scheduled":
@@ -121,7 +121,7 @@ export const GET = createApiHandler(
   }
 );
 
-async function getCompletedReminders(patientId: string, userId: string) {
+async function getCompletedReminders(patientId: string, userId: string, page?: number | string, limit?: number | string) {
   // Get completed reminders (confirmed status or manually confirmed)
   const allReminders = await db
     .select({
@@ -188,17 +188,54 @@ async function getCompletedReminders(patientId: string, userId: string) {
       const dateA = new Date(a.confirmedAt).getTime();
       const dateB = new Date(b.confirmedAt).getTime();
       return dateB - dateA;
-    })
-    .slice(0, 5); // Return only 5 most recent
+    });
 
-  logger.info('Completed reminders fetched', {
+  // Check if pagination parameters are provided
+  const hasPageOrLimit = page !== undefined || limit !== undefined;
+  
+  if (hasPageOrLimit) {
+    // Apply pagination with metadata
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.max(1, Number(limit) || 20);
+    const offset = (pageNum - 1) * limitNum;
+    const total = transformedReminders.length;
+    const totalPages = Math.ceil(total / limitNum);
+    const paginatedReminders = transformedReminders.slice(offset, offset + limitNum);
+
+    logger.info('Completed reminders fetched with pagination', {
+      patientId,
+      userId,
+      count: paginatedReminders.length,
+      page: pageNum,
+      limit: limitNum,
+      total,
+      operation: 'fetch_completed_reminders'
+    });
+
+    return {
+      data: paginatedReminders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPreviousPage: pageNum > 1,
+      }
+    };
+  }
+
+  // Legacy behavior: return only top 5 most recent without pagination metadata
+  const legacyReminders = transformedReminders.slice(0, 5);
+
+  logger.info('Completed reminders fetched (legacy)', {
     patientId,
     userId,
-    count: transformedReminders.length,
+    count: legacyReminders.length,
     operation: 'fetch_completed_reminders'
   });
 
-  return transformedReminders;
+  return legacyReminders;
 }
 
 async function getPendingReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
