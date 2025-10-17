@@ -277,7 +277,9 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
     !manuallyConfirmedIds.has(reminder.id)
   );
 
-  return filteredReminders
+  const total = filteredReminders.length;
+  const totalPages = Math.ceil(total / limit);
+  const paginatedReminders = filteredReminders
     .slice(offset, offset + limit)
     .map((reminder) => ({
       id: reminder.id,
@@ -291,6 +293,18 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
       confirmationSentAt: reminder.confirmationSentAt,
       manuallyConfirmed: manuallyConfirmedIds.has(reminder.id),
     }));
+
+  return {
+    data: paginatedReminders,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    }
+  };
 }
 
 async function getScheduledReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
@@ -314,6 +328,15 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
     }
   }
 
+  // Get total count first
+  const countResult = await db
+    .select({ count: db.fn.count(reminders.id) })
+    .from(reminders)
+    .where(and(...conditions));
+  const total = Number(countResult[0]?.count || 0);
+  const totalPages = Math.ceil(total / limit);
+
+  // Get paginated data
   const scheduledReminders = await db
     .select({
       id: reminders.id,
@@ -328,18 +351,31 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
     .limit(limit)
     .offset(offset);
 
-  return scheduledReminders.map((reminder) => {
-    const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
-    const attachedContent = metadata?.attachedContent;
+  const paginatedReminders = scheduledReminders
+    .map((reminder) => {
+      const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
+      const attachedContent = metadata?.attachedContent;
 
-    return {
-      id: reminder.id,
-      scheduledTime: reminder.scheduledTime,
-      nextReminderDate: reminder.startDate.toISOString().split("T")[0],
-      customMessage: reminder.customMessage,
-      attachedContent: Array.isArray(attachedContent) ? attachedContent : [],
-    };
-  });
+      return {
+        id: reminder.id,
+        scheduledTime: reminder.scheduledTime,
+        nextReminderDate: reminder.startDate.toISOString().split("T")[0],
+        customMessage: reminder.customMessage,
+        attachedContent: Array.isArray(attachedContent) ? attachedContent : [],
+      };
+    });
+
+  return {
+    data: paginatedReminders,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPreviousPage: page > 1,
+    }
+  };
 }
 
 async function getAllReminders(patientId: string, includeDeleted: boolean, limit: number, offset: number) {

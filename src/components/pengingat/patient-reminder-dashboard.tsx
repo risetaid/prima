@@ -113,13 +113,13 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=scheduled`,
+        `/api/patients/${patientId}/reminders?filter=scheduled&page=1&limit=100`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
+        const data = result.data || []; // Extract data from pagination wrapper
 
         // Ensure data is an array, handle empty objects or invalid responses
         const dataArray = Array.isArray(data) ? data : [];
@@ -129,7 +129,8 @@ export function PatientReminderDashboard({
           hasData: !!result.data,
           dataType: typeof data,
           isArray: Array.isArray(data),
-          count: dataArray.length
+          count: dataArray.length,
+          total: result.pagination?.total
         });
 
         const mappedData = dataArray.map((item: ScheduledReminderResponse) => ({
@@ -163,13 +164,13 @@ export function PatientReminderDashboard({
 
     try {
       const response = await fetch(
-        `/api/patients/${patientId}/reminders?filter=pending`,
+        `/api/patients/${patientId}/reminders?filter=pending&page=1&limit=100`,
         { signal: controller.signal }
       );
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result; // Unwrap createApiHandler response
+        const data = result.data || []; // Extract data from pagination wrapper
 
         // Ensure data is an array, handle empty objects or invalid responses
         const dataArray = Array.isArray(data) ? data : [];
@@ -180,6 +181,7 @@ export function PatientReminderDashboard({
           dataType: typeof data,
           isArray: Array.isArray(data),
           count: dataArray.length,
+          total: result.pagination?.total,
           sampleData: dataArray.slice(0, 2).map(item => ({
             id: item.id,
             hasReminderDate: !!item.reminderDate,
