@@ -71,6 +71,13 @@
       "when": 1759940019217,
       "tag": "0009_wet_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1760983643331,
+      "tag": "0010_futuristic_corsair",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "manual_confirmations" ADD COLUMN "medications_taken" text[] DEFAULT '{}';
