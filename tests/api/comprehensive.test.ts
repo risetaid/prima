@@ -237,7 +237,7 @@ describe("Create Patient API - POST /api/patients", () => {
   });
 
   it("should validate phone number format", () => {
-    const isValidPhone = (phone) => {
+    const isValidPhone = (phone: string) => {
       const normalized = phone.replace(/\D/g, "");
       return /^62\d{9,12}$/.test(normalized);
     };
@@ -255,7 +255,7 @@ describe("Create Patient API - POST /api/patients", () => {
   });
 
   it("should require all mandatory fields", () => {
-    const isValid = (data) => {
+    const isValid = (data: any) => {
       return !!(data.name && data.phoneNumber && data.age);
     };
 
@@ -484,7 +484,7 @@ describe("Create Article API - POST /api/cms/articles", () => {
   });
 
   it("should auto-generate slug from title", () => {
-    const generateSlug = (title) => {
+    const generateSlug = (title: string) => {
       return title
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, "")
@@ -512,7 +512,7 @@ describe("CMS Videos API - GET /api/cms/videos", () => {
   });
 
   it("should validate YouTube URLs", () => {
-    const isValidYouTubeUrl = (url) => {
+    const isValidYouTubeUrl = (url: string) => {
       return /youtube\.com|youtu\.be/.test(url);
     };
 
@@ -549,7 +549,7 @@ describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
   });
 
   it("should normalize phone numbers", () => {
-    const normalizePhone = (phone) => {
+    const normalizePhone = (phone: string) => {
       let normalized = phone.replace(/\D/g, "");
       if (normalized.startsWith("0")) {
         normalized = "62" + normalized.slice(1);
@@ -561,7 +561,7 @@ describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
   });
 
   it("should validate minimum required fields", () => {
-    const isValid = (msg) => {
+    const isValid = (msg: any) => {
       return (
         msg.sender &&
         msg.sender.length >= 6 &&
@@ -733,7 +733,7 @@ describe("RBAC - Role-Based Access Control", () => {
   });
 
   it("should verify permissions on each request", () => {
-    const checkPermission = (role, endpoint) => {
+    const checkPermission = (role: string, endpoint: string) => {
       return role === "ADMIN" || role === "DEVELOPER";
     };
 
@@ -803,14 +803,15 @@ describe("API Response Format Consistency", () => {
 
 describe("Input Data Validation", () => {
   it("should validate email format", () => {
-    const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const isValidEmail = (email: string) =>
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
     expect(isValidEmail("user@prima.test")).toBe(true);
     expect(isValidEmail("invalid-email")).toBe(false);
   });
 
   it("should validate age range", () => {
-    const isValidAge = (age) => age >= 1 && age <= 150;
+    const isValidAge = (age: number) => age >= 1 && age <= 150;
 
     expect(isValidAge(45)).toBe(true);
     expect(isValidAge(0)).toBe(false);
@@ -837,7 +838,7 @@ describe("Input Data Validation", () => {
   });
 
   it("should trim whitespace from inputs", () => {
-    const trim = (str) => str.trim();
+    const trim = (str: string) => str.trim();
 
     expect(trim("  test  ")).toBe("test");
   });
