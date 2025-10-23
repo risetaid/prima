@@ -155,7 +155,13 @@ export class ConversationStateService {
    */
   async addMessage(
     conversationStateId: string,
-    message: Omit<ConversationMessageData, 'id' | 'conversationStateId' | 'createdAt'>
+    message: Omit<ConversationMessageData, 'id' | 'conversationStateId' | 'createdAt'> & {
+      llmResponseId?: string;
+      llmModel?: string;
+      llmTokensUsed?: number;
+      llmResponseTimeMs?: number;
+      llmCost?: number;
+    }
   ): Promise<ConversationMessageData> {
     try {
       // Prepare the insert data with proper type conversions
@@ -180,9 +186,16 @@ export class ConversationStateService {
         intent: message.intent,
         confidence: message.confidence,
         processedAt: message.processedAt,
+        llmResponseId: message.llmResponseId,
+        llmModel: message.llmModel,
+        llmTokensUsed: message.llmTokensUsed,
+        llmResponseTimeMs: message.llmResponseTimeMs,
       }
 
       // Convert llmCost to string for decimal storage
+      if (message.llmCost !== undefined) {
+        insertData.llmCost = message.llmCost.toFixed(6);
+      }
 
       const newMessage = await db
         .insert(conversationMessages)

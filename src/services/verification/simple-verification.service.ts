@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
 import { invalidatePatientCache } from "@/lib/cache";
 import { ConversationStateService } from "@/services/conversation-state.service";
+import { getAIIntentService } from "@/services/ai/ai-intent.service";
 
 export type VerificationResponse = {
   processed: boolean;
@@ -14,6 +15,7 @@ export type VerificationResponse = {
 };
 
 export class SimpleVerificationService {
+  private aiIntentService = getAIIntentService();
   /**
    * Send verification message to patient
    */
@@ -139,29 +141,102 @@ await invalidatePatientCache(patientId);
         messageLength: message.length,
       });
 
-      const msg = message.toLowerCase().trim();
-
-      // Simple keyword matching
-      const acceptKeywords = ['ya', 'iya', 'yes', 'y', 'setuju', 'boleh', 'ok', 'oke'];
-      const declineKeywords = ['tidak', 'no', 'n', 'tolak', 'ga', 'gak', 'engga'];
-
       let action: 'verified' | 'declined' | 'invalid_response' = 'invalid_response';
+      let classificationMethod: 'ai' | 'keyword' | 'none' = 'none';
 
-      logger.info("Checking message against keywords", {
-        patientId,
-        message: msg,
-        acceptKeywords,
-        declineKeywords,
-      });
+      // 1. Try AI Intent Classification first
+      try {
+        // Get patient name for context
+        const patientData = await db
+          .select({ name: patients.name })
+          .from(patients)
+          .where(eq(patients.id, patientId))
+          .limit(1);
 
-      if (acceptKeywords.some(keyword => msg.includes(keyword))) {
-        action = 'verified';
-        logger.info("Message matched accept keywords", { patientId, action, matchedKeyword: acceptKeywords.find(k => msg.includes(k)) });
-      } else if (declineKeywords.some(keyword => msg.includes(keyword))) {
-        action = 'declined';
-        logger.info("Message matched decline keywords", { patientId, action, matchedKeyword: declineKeywords.find(k => msg.includes(k)) });
-      } else {
-        logger.info("Message did not match any keywords", { patientId, action });
+        const patientName = patientData[0]?.name;
+
+        logger.info("🤖 Attempting AI verification classification", {
+          patientId,
+          patientName,
+          messagePreview: message.substring(0, 50)
+        });
+
+        const aiResult = await this.aiIntentService.classifyVerificationResponse(
+          message,
+          patientName
+        );
+
+        logger.info("🤖 AI verification classification result", {
+          patientId,
+          intent: aiResult.intent,
+          confidence: aiResult.confidence,
+          confidenceLevel: aiResult.confidenceLevel,
+          reasoning: aiResult.reasoning.substring(0, 100)
+        });
+
+        // Map AI intent to action if confidence is sufficient
+        if (aiResult.intent === 'verification_accept' && aiResult.confidenceLevel !== 'low') {
+          action = 'verified';
+          classificationMethod = 'ai';
+          logger.info("✅ AI classified as ACCEPT", {
+            patientId,
+            confidence: aiResult.confidence
+          });
+        } else if (aiResult.intent === 'verification_decline' && aiResult.confidenceLevel !== 'low') {
+          action = 'declined';
+          classificationMethod = 'ai';
+          logger.info("❌ AI classified as DECLINE", {
+            patientId,
+            confidence: aiResult.confidence
+          });
+        } else {
+          logger.info("🔄 AI unclear or low confidence, falling back to keywords", {
+            patientId,
+            intent: aiResult.intent,
+            confidence: aiResult.confidence
+          });
+        }
+      } catch (error) {
+        logger.warn("⚠️ AI verification classification failed, falling back to keywords", {
+          patientId,
+          error: error instanceof Error ? error.message : 'Unknown'
+        });
+      }
+
+      // 2. Fallback to keyword matching if AI didn't provide clear result
+      if (action === 'invalid_response') {
+        const msg = message.toLowerCase().trim();
+
+        // Simple keyword matching
+        const acceptKeywords = ['ya', 'iya', 'yes', 'y', 'setuju', 'boleh', 'ok', 'oke'];
+        const declineKeywords = ['tidak', 'no', 'n', 'tolak', 'ga', 'gak', 'engga'];
+
+        logger.info("🔤 Using keyword fallback for verification", {
+          patientId,
+          message: msg,
+          acceptKeywords,
+          declineKeywords,
+        });
+
+        if (acceptKeywords.some(keyword => msg.includes(keyword))) {
+          action = 'verified';
+          classificationMethod = 'keyword';
+          logger.info("✅ Keyword matched ACCEPT", {
+            patientId,
+            action,
+            matchedKeyword: acceptKeywords.find(k => msg.includes(k))
+          });
+        } else if (declineKeywords.some(keyword => msg.includes(keyword))) {
+          action = 'declined';
+          classificationMethod = 'keyword';
+          logger.info("❌ Keyword matched DECLINE", {
+            patientId,
+            action,
+            matchedKeyword: declineKeywords.find(k => msg.includes(k))
+          });
+        } else {
+          logger.info("❓ No keyword match, invalid response", { patientId, action });
+        }
       }
 
       if (action === 'invalid_response') {
@@ -200,6 +275,7 @@ Terima kasih! 💙 Tim PRIMA`;
         patientId,
         newStatus: status,
         action,
+        classificationMethod, // Track whether AI or keyword was used
       });
 
       const updateResult = await db

@@ -253,6 +253,12 @@ export const conversationMessages = pgTable(
     intent: text("intent"),
     confidence: integer("confidence"),
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    // AI metadata fields
+    llmResponseId: text("llm_response_id"),
+    llmModel: text("llm_model"),
+    llmTokensUsed: integer("llm_tokens_used"),
+    llmResponseTimeMs: integer("llm_response_time_ms"),
+    llmCost: text("llm_cost"), // Stored as string to preserve precision
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -6,10 +6,13 @@ import { eq, and, desc, gte, or } from "drizzle-orm";
 import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
+import { getAIIntentService } from "@/services/ai/ai-intent.service";
+import type { AIIntent } from "@/lib/ai-types";
 
 export class SimpleConfirmationService {
   private whatsappService: WhatsAppService;
   private patientLookup: PatientLookupService;
+  private aiIntentService = getAIIntentService();
 
   constructor() {
     this.whatsappService = new WhatsAppService();
@@ -46,32 +49,86 @@ export class SimpleConfirmationService {
         verificationStatus: patient.verificationStatus
       });
 
-      // 2. Check for simple keyword matches
-      const normalizedMessage = message.toLowerCase().trim();
-      logger.info('🔤 Normalized message for matching', {
-        original: message,
-        normalized: normalizedMessage,
-        patientId: patient.id
-      });
-
+      // 2. Try AI Intent Classification first
       let confirmationType: 'confirmed' | 'missed' | null = null;
+      let classificationMethod: 'ai' | 'keyword' | 'none' = 'none';
 
-      if (['sudah', 'selesai'].includes(normalizedMessage)) {
-        confirmationType = 'confirmed';
-        logger.info('✅ Matched CONFIRMED keyword', { normalizedMessage, patientId: patient.id });
-      } else if (['belum'].includes(normalizedMessage)) {
-        confirmationType = 'missed';
-        logger.info('⏰ Matched MISSED keyword', { normalizedMessage, patientId: patient.id });
-      } else {
-        logger.info('❌ Not a confirmation keyword', {
+      try {
+        logger.info('🤖 Attempting AI intent classification', {
           patientId: patient.id,
-          normalizedMessage,
-          original: message.substring(0, 50)
+          messagePreview: message.substring(0, 50)
         });
-        return { success: true, action: 'invalid_response' };
+
+        const aiResult = await this.aiIntentService.classifyReminderConfirmation(
+          message,
+          patient.name
+        );
+
+        logger.info('🤖 AI classification result', {
+          patientId: patient.id,
+          intent: aiResult.intent,
+          confidence: aiResult.confidence,
+          confidenceLevel: aiResult.confidenceLevel,
+          reasoning: aiResult.reasoning.substring(0, 100)
+        });
+
+        // Map AI intent to confirmation type if confidence is high enough
+        if (aiResult.intent === 'reminder_confirmed' && aiResult.confidenceLevel !== 'low') {
+          confirmationType = 'confirmed';
+          classificationMethod = 'ai';
+          logger.info('✅ AI classified as CONFIRMED', {
+            patientId: patient.id,
+            confidence: aiResult.confidence
+          });
+        } else if (aiResult.intent === 'reminder_missed' && aiResult.confidenceLevel !== 'low') {
+          confirmationType = 'missed';
+          classificationMethod = 'ai';
+          logger.info('⏰ AI classified as MISSED', {
+            patientId: patient.id,
+            confidence: aiResult.confidence
+          });
+        } else {
+          logger.info('🔄 AI unclear or low confidence, falling back to keywords', {
+            patientId: patient.id,
+            intent: aiResult.intent,
+            confidence: aiResult.confidence
+          });
+        }
+      } catch (error) {
+        logger.warn('⚠️ AI classification failed, falling back to keywords', {
+          patientId: patient.id,
+          error: error instanceof Error ? error.message : 'Unknown'
+        });
       }
 
-      // 3. Find most recent pending reminder (last 24 hours)
+      // 3. Fallback to keyword matching if AI didn't provide clear result
+      if (!confirmationType) {
+        const normalizedMessage = message.toLowerCase().trim();
+        logger.info('🔤 Using keyword fallback', {
+          original: message,
+          normalized: normalizedMessage,
+          patientId: patient.id
+        });
+
+        if (['sudah', 'selesai'].includes(normalizedMessage)) {
+          confirmationType = 'confirmed';
+          classificationMethod = 'keyword';
+          logger.info('✅ Keyword matched CONFIRMED', { normalizedMessage, patientId: patient.id });
+        } else if (['belum'].includes(normalizedMessage)) {
+          confirmationType = 'missed';
+          classificationMethod = 'keyword';
+          logger.info('⏰ Keyword matched MISSED', { normalizedMessage, patientId: patient.id });
+        } else {
+          logger.info('❌ No keyword match, invalid response', {
+            patientId: patient.id,
+            normalizedMessage,
+            original: message.substring(0, 50)
+          });
+          return { success: true, action: 'invalid_response' };
+        }
+      }
+
+      // 4. Find most recent pending reminder (last 24 hours)
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
@@ -126,7 +183,7 @@ export class SimpleConfirmationService {
         confirmationType
       });
 
-      // 4. Update reminder based on confirmation
+      // 5. Update reminder based on confirmation (include classification method)
       const updateData: {
         confirmationResponse: string;
         confirmationResponseAt: Date;
@@ -144,7 +201,8 @@ export class SimpleConfirmationService {
       logger.info('💾 Updating reminder with data', {
         reminderId: reminder.id,
         updateData,
-        patientId: patient.id
+        patientId: patient.id,
+        classificationMethod // Track whether AI or keyword was used
       });
 
       await db
@@ -159,7 +217,7 @@ export class SimpleConfirmationService {
         message: message.substring(0, 50)
       });
 
-      // 5. Send acknowledgment
+      // 6. Send acknowledgment
       await this.sendAcknowledgment({
         id: patient.id,
         name: patient.name,
