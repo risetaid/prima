@@ -1,7 +1,7 @@
 // AI Prompt Templates for PRIMA Healthcare System
 // Indonesian healthcare context with safety guidelines
 
-import type { AIPromptTemplate, AIIntent } from '@/lib/ai-types';
+import type { AIPromptTemplate } from '@/lib/ai-types';
 
 /**
  * System prompt for intent classification

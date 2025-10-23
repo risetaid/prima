@@ -245,11 +245,14 @@ export class AIClient {
   /**
    * Extract retry-after header from rate limit error
    */
-  private extractRetryAfter(error: any): number {
+  private extractRetryAfter(error: unknown): number {
     try {
-      const retryAfterHeader = error.headers?.['retry-after'];
-      if (retryAfterHeader) {
-        return parseInt(String(retryAfterHeader), 10);
+      if (error && typeof error === 'object' && 'headers' in error) {
+        const headers = error.headers as Record<string, unknown>;
+        const retryAfterHeader = headers?.['retry-after'];
+        if (retryAfterHeader) {
+          return parseInt(String(retryAfterHeader), 10);
+        }
       }
     } catch {
       // Ignore parsing errors

@@ -189,6 +189,40 @@ export const POST = createApiHandler(
 
       const result = await simpleConfirmationService.processReminderResponse(sender, message);
 
+      // If it's not a reminder confirmation response, check if it's a general inquiry
+      if (result.action === 'invalid_response') {
+        logger.info("Not a reminder confirmation, checking for general inquiry", {
+          patientId: patient.id,
+          message: message?.substring(0, 50),
+        });
+
+        // Priority 3: Handle general health inquiries with conversational AI
+        const { getAIGeneralInquiryService } = await import("@/services/ai/ai-general-inquiry.service");
+        const aiGeneralInquiryService = getAIGeneralInquiryService();
+
+        const inquiryResult = await aiGeneralInquiryService.handleInquiry(
+          message,
+          {
+            id: patient.id,
+            name: patient.name,
+            phoneNumber: patient.phoneNumber,
+            cancerStage: patient.cancerStage,
+          },
+          patient.assignedVolunteerId ? {
+            id: patient.assignedVolunteerId,
+            name: 'Assigned Volunteer', // Could fetch actual name if needed
+          } : undefined
+        );
+
+        return {
+          ok: true,
+          processed: true,
+          action: inquiryResult.action,
+          source: 'ai_general_inquiry',
+          escalated: inquiryResult.action === 'escalated' || inquiryResult.action === 'emergency',
+        };
+      }
+
       return {
         ok: true,
         processed: true,

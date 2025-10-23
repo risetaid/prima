@@ -15,6 +15,8 @@ export interface PatientLookupResult {
     phoneNumber: string
     verificationStatus: string
     isActive: boolean
+    cancerStage?: string | null
+    assignedVolunteerId?: string | null
   }
   alternatives?: string[]
   error?: string
@@ -41,11 +43,13 @@ export class PatientLookupService {
           name: patients.name,
           phoneNumber: patients.phoneNumber,
           verificationStatus: patients.verificationStatus,
-          isActive: patients.isActive
+          isActive: patients.isActive,
+          cancerStage: patients.cancerStage,
+          assignedVolunteerId: patients.assignedVolunteerId
         })
         .from(patients)
         .where(and(
-          eq(patients.phoneNumber, phoneNumber), 
+          eq(patients.phoneNumber, phoneNumber),
           eq(patients.verificationStatus, 'PENDING'),
           eq(patients.isActive, true)
         ))
@@ -59,11 +63,13 @@ export class PatientLookupService {
             name: patients.name,
             phoneNumber: patients.phoneNumber,
             verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive
+            isActive: patients.isActive,
+            cancerStage: patients.cancerStage,
+            assignedVolunteerId: patients.assignedVolunteerId
           })
           .from(patients)
           .where(and(
-            eq(patients.phoneNumber, phoneNumber), 
+            eq(patients.phoneNumber, phoneNumber),
             eq(patients.verificationStatus, 'VERIFIED'),
             eq(patients.isActive, true)
           ))
@@ -78,7 +84,9 @@ export class PatientLookupService {
             name: patients.name,
             phoneNumber: patients.phoneNumber,
             verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive
+            isActive: patients.isActive,
+            cancerStage: patients.cancerStage,
+            assignedVolunteerId: patients.assignedVolunteerId
           })
           .from(patients)
           .where(and(
@@ -101,11 +109,13 @@ export class PatientLookupService {
             name: patients.name,
             phoneNumber: patients.phoneNumber,
             verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive
+            isActive: patients.isActive,
+            cancerStage: patients.cancerStage,
+            assignedVolunteerId: patients.assignedVolunteerId
           })
           .from(patients)
           .where(and(
-            whereClause, 
+            whereClause,
             eq(patients.verificationStatus, 'PENDING'),
             eq(patients.isActive, true)
           ))
@@ -119,11 +129,13 @@ export class PatientLookupService {
               name: patients.name,
               phoneNumber: patients.phoneNumber,
               verificationStatus: patients.verificationStatus,
-              isActive: patients.isActive
+              isActive: patients.isActive,
+              cancerStage: patients.cancerStage,
+              assignedVolunteerId: patients.assignedVolunteerId
             })
             .from(patients)
             .where(and(
-              whereClause, 
+              whereClause,
               eq(patients.verificationStatus, 'VERIFIED'),
               eq(patients.isActive, true)
             ))
@@ -138,7 +150,9 @@ export class PatientLookupService {
               name: patients.name,
               phoneNumber: patients.phoneNumber,
               verificationStatus: patients.verificationStatus,
-              isActive: patients.isActive
+              isActive: patients.isActive,
+              cancerStage: patients.cancerStage,
+              assignedVolunteerId: patients.assignedVolunteerId
             })
             .from(patients)
             .where(and(
@@ -166,7 +180,9 @@ export class PatientLookupService {
             name: patient.name,
             phoneNumber: patient.phoneNumber,
             verificationStatus: patient.verificationStatus,
-            isActive: patient.isActive
+            isActive: patient.isActive,
+            cancerStage: patient.cancerStage,
+            assignedVolunteerId: patient.assignedVolunteerId
           }
         }
       }
@@ -227,7 +243,9 @@ export class PatientLookupService {
           name: patients.name,
           phoneNumber: patients.phoneNumber,
           verificationStatus: patients.verificationStatus,
-          isActive: patients.isActive
+          isActive: patients.isActive,
+          cancerStage: patients.cancerStage,
+          assignedVolunteerId: patients.assignedVolunteerId
         })
 
       if (newPatient.length > 0) {
@@ -246,7 +264,9 @@ export class PatientLookupService {
             name: patient.name,
             phoneNumber: patient.phoneNumber,
             verificationStatus: patient.verificationStatus,
-            isActive: patient.isActive
+            isActive: patient.isActive,
+            cancerStage: patient.cancerStage,
+            assignedVolunteerId: patient.assignedVolunteerId
           }
         }
       }

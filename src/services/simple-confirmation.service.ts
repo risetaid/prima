@@ -7,7 +7,6 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { getAIIntentService } from "@/services/ai/ai-intent.service";
-import type { AIIntent } from "@/lib/ai-types";
 
 export class SimpleConfirmationService {
   private whatsappService: WhatsAppService;
