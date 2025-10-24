@@ -7,10 +7,12 @@ import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { PatientReminderHeader } from "@/components/pengingat/PatientReminderHeader";
 import { ReminderColumn } from "@/components/pengingat/ReminderColumn";
 import { EditQuickReminderModal } from "@/components/pengingat/EditQuickReminderModal";
-import type { Reminder, ReminderStats, ContentItem } from "@/components/pengingat/types";
-import { logger } from '@/lib/logger';
-
-
+import type {
+  Reminder,
+  ReminderStats,
+  ContentItem,
+} from "@/components/pengingat/types";
+import { logger } from "@/lib/logger";
 
 interface ScheduledReminderResponse {
   id: string;
@@ -91,17 +93,25 @@ export function PatientReminderDashboard({
       if (response.ok) {
         const result = await response.json();
         const statsData = result.data || result; // Unwrap createApiHandler response
-        logger.info('📊 Dashboard stats response:', { success: result.success, hasData: !!result.data, stats: statsData });
+        logger.info("📊 Dashboard stats response:", {
+          success: result.success,
+          hasData: !!result.data,
+          stats: statsData,
+          rawResult: result,
+        });
         setStats(statsData);
       } else {
         logger.error("Stats API error", undefined, {
           statusCode: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         toast.error("Gagal memuat statistik pengingat");
       }
     } catch (error: unknown) {
-      logger.error("Error fetching stats:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching stats:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memuat statistik pengingat");
     }
   }, [patientId]);
@@ -119,24 +129,28 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || []; // Extract data from pagination wrapper
 
-        // Ensure data is an array, handle empty objects or invalid responses
-        const dataArray = Array.isArray(data) ? data : [];
+        // Handle nested response structure: { success: true, data: { data: [...], pagination: {...} } }
+        const responseData = result.data?.data || result.data || [];
+        const dataArray = Array.isArray(responseData) ? responseData : [];
 
         logger.info("Scheduled reminders data:", {
           success: result.success,
           hasData: !!result.data,
-          dataType: typeof data,
-          isArray: Array.isArray(data),
+          hasNestedData: !!result.data?.data,
+          dataType: typeof responseData,
+          isArray: Array.isArray(responseData),
           count: dataArray.length,
-          total: result.pagination?.total
+          total: result.data?.pagination?.total || result.pagination?.total,
         });
 
         const mappedData = dataArray.map((item: ScheduledReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
-          reminderDate: item.reminderDate || item.nextReminderDate || new Date().toISOString().split("T")[0],
+          reminderDate:
+            item.reminderDate ||
+            item.nextReminderDate ||
+            new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "scheduled",
           attachedContent: item.attachedContent || [],
@@ -145,12 +159,15 @@ export function PatientReminderDashboard({
       } else {
         logger.error("Scheduled reminders API error", undefined, {
           statusCode: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         toast.error("Gagal memuat pengingat terjadwal");
       }
     } catch (error: unknown) {
-      logger.error("Error fetching scheduled reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching scheduled reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memuat pengingat terjadwal");
     } finally {
       clearTimeout(timeoutId);
@@ -170,31 +187,33 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || []; // Extract data from pagination wrapper
 
-        // Ensure data is an array, handle empty objects or invalid responses
-        const dataArray = Array.isArray(data) ? data : [];
+        // Handle nested response structure: { success: true, data: { data: [...], pagination: {...} } }
+        const responseData = result.data?.data || result.data || [];
+        const dataArray = Array.isArray(responseData) ? responseData : [];
 
         logger.info("Pending reminders data:", {
           success: result.success,
           hasData: !!result.data,
-          dataType: typeof data,
-          isArray: Array.isArray(data),
+          hasNestedData: !!result.data?.data,
+          dataType: typeof responseData,
+          isArray: Array.isArray(responseData),
           count: dataArray.length,
-          total: result.pagination?.total,
-          sampleData: dataArray.slice(0, 2).map(item => ({
+          total: result.data?.pagination?.total || result.pagination?.total,
+          sampleData: dataArray.slice(0, 2).map((item) => ({
             id: item.id,
             hasReminderDate: !!item.reminderDate,
             hasScheduledTime: !!item.scheduledTime,
             hasCustomMessage: !!item.customMessage,
-            confirmationStatus: item.confirmationStatus
-          }))
+            confirmationStatus: item.confirmationStatus,
+          })),
         });
 
         const mappedData = dataArray.map((item: PendingReminderResponse) => ({
           id: item.id,
           scheduledTime: item.scheduledTime || "--:--",
-          reminderDate: item.reminderDate || new Date().toISOString().split("T")[0],
+          reminderDate:
+            item.reminderDate || new Date().toISOString().split("T")[0],
           customMessage: item.customMessage || "",
           status: "pending",
           confirmationStatus: item.confirmationStatus,
@@ -207,12 +226,15 @@ export function PatientReminderDashboard({
       } else {
         logger.error("Pending reminders API error", undefined, {
           statusCode: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         toast.error("Gagal memuat pengingat perlu diperbarui");
       }
     } catch (error: unknown) {
-      logger.error("Error fetching pending reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching pending reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memuat pengingat perlu diperbarui");
     } finally {
       clearTimeout(timeoutId);
@@ -232,18 +254,19 @@ export function PatientReminderDashboard({
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || []; // Extract data from pagination wrapper
 
-        // Ensure data is an array, handle empty objects or invalid responses
-        const dataArray = Array.isArray(data) ? data : [];
+        // Handle nested response structure: { success: true, data: { data: [...], pagination: {...} } }
+        const responseData = result.data?.data || result.data || [];
+        const dataArray = Array.isArray(responseData) ? responseData : [];
 
         logger.info("Completed reminders data:", {
           success: result.success,
           hasData: !!result.data,
-          dataType: typeof data,
-          isArray: Array.isArray(data),
+          hasNestedData: !!result.data?.data,
+          dataType: typeof responseData,
+          isArray: Array.isArray(responseData),
           count: dataArray.length,
-          total: result.pagination?.total
+          total: result.data?.pagination?.total || result.pagination?.total,
         });
 
         const mappedData = dataArray.map((item: CompletedReminderResponse) => ({
@@ -255,52 +278,68 @@ export function PatientReminderDashboard({
           status: "completed",
           confirmationStatus: item.confirmationStatus,
           confirmedAt: item.confirmedAt,
-          manuallyConfirmed: Boolean((item as { manuallyConfirmed?: boolean }).manuallyConfirmed),
+          manuallyConfirmed: Boolean(
+            (item as { manuallyConfirmed?: boolean }).manuallyConfirmed
+          ),
         }));
         setSelesaiReminders(mappedData);
       } else {
         logger.error("Completed reminders API error", undefined, {
           statusCode: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
         });
         toast.error("Gagal memuat pengingat selesai");
       }
     } catch (error: unknown) {
-      logger.error("Error fetching completed reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching completed reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memuat pengingat selesai");
     } finally {
       clearTimeout(timeoutId);
     }
   }, [patientId]);
 
-  const fetchAllReminders = useCallback(async (retryCount = 0) => {
-    try {
-      logger.info("Fetching all reminders for patient", { patientId });
-      await Promise.all([
-        fetchScheduledReminders(),
-        fetchPendingReminders(),
-        fetchCompletedReminders(),
-      ]);
-      logger.info("All reminders fetched successfully");
-    } catch (error: unknown) {
-      logger.error("Error fetching all reminders:", error instanceof Error ? error : new Error(String(error)));
+  const fetchAllReminders = useCallback(
+    async (retryCount = 0) => {
+      try {
+        logger.info("Fetching all reminders for patient", { patientId });
+        await Promise.all([
+          fetchScheduledReminders(),
+          fetchPendingReminders(),
+          fetchCompletedReminders(),
+        ]);
+        logger.info("All reminders fetched successfully");
+      } catch (error: unknown) {
+        logger.error(
+          "Error fetching all reminders:",
+          error instanceof Error ? error : new Error(String(error))
+        );
 
-      // Only retry once for network errors, then fail gracefully
-      if (retryCount === 0) {
-        logger.info("Retrying fetch once...");
-        setTimeout(() => {
-          fetchAllReminders(1);
-        }, 1000);
-      } else {
-        // Show error toast but don't keep retrying
-        toast.error("Gagal memuat data pengingat. Silakan refresh halaman.");
+        // Only retry once for network errors, then fail gracefully
+        if (retryCount === 0) {
+          logger.info("Retrying fetch once...");
+          setTimeout(() => {
+            fetchAllReminders(1);
+          }, 1000);
+        } else {
+          // Show error toast but don't keep retrying
+          toast.error("Gagal memuat data pengingat. Silakan refresh halaman.");
+        }
+      } finally {
+        if (retryCount === 0) {
+          setLoading(false);
+        }
       }
-    } finally {
-      if (retryCount === 0) {
-        setLoading(false);
-      }
-    }
-  }, [fetchScheduledReminders, fetchPendingReminders, fetchCompletedReminders, patientId]);
+    },
+    [
+      fetchScheduledReminders,
+      fetchPendingReminders,
+      fetchCompletedReminders,
+      patientId,
+    ]
+  );
 
   useEffect(() => {
     if (patientId) {
@@ -323,28 +362,31 @@ export function PatientReminderDashboard({
 
     // Warn if counts don't match (within tolerance of 1 for timing issues)
     const tolerance = 1;
-    if (Math.abs(stats.terjadwal - actualCounts.terjadwal) > tolerance ||
-        Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > tolerance ||
-        Math.abs(stats.selesai - actualCounts.selesai) > tolerance) {
+    if (
+      Math.abs(stats.terjadwal - actualCounts.terjadwal) > tolerance ||
+      Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) >
+        tolerance ||
+      Math.abs(stats.selesai - actualCounts.selesai) > tolerance
+    ) {
       logger.warn("Reminder counts don't match stats", { stats, actualCounts });
 
       // Only show toast for significant discrepancies
       if (Math.abs(stats.perluDiperbarui - actualCounts.perluDiperbarui) > 2) {
-        toast.warning("Jumlah pengingat perlu diperbarui tidak akurat. Silakan refresh halaman.");
+        toast.warning(
+          "Jumlah pengingat perlu diperbarui tidak akurat. Silakan refresh halaman."
+        );
       }
     }
-  }, [stats, terjadwalReminders.length, perluDiperbaruiReminders.length, selesaiReminders.length, loading]);
+  }, [
+    stats,
+    terjadwalReminders.length,
+    perluDiperbaruiReminders.length,
+    selesaiReminders.length,
+    loading,
+  ]);
 
   // Remove periodic stats refresh to prevent infinite API calls
   // Stats will be refreshed manually via the refresh button or when actions are performed
-
-
-
-
-
-
-
-
 
   const handleAddReminder = () => {
     setIsAddModalOpen(true);
@@ -353,13 +395,13 @@ export function PatientReminderDashboard({
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        fetchStats(),
-        fetchAllReminders(),
-      ]);
+      await Promise.all([fetchStats(), fetchAllReminders()]);
       toast.success("Data berhasil diperbarui");
     } catch (error: unknown) {
-      logger.error("Error refreshing data:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error refreshing data:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal memperbarui data");
     } finally {
       setIsRefreshing(false);
@@ -436,11 +478,14 @@ export function PatientReminderDashboard({
     );
   };
 
-  const handlePendingAction = async (reminderId: string, action: "ya" | "tidak") => {
+  const handlePendingAction = async (
+    reminderId: string,
+    action: "ya" | "tidak"
+  ) => {
     try {
       // Convert "ya"/"tidak" to boolean
       const confirmed = action === "ya";
-      
+
       // API call to update reminder status - reminderId here is actually ReminderLog ID
       const response = await fetch(
         `/api/patients/${patientId}/reminders/${reminderId}/confirm`,
@@ -475,14 +520,20 @@ export function PatientReminderDashboard({
         const errorData = await response.json().catch(() => ({}));
         logger.error("Failed to confirm reminder:", errorData);
         toast.error("❌ Gagal Mengupdate", {
-          description: errorData.error || "Tidak dapat menyimpan status pengingat. Coba lagi.",
+          description:
+            errorData.error ||
+            "Tidak dapat menyimpan status pengingat. Coba lagi.",
           duration: 5000,
         });
       }
     } catch (error: unknown) {
-      logger.error("Error confirming reminder:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error confirming reminder:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("❌ Kesalahan Jaringan", {
-        description: "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
+        description:
+          "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
         duration: 5000,
       });
     }
@@ -536,12 +587,13 @@ export function PatientReminderDashboard({
       fetchStats().catch(logger.error);
       fetchAllReminders().catch(logger.error);
     } catch (error: unknown) {
-      logger.error("Error deleting reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error deleting reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       toast.error("Gagal menghapus pengingat");
     }
   };
-
-
 
   if (loading) {
     return null;

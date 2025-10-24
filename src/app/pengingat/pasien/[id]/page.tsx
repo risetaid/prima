@@ -15,7 +15,7 @@ import { Header } from "@/components/ui/header";
 import { PatientReminderDashboard } from "@/components/pengingat/patient-reminder-dashboard";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 interface ReminderStats {
   terjadwal: number;
   perluDiperbarui: number;
@@ -47,7 +47,9 @@ export default function PatientReminderPage() {
   const [canAddReminders, setCanAddReminders] = useState<boolean>(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([]);
+  const [completedReminders, setCompletedReminders] = useState<
+    CompletedReminder[]
+  >([]);
 
   const patientId = params.id as string;
 
@@ -65,7 +67,11 @@ export default function PatientReminderPage() {
       if (response.ok) {
         const result = await response.json();
         const statsData = result.data || result; // Unwrap createApiHandler response
-        logger.info('📊 Reminder stats response:', { success: result.success, hasData: !!result.data, stats: statsData });
+        logger.info("📊 Reminder stats response:", {
+          success: result.success,
+          hasData: !!result.data,
+          stats: statsData,
+        });
         setStats(statsData);
       } else {
         // Fallback to empty stats if API fails
@@ -77,7 +83,10 @@ export default function PatientReminderPage() {
         });
       }
     } catch (error: unknown) {
-      logger.error("Error fetching reminder stats:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching reminder stats:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       setStats({
         terjadwal: 0,
         perluDiperbarui: 0,
@@ -96,7 +105,7 @@ export default function PatientReminderPage() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
       const response = await fetch(`/api/patients/${patientId}`, {
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
@@ -104,7 +113,11 @@ export default function PatientReminderPage() {
       if (response.ok) {
         const result = await response.json();
         const patient = result.data || result; // Unwrap createApiHandler response
-        logger.info('👤 Patient data response:', { success: result.success, hasData: !!result.data, name: patient.name });
+        logger.info("👤 Patient data response:", {
+          success: result.success,
+          hasData: !!result.data,
+          name: patient.name,
+        });
         setPatientName(patient.name);
         const allowed =
           patient.verificationStatus === "VERIFIED" &&
@@ -112,7 +125,10 @@ export default function PatientReminderPage() {
         setCanAddReminders(allowed);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching patient:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching patient:",
+        error instanceof Error ? error : new Error(String(error))
+      );
     } finally {
       setLoading(false);
     }
@@ -124,9 +140,12 @@ export default function PatientReminderPage() {
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     try {
-      const response = await fetch(`/api/patients/${patientId}/reminders?filter=completed&page=1&limit=100`, {
-        signal: controller.signal
-      });
+      const response = await fetch(
+        `/api/patients/${patientId}/reminders?filter=completed&page=1&limit=100`,
+        {
+          signal: controller.signal,
+        }
+      );
 
       if (response.ok) {
         const result = await response.json();
@@ -135,13 +154,13 @@ export default function PatientReminderPage() {
         // Ensure data is an array, handle empty objects or invalid responses
         const remindersArray = Array.isArray(data) ? data : [];
 
-        logger.info('✅ Completed reminders response:', {
+        logger.info("✅ Completed reminders response:", {
           success: result.success,
           hasData: !!result.data,
           dataType: typeof data,
           isArray: Array.isArray(data),
           count: remindersArray.length,
-          total: result.pagination?.total
+          total: result.pagination?.total,
         });
 
         setCompletedReminders(remindersArray);
@@ -149,7 +168,10 @@ export default function PatientReminderPage() {
         setCompletedReminders([]);
       }
     } catch (error: unknown) {
-      logger.error("Error fetching completed reminders:", error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        "Error fetching completed reminders:",
+        error instanceof Error ? error : new Error(String(error))
+      );
       setCompletedReminders([]);
     } finally {
       clearTimeout(timeoutId);
@@ -165,13 +187,21 @@ export default function PatientReminderPage() {
           await fetchReminderStats();
           await fetchCompletedReminders();
         } catch (error: unknown) {
-          logger.error("Error fetching reminder page data:", error instanceof Error ? error : new Error(String(error)));
+          logger.error(
+            "Error fetching reminder page data:",
+            error instanceof Error ? error : new Error(String(error))
+          );
         }
       };
 
       fetchData();
     }
-  }, [patientId, fetchReminderStats, fetchPatientName, fetchCompletedReminders]);
+  }, [
+    patientId,
+    fetchReminderStats,
+    fetchPatientName,
+    fetchCompletedReminders,
+  ]);
 
   const handleAddReminder = () => {
     if (!canAddReminders) return;
@@ -259,10 +289,10 @@ export default function PatientReminderPage() {
             <span>Tambah Pengingat Baru</span>
           </button>
           {!canAddReminders && (
-             <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
-               Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
-               &quot;YA&quot;.
-             </p>
+            <p className="text-xs text-gray-500 -mt-6 mb-6 text-center">
+              Pasien belum terverifikasi. Kirim verifikasi dan tunggu balasan
+              &quot;YA&quot;.
+            </p>
           )}
 
           {/* Add Reminder Modal */}
