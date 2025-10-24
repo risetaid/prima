@@ -245,8 +245,6 @@ export default function UserManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (loading) return null;
-
   const pendingUsers = users.filter((user) => !user.isApproved);
 
   const handleSearch = (query: string) => {
@@ -311,13 +309,21 @@ export default function UserManagement() {
           <CardTitle className="text-base sm:text-lg">Cari Pengguna</CardTitle>
         </CardHeader>
         <CardContent>
-          <input
-            type="text"
-            placeholder="Cari berdasarkan email..."
-            value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Cari berdasarkan email..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              disabled={loading}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
+            {loading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -331,6 +337,7 @@ export default function UserManagement() {
           onRoleToggle={toggleUserRole}
           onDemote={demoteUserRole}
           isPending
+          loading={loading}
         />
       )}
 
@@ -342,6 +349,7 @@ export default function UserManagement() {
         onStatusToggle={toggleUserStatus}
         onRoleToggle={toggleUserRole}
         onDemote={demoteUserRole}
+        loading={loading}
       />
 
       {/* Pagination Controls */}
@@ -350,9 +358,15 @@ export default function UserManagement() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
               <p className="text-sm text-gray-600">
-                Menampilkan {(currentPage - 1) * pageLimit + 1} -{" "}
-                {Math.min(currentPage * pageLimit, totalUsers)} dari{" "}
-                {totalUsers} pengguna
+                {loading ? (
+                  "Memuat..."
+                ) : (
+                  <>
+                    Menampilkan {(currentPage - 1) * pageLimit + 1} -{" "}
+                    {Math.min(currentPage * pageLimit, totalUsers)} dari{" "}
+                    {totalUsers} pengguna
+                  </>
+                )}
               </p>
               <div className="flex gap-2">
                 <Button

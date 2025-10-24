@@ -6,7 +6,8 @@ import UserCard from "@/components/admin/UserCard";
 import type { User, UserRole } from "@/types/api";
 
 // Extended User type for display
-interface UserDisplay extends Omit<User, 'createdAt' | 'updatedAt' | 'lastLoginAt' | 'deletedAt'> {
+interface UserDisplay
+  extends Omit<User, "createdAt" | "updatedAt" | "lastLoginAt" | "deletedAt"> {
   createdAt: string | Date;
   approver?: {
     firstName: string | null;
@@ -24,6 +25,7 @@ interface UserListProps {
   onRoleToggle: (user: UserDisplay, currentRole: UserRole) => void;
   onDemote: (user: UserDisplay, targetRole: "ADMIN" | "RELAWAN") => void;
   isPending?: boolean;
+  loading?: boolean;
 }
 
 const UserList: React.FC<UserListProps> = ({
@@ -35,6 +37,7 @@ const UserList: React.FC<UserListProps> = ({
   onRoleToggle,
   onDemote,
   isPending = false,
+  loading = false,
 }) => {
   if (isPending && users.length === 0) return null;
 
@@ -45,34 +48,49 @@ const UserList: React.FC<UserListProps> = ({
           {isPending ? (
             <>
               <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
-              <span className="hidden sm:inline">Pending Approvals ({users.length})</span>
-              <span className="sm:hidden">Menunggu Persetujuan ({users.length})</span>
+              <span className="hidden sm:inline">
+                Pending Approvals ({users.length})
+              </span>
+              <span className="sm:hidden">
+                Menunggu Persetujuan ({users.length})
+              </span>
             </>
           ) : (
             <>
               <UserIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-              <span className="hidden sm:inline">All Users ({users.length})</span>
+              <span className="hidden sm:inline">
+                All Users ({users.length})
+              </span>
               <span className="sm:hidden">Semua Pengguna ({users.length})</span>
             </>
           )}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-3 sm:space-y-4">
-          {users.map((user) => (
-            <UserCard
-              key={user.id}
-              user={user}
-              currentUser={currentUser}
-              actionLoading={actionLoading}
-              onApproval={onApproval}
-              onStatusToggle={onStatusToggle}
-              onRoleToggle={onRoleToggle}
-              onDemote={onDemote}
-              showApprovalActions={isPending}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-gray-600">Memuat data pengguna...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 sm:space-y-4">
+            {users.map((user) => (
+              <UserCard
+                key={user.id}
+                user={user}
+                currentUser={currentUser}
+                actionLoading={actionLoading}
+                onApproval={onApproval}
+                onStatusToggle={onStatusToggle}
+                onRoleToggle={onRoleToggle}
+                onDemote={onDemote}
+                showApprovalActions={isPending}
+              />
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
