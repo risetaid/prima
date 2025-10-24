@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw } from "lucide-react";
@@ -21,66 +21,84 @@ interface UserWithApprover
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<UserWithApprover[]>([]);
+  const [allUsers, setAllUsers] = useState<UserWithApprover[]>([]); // Store all fetched users
   const [currentUser, setCurrentUser] = useState<UserWithApprover | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [pageLimit] = useState(10);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchUsers = useCallback(
-    async (page: number = 1, search: string = "") => {
-      try {
-        setLoading(true);
-        const queryParams = new URLSearchParams({
-          page: page.toString(),
-          limit: pageLimit.toString(),
-          ...(search && { search }),
-        });
+  // Client-side filtering of users
+  const filteredUsers = (() => {
+    if (!searchQuery.trim()) return allUsers;
 
-        const [usersResult, profileResult] = await Promise.all([
-          apiClient<{
-            users: UserWithApprover[];
-            pagination: {
-              total: number;
-              totalPages: number;
-              page: number;
-              hasMore: boolean;
-            };
-            pendingCount: number;
-          }>(`/api/admin/users?${queryParams.toString()}`),
-          apiClient<UserWithApprover>("/api/user/profile"),
-        ]);
+    const query = searchQuery.toLowerCase();
+    return allUsers.filter((user) => {
+      const email = user.email?.toLowerCase() || "";
+      const firstName = user.firstName?.toLowerCase() || "";
+      const lastName = user.lastName?.toLowerCase() || "";
+      const fullName = `${firstName} ${lastName}`.trim();
 
-        if (usersResult.success && usersResult.data) {
-          setUsers(usersResult.data.users);
-          setTotalPages(usersResult.data.pagination.totalPages);
-          setTotalUsers(usersResult.data.pagination.total);
-          setCurrentPage(page);
-        } else {
-          toast.error("Failed to fetch users", {
-            description: getApiErrorMessage(usersResult),
-          });
-        }
+      return (
+        email.includes(query) ||
+        firstName.includes(query) ||
+        lastName.includes(query) ||
+        fullName.includes(query)
+      );
+    });
+  })();
 
-        if (profileResult.success && profileResult.data) {
-          setCurrentUser(profileResult.data);
-        }
-      } catch {
-        toast.error("Failed to fetch users", {
-          description: "Network error occurred",
-        });
-      } finally {
-        setLoading(false);
-      }
-    },
-    [pageLimit]
+  // Client-side pagination
+  const totalPages = Math.ceil(filteredUsers.length / pageLimit);
+  const totalUsers = filteredUsers.length;
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageLimit,
+    currentPage * pageLimit
   );
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      setIsInitialLoading(true);
+      const queryParams = new URLSearchParams({
+        page: "1",
+        limit: "1000", // Fetch all users for client-side filtering
+      });
+
+      const [usersResult, profileResult] = await Promise.all([
+        apiClient<{
+          users: UserWithApprover[];
+          pagination: {
+            total: number;
+            totalPages: number;
+            page: number;
+            hasMore: boolean;
+          };
+          pendingCount: number;
+        }>(`/api/admin/users?${queryParams.toString()}`),
+        apiClient<UserWithApprover>("/api/user/profile"),
+      ]);
+
+      if (usersResult.success && usersResult.data) {
+        setAllUsers(usersResult.data.users);
+      } else {
+        toast.error("Failed to fetch users", {
+          description: getApiErrorMessage(usersResult),
+        });
+      }
+
+      if (profileResult.success && profileResult.data) {
+        setCurrentUser(profileResult.data);
+      }
+    } catch {
+      toast.error("Failed to fetch users", {
+        description: "Network error occurred",
+      });
+    } finally {
+      setIsInitialLoading(false);
+    }
+  }, []);
 
   const performUserAction = useCallback(
     async (
@@ -103,7 +121,7 @@ export default function UserManagement() {
 
         if (result.success) {
           toast.success(successMessage);
-          fetchUsers(currentPage, searchQuery);
+          fetchUsers();
         } else {
           toast.error(errorMessage, {
             description: getApiErrorMessage(result),
@@ -117,7 +135,7 @@ export default function UserManagement() {
         setActionLoading(null);
       }
     },
-    [setActionLoading, fetchUsers, currentPage, searchQuery]
+    [setActionLoading, fetchUsers]
   );
 
   const handleApproval = useCallback(
@@ -218,7 +236,7 @@ export default function UserManagement() {
         toast.success("Sync Clerk berhasil", {
           description: `Sinkronisasi selesai: ${summary}`,
         });
-        fetchUsers(1, searchQuery);
+        fetchUsers();
       } else {
         toast.error("Sync Clerk gagal", {
           description: getApiErrorMessage(result),
@@ -231,40 +249,33 @@ export default function UserManagement() {
     } finally {
       setSyncing(false);
     }
-  }, [syncing, setSyncing, fetchUsers, searchQuery]);
+  }, [syncing, setSyncing, fetchUsers]);
 
   useEffect(() => {
-    fetchUsers(1, searchQuery);
+    fetchUsers();
+  }, [fetchUsers]);
 
-    // Cleanup timeout on unmount
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const pendingUsers = users.filter((user) => !user.isApproved);
+  const pendingUsers = paginatedUsers.filter((user) => !user.isApproved);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-
-    // Set new timeout to debounce search
-    searchTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(1);
-      fetchUsers(1, query);
-    }, 500); // 500ms debounce delay
+    setCurrentPage(1); // Reset to first page when searching
   };
 
   const handlePageChange = (newPage: number) => {
-    fetchUsers(newPage, searchQuery);
+    setCurrentPage(newPage);
   };
+
+  if (isInitialLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-600">Memuat data pengguna...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 pb-8">
@@ -309,21 +320,13 @@ export default function UserManagement() {
           <CardTitle className="text-base sm:text-lg">Cari Pengguna</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Cari berdasarkan email..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              disabled={loading}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
-            />
-            {loading && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-          </div>
+          <input
+            type="text"
+            placeholder="Cari berdasarkan email atau nama..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600"
+          />
         </CardContent>
       </Card>
 
@@ -337,19 +340,19 @@ export default function UserManagement() {
           onRoleToggle={toggleUserRole}
           onDemote={demoteUserRole}
           isPending
-          loading={loading}
+          loading={false}
         />
       )}
 
       <UserList
-        users={users}
+        users={paginatedUsers}
         currentUser={currentUser}
         actionLoading={actionLoading}
         onApproval={handleApproval}
         onStatusToggle={toggleUserStatus}
         onRoleToggle={toggleUserRole}
         onDemote={demoteUserRole}
-        loading={loading}
+        loading={false}
       />
 
       {/* Pagination Controls */}
@@ -358,20 +361,14 @@ export default function UserManagement() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
               <p className="text-sm text-gray-600">
-                {loading ? (
-                  "Memuat..."
-                ) : (
-                  <>
-                    Menampilkan {(currentPage - 1) * pageLimit + 1} -{" "}
-                    {Math.min(currentPage * pageLimit, totalUsers)} dari{" "}
-                    {totalUsers} pengguna
-                  </>
-                )}
+                Menampilkan {(currentPage - 1) * pageLimit + 1} -{" "}
+                {Math.min(currentPage * pageLimit, totalUsers)} dari{" "}
+                {totalUsers} pengguna
               </p>
               <div className="flex gap-2">
                 <Button
                   onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1 || loading}
+                  disabled={currentPage === 1}
                   size="sm"
                   variant="outline"
                   className="text-xs sm:text-sm"
@@ -384,7 +381,6 @@ export default function UserManagement() {
                       <Button
                         key={page}
                         onClick={() => handlePageChange(page)}
-                        disabled={loading}
                         size="sm"
                         variant={page === currentPage ? "default" : "outline"}
                         className="text-xs sm:text-sm min-w-8"
@@ -396,7 +392,7 @@ export default function UserManagement() {
                 </div>
                 <Button
                   onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages || loading}
+                  disabled={currentPage === totalPages}
                   size="sm"
                   variant="outline"
                   className="text-xs sm:text-sm"
