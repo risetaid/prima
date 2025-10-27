@@ -233,7 +233,7 @@ export function buildConversationPrompt(
   }
 
   prompt += `\nPERTANYAAN TERBARU:\nPasien: ${message}\n\n`;
-  prompt += `Berikan response yang membantu, empati, dan aman. Jika ada tanda darurat, set shouldEscalate=true.`;
+  prompt += `Berikan response dalam TEKS BIASA (bukan JSON) yang membantu, empati, dan aman. Jika ada tanda darurat, sampaikan ke pasien untuk segera hubungi dokter/rumah sakit.`;
 
   return prompt;
 }

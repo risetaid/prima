@@ -133,25 +133,6 @@ function normalizeIncoming(envelope: WahaWebhookEnvelope) {
   };
 }
 
-async function checkIdempotency(data: {
-  id?: string;
-  sender: string;
-  timestamp?: string | number;
-  message: string;
-}) {
-  const fallbackId = hashFallbackId([
-    data.id,
-    data.sender,
-    String(data.timestamp || ""),
-    data.message,
-  ]);
-  const idemKey = `webhook:waha:incoming:${fallbackId}`;
-  if (await isDuplicateEvent(idemKey)) {
-    return { ok: true, duplicate: true };
-  }
-  return null;
-}
-
 export const POST = createApiHandler(
   {
     auth: "custom",
@@ -206,17 +187,17 @@ export const POST = createApiHandler(
       throw new Error(`Invalid payload: ${JSON.stringify(validationResult.error.flatten())}`);
     }
 
-    const { sender, message, device, id, timestamp } = validationResult.data;
+    const { sender, message, device, id } = validationResult.data;
 
-    // Check for duplicate events
-    const duplicateCheck = await checkIdempotency({
-      id,
-      sender,
-      timestamp,
-      message,
-    });
-    if (duplicateCheck) {
-      return { ok: true, duplicate: true };
+    // Check for duplicate events using message ID only
+    // WAHA sends both "message" and "message.any" events for the same message
+    // So we use only the unique message ID to prevent duplicates
+    if (id) {
+      const idemKey = `webhook:waha:message:${id}`;
+      if (await isDuplicateEvent(idemKey)) {
+        logger.info('Duplicate message detected, skipping', { messageId: id });
+        return { ok: true, duplicate: true };
+      }
     }
 
     logger.info("WAHA incoming webhook received", {
