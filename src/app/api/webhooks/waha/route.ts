@@ -173,8 +173,12 @@ export const POST = createApiHandler(
       senderPreview: envelope.payload?.from || 'no sender'
     });
 
-    // Filter 1: Only process "message" events (ignore message.ack, session.status, etc.)
-    if (envelope.event && envelope.event !== 'message') {
+    // Filter 1: Only process message events (message or message.any)
+    // message.any includes all messages (incoming and outgoing)
+    // message includes only incoming messages
+    const isMessageEvent = envelope.event === 'message' || envelope.event === 'message.any';
+
+    if (envelope.event && !isMessageEvent) {
       // Handle message acknowledgment (delivery status) separately
       if (envelope.event === 'message.ack') {
         return await handleMessageAck(envelope);
