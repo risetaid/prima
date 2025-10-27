@@ -120,7 +120,7 @@ openspec/            # Spec-driven development
 | **Auth**          | Clerk 6.31                                    | User authentication & roles    |
 | **Validation**    | Zod 4.0                                       | Runtime schema validation      |
 | **Form Handling** | React Hook Form 7.62                          | Efficient form state           |
-| **WhatsApp**      | Fonnte API                                    | Message delivery & webhooks    |
+| **WhatsApp**      | WAHA (WhatsApp HTTP API)                      | Message delivery & webhooks    |
 | **Caching**       | Redis (ioredis)                               | Sessions & rate limiting       |
 | **File Storage**  | MinIO                                         | S3-compatible object storage   |
 | **AI**            | Anthropic SDK 0.63                            | Claude integration             |
@@ -308,7 +308,7 @@ Multi-layered:
 | Service               | Use                      | Env Vars                                    |
 | --------------------- | ------------------------ | ------------------------------------------- |
 | **Clerk**             | User auth & webhooks     | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` |
-| **Fonnte**            | WhatsApp send & incoming | `FONNTE_API_KEY`, `FONNTE_DEVICE_ID`        |
+| **WAHA**              | WhatsApp send & incoming | `WAHA_API_KEY`, `WAHA_ENDPOINT`, `WAHA_SESSION` |
 | **YouTube API**       | Video metadata           | `YOUTUBE_API_KEY`                           |
 | **MinIO**             | File storage             | `MINIO_*` credentials                       |
 | **PostgreSQL** (Neon) | Primary database         | `DATABASE_URL`                              |
@@ -317,7 +317,7 @@ Multi-layered:
 
 ### Webhook Handlers
 
-- **`/api/webhooks/fonnte/incoming`** — WhatsApp message ingestion
+- **`/api/webhooks/waha/incoming`** — WhatsApp message ingestion
 - **`/api/webhooks/clerk`** — Auth events (user created/updated/deleted)
 
 ---
@@ -390,9 +390,9 @@ All required in `.env.local`. See `README.md` for the complete list. Critical on
 ### Adding a WhatsApp Message Handler
 
 1. Add conversation flow logic in `conversation-state.service.ts`
-2. Update webhook handler at `/api/webhooks/fonnte/incoming`
-3. Add Fonnte API call via `src/lib/fonnte.ts`
-4. Test with mock Fonnte payloads
+2. Update webhook handler at `/api/webhooks/waha/incoming`
+3. Add WAHA API call via `src/lib/waha.ts`
+4. Test with mock WAHA payloads
 
 ---
 

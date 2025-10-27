@@ -144,7 +144,7 @@ export class SimpleConfirmationService {
           and(
             eq(reminders.patientId, patient.id),
             // Allow both SENT and DELIVERED status
-            // Fonnte may update status to DELIVERED before patient responds
+            // WAHA may update status to DELIVERED before patient responds
             or(
               eq(reminders.status, 'SENT'),
               eq(reminders.status, 'DELIVERED')

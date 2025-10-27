@@ -29,7 +29,7 @@ These instructions tell an AI coding assistant what matters in this repository s
 
    - Packaging/runtime: project uses Bun (not npm/pnpm/yarn). Prefer Bun-specific commands and `bunx` for CLI tools.
    - Auth: Clerk is used for authentication; environment secrets live in `.env.local` (see `README.md` for vars). Look for `CLERK_` prefixes.
-   - WhatsApp integration: Fonnte service; keys/config live under `FONNTE_*` env vars and webhook endpoints in `src/app/api/*`.
+   - WhatsApp integration: WAHA (WhatsApp HTTP API); keys/config live under `WAHA_*` env vars and webhook endpoints in `src/app/api/webhooks/waha/*`.
    - Database: Drizzle ORM models in `db/` and migration SQL under `drizzle/migrations/`. When changing schema, update Drizzle migrations and run `drizzle-kit push`.
    - Schemas/validation: Zod is the primary validation library. Look for `zod` imports in `src/` and `lib/api-schemas.ts`.
    - Tests: Vitest is used; tests live under `tests/` (or alongside code). Use `bun test` and prefer small, focused tests.
@@ -44,7 +44,7 @@ These instructions tell an AI coding assistant what matters in this repository s
 5. Integration points & external systems
 
    - Clerk (auth) — watch for webhook endpoints and Clerk envs.
-   - Fonnte (WhatsApp) — message sending, webhooks, device config.
+   - WAHA (WhatsApp HTTP API) — message sending, webhooks, session management via `WAHA_*` env vars.
    - YouTube Data API — used by content importing; env var `YOUTUBE_API_KEY`.
    - Database — Neon/Postgres; connection via `DATABASE_URL`.
 

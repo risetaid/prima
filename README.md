@@ -11,7 +11,7 @@ Modern healthcare platform for patient management, reminders, and educational co
 - **Bun** (required, not npm/yarn)
 - **PostgreSQL** (Neon recommended)
 - **Clerk** account (auth)
-- **Fonnte** account (WhatsApp)
+- **WAHA** account (WhatsApp HTTP API)
 
 ### Local Development
 
@@ -70,7 +70,9 @@ See `.env.local` for all required variables. Key vars:
 
 - `DATABASE_URL` — Postgres connection
 - `CLERK_*` — Clerk auth keys
-- `FONNTE_*` — WhatsApp integration
+- `WAHA_API_KEY` — WhatsApp HTTP API key
+- `WAHA_ENDPOINT` — WAHA API endpoint
+- `WAHA_SESSION` — WAHA session name (default: default)
 - `YOUTUBE_API_KEY` — YouTube Data API
 
 ---
@@ -81,7 +83,7 @@ See `.env.local` for all required variables. Key vars:
 - **Drizzle ORM** for DB (see `db/`, `drizzle/`)
 - **Zod** for validation (see `src/lib/api-schemas.ts`)
 - **Clerk** for auth (env: `CLERK_*`)
-- **Fonnte** for WhatsApp (env: `FONNTE_*`)
+- **WAHA** for WhatsApp (env: `WAHA_*`)
 - **API routes:** thin controllers in `src/app/api/*`, delegate to `src/services/*`
 - **Error handling:** see `src/app/global-error.tsx`, `src/lib/error-handling`
 
@@ -101,7 +103,7 @@ See `.env.local` for all required variables. Key vars:
 - **TypeScript**
 - **Drizzle ORM** (Postgres)
 - **Clerk** (auth)
-- **Fonnte** (WhatsApp)
+- **WAHA** (WhatsApp HTTP API)
 - **Tailwind CSS**, **Shadcn/ui**, **Radix UI**
 - **Zod** (validation)
 - **Vitest** (testing)

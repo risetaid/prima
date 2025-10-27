@@ -231,7 +231,7 @@ export class RateLimitService {
 // Specialized rate limiters for different use cases
 export class WhatsAppRateLimiter extends RateLimitService {
   private readonly WHATSAPP_WINDOW_MS = 60000 // 1 minute
-  private readonly WHATSAPP_MAX_REQUESTS = 30 // Fonnte typical rate limit
+  private readonly WHATSAPP_MAX_REQUESTS = 30 // WAHA typical rate limit
 
   async checkWhatsAppRateLimit(phoneNumber: string): Promise<RateLimitResult> {
     return this.checkRateLimit(phoneNumber, {

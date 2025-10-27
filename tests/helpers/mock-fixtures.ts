@@ -167,13 +167,48 @@ export const MOCK_FONNTE_PAYLOADS = {
   },
 };
 
+export const MOCK_WAHA_PAYLOADS = {
+  validMessage: {
+    from: "628123456789@c.us",
+    chatId: "628123456789@c.us",
+    text: "Sudah minum obat hari ini",
+    messageId: "msg-001-waha",
+    timestamp: Math.floor(Date.now() / 1000),
+  },
+  validMessageWithoutId: {
+    from: "628123456789@c.us",
+    chatId: "628123456789@c.us",
+    text: "Ya, sudah dikonfirmasi",
+    timestamp: Math.floor(Date.now() / 1000),
+  },
+  invalidPhone: {
+    from: "invalid",
+    chatId: "invalid",
+    text: "Test message",
+    messageId: "msg-002-waha",
+  },
+  invalidMessage: {
+    from: "628123456789@c.us",
+    chatId: "628123456789@c.us",
+    text: "", // Empty message
+    messageId: "msg-003-waha",
+  },
+  verificationConfirmation: {
+    from: "628123456789@c.us",
+    chatId: "628123456789@c.us",
+    text: "OTP: 123456",
+    messageId: "msg-004-waha",
+    timestamp: Math.floor(Date.now() / 1000),
+  },
+};
+
 export const MOCK_WEBHOOK_HEADERS = {
   valid: {
-    "x-fonnte-token": process.env.FONNTE_WEBHOOK_TOKEN || "test-webhook-token",
+    "x-api-key": process.env.WAHA_API_KEY || "test-waha-api-key",
     "content-type": "application/json",
   },
   invalid: {
-    "x-fonnte-token": "invalid-token",
+    "x-api-key": "invalid-key",
     "content-type": "application/json",
   },
   missing: {

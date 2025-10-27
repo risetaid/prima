@@ -525,20 +525,21 @@ describe("CMS Videos API - GET /api/cms/videos", () => {
 // SECTION 6: Webhook Tests
 // ============================================================================
 
-describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
-  it("should process valid Fonnte message", () => {
+describe("WAHA Webhook - POST /api/webhooks/waha/incoming", () => {
+  it("should process valid WAHA message", () => {
     const payload = {
-      sender: "628123456789",
-      message: "Sudah minum obat",
-      id: "msg-001",
+      from: "628123456789@c.us",
+      chatId: "628123456789@c.us",
+      text: "Sudah minum obat",
+      messageId: "msg-001",
       timestamp: Math.floor(Date.now() / 1000),
     };
 
-    expect(payload).toHaveProperty("sender");
-    expect(payload).toHaveProperty("message");
+    expect(payload).toHaveProperty("from");
+    expect(payload).toHaveProperty("text");
   });
 
-  it("should require X-Fonnte-Token header", () => {
+  it("should require X-Api-Key header", () => {
     const hasAuthToken = true;
     expect(hasAuthToken).toBe(true);
   });
@@ -548,8 +549,11 @@ describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
     expect(statusCode).toBe(401);
   });
 
-  it("should normalize phone numbers", () => {
+  it("should normalize phone numbers and strip @c.us suffix", () => {
     const normalizePhone = (phone: string) => {
+      if (phone && phone.includes("@c.us")) {
+        return phone.replace("@c.us", "");
+      }
       let normalized = phone.replace(/\D/g, "");
       if (normalized.startsWith("0")) {
         normalized = "62" + normalized.slice(1);
@@ -557,21 +561,22 @@ describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
       return normalized;
     };
 
+    expect(normalizePhone("628123456789@c.us")).toBe("628123456789");
     expect(normalizePhone("081234567890")).toBe("6281234567890");
   });
 
   it("should validate minimum required fields", () => {
     const isValid = (msg: any) => {
       return (
-        msg.sender &&
-        msg.sender.length >= 6 &&
-        msg.message &&
-        msg.message.length >= 1
+        msg.from &&
+        msg.from.length >= 6 &&
+        msg.text &&
+        msg.text.length >= 1
       );
     };
 
-    expect(isValid({ sender: "628123456789", message: "test" })).toBe(true);
-    expect(isValid({ sender: "123", message: "test" })).toBe(false);
+    expect(isValid({ from: "628123456789@c.us", text: "test" })).toBe(true);
+    expect(isValid({ from: "123", text: "test" })).toBe(false);
   });
 
   it("should process confirmation keywords", () => {
@@ -585,16 +590,16 @@ describe("Fonnte Webhook - POST /api/webhooks/fonnte/incoming", () => {
   });
 });
 
-describe("Fonnte Webhook - Idempotency & Deduplication", () => {
+describe("WAHA Webhook - Idempotency & Deduplication", () => {
   it("should detect duplicate messages by ID", () => {
-    const msg1 = { id: "msg-001", sender: "628123456789", timestamp: 1000 };
-    const msg2 = { id: "msg-001", sender: "628123456789", timestamp: 1000 };
+    const msg1 = { messageId: "msg-001", from: "628123456789@c.us", timestamp: 1000 };
+    const msg2 = { messageId: "msg-001", from: "628123456789@c.us", timestamp: 1000 };
 
-    expect(msg1.id).toBe(msg2.id);
-    expect(msg1.sender).toBe(msg2.sender);
+    expect(msg1.messageId).toBe(msg2.messageId);
+    expect(msg1.from).toBe(msg2.from);
   });
 
-  it("should generate fallback ID when message_id missing", () => {
+  it("should generate fallback ID when messageId missing", () => {
     const sender = "628123456789";
     const timestamp = 1000;
     const message = "test";
@@ -604,8 +609,8 @@ describe("Fonnte Webhook - Idempotency & Deduplication", () => {
   });
 
   it("should use Redis for idempotency tracking", () => {
-    const idemKey = "webhook:fonnte:incoming:msg-001";
-    expect(idemKey).toContain("webhook:fonnte:incoming");
+    const idemKey = "webhook:waha:incoming:msg-001";
+    expect(idemKey).toContain("webhook:waha:incoming");
   });
 
   it("should return duplicate flag without reprocessing", () => {

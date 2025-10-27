@@ -18,7 +18,7 @@ export function requireWebhookToken(request: NextRequest): NextResponse | null {
   const expected = process.env.WEBHOOK_TOKEN || ''
 
   // If no token configured, allow all requests
-  // This makes it compatible with Fonnte which doesn't support auth
+  // This makes it compatible with WAHA which uses X-Api-Key header for authentication
   if (!expected) {
     console.log('⚠️ WEBHOOK_TOKEN not configured - allowing unauthenticated webhook')
     return null
@@ -28,8 +28,8 @@ export function requireWebhookToken(request: NextRequest): NextResponse | null {
   if (token && token === expected) {
     return null
   }
-  
-  // For Fonnte compatibility: If no token provided but WEBHOOK_TOKEN exists,
+
+  // For WAHA compatibility: If no token provided but WEBHOOK_TOKEN exists,
   // check if ALLOW_UNSIGNED_WEBHOOKS is enabled
   if (!token && process.env.ALLOW_UNSIGNED_WEBHOOKS === 'true') {
     console.log('⚠️ Allowing unsigned webhook (ALLOW_UNSIGNED_WEBHOOKS=true)')
