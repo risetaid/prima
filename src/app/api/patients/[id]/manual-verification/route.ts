@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/waha";
 
 import { logger } from '@/lib/logger';
 // Manual verification by volunteer
@@ -114,38 +115,20 @@ Semoga sehat selalu! 🙏`;
 // Helper function to send confirmation message
 async function sendConfirmationMessage(phoneNumber: string, message: string) {
   try {
-    // Format Indonesian phone number
-    let formattedPhone = phoneNumber;
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "62" + formattedPhone.slice(1);
-    } else if (!formattedPhone.startsWith("62")) {
-      formattedPhone = "62" + formattedPhone;
-    }
+    // Format phone number using WAHA formatter
+    const formattedPhone = formatWhatsAppNumber(phoneNumber);
 
-    const fonnte_token = process.env.FONNTE_TOKEN;
-    if (!fonnte_token) {
-      logger.warn(
-        "FONNTE_TOKEN not configured, skipping confirmation message"
-      );
-      return;
-    }
-
-    const response = await fetch("https://api.fonnte.com/send", {
-      method: "POST",
-      headers: {
-        Authorization: fonnte_token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        target: formattedPhone,
-        message: message,
-        countryCode: "62",
-      }),
+    // Send via WAHA
+    const result = await sendWhatsAppMessage({
+      to: formattedPhone,
+      body: message,
     });
 
-    const result = await response.json();
-    if (!response.ok) {
-      logger.warn("Failed to send confirmation message", { result });
+    if (!result.success) {
+      logger.warn("Failed to send confirmation message", {
+        error: result.error,
+        phoneNumber: formattedPhone
+      });
     }
   } catch (error: unknown) {
     logger.warn("Error sending confirmation message", { error: error instanceof Error ? error.message : String(error) });

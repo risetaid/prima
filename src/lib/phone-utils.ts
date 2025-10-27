@@ -5,7 +5,7 @@
  * consistency across the application, especially for Indonesian phone numbers.
  */
 
-import { formatWhatsAppNumber } from "@/lib/fonnte";
+import { formatWhatsAppNumber } from "@/lib/waha";
 
 /**
  * Phone number format information

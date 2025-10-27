@@ -202,21 +202,21 @@ export class ReminderHelpers {
     status: 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED',
     options?: {
       sentAt?: Date;
-      fonnteMessageId?: string;
+      wahaMessageId?: string;
       confirmationStatus?: string;
       confirmationResponse?: string;
     }
   ): Promise<Reminder | undefined> {
-    const updateData: Record<string, unknown> = { 
-      status, 
+    const updateData: Record<string, unknown> = {
+      status,
       updatedAt: new Date()
     };
 
     if (options?.sentAt) {
       updateData.sentAt = options.sentAt;
     }
-    if (options?.fonnteMessageId) {
-      updateData.fonnteMessageId = options.fonnteMessageId;
+    if (options?.wahaMessageId) {
+      updateData.wahaMessageId = options.wahaMessageId;
     }
     if (options?.confirmationStatus) {
       updateData.confirmationStatus = options.confirmationStatus;

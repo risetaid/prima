@@ -3,7 +3,7 @@ import { schemas } from '@/lib/api-schemas'
 import { db, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 import { invalidatePatientCache } from '@/lib/cache'
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/waha'
 
 // POST /api/patients/[id]/deactivate - Deactivate patient and send confirmation
 export const POST = createApiHandler(

@@ -1,7 +1,7 @@
 // Simple Verification Service - Direct WhatsApp verification without complexity
 import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/waha";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
 import { invalidatePatientCache } from "@/lib/cache";

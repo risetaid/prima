@@ -249,7 +249,7 @@ export const POST = createApiHandler(
               .set({
                 sentAt: getWIBTime(),
                 status: status,
-                fonnteMessageId: result.messageId,
+                wahaMessageId: result.messageId,
                 updatedAt: getWIBTime(),
               })
               .where(eq(reminders.id, reminder.id));
@@ -305,7 +305,7 @@ export const POST = createApiHandler(
         timestamp: new Date().toISOString(),
         wibTime: `${getCurrentDateWIB()} ${getCurrentTimeWIB()}`,
         duration: `${duration}ms`,
-        provider: "FONNTE",
+        provider: "WAHA",
         triggeredBy: user!.email || user!.id,
         note: "Instant send includes only today's reminders that haven't been delivered yet",
       },

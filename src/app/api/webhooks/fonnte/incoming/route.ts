@@ -273,15 +273,15 @@ async function handleMessageStatusUpdate(parsed: Record<string, unknown>) {
     const logData = await db
       .select({ patientId: reminders.patientId })
       .from(reminders)
-      .where(eq(reminders.fonnteMessageId, id))
+      .where(eq(reminders.wahaMessageId, id))
       .limit(1);
 
     const updates = { status: mapped! };
     if (mapped === 'FAILED' && reason) {
-      logger.warn('Fonnte message failed', { id, reason });
+      logger.warn('WAHA message failed', { id, reason });
     }
 
-    await db.update(reminders).set(updates).where(eq(reminders.fonnteMessageId, id));
+    await db.update(reminders).set(updates).where(eq(reminders.wahaMessageId, id));
     logger.info('Updated reminder log status from webhook', { id, mapped });
 
     // Invalidate cache if we have patientId

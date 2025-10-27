@@ -6,7 +6,7 @@ import { db, reminders, manualConfirmations, patients } from "@/db";
 import { eq, and, isNull, desc, asc, gte, lte, inArray, count } from "drizzle-orm";
 import { getWIBTime, shouldSendReminderNow, createWIBDateRange } from "@/lib/datetime";
 import { del, CACHE_KEYS } from "@/lib/cache";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/fonnte";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/waha";
 import { cmsArticles, cmsVideos } from "@/db";
 
 interface CompletedReminder {
@@ -766,7 +766,7 @@ async function sendImmediateReminders(
       await db.update(reminders).set({
         sentAt: getWIBTime(),
         status: status,
-        fonnteMessageId: result.messageId,
+        wahaMessageId: result.messageId,
         updatedAt: getWIBTime(),
       }).where(eq(reminders.id, schedule.id));
 

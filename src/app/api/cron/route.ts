@@ -213,7 +213,7 @@ async function processRemindersWithLock() {
             .set({
               sentAt: getWIBTime(),
               status: status,
-              fonnteMessageId: sendResult.messageId,
+              wahaMessageId: sendResult.messageId,
               updatedAt: getWIBTime(),
             })
             .where(eq(reminders.id, reminder.id));

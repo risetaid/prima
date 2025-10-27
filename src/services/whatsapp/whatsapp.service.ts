@@ -3,7 +3,7 @@ import {
   sendWhatsAppMessage,
   formatWhatsAppNumber,
   WhatsAppMessageResult,
-} from "@/lib/fonnte";
+} from "@/lib/waha";
 import { ValidatedContent } from "@/services/reminder/reminder.types";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";

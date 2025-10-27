@@ -55,7 +55,7 @@ export const reminders = pgTable(
     // Delivery tracking
     sentAt: timestamp("sent_at", { withTimezone: true }),
     status: reminderStatusEnum("status").notNull().default("PENDING"),
-    fonnteMessageId: text("fonnte_message_id"),
+    wahaMessageId: text("waha_message_id"),
     // Confirmation tracking
     confirmationStatus: confirmationStatusEnum("confirmation_status").default("PENDING"),
     confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),

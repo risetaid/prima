@@ -1,0 +1,1 @@
+ALTER TABLE "reminders" RENAME COLUMN "fonnte_message_id" TO "waha_message_id";

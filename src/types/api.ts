@@ -121,7 +121,7 @@ export interface Reminder {
   confirmationResponseAt: Date | null;
   confirmationSentAt: Date | null;
   sentAt: Date | null;
-  fonnteMessageId: string | null;
+  wahaMessageId: string | null;
   priority: number | null;
   metadata: Record<string, unknown> | null;
   createdById: string;

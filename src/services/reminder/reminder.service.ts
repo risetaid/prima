@@ -356,7 +356,7 @@ export class ReminderService {
         status: result.success ? "DELIVERED" : "FAILED",
         message: formattedMessage,
         phoneNumber: params.phoneNumber,
-        fonnteMessageId: result.messageId,
+        wahaMessageId: result.messageId,
       });
 
       // Reminder confirmation now handled by simple direct lookup

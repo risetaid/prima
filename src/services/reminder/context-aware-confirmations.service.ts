@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { reminders, patients } from '@/db'
 import { eq } from 'drizzle-orm'
 
-import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/fonnte'
+import { sendWhatsAppMessage, formatWhatsAppNumber } from '@/lib/waha'
 
 export interface ConfirmationContext {
   patientId: string
