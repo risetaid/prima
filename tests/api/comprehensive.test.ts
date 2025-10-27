@@ -525,7 +525,7 @@ describe("CMS Videos API - GET /api/cms/videos", () => {
 // SECTION 6: Webhook Tests
 // ============================================================================
 
-describe("WAHA Webhook - POST /api/webhooks/waha/incoming", () => {
+describe("WAHA Webhook - POST /api/webhooks/waha", () => {
   it("should process valid WAHA message", () => {
     const payload = {
       from: "628123456789@c.us",

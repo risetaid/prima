@@ -317,7 +317,7 @@ Multi-layered:
 
 ### Webhook Handlers
 
-- **`/api/webhooks/waha/incoming`** — WhatsApp message ingestion
+- **`/api/webhooks/waha`** — WhatsApp webhook (message ingestion, status updates, etc.)
 - **`/api/webhooks/clerk`** — Auth events (user created/updated/deleted)
 
 ---
@@ -390,7 +390,7 @@ All required in `.env.local`. See `README.md` for the complete list. Critical on
 ### Adding a WhatsApp Message Handler
 
 1. Add conversation flow logic in `conversation-state.service.ts`
-2. Update webhook handler at `/api/webhooks/waha/incoming`
+2. Update webhook handler at `/api/webhooks/waha`
 3. Add WAHA API call via `src/lib/waha.ts`
 4. Test with mock WAHA payloads
 

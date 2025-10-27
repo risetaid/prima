@@ -328,6 +328,6 @@ export const GET = createApiHandler(
   async (body, { request }) => {
     const { searchParams } = new URL(request.url);
     const mode = searchParams.get("mode") || "ping";
-    return { ok: true, route: "waha/incoming", mode };
+    return { ok: true, route: "waha", mode };
   }
 );
