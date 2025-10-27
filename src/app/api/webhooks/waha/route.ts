@@ -9,6 +9,40 @@ import { SimpleVerificationService } from "@/services/verification/simple-verifi
 import { logger } from "@/lib/logger";
 import { createApiHandler } from "@/lib/api-helpers";
 
+// Official WAHA webhook structure (see: https://waha.devlike.pro/docs/how-to/events/)
+interface WahaWebhookEnvelope {
+  id?: string; // Event ID
+  timestamp?: number; // Event timestamp
+  event?: string; // Event type: "message", "message.ack", etc.
+  session?: string; // Session name
+  payload?: WahaMessagePayload; // The actual message data
+  me?: {
+    id: string;
+    pushName: string;
+  };
+  environment?: {
+    tier: string;
+    version: string;
+  };
+  engine?: string;
+  [key: string]: unknown;
+}
+
+interface WahaMessagePayload {
+  id?: string; // Message ID
+  timestamp?: number;
+  from?: string; // Format: 628xxxxxxxxxx@c.us
+  fromMe?: boolean; // Critical: filter out our own messages
+  to?: string;
+  body?: string; // Message text
+  source?: string; // "api" or "app"
+  hasMedia?: boolean;
+  ack?: number; // -1=ERROR, 1=SERVER, 2=DEVICE, 3=READ, 4=PLAYED
+  pushName?: string;
+  [key: string]: unknown;
+}
+
+// Legacy flat structure for backwards compatibility
 interface WebhookBody {
   from?: string;
   chatId?: string;
@@ -53,21 +87,41 @@ const IncomingSchema = z.object({
   timestamp: z.union([z.string(), z.number()]).optional(),
 });
 
-function normalizeIncoming(body: WebhookBody) {
-  // WAHA sends in format: 628xxxxxxxxxx@c.us
-  // We need to strip @c.us for lookups
-  let sender = body.from || body.chatId || body.sender || body.phone || body.number;
+function normalizeIncoming(envelope: WahaWebhookEnvelope) {
+  // WAHA wraps message data in payload object
+  // See: https://waha.devlike.pro/docs/how-to/events/
+  const payload = envelope.payload;
 
-  // Strip @c.us suffix if present
-  if (sender && sender.includes('@c.us')) {
+  if (!payload) {
+    // Fallback for legacy flat structure (shouldn't happen with WAHA)
+    const legacy = envelope as unknown as WebhookBody;
+    let sender = legacy.from || legacy.chatId || legacy.sender || legacy.phone || legacy.number;
+    if (sender?.includes('@c.us')) {
+      sender = sender.replace('@c.us', '');
+    }
+    return {
+      sender,
+      message: legacy.text || legacy.message || legacy.body,
+      device: envelope.session || legacy.device,
+      name: legacy.pushName || legacy.name,
+      id: legacy.messageId || legacy.id || legacy.message_id,
+      timestamp: legacy.timestamp || legacy.time,
+    };
+  }
+
+  // Extract from WAHA payload structure
+  let sender = payload.from || payload.to;
+
+  // Strip @c.us suffix (WAHA format: 628xxxxxxxxxx@c.us)
+  if (sender?.includes('@c.us')) {
     sender = sender.replace('@c.us', '');
   }
 
-  const message = body.text || body.message || body.body;
-  const device = body.device || body.instance;
-  const name = body.pushName || body.name;
-  const id = body.messageId || body.id || body.message_id;
-  const timestamp = body.timestamp || body.time;
+  const message = payload.body;
+  const device = envelope.session;
+  const name = payload.pushName;
+  const id = payload.id;
+  const timestamp = payload.timestamp || envelope.timestamp;
 
   return {
     sender,
@@ -106,24 +160,43 @@ export const POST = createApiHandler(
   },
   async (body, { request }) => {
     // Body is already parsed by createApiHandler
-    const parsed = (body || {}) as Record<string, unknown>;
+    const envelope = (body || {}) as WahaWebhookEnvelope;
 
     // Log raw payload for debugging
     logger.info('📥 WAHA webhook payload received', {
       contentType: request.headers.get('content-type'),
-      hasData: Object.keys(parsed).length > 0,
-      keys: Object.keys(parsed),
-      senderPreview: parsed.from || parsed.chatId || parsed.sender || 'no sender'
+      event: envelope.event,
+      session: envelope.session,
+      hasPayload: Boolean(envelope.payload),
+      payloadKeys: envelope.payload ? Object.keys(envelope.payload) : [],
+      fromMe: envelope.payload?.fromMe,
+      senderPreview: envelope.payload?.from || 'no sender'
     });
 
-    // Check if this is a message status update (no sender, but has id and status)
-    if (!parsed.sender && !parsed.from && !parsed.chatId && parsed.id && (parsed.status || parsed.state)) {
-      // Handle message status update
-      return await handleMessageStatusUpdate(parsed);
+    // Filter 1: Only process "message" events (ignore message.ack, session.status, etc.)
+    if (envelope.event && envelope.event !== 'message') {
+      // Handle message acknowledgment (delivery status) separately
+      if (envelope.event === 'message.ack') {
+        return await handleMessageAck(envelope);
+      }
+
+      logger.info('Ignoring non-message event', { event: envelope.event });
+      return { ok: true, ignored: true, reason: 'not_message_event', event: envelope.event };
+    }
+
+    // Filter 2: Skip messages sent by us (fromMe: true or source: "api")
+    // This prevents infinite loops and wasted AI tokens
+    if (envelope.payload?.fromMe === true || envelope.payload?.source === 'api') {
+      logger.info('Ignoring outbound message', {
+        fromMe: envelope.payload?.fromMe,
+        source: envelope.payload?.source,
+        messageId: envelope.payload?.id
+      });
+      return { ok: true, ignored: true, reason: 'own_message' };
     }
 
     // Handle incoming message (patient response)
-    const normalized = normalizeIncoming(parsed);
+    const normalized = normalizeIncoming(envelope);
     const validationResult = IncomingSchema.safeParse(normalized);
     if (!validationResult.success) {
       throw new Error(`Invalid payload: ${JSON.stringify(validationResult.error.flatten())}`);
@@ -247,31 +320,39 @@ export const POST = createApiHandler(
   }
 );
 
-// Handle message status updates (sent/delivered/failed)
-async function handleMessageStatusUpdate(parsed: Record<string, unknown>) {
-  // Normalize status data
-  const id = String((parsed.id as string) || (parsed.messageId as string) || (parsed.message_id as string) || (parsed.msgId as string) || '');
-  const status = (parsed.status as string) || (parsed.state as string);
-  const reason = parsed.reason as string;
-  const timestamp = (parsed.timestamp as string | number) || (parsed.time as string | number) || (parsed.updated_at as string | number);
-
-  logger.info('WAHA message status update received', {
-    id,
-    status,
-    reason,
-    timestamp
-  });
-
-  // Check for duplicate status updates
-  const idemKey = `webhook:waha:message-status:${hashFallbackId([id, String(timestamp || '')])}`;
-  if (await isDuplicateEvent(idemKey)) {
-    return { ok: true, duplicate: true, type: 'message_status' };
+// Handle message acknowledgment (delivery status) - WAHA uses message.ack event
+// See: https://waha.devlike.pro/docs/how-to/events/#messageack
+async function handleMessageAck(envelope: WahaWebhookEnvelope) {
+  const payload = envelope.payload;
+  if (!payload) {
+    return { ok: true, ignored: true, type: 'message_ack', reason: 'no_payload' };
   }
 
-  // Map status to enum
-  const mapped = mapStatusToEnum(status);
+  const id = payload.id;
+  const ack = payload.ack; // -1=ERROR, 1=SERVER, 2=DEVICE, 3=READ, 4=PLAYED
+  const timestamp = payload.timestamp || envelope.timestamp;
+
+  logger.info('WAHA message acknowledgment received', {
+    id,
+    ack,
+    timestamp,
+    event: envelope.event
+  });
+
+  if (!id) {
+    return { ok: true, ignored: true, type: 'message_ack', reason: 'no_id' };
+  }
+
+  // Check for duplicate status updates
+  const idemKey = `webhook:waha:message-ack:${hashFallbackId([id, String(timestamp || ''), String(ack || '')])}`;
+  if (await isDuplicateEvent(idemKey)) {
+    return { ok: true, duplicate: true, type: 'message_ack' };
+  }
+
+  // Map ACK to enum
+  const mapped = mapAckToEnum(ack);
   if (!mapped) {
-    return { ok: true, ignored: true, type: 'message_status', reason: 'unmapped_status' };
+    return { ok: true, ignored: true, type: 'message_ack', reason: 'unmapped_ack', ack };
   }
 
   try {
@@ -288,35 +369,37 @@ async function handleMessageStatusUpdate(parsed: Record<string, unknown>) {
       .limit(1);
 
     const updates = { status: mapped! };
-    if (mapped === 'FAILED' && reason) {
-      logger.warn('WAHA message failed', { id, reason });
+    if (mapped === 'FAILED') {
+      logger.warn('WAHA message failed', { id, ack });
     }
 
     await db.update(reminders).set(updates).where(eq(reminders.wahaMessageId, id));
-    logger.info('Updated reminder log status from WAHA webhook', { id, mapped });
+    logger.info('Updated reminder status from WAHA message.ack', { id, ack, mapped });
 
     // Invalidate cache if we have patientId
     if (logData.length > 0) {
       await del(CACHE_KEYS.reminderStats(logData[0].patientId));
     }
 
-    return { ok: true, processed: true, type: 'message_status' };
+    return { ok: true, processed: true, type: 'message_ack' };
 
   } catch (error) {
-    logger.error('Failed to update message status', error as Error, { id, status });
-    throw new Error('Failed to update message status');
+    logger.error('Failed to update message ack status', error as Error, { id, ack });
+    throw new Error('Failed to update message ack status');
   }
 }
 
-function mapStatusToEnum(status?: string): 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null {
-  const s = (status || '').toLowerCase()
-  if (!s) return null
+// Map WAHA ACK values to our status enum
+// See: https://waha.devlike.pro/docs/how-to/events/#messageack
+// -1 = ERROR, 1 = SERVER, 2 = DEVICE, 3 = READ, 4 = PLAYED
+function mapAckToEnum(ack?: number): 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED' | null {
+  if (ack === undefined || ack === null) return null;
 
-  // WAHA status values (verify these)
-  if (['sent', 'sending', 'queued'].includes(s)) return 'SENT'
-  if (['delivered', 'read', 'received'].includes(s)) return 'DELIVERED'
-  if (['failed', 'error', 'rejected'].includes(s)) return 'FAILED'
-  return null
+  if (ack === -1) return 'FAILED'; // Error
+  if (ack === 1) return 'SENT'; // Server received
+  if (ack === 2 || ack === 3 || ack === 4) return 'DELIVERED'; // Device, Read, or Played
+
+  return null;
 }
 
 export const GET = createApiHandler(
