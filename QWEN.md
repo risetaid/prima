@@ -1,69 +1,48 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-<!-- OPENSPEC:START -->
-
-# OpenSpec Instructions
-
-These instructions are for AI assistants working in this project.
-
-Always open `@/openspec/AGENTS.md` when the request:
-
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
-
-Use `@/openspec/AGENTS.md` to learn:
-
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
-
-Keep this managed block so 'openspec update' can refresh the instructions.
-
-<!-- OPENSPEC:END -->
-
----
+# PRIMA System - QWEN Context
 
 ## Project Overview
 
-**PRIMA** (Patient Reminder and Information Management Application) is a modern healthcare platform for managing patient reminders, medical information, and WhatsApp integration. Built with Next.js 15 (App Router), TypeScript, Drizzle ORM, and Clerk authentication.
+PRIMA (Patient Reminder and Information Management Application) is a modern healthcare platform for managing patient reminders, medical information, and WhatsApp integration. Built with Next.js 15 (App Router), TypeScript, Drizzle ORM, and Clerk authentication.
+
+The application is designed to support cancer patient care through automated reminders, health education content, and AI-powered conversation handling. It uses WhatsApp as the primary communication channel with patients and includes features for volunteer coordination and emergency escalation.
 
 **Key Principles**: Bun-only, TDD, API/service separation, type-safety first, spec-driven development.
 
----
+## Tech Stack
 
-## Essential Commands
+| Layer             | Tech                                          | Purpose                        |
+| ----------------- | --------------------------------------------- | ------------------------------ |
+| **Frontend**      | Next.js 15 (App Router), React 19, TypeScript | Server & client-side rendering |
+| **Styling**       | Tailwind CSS 4, Shadcn/ui, Radix UI           | Responsive UI components       |
+| **Database**      | PostgreSQL (Neon), Drizzle ORM                | Type-safe data layer           |
+| **Auth**          | Clerk 6.31                                    | User authentication & roles    |
+| **Validation**    | Zod 4.0                                       | Runtime schema validation      |
+| **Form Handling** | React Hook Form 7.62                          | Efficient form state           |
+| **WhatsApp**      | WAHA (WhatsApp HTTP API)                      | Message delivery & webhooks    |
+| **Caching**       | Redis (ioredis)                               | Sessions & rate limiting       |
+| **File Storage**  | MinIO                                         | S3-compatible object storage   |
+| **AI**            | Anthropic SDK 0.63                            | Claude integration             |
+| **Testing**       | Vitest                                        | Unit tests                     |
+| **Notifications** | Sonner                                        | Toast UI                       |
 
-### Development
+## Project Structure
 
-```bash
-bun install              # Install dependencies
-bun dev                  # Start dev server (with Turbopack)
-bun run build            # Production build
-bun start                # Run production server
-bun run lint             # ESLint check
-bun run typecheck        # TypeScript check
-bun test                 # Run Vitest tests
 ```
+src/
+├── app/              # Next.js routes + API (thin controllers)
+├── services/         # Business logic (15+ services)
+├── lib/              # Utilities & helpers (35+ modules)
+├── components/       # React UI (organized by domain)
+├── db/               # Drizzle schemas & types
+├── hooks/            # Custom React hooks
+├── middleware.ts     # Clerk auth middleware
+└── types.ts          # Global TypeScript definitions
 
-### Database (Drizzle ORM)
-
-```bash
-bunx drizzle-kit generate    # Generate new migrations from schema changes
-bunx drizzle-kit push        # Apply migrations to database
-bunx drizzle-kit studio      # Visual DB editor
-bun run nuke-recreate-db     # Full database reset
+db/                  # Schema files (core, reminder, content)
+drizzle/             # Auto-generated SQL migrations
+scripts/             # Maintenance & setup utilities
+openspec/            # Spec-driven development
 ```
-
-### Single Test Execution
-
-```bash
-bun test [filename]          # Run specific test file
-```
-
----
 
 ## Architecture Overview
 
@@ -91,45 +70,127 @@ The codebase follows a **strict three-layer architecture**:
 
 **Example**: `src/app/api/reminders/[id]` → `ReminderService` → `ReminderRepository` → database
 
-### Directory Structure
+### Key Services
 
+#### WhatsApp Service
+Handles all WhatsApp communication with patients:
+- Message sending with retry logic and rate limiting
+- Verification message templates
+- Follow-up reminders
+- Emergency alerts to volunteers
+- Personalized responses based on AI analysis
+
+#### Reminder Service
+Core logic for reminder management:
+- Creating, updating, and deleting reminders
+- Processing recurring schedules
+- Sending reminders via WhatsApp
+- Tracking patient responses
+- Managing content attachments to reminders
+
+#### AI Services
+- **AI Conversation Service**: Handles multi-turn health conversations with patient context
+- **AI Intent Service**: Classifies patient messages into intents (confirmation, missed, emergency, etc.)
+- **AI General Inquiry Service**: Handles general health questions with safety protocols
+
+## Database Schema
+
+### Core Tables
+- **users**: Healthcare staff and volunteers with roles (RELAWAN, ADMIN, etc.)
+- **patients**: Patient information including diagnosis, contact details, and health status
+- **medical_records**: Medical record tracking with record types, dates, and author information
+
+### Reminder Tables
+- **reminders**: Scheduled health reminders with type (MEDICATION, APPOINTMENT, GENERAL), status, and delivery tracking
+- **manual_confirmations**: Volunteer-verified confirmations of patient activities
+- **reminder_logs**: Logging of all reminder-related actions
+- **whatsapp_templates**: Predefined templates for various reminder types
+
+### Conversation Tables
+- **conversation_states**: Tracking ongoing AI conversations with patients
+- **conversation_messages**: Log of all messages in AI conversations
+- **volunteer_notifications**: System notifications for volunteer attention
+
+### Content Management Tables
+- **cms_articles**: Educational articles for patients
+- **cms_videos**: Educational videos for patients
+
+### Key Relations
+
+- Users → Patients (one-to-many)
+- Users → Reminders (assigned reminders)
+- Reminders → Patients (one-to-many)
+- Reminders → ManualConfirmations (responses)
+
+### Indexes
+
+Strategic indexes on frequent queries:
+
+- `users.clerkId`, `users.role`, `users.isActive`
+- `patients.phoneNumber`, `patients.verificationStatus`
+- `reminders.patientId`, `reminders.status`, `reminders.scheduledTime`
+
+## Building and Running
+
+### Prerequisites
+- Bun (required, not npm/yarn)
+- PostgreSQL (Neon recommended)
+- Clerk account (authentication)
+- WAHA account (WhatsApp HTTP API)
+- Anthropic API key for AI services
+
+### Essential Commands
+
+#### Development
+```bash
+bun install              # Install dependencies
+bun dev                  # Start dev server (with Turbopack)
+bun run build            # Production build
+bun start                # Run production server
+bun run lint             # ESLint check
+bun run typecheck        # TypeScript check
+bun test                 # Run Vitest tests
 ```
-src/
-├── app/              # Next.js routes + API (thin controllers)
-├── services/         # Business logic (15+ services)
-├── lib/              # Utilities & helpers (35+ modules)
-├── components/       # React UI (organized by domain)
-├── db/               # Drizzle schemas & types
-├── hooks/            # Custom React hooks
-├── middleware.ts     # Clerk auth middleware
-└── types.ts          # Global TypeScript definitions
 
-db/                  # Schema files (core, reminder, content)
-drizzle/             # Auto-generated SQL migrations
-scripts/             # Maintenance & setup utilities
-openspec/            # Spec-driven development
+#### Database (Drizzle ORM)
+```bash
+bunx drizzle-kit generate    # Generate new migrations from schema changes
+bunx drizzle-kit push        # Apply migrations to database
+bunx drizzle-kit studio      # Visual DB editor
+bun run nuke-recreate-db     # Full database reset
 ```
 
-### Key Technologies
+#### Single Test Execution
+```bash
+bun test [filename]          # Run specific test file
+```
 
-| Layer             | Tech                                          | Purpose                        |
-| ----------------- | --------------------------------------------- | ------------------------------ |
-| **Frontend**      | Next.js 15 (App Router), React 19, TypeScript | Server & client-side rendering |
-| **Styling**       | Tailwind CSS 4, Shadcn/ui, Radix UI           | Responsive UI components       |
-| **Database**      | PostgreSQL (Neon), Drizzle ORM                | Type-safe data layer           |
-| **Auth**          | Clerk 6.31                                    | User authentication & roles    |
-| **Validation**    | Zod 4.0                                       | Runtime schema validation      |
-| **Form Handling** | React Hook Form 7.62                          | Efficient form state           |
-| **WhatsApp**      | WAHA (WhatsApp HTTP API)                      | Message delivery & webhooks    |
-| **Caching**       | Redis (ioredis)                               | Sessions & rate limiting       |
-| **File Storage**  | MinIO                                         | S3-compatible object storage   |
-| **AI**            | Anthropic SDK 0.63                            | Claude integration             |
-| **Testing**       | Vitest                                        | Unit tests                     |
-| **Notifications** | Sonner                                        | Toast UI                       |
+### Testing and Quality
+```bash
+bun test          # Run tests
+bun run lint      # Lint code
+bunx tsc --noEmit # Type check
+```
 
----
+## Key Environment Variables
 
-## Code Conventions
+- `DATABASE_URL` — PostgreSQL connection string
+- `CLERK_*` — Clerk authentication keys
+- `WAHA_API_KEY` — WhatsApp HTTP API key
+- `WAHA_ENDPOINT` — WAHA API endpoint
+- `WAHA_SESSION` — WAHA session name (default: default)
+- `YOUTUBE_API_KEY` — YouTube Data API key
+- `ANTHROPIC_API_KEY` — Anthropic Claude API key
+- `REDIS_URL` — Redis connection for caching/rate limiting
+
+All required in `.env.local`. Critical ones:
+- `DATABASE_URL` — PostgreSQL connection
+- `CLERK_PUBLISHABLE_KEY` & `CLERK_SECRET_KEY` — Auth
+- `FONNTE_API_KEY` & `FONNTE_DEVICE_ID` — WhatsApp
+- `YOUTUBE_API_KEY` — Video imports
+- `REDIS_URL` — Caching
+
+## Development Conventions
 
 ### API Routes → Service Delegation
 
@@ -221,42 +282,6 @@ src/components/
 - **Roles**: RELAWAN (volunteer), ADMIN, DOC
 - **Protected Routes**: `/pasien/*`, `/pengingat/*`, `/admin/*` and most API routes
 
----
-
-## Database Schema Highlights
-
-### Core Tables
-
-| Table                  | Purpose                                                |
-| ---------------------- | ------------------------------------------------------ |
-| `users`                | Volunteers & admins (with Clerk sync)                  |
-| `patients`             | Cancer patients (phone, verification status)           |
-| `reminders`            | Medication/appointment reminders (recurrence patterns) |
-| `whatsapp_templates`   | Message templates with variables                       |
-| `manual_confirmations` | Volunteer confirmation responses                       |
-| `medical_records`      | Patient medical history                                |
-| `cms_articles`         | Educational content                                    |
-| `conversation_states`  | Multi-turn WhatsApp conversation tracking              |
-
-### Key Relations
-
-- Users → Patients (one-to-many)
-- Users → Reminders (assigned reminders)
-- Reminders → Patients (one-to-many)
-- Reminders → ManualConfirmations (responses)
-
-### Indexes
-
-Strategic indexes on frequent queries:
-
-- `users.clerkId`, `users.role`, `users.isActive`
-- `patients.phoneNumber`, `patients.verificationStatus`
-- `reminders.patientId`, `reminders.status`, `reminders.scheduledTime`
-
----
-
-## Important Patterns & Utilities
-
 ### Service Pattern Example
 
 ```typescript
@@ -274,6 +299,61 @@ export class ReminderService {
   }
 }
 ```
+
+## Key Features
+
+### Patient Management
+- Patient profiles with diagnosis, medications, and health status
+- Volunteer assignment and tracking
+- Verification system for WhatsApp communication
+- Emergency escalation protocols
+
+### Reminder System
+- Automated medication and appointment reminders
+- Customizable scheduling and recurrence patterns
+- AI-powered response processing
+- Content attachment to reminders (articles, videos)
+
+### WhatsApp Integration
+- Two-way conversation support
+- Message templates for various scenarios
+- Rate limiting and retry mechanisms
+- Verification and confirmation workflows
+
+### AI-Powered Assistance
+- Intent classification for patient messages
+- Context-aware conversation handling
+- Emergency detection and escalation
+- General health inquiry support
+
+### Content Management
+- CMS for health education articles
+- Video content management
+- Content attachment to reminders
+- Categorization and search capabilities
+
+## Testing Strategy
+
+### Running Tests
+
+```bash
+bun test                    # All tests
+bun test reminder.test.ts   # Single file
+```
+
+### Test Utilities
+
+- `src/lib/reminder-testing.ts` — Mock data and test helpers
+- Vitest framework (no Jest)
+
+### Testing Approach
+
+- **Unit Tests**: Vitest for service layer testing
+- **Integration Tests**: API route testing
+- **Type Safety**: Comprehensive TypeScript coverage with Zod validation
+- **AI Safety Tests**: Validation of AI response safety protocols
+
+## Important Patterns & Utilities
 
 ### Rate Limiting
 
@@ -299,8 +379,6 @@ Multi-layered:
 - Manages confirmation workflows
 - Persists conversation context
 
----
-
 ## Integration Points
 
 ### External Services
@@ -320,24 +398,6 @@ Multi-layered:
 - **`/api/webhooks/waha`** — WhatsApp webhook (message ingestion, status updates, etc.)
 - **`/api/webhooks/clerk`** — Auth events (user created/updated/deleted)
 
----
-
-## Testing
-
-### Running Tests
-
-```bash
-bun test                    # All tests
-bun test reminder.test.ts   # Single file
-```
-
-### Test Utilities
-
-- `src/lib/reminder-testing.ts` — Mock data and test helpers
-- Vitest framework (no Jest)
-
----
-
 ## Build & Deployment
 
 ### Next.js Configuration
@@ -354,20 +414,6 @@ bun test reminder.test.ts   # Single file
 bun run build   # Creates .next/standalone
 bun start       # Starts production server
 ```
-
----
-
-## Environment Variables
-
-All required in `.env.local`. See `README.md` for the complete list. Critical ones:
-
-- `DATABASE_URL` — PostgreSQL connection
-- `CLERK_PUBLISHABLE_KEY` & `CLERK_SECRET_KEY` — Auth
-- `FONNTE_API_KEY` & `FONNTE_DEVICE_ID` — WhatsApp
-- `YOUTUBE_API_KEY` — Video imports
-- `REDIS_URL` — Caching
-
----
 
 ## Common Development Tasks
 
@@ -394,8 +440,6 @@ All required in `.env.local`. See `README.md` for the complete list. Critical on
 3. Add WAHA API call via `src/lib/waha.ts`
 4. Test with mock WAHA payloads
 
----
-
 ## Key Files to Check
 
 When triaging a bug or understanding a feature:
@@ -408,7 +452,13 @@ When triaging a bug or understanding a feature:
 6. **Utilities**: `src/lib/` — Helpers & integrations
 7. **Migrations**: `drizzle/migrations/` — Schema history
 
----
+## Security Measures
+
+- Clerk-based authentication with role-based access control
+- Patient data access controls limiting volunteer access
+- Rate limiting for WhatsApp messages
+- Secure environment variable management
+- AI safety protocols preventing medical advice beyond scope
 
 ## Important Notes
 
@@ -418,8 +468,6 @@ When triaging a bug or understanding a feature:
 - **No secrets in code** — All credentials from `.env.local`.
 - **Clerk auth required** — Most routes protected by middleware.
 - **Tests required** — New features must include Vitest tests.
-
----
 
 ## Git & GitHub Workflow (AI Agents)
 
@@ -473,8 +521,6 @@ gh issue close [number]
 - **Always review** → Run `git status` and `git diff` before operations
 - **Never use `--force`** → Protect repository history
 - **Document changes** → Update `.env.example`, `README.md`, and specs when needed
-
----
 
 ## Conventional Commits Guidelines
 
