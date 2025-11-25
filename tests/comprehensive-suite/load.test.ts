@@ -94,6 +94,12 @@ export class LoadTests {
       duration,
       metrics,
       errors: groupedErrors,
+      endpoints: scenarios.map((s) => ({
+        name: s.name,
+        method: s.method,
+        path: s.path,
+        type: s.path === "/api/health" ? "public" : "protected",
+      })),
     };
   }
 
@@ -172,11 +178,17 @@ export class LoadTests {
       duration,
       metrics,
       errors: groupedErrors,
+      endpoints: scenarios.map((s) => ({
+        name: s.name,
+        method: s.method,
+        path: s.path,
+        type: s.path === "/api/health" ? "public" : "protected",
+      })),
     };
   }
 
   /**
-   * Print load test summary
+   * Print summary of load test results
    */
   private printLoadTestSummary(testName: string, metrics: PerformanceMetrics) {
     const successRate = (metrics.successRate * 100).toFixed(1);

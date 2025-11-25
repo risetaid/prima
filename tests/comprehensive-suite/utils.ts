@@ -19,12 +19,17 @@ export class TestUtils {
   }
 
   /**
-   * Run a test with error handling
+   * Run a test with error handling and optional details
    */
   static async runTest(
     name: string,
     category: string,
-    testFn: () => Promise<void>
+    testFn: () => Promise<void>,
+    details?: {
+      method?: string;
+      endpoint?: string;
+      [key: string]: any;
+    }
   ): Promise<TestResult> {
     const start = performance.now();
     try {
@@ -35,6 +40,7 @@ export class TestUtils {
         category,
         status: "passed",
         duration,
+        details,
       };
     } catch (error) {
       const duration = performance.now() - start;
@@ -44,6 +50,7 @@ export class TestUtils {
         status: "failed",
         duration,
         error: error instanceof Error ? error.message : String(error),
+        details,
       };
     }
   }
@@ -79,8 +86,8 @@ export class TestUtils {
       p50: sorted[Math.floor(total * 0.5)],
       p95: sorted[Math.floor(total * 0.95)],
       p99: sorted[Math.floor(total * 0.99)],
-      successRate: (total - errors) / (total + errors),
-      totalRequests: total + errors,
+      successRate: (total - errors) / total,
+      totalRequests: total,
       failedRequests: errors,
     };
   }
@@ -242,6 +249,28 @@ export class TestUtils {
       process.env.NEXT_PUBLIC_API_URL ||
       "http://localhost:3000"
     );
+  }
+
+  /**
+   * Check if testing against production (non-localhost)
+   */
+  static isProduction(): boolean {
+    const url = this.getBaseURL();
+    return !url.includes("localhost") && !url.includes("127.0.0.1");
+  }
+
+  /**
+   * Get authentication token for testing
+   * For production: Uses TEST_AUTH_TOKEN env var
+   * For localhost: Uses mock token or creates test session
+   */
+  static getAuthToken(): string | null {
+    // For production testing, require explicit auth token
+    if (this.isProduction()) {
+      return process.env.TEST_AUTH_TOKEN || null;
+    }
+    // For localhost, we can test without auth (tests expect 401/403)
+    return null;
   }
 
   /**

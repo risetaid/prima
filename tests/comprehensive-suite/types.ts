@@ -9,7 +9,15 @@ export interface TestResult {
   status: "passed" | "failed" | "skipped";
   duration: number; // in milliseconds
   error?: string;
-  details?: Record<string, any>;
+  details?: {
+    method?: string;
+    endpoint?: string;
+    statusCode?: number;
+    responseTime?: number;
+    requestBody?: any;
+    responseBody?: any;
+    [key: string]: any;
+  };
 }
 
 export interface PerformanceMetrics {
@@ -29,6 +37,12 @@ export interface LoadTestResult {
   duration: number;
   metrics: PerformanceMetrics;
   errors: Array<{ message: string; count: number }>;
+  endpoints?: Array<{
+    name: string;
+    method: string;
+    path: string;
+    type: "public" | "protected";
+  }>;
 }
 
 export interface TestSuiteReport {

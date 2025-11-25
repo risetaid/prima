@@ -42,11 +42,12 @@ export class ContentTests {
   }
 
   private async testListVideos() {
+    const endpoint = "/api/cms/videos";
     const result = await TestUtils.runTest(
       "List All Videos",
       "content",
       async () => {
-        const response = await this.client.get("/api/cms/videos");
+        const response = await this.client.get(endpoint);
 
         // Should return videos list or require auth
         if (response.status === 500) {
@@ -56,30 +57,40 @@ export class ContentTests {
         if (response.ok && !Array.isArray(response.data)) {
           throw new Error("Invalid response format - expected array");
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Retrieve list of all educational videos",
       }
     );
     this.testResults.push(result);
   }
 
   private async testGetVideoDetails() {
+    const endpoint = "/api/cms/videos/test_video_123";
     const result = await TestUtils.runTest(
       "Get Single Video Details",
       "content",
       async () => {
-        const response = await this.client.get(
-          "/api/cms/videos/test_video_123"
-        );
+        const response = await this.client.get(endpoint);
 
         // Should return video or 404
         if (response.status === 500) {
           throw new Error("Video details retrieval error");
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Get detailed information for specific video",
       }
     );
     this.testResults.push(result);
   }
 
   private async testCreateVideo() {
+    const endpoint = "/api/cms/videos";
     const result = await TestUtils.runTest(
       "Create New Video",
       "content",
@@ -92,18 +103,24 @@ export class ContentTests {
           tags: ["kesehatan", "mata", "edukasi"],
         };
 
-        const response = await this.client.post("/api/cms/videos", videoData);
+        const response = await this.client.post(endpoint, videoData);
 
         // Should create or require auth
         if (response.status === 500) {
           throw new Error("Video creation error");
         }
+      },
+      {
+        method: "POST",
+        endpoint,
+        description: "Create new educational video with YouTube URL",
       }
     );
     this.testResults.push(result);
   }
 
   private async testUpdateVideo() {
+    const endpoint = "/api/cms/videos/test_video_123";
     const result = await TestUtils.runTest(
       "Update Video Information",
       "content",
@@ -113,63 +130,74 @@ export class ContentTests {
           description: "Updated description",
         };
 
-        const response = await this.client.put(
-          "/api/cms/videos/test_video_123",
-          updateData
-        );
+        const response = await this.client.put(endpoint, updateData);
 
         // Should update or return not found/auth error
         if (response.status === 500) {
           throw new Error("Video update error");
         }
+      },
+      {
+        method: "PUT",
+        endpoint,
+        description: "Update video title and description",
       }
     );
     this.testResults.push(result);
   }
 
   private async testDeleteVideo() {
+    const endpoint = "/api/cms/videos/test_video_123";
     const result = await TestUtils.runTest(
       "Delete Video",
       "content",
       async () => {
-        const response = await this.client.delete(
-          "/api/cms/videos/test_video_123"
-        );
+        const response = await this.client.delete(endpoint);
 
         // Should delete or return not found/auth error
         if (response.status === 500) {
           throw new Error("Video deletion error");
         }
+      },
+      {
+        method: "DELETE",
+        endpoint,
+        description: "Remove video from system",
       }
     );
     this.testResults.push(result);
   }
 
   private async testVideoYouTubeSync() {
+    const endpoint = "/api/youtube?channelId=test_channel";
     const result = await TestUtils.runTest(
       "YouTube Video Sync",
       "content",
       async () => {
         // Test YouTube API integration
-        const response = await this.client.get(
-          "/api/youtube?channelId=test_channel"
-        );
+        const response = await this.client.get(endpoint);
 
         // Should handle YouTube API calls
         if (response.status === 500) {
           throw new Error("YouTube sync error");
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Sync videos from YouTube channel",
       }
     );
     this.testResults.push(result);
   }
 
   private async testListArticles() {
+    const endpoint = "/api/cms/articles";
     const result = await TestUtils.runTest(
       "List All Articles",
       "content",
       async () => {
-        const response = await this.client.get("/api/cms/articles");
+        const response = await this.client.get(endpoint);
 
         // Should return articles list
         if (response.status === 500) {
@@ -179,30 +207,40 @@ export class ContentTests {
         if (response.ok && !Array.isArray(response.data)) {
           throw new Error("Invalid response format - expected array");
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Retrieve list of all health articles (berita)",
       }
     );
     this.testResults.push(result);
   }
 
   private async testGetArticleDetails() {
+    const endpoint = "/api/cms/articles/test_article_123";
     const result = await TestUtils.runTest(
       "Get Single Article Details",
       "content",
       async () => {
-        const response = await this.client.get(
-          "/api/cms/articles/test_article_123"
-        );
+        const response = await this.client.get(endpoint);
 
         // Should return article or 404
         if (response.status === 500) {
           throw new Error("Article details retrieval error");
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Get full content and metadata for specific article",
       }
     );
     this.testResults.push(result);
   }
 
   private async testCreateArticle() {
+    const endpoint = "/api/cms/articles";
     const result = await TestUtils.runTest(
       "Create New Article",
       "content",
@@ -217,21 +255,24 @@ export class ContentTests {
           featured: false,
         };
 
-        const response = await this.client.post(
-          "/api/cms/articles",
-          articleData
-        );
+        const response = await this.client.post(endpoint, articleData);
 
         // Should create or require auth
         if (response.status === 500) {
           throw new Error("Article creation error");
         }
+      },
+      {
+        method: "POST",
+        endpoint,
+        description: "Create new health article with full content",
       }
     );
     this.testResults.push(result);
   }
 
   private async testUpdateArticle() {
+    const endpoint = "/api/cms/articles/test_article_123";
     const result = await TestUtils.runTest(
       "Update Article Content",
       "content",
@@ -241,39 +282,46 @@ export class ContentTests {
           content: "Updated article content",
         };
 
-        const response = await this.client.put(
-          "/api/cms/articles/test_article_123",
-          updateData
-        );
+        const response = await this.client.put(endpoint, updateData);
 
         // Should update or return not found/auth error
         if (response.status === 500) {
           throw new Error("Article update error");
         }
+      },
+      {
+        method: "PUT",
+        endpoint,
+        description: "Update article title and content",
       }
     );
     this.testResults.push(result);
   }
 
   private async testDeleteArticle() {
+    const endpoint = "/api/cms/articles/test_article_123";
     const result = await TestUtils.runTest(
       "Delete Article",
       "content",
       async () => {
-        const response = await this.client.delete(
-          "/api/cms/articles/test_article_123"
-        );
+        const response = await this.client.delete(endpoint);
 
         // Should delete or return not found/auth error
         if (response.status === 500) {
           throw new Error("Article deletion error");
         }
+      },
+      {
+        method: "DELETE",
+        endpoint,
+        description: "Remove article from system",
       }
     );
     this.testResults.push(result);
   }
 
   private async testArticlePublishing() {
+    const endpoint = "/api/cms/articles/test_article_123";
     const result = await TestUtils.runTest(
       "Article Publishing Workflow",
       "content",
@@ -284,21 +332,24 @@ export class ContentTests {
           publishedAt: new Date().toISOString(),
         };
 
-        const response = await this.client.put(
-          "/api/cms/articles/test_article_123",
-          publishData
-        );
+        const response = await this.client.put(endpoint, publishData);
 
         // Should handle publishing
         if (response.status === 500) {
           throw new Error("Article publishing error");
         }
+      },
+      {
+        method: "PUT",
+        endpoint,
+        description: "Publish or unpublish article",
       }
     );
     this.testResults.push(result);
   }
 
   private async testContentSearch() {
+    const endpoint = "/api/cms/content?search={query}";
     const result = await TestUtils.runTest(
       "Content Search Functionality",
       "content",
@@ -315,12 +366,18 @@ export class ContentTests {
             throw new Error(`Content search error for: ${query}`);
           }
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Search videos and articles by keyword",
       }
     );
     this.testResults.push(result);
   }
 
   private async testContentFiltering() {
+    const endpoint = "/api/cms/content?category={category}&type={type}";
     const result = await TestUtils.runTest(
       "Content Filtering by Category",
       "content",
@@ -337,12 +394,18 @@ export class ContentTests {
             throw new Error(`Content filtering error for: ${filter}`);
           }
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Filter content by category and type",
       }
     );
     this.testResults.push(result);
   }
 
   private async testContentPagination() {
+    const endpoint = "/api/cms/content?page={page}&limit={limit}";
     const result = await TestUtils.runTest(
       "Content Pagination",
       "content",
@@ -371,6 +434,11 @@ export class ContentTests {
             }
           }
         }
+      },
+      {
+        method: "GET",
+        endpoint,
+        description: "Paginate through content with page and limit parameters",
       }
     );
     this.testResults.push(result);
