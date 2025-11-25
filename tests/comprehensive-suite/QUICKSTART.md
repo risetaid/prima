@@ -1,6 +1,6 @@
 # Quick Start - Comprehensive Testing
 
-## TL;DR
+## Testing Localhost (Development)
 
 ```bash
 # 1. Start the server
@@ -12,6 +12,24 @@ bun run test:comprehensive
 # 3. Open the HTML report
 # Navigate to test-results/ and open the latest .html file
 ```
+
+## Testing Railway Deployment (Production)
+
+```bash
+# Test your Railway deployment
+bun run test:comprehensive --url https://prima.railway.app
+
+# Or test specific categories only
+bun run test:auth --url https://prima.railway.app
+bun run test:load --url https://prima.railway.app
+```
+
+⚠️ **Production Testing Warning**: When testing production environments:
+
+- Tests will create real data (test patients, reminders, etc.)
+- Load tests will simulate 10-100 concurrent users
+- Consider testing during low-traffic periods
+- Review and clean up test data afterwards
 
 ## What You Get
 
@@ -37,14 +55,16 @@ bun run test:comprehensive
 
 ## Test Categories
 
-| Command                      | What It Tests        | Duration |
-| ---------------------------- | -------------------- | -------- |
-| `bun run test:comprehensive` | Everything           | ~8 min   |
-| `bun run test:auth`          | Login & Security     | ~1 min   |
-| `bun run test:reminder`      | Reminder System      | ~2 min   |
-| `bun run test:whatsapp`      | WhatsApp Integration | ~2 min   |
-| `bun run test:content`       | Videos & Articles    | ~1 min   |
-| `bun run test:load`          | Load & Performance   | ~3 min   |
+| Command                      | What It Tests        | Duration | Railway Support    |
+| ---------------------------- | -------------------- | -------- | ------------------ |
+| `bun run test:comprehensive` | Everything           | ~8 min   | ✅ Yes             |
+| `bun run test:auth`          | Login & Security     | ~1 min   | ✅ Yes             |
+| `bun run test:reminder`      | Reminder System      | ~2 min   | ✅ Yes             |
+| `bun run test:whatsapp`      | WhatsApp Integration | ~2 min   | ⚠️ Requires Config |
+| `bun run test:content`       | Videos & Articles    | ~1 min   | ✅ Yes             |
+| `bun run test:load`          | Load & Performance   | ~3 min   | ✅ Yes             |
+
+**Note**: WhatsApp tests require proper WAHA configuration on Railway. Tests will skip gracefully if not configured.
 
 ## Understanding Results
 

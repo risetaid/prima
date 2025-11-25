@@ -26,13 +26,40 @@ This directory contains a comprehensive testing suite for the PRIMA system with 
 
 ## Quick Start
 
-### Run All Tests
+### Testing Localhost (Development)
 
 ```bash
+# Run all tests
 bun run test:comprehensive
+
+# Run specific category
+bun run test:auth
+bun run test:reminder
+bun run test:whatsapp
+bun run test:content
+bun run test:load
 ```
 
-### Run Specific Category
+### Testing Railway Deployment (Production)
+
+```bash
+# Run all tests against Railway
+bun run test:comprehensive --url https://prima.railway.app
+
+# Run specific category on Railway
+bun run test:auth --url https://prima.railway.app
+bun run test:load --url https://prima.railway.app
+```
+
+**⚠️ Production Testing Considerations:**
+
+- Tests will create real data in production database
+- Load tests simulate 10-100 concurrent users on your live system
+- Consider running during off-peak hours
+- Review and clean up test data after completion
+- WhatsApp tests require WAHA to be configured on Railway
+
+### Run Specific Category (Localhost)
 
 ```bash
 # Authentication tests only
@@ -138,18 +165,35 @@ After running tests, check the `test-results/` directory:
 
 ### Environment Variables
 
-Make sure these are set in your `.env.local`:
+**For Localhost Testing:**
 
 ```env
-# Required for full test coverage
-WAHA_ENDPOINT=http://your-waha-instance:3000
+# .env.local
+WAHA_ENDPOINT=http://localhost:3001
 WAHA_API_KEY=your_api_key
 WAHA_SESSION=default
 WEBHOOK_TOKEN=your_webhook_token
-
-# Optional
-NEXT_PUBLIC_API_URL=http://localhost:3000
 ```
+
+**For Railway Testing:**
+
+```bash
+# Option 1: Command line argument (recommended)
+bun run test:comprehensive --url https://prima.railway.app
+
+# Option 2: Environment variable
+TEST_BASE_URL=https://prima.railway.app bun run test:comprehensive
+
+# Option 3: Set in .env.local
+NEXT_PUBLIC_API_URL=https://prima.railway.app
+```
+
+**Railway Environment Requirements:**
+
+- Ensure WAHA is deployed and configured
+- Database should be accessible
+- All environment variables properly set on Railway
+- Authentication endpoints are accessible
 
 ### Test Timeout
 

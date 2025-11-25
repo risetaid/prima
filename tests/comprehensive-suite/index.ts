@@ -11,7 +11,14 @@ async function main() {
   const runner = new ComprehensiveTestRunner();
 
   try {
-    if (args.length === 0) {
+    // Parse --url argument
+    const urlIndex = args.indexOf("--url");
+    if (urlIndex !== -1 && args[urlIndex + 1]) {
+      process.env.TEST_BASE_URL = args[urlIndex + 1];
+      console.log(`✓ Base URL set to: ${args[urlIndex + 1]}\n`);
+    }
+
+    if (args.length === 0 || (urlIndex !== -1 && args.length === 2)) {
       // Run all tests
       await runner.runAll();
     } else if (args[0] === "--category" && args[1]) {
@@ -49,7 +56,12 @@ Usage:
 Options:
   (no args)                    Run all tests
   --category <name>           Run specific category only
+  --url <url>                 Test against specific URL
   --help, -h                  Show this help message
+
+Environment Variables:
+  TEST_BASE_URL               Base URL for testing (e.g., https://prima.railway.app)
+  NEXT_PUBLIC_API_URL         Alternative URL variable
 
 Categories:
   auth                        Authentication tests
@@ -59,9 +71,13 @@ Categories:
   load                        Load & performance tests
 
 Examples:
+  # Test localhost
   bun run tests/comprehensive-suite/index.ts
   bun run tests/comprehensive-suite/index.ts --category auth
-  bun run tests/comprehensive-suite/index.ts --category load
+  
+  # Test Railway deployment
+  bun run tests/comprehensive-suite/index.ts --url https://prima.railway.app
+  bun run tests/comprehensive-suite/index.ts --url https://prima.railway.app --category load
 
 Output:
   Results are saved to test-results/ directory:

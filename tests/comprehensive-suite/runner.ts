@@ -20,10 +20,29 @@ export class ComprehensiveTestRunner {
    * Run all comprehensive tests
    */
   async runAll() {
+    const baseURL =
+      process.env.TEST_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:3000";
+    const isProduction = !baseURL.includes("localhost");
+
     console.log("═══════════════════════════════════════════════════════");
     console.log("    PRIMA COMPREHENSIVE TEST SUITE");
     console.log("    Testing: Auth, Reminders, WhatsApp, Content, Load");
-    console.log("═══════════════════════════════════════════════════════\n");
+    console.log("═══════════════════════════════════════════════════════");
+    console.log(
+      `\n🌐 Target Environment: ${
+        isProduction ? "🚀 Production (Railway)" : "💻 Local Development"
+      }`
+    );
+    console.log(`📍 Base URL: ${baseURL}\n`);
+
+    if (isProduction) {
+      console.log("⚠️  WARNING: Testing production environment!");
+      console.log("   - Tests will run against live data");
+      console.log("   - Some tests may create temporary test records");
+      console.log("   - Load tests will stress production server\n");
+    }
 
     const startTime = Date.now();
 

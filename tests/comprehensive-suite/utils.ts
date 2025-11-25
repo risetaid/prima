@@ -234,11 +234,23 @@ export class TestUtils {
   }
 
   /**
+   * Get base URL from environment or use default
+   */
+  static getBaseURL(): string {
+    return (
+      process.env.TEST_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:3000"
+    );
+  }
+
+  /**
    * Create a mock HTTP client for testing
    */
-  static createTestClient(baseURL: string = "http://localhost:3000") {
+  static createTestClient(baseURL?: string) {
+    const url = baseURL || TestUtils.getBaseURL();
     return {
-      baseURL,
+      baseURL: url,
       headers: {} as Record<string, string>,
 
       setAuth(token: string) {
