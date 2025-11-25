@@ -175,17 +175,26 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
 
     // Check performance issues
     const loadTests = report.categories.load;
-    if (loadTests.concurrent10?.metrics.successRate < 0.95) {
+    if (
+      loadTests.concurrent10?.metrics.successRate !== undefined &&
+      loadTests.concurrent10.metrics.successRate < 0.95
+    ) {
       recommendations.push(
         "⚠️ Performa sistem menurun pada beban rendah (10 pengguna). Ini masalah serius yang perlu segera diperbaiki."
       );
     }
-    if (loadTests.concurrent50?.metrics.averageResponseTime > 3000) {
+    if (
+      loadTests.concurrent50?.metrics.averageResponseTime !== undefined &&
+      loadTests.concurrent50.metrics.averageResponseTime > 3000
+    ) {
       recommendations.push(
         "🐌 Sistem lambat saat banyak pengguna (50+). Pertimbangkan untuk meningkatkan kapasitas server."
       );
     }
-    if (loadTests.stress100?.metrics.successRate < 0.8) {
+    if (
+      loadTests.stress100?.metrics.successRate !== undefined &&
+      loadTests.stress100.metrics.successRate < 0.8
+    ) {
       recommendations.push(
         "🔥 Sistem tidak stabil pada beban tinggi (100 pengguna). Ini normal untuk stress test, tapi perlu monitoring."
       );
