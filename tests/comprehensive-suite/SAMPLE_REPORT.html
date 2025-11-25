@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contoh Laporan Pengujian PRIMA</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        color: #333;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 40px;
+        text-align: center;
+      }
+      .header h1 {
+        font-size: 32px;
+        margin-bottom: 10px;
+      }
+      .header .status {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+      }
+      .header .timestamp {
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        padding: 40px;
+        background: #f9fafb;
+      }
+      .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+      .stat-card .value {
+        font-size: 36px;
+        font-weight: bold;
+        color: #667eea;
+        margin-bottom: 5px;
+      }
+      .stat-card .label {
+        font-size: 14px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .categories {
+        padding: 40px;
+      }
+      .category {
+        margin-bottom: 30px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .category-header {
+        background: #f3f4f6;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+      .category-header:hover {
+        background: #e5e7eb;
+      }
+      .category-title {
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .category-status {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+      }
+      .badge {
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .badge-success {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .badge-warning {
+        background: #fef3c7;
+        color: #92400e;
+      }
+
+      .category-content {
+        padding: 20px;
+        display: none;
+      }
+      .category-content.active {
+        display: block;
+      }
+
+      .test-item {
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .test-item.passed {
+        background: #f0fdf4;
+        border-left: 4px solid #10b981;
+      }
+      .test-item.failed {
+        background: #fef2f2;
+        border-left: 4px solid #ef4444;
+      }
+      .test-item .name {
+        font-weight: 500;
+      }
+      .test-item .duration {
+        color: #6b7280;
+        font-size: 14px;
+      }
+
+      .load-tests {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .load-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .load-card h4 {
+        font-size: 16px;
+        margin-bottom: 15px;
+        color: #374151;
+      }
+      .metric {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .metric:last-child {
+        border-bottom: none;
+      }
+      .metric-label {
+        color: #6b7280;
+        font-size: 14px;
+      }
+      .metric-value {
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .recommendations {
+        background: #fffbeb;
+        border: 2px solid #fbbf24;
+        border-radius: 12px;
+        padding: 30px;
+        margin: 40px;
+      }
+      .recommendations h3 {
+        font-size: 20px;
+        margin-bottom: 20px;
+        color: #92400e;
+      }
+      .recommendations ul {
+        list-style: none;
+      }
+      .recommendations li {
+        padding: 10px 0;
+        padding-left: 30px;
+        position: relative;
+      }
+      .recommendations li:before {
+        content: "→";
+        position: absolute;
+        left: 0;
+        color: #f59e0b;
+        font-weight: bold;
+      }
+
+      .note {
+        background: #dbeafe;
+        border-left: 4px solid #3b82f6;
+        padding: 20px;
+        margin: 40px;
+        border-radius: 8px;
+      }
+      .note h4 {
+        color: #1e40af;
+        margin-bottom: 10px;
+      }
+      .note p {
+        color: #1e3a8a;
+        line-height: 1.6;
+      }
+    </style>
+    <script>
+      function toggleCategory(id) {
+        const content = document.getElementById(id);
+        content.classList.toggle("active");
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>📊 Laporan Pengujian Sistem PRIMA</h1>
+        <div class="status">✅ SEMUA TES BERHASIL</div>
+        <div class="timestamp">Contoh Laporan - November 25, 2025</div>
+      </div>
+
+      <div class="summary">
+        <div class="stat-card">
+          <div class="value">65</div>
+          <div class="label">Total Tes</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" style="color: #10b981">63</div>
+          <div class="label">Berhasil</div>
+        </div>
+        <div class="stat-card">
+          <div class="value" style="color: #ef4444">2</div>
+          <div class="label">Gagal</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">96.9%</div>
+          <div class="label">Tingkat Keberhasilan</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">8.4s</div>
+          <div class="label">Durasi Total</div>
+        </div>
+      </div>
+
+      <div class="categories">
+        <div class="category">
+          <div class="category-header" onclick="toggleCategory('auth')">
+            <div class="category-title">🔐 Autentikasi</div>
+            <div class="category-status">
+              <span>11/11 (100%)</span>
+              <span class="badge badge-success">✓ Berhasil</span>
+            </div>
+          </div>
+          <div id="auth" class="category-content active">
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ API Health Check</div>
+              </div>
+              <div class="duration">142ms</div>
+            </div>
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ User Signup</div>
+              </div>
+              <div class="duration">89ms</div>
+            </div>
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ User Login</div>
+              </div>
+              <div class="duration">67ms</div>
+            </div>
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ Invalid Credentials Rejection</div>
+              </div>
+              <div class="duration">45ms</div>
+            </div>
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ SQL Injection Prevention</div>
+              </div>
+              <div class="duration">78ms</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="category">
+          <div class="category-header" onclick="toggleCategory('reminder')">
+            <div class="category-title">⏰ Sistem Pengingat</div>
+            <div class="category-status">
+              <span>14/15 (93.3%)</span>
+              <span class="badge badge-warning">⚠ Perhatian</span>
+            </div>
+          </div>
+          <div id="reminder" class="category-content">
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ Create New Reminder</div>
+              </div>
+              <div class="duration">234ms</div>
+            </div>
+            <div class="test-item passed">
+              <div>
+                <div class="name">✓ Daily Schedule Configuration</div>
+              </div>
+              <div class="duration">156ms</div>
+            </div>
+            <div class="test-item failed">
+              <div>
+                <div class="name">✗ Instant Send All Reminders</div>
+                <div class="error">
+                  Tidak dapat terhubung ke server WhatsApp
+                </div>
+              </div>
+              <div class="duration">5002ms</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="category">
+          <div class="category-header" onclick="toggleCategory('load')">
+            <div class="category-title">🔥 Uji Beban (Load Testing)</div>
+          </div>
+          <div id="load" class="category-content">
+            <div class="load-tests">
+              <div class="load-card">
+                <h4>10 Pengguna</h4>
+                <div class="metric">
+                  <span class="metric-label">Tingkat Keberhasilan</span>
+                  <span class="metric-value">98.5%</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Rata-rata</span>
+                  <span class="metric-value">420ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Tercepat</span>
+                  <span class="metric-value">89ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Terlama</span>
+                  <span class="metric-value">1234ms</span>
+                </div>
+              </div>
+
+              <div class="load-card">
+                <h4>25 Pengguna</h4>
+                <div class="metric">
+                  <span class="metric-label">Tingkat Keberhasilan</span>
+                  <span class="metric-value">96.2%</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Rata-rata</span>
+                  <span class="metric-value">680ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Tercepat</span>
+                  <span class="metric-value">120ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Terlama</span>
+                  <span class="metric-value">2100ms</span>
+                </div>
+              </div>
+
+              <div class="load-card">
+                <h4>50 Pengguna</h4>
+                <div class="metric">
+                  <span class="metric-label">Tingkat Keberhasilan</span>
+                  <span class="metric-value">91.8%</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Rata-rata</span>
+                  <span class="metric-value">1100ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Tercepat</span>
+                  <span class="metric-value">156ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Terlama</span>
+                  <span class="metric-value">3456ms</span>
+                </div>
+              </div>
+
+              <div class="load-card">
+                <h4>100 Pengguna (Stress)</h4>
+                <div class="metric">
+                  <span class="metric-label">Tingkat Keberhasilan</span>
+                  <span class="metric-value">82.3%</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Rata-rata</span>
+                  <span class="metric-value">2400ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Tercepat</span>
+                  <span class="metric-value">234ms</span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Waktu Terlama</span>
+                  <span class="metric-value">8901ms</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <h4>ℹ️ Catatan Penting</h4>
+        <p>
+          Ini adalah contoh tampilan laporan. Laporan sebenarnya akan dibuat
+          otomatis dengan data hasil pengujian sistem Anda. Klik pada kategori
+          untuk melihat detail tes di dalamnya.
+        </p>
+      </div>
+
+      <div class="recommendations">
+        <h3>💡 Rekomendasi</h3>
+        <ul>
+          <li>
+            ⚠️ Integrasi WhatsApp mengalami gangguan. Pastikan service WAHA
+            berjalan dan kredensial API sudah benar.
+          </li>
+          <li>✅ Sistem authentication berfungsi dengan baik dan aman.</li>
+          <li>
+            ✅ Performa sistem bagus untuk beban ringan hingga sedang (10-25
+            pengguna).
+          </li>
+          <li>
+            🔥 Pada beban tinggi (100 pengguna), sistem masih berfungsi tapi
+            lebih lambat. Pertimbangkan upgrade jika traffic tinggi sering
+            terjadi.
+          </li>
+        </ul>
+      </div>
+    </div>
+  </body>
+</html>

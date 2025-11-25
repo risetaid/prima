@@ -1,0 +1,666 @@
+/**
+ * Test Reporter - Generates User-Friendly Reports
+ * Creates HTML and plain text reports for non-technical users
+ */
+
+import {
+  TestSuiteReport,
+  TestResult,
+  PerformanceMetrics,
+  LoadTestResult,
+  HumanReadableReport,
+} from "./types";
+import { writeFileSync } from "fs";
+import { join } from "path";
+
+export class TestReporter {
+  /**
+   * Generate a human-readable summary for non-technical users
+   */
+  generateHumanReadableSummary(report: TestSuiteReport): HumanReadableReport {
+    const passRate = ((report.passed / report.totalTests) * 100).toFixed(1);
+    const status =
+      report.failed === 0 ? "✅ SEMUA TES BERHASIL" : "⚠️ ADA TES YANG GAGAL";
+
+    const summary = `
+═══════════════════════════════════════════════
+  LAPORAN HASIL PENGUJIAN SISTEM PRIMA
+═══════════════════════════════════════════════
+
+Status: ${status}
+Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
+
+📊 RINGKASAN:
+• Total Tes: ${report.totalTests}
+• Berhasil: ${report.passed} (${passRate}%)
+• Gagal: ${report.failed}
+• Dilewati: ${report.skipped}
+• Durasi Total: ${(report.duration / 1000).toFixed(2)} detik
+`;
+
+    const details = this.generateDetailsSection(report);
+    const recommendations = this.generateRecommendations(report);
+
+    return { summary, details, recommendations };
+  }
+
+  private generateDetailsSection(report: TestSuiteReport): string {
+    let details = "\n📋 DETAIL PENGUJIAN PER KATEGORI:\n\n";
+
+    // Auth Tests
+    details += this.formatCategory(
+      "🔐 Autentikasi (Login & Keamanan)",
+      report.categories.auth
+    );
+
+    // Reminder Tests
+    details += this.formatCategory(
+      "⏰ Sistem Pengingat",
+      report.categories.reminder
+    );
+
+    // WhatsApp Tests
+    details += this.formatCategory(
+      "💬 Integrasi WhatsApp",
+      report.categories.whatsapp
+    );
+
+    // Content Tests
+    details += this.formatCategory(
+      "📺 Video & Berita",
+      report.categories.content
+    );
+
+    // Load Tests
+    details += this.formatLoadTests(report.categories.load);
+
+    return details;
+  }
+
+  private formatCategory(title: string, category: any): string {
+    if (!category || category.total === 0) {
+      return `${title}\n  Status: Tidak ada tes\n\n`;
+    }
+
+    const passRate = ((category.passed / category.total) * 100).toFixed(1);
+    const status = category.failed === 0 ? "✅ Berhasil" : "❌ Ada Masalah";
+
+    let output = `${title}\n`;
+    output += `  Status: ${status}\n`;
+    output += `  Hasil: ${category.passed}/${category.total} tes berhasil (${passRate}%)\n`;
+    output += `  Waktu: ${(category.duration / 1000).toFixed(2)} detik\n`;
+
+    if (category.failed > 0) {
+      output += `  ⚠️ Tes yang gagal:\n`;
+      category.tests
+        .filter((t: TestResult) => t.status === "failed")
+        .forEach((test: TestResult) => {
+          output += `     • ${test.name}\n`;
+          if (test.error) {
+            output += `       Alasan: ${this.simplifyError(test.error)}\n`;
+          }
+        });
+    }
+
+    output += "\n";
+    return output;
+  }
+
+  private formatLoadTests(load: any): string {
+    let output = "🔥 UJI BEBAN (Load Testing)\n\n";
+
+    const tests = [
+      { name: "10 Pengguna Bersamaan", data: load.concurrent10 },
+      { name: "25 Pengguna Bersamaan", data: load.concurrent25 },
+      { name: "50 Pengguna Bersamaan", data: load.concurrent50 },
+      { name: "100 Pengguna (Stress Test)", data: load.stress100 },
+    ];
+
+    tests.forEach(({ name, data }) => {
+      if (!data) {
+        output += `  ${name}: Tidak dijalankan\n`;
+        return;
+      }
+
+      const successRate = (data.metrics.successRate * 100).toFixed(1);
+      const avgTime = data.metrics.averageResponseTime.toFixed(0);
+      const status = data.metrics.successRate >= 0.95 ? "✅" : "⚠️";
+
+      output += `  ${name}: ${status}\n`;
+      output += `    • Tingkat Keberhasilan: ${successRate}%\n`;
+      output += `    • Waktu Respons Rata-rata: ${avgTime}ms\n`;
+      output += `    • Waktu Tercepat: ${data.metrics.minResponseTime.toFixed(
+        0
+      )}ms\n`;
+      output += `    • Waktu Terlama: ${data.metrics.maxResponseTime.toFixed(
+        0
+      )}ms\n`;
+
+      if (data.errors.length > 0) {
+        output += `    ⚠️ Error yang ditemukan:\n`;
+        data.errors.slice(0, 3).forEach((err: any) => {
+          output += `       • ${err.message} (${err.count}x)\n`;
+        });
+      }
+
+      output += "\n";
+    });
+
+    return output;
+  }
+
+  private generateRecommendations(report: TestSuiteReport): string[] {
+    const recommendations: string[] = [];
+
+    // Check auth issues
+    if (report.categories.auth.failed > 0) {
+      recommendations.push(
+        "🔐 Ada masalah pada sistem autentikasi. Periksa konfigurasi login dan keamanan."
+      );
+    }
+
+    // Check reminder issues
+    if (report.categories.reminder.failed > 0) {
+      recommendations.push(
+        "⏰ Sistem pengingat mengalami gangguan. Pastikan database dan penjadwalan berjalan dengan baik."
+      );
+    }
+
+    // Check WhatsApp issues
+    if (report.categories.whatsapp.failed > 0) {
+      recommendations.push(
+        "💬 Integrasi WhatsApp bermasalah. Cek koneksi ke server WhatsApp dan kredensial API."
+      );
+    }
+
+    // Check performance issues
+    const loadTests = report.categories.load;
+    if (loadTests.concurrent10?.metrics.successRate < 0.95) {
+      recommendations.push(
+        "⚠️ Performa sistem menurun pada beban rendah (10 pengguna). Ini masalah serius yang perlu segera diperbaiki."
+      );
+    }
+    if (loadTests.concurrent50?.metrics.averageResponseTime > 3000) {
+      recommendations.push(
+        "🐌 Sistem lambat saat banyak pengguna (50+). Pertimbangkan untuk meningkatkan kapasitas server."
+      );
+    }
+    if (loadTests.stress100?.metrics.successRate < 0.8) {
+      recommendations.push(
+        "🔥 Sistem tidak stabil pada beban tinggi (100 pengguna). Ini normal untuk stress test, tapi perlu monitoring."
+      );
+    }
+
+    // If all tests pass
+    if (recommendations.length === 0) {
+      recommendations.push(
+        "✅ Semua sistem berjalan dengan baik! Tidak ada masalah yang ditemukan."
+      );
+    }
+
+    return recommendations;
+  }
+
+  private simplifyError(error: string): string {
+    // Simplify technical errors for non-technical users
+    if (error.includes("ECONNREFUSED") || error.includes("connect")) {
+      return "Tidak dapat terhubung ke server";
+    }
+    if (error.includes("timeout")) {
+      return "Waktu tunggu habis (server terlalu lama merespons)";
+    }
+    if (error.includes("401") || error.includes("unauthorized")) {
+      return "Masalah autentikasi (kredensial tidak valid)";
+    }
+    if (error.includes("404")) {
+      return "Endpoint tidak ditemukan";
+    }
+    if (error.includes("500")) {
+      return "Server mengalami error internal";
+    }
+    if (error.includes("rate limit")) {
+      return "Terlalu banyak permintaan (dibatasi sistem)";
+    }
+
+    // Return first 100 chars if no pattern matches
+    return error.substring(0, 100);
+  }
+
+  /**
+   * Generate HTML report for browser viewing
+   */
+  generateHTMLReport(report: TestSuiteReport): string {
+    const passRate = ((report.passed / report.totalTests) * 100).toFixed(1);
+    const statusColor = report.failed === 0 ? "#10b981" : "#f59e0b";
+    const statusText =
+      report.failed === 0 ? "SEMUA TES BERHASIL" : "ADA TES YANG GAGAL";
+
+    return `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laporan Pengujian PRIMA</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, ${statusColor} 0%, ${statusColor}dd 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+    .header h1 { font-size: 32px; margin-bottom: 10px; }
+    .header .status { font-size: 24px; font-weight: bold; margin-bottom: 20px; }
+    .header .timestamp { font-size: 14px; opacity: 0.9; }
+    
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 40px;
+      background: #f9fafb;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .stat-card .value {
+      font-size: 36px;
+      font-weight: bold;
+      color: #667eea;
+      margin-bottom: 5px;
+    }
+    .stat-card .label {
+      font-size: 14px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .categories {
+      padding: 40px;
+    }
+    .category {
+      margin-bottom: 30px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .category-header {
+      background: #f3f4f6;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+    .category-header:hover { background: #e5e7eb; }
+    .category-title {
+      font-size: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .category-status {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+    .badge {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-success { background: #d1fae5; color: #065f46; }
+    .badge-warning { background: #fef3c7; color: #92400e; }
+    .badge-error { background: #fee2e2; color: #991b1b; }
+    
+    .category-content {
+      padding: 20px;
+      display: none;
+    }
+    .category-content.active { display: block; }
+    
+    .test-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .test-item.passed { background: #f0fdf4; border-left: 4px solid #10b981; }
+    .test-item.failed { background: #fef2f2; border-left: 4px solid #ef4444; }
+    .test-item .name { font-weight: 500; }
+    .test-item .duration { color: #6b7280; font-size: 14px; }
+    .test-item .error {
+      margin-top: 8px;
+      padding: 8px;
+      background: #fff;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #dc2626;
+      font-family: monospace;
+    }
+    
+    .load-tests {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .load-card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .load-card h4 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #374151;
+    }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .metric:last-child { border-bottom: none; }
+    .metric-label { color: #6b7280; font-size: 14px; }
+    .metric-value { font-weight: 600; color: #111827; }
+    
+    .recommendations {
+      background: #fffbeb;
+      border: 2px solid #fbbf24;
+      border-radius: 12px;
+      padding: 30px;
+      margin: 40px;
+    }
+    .recommendations h3 {
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: #92400e;
+    }
+    .recommendations ul {
+      list-style: none;
+    }
+    .recommendations li {
+      padding: 10px 0;
+      padding-left: 30px;
+      position: relative;
+    }
+    .recommendations li:before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: #f59e0b;
+      font-weight: bold;
+    }
+    
+    @media print {
+      body { background: white; padding: 0; }
+      .container { box-shadow: none; }
+      .category-content { display: block !important; }
+    }
+  </style>
+  <script>
+    function toggleCategory(id) {
+      const content = document.getElementById(id);
+      content.classList.toggle('active');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 Laporan Pengujian Sistem PRIMA</h1>
+      <div class="status">${statusText}</div>
+      <div class="timestamp">Waktu Pengujian: ${new Date(
+        report.timestamp
+      ).toLocaleString("id-ID")}</div>
+    </div>
+    
+    <div class="summary">
+      <div class="stat-card">
+        <div class="value">${report.totalTests}</div>
+        <div class="label">Total Tes</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" style="color: #10b981;">${report.passed}</div>
+        <div class="label">Berhasil</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" style="color: #ef4444;">${report.failed}</div>
+        <div class="label">Gagal</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">${passRate}%</div>
+        <div class="label">Tingkat Keberhasilan</div>
+      </div>
+      <div class="stat-card">
+        <div class="value">${(report.duration / 1000).toFixed(1)}s</div>
+        <div class="label">Durasi Total</div>
+      </div>
+    </div>
+    
+    <div class="categories">
+      ${this.generateCategoryHTML(
+        "auth",
+        "🔐 Autentikasi",
+        report.categories.auth
+      )}
+      ${this.generateCategoryHTML(
+        "reminder",
+        "⏰ Sistem Pengingat",
+        report.categories.reminder
+      )}
+      ${this.generateCategoryHTML(
+        "whatsapp",
+        "💬 Integrasi WhatsApp",
+        report.categories.whatsapp
+      )}
+      ${this.generateCategoryHTML(
+        "content",
+        "📺 Video & Berita",
+        report.categories.content
+      )}
+      ${this.generateLoadTestHTML(report.categories.load)}
+    </div>
+    
+    ${this.generateRecommendationsHTML(this.generateRecommendations(report))}
+  </div>
+</body>
+</html>`;
+  }
+
+  private generateCategoryHTML(
+    id: string,
+    title: string,
+    category: any
+  ): string {
+    if (!category || category.total === 0) {
+      return `
+      <div class="category">
+        <div class="category-header">
+          <div class="category-title">${title}</div>
+          <span class="badge badge-warning">Tidak ada tes</span>
+        </div>
+      </div>`;
+    }
+
+    const passRate = ((category.passed / category.total) * 100).toFixed(1);
+    const statusBadge =
+      category.failed === 0
+        ? '<span class="badge badge-success">✓ Berhasil</span>'
+        : '<span class="badge badge-error">✗ Ada Masalah</span>';
+
+    const testsHTML = category.tests
+      .map((test: TestResult) => {
+        const errorHTML =
+          test.status === "failed" && test.error
+            ? `<div class="error">${this.simplifyError(test.error)}</div>`
+            : "";
+        return `
+        <div class="test-item ${test.status}">
+          <div>
+            <div class="name">${test.status === "passed" ? "✓" : "✗"} ${
+          test.name
+        }</div>
+            ${errorHTML}
+          </div>
+          <div class="duration">${test.duration}ms</div>
+        </div>`;
+      })
+      .join("");
+
+    return `
+    <div class="category">
+      <div class="category-header" onclick="toggleCategory('${id}')">
+        <div class="category-title">${title}</div>
+        <div class="category-status">
+          <span>${category.passed}/${category.total} (${passRate}%)</span>
+          ${statusBadge}
+        </div>
+      </div>
+      <div id="${id}" class="category-content">
+        ${testsHTML}
+      </div>
+    </div>`;
+  }
+
+  private generateLoadTestHTML(load: any): string {
+    const tests = [
+      { name: "10 Pengguna", data: load.concurrent10 },
+      { name: "25 Pengguna", data: load.concurrent25 },
+      { name: "50 Pengguna", data: load.concurrent50 },
+      { name: "100 Pengguna", data: load.stress100 },
+    ];
+
+    const cardsHTML = tests
+      .map(({ name, data }) => {
+        if (!data) {
+          return `
+        <div class="load-card">
+          <h4>${name}</h4>
+          <p style="color: #6b7280;">Tidak dijalankan</p>
+        </div>`;
+        }
+
+        return `
+        <div class="load-card">
+          <h4>${name}</h4>
+          <div class="metric">
+            <span class="metric-label">Tingkat Keberhasilan</span>
+            <span class="metric-value">${(
+              data.metrics.successRate * 100
+            ).toFixed(1)}%</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Waktu Rata-rata</span>
+            <span class="metric-value">${data.metrics.averageResponseTime.toFixed(
+              0
+            )}ms</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Waktu Tercepat</span>
+            <span class="metric-value">${data.metrics.minResponseTime.toFixed(
+              0
+            )}ms</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Waktu Terlama</span>
+            <span class="metric-value">${data.metrics.maxResponseTime.toFixed(
+              0
+            )}ms</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Total Permintaan</span>
+            <span class="metric-value">${data.metrics.totalRequests}</span>
+          </div>
+        </div>`;
+      })
+      .join("");
+
+    return `
+    <div class="category">
+      <div class="category-header" onclick="toggleCategory('load')">
+        <div class="category-title">🔥 Uji Beban (Load Testing)</div>
+      </div>
+      <div id="load" class="category-content">
+        <div class="load-tests">
+          ${cardsHTML}
+        </div>
+      </div>
+    </div>`;
+  }
+
+  private generateRecommendationsHTML(recommendations: string[]): string {
+    const listHTML = recommendations.map((rec) => `<li>${rec}</li>`).join("");
+
+    return `
+    <div class="recommendations">
+      <h3>💡 Rekomendasi</h3>
+      <ul>${listHTML}</ul>
+    </div>`;
+  }
+
+  /**
+   * Save reports to disk
+   */
+  async saveReports(
+    report: TestSuiteReport,
+    outputDir: string = "./test-results"
+  ) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+    // Generate reports
+    const humanReadable = this.generateHumanReadableSummary(report);
+    const html = this.generateHTMLReport(report);
+
+    // Save text report
+    const textPath = join(outputDir, `test-report-${timestamp}.txt`);
+    writeFileSync(
+      textPath,
+      humanReadable.summary +
+        "\n" +
+        humanReadable.details +
+        "\n💡 REKOMENDASI:\n" +
+        humanReadable.recommendations.map((r) => `• ${r}`).join("\n")
+    );
+
+    // Save HTML report
+    const htmlPath = join(outputDir, `test-report-${timestamp}.html`);
+    writeFileSync(htmlPath, html);
+
+    // Save JSON report (for programmatic access)
+    const jsonPath = join(outputDir, `test-report-${timestamp}.json`);
+    writeFileSync(jsonPath, JSON.stringify(report, null, 2));
+
+    console.log("\n✅ Laporan berhasil disimpan:");
+    console.log(`   📄 Teks: ${textPath}`);
+    console.log(`   🌐 HTML: ${htmlPath}`);
+    console.log(`   📊 JSON: ${jsonPath}`);
+
+    return { textPath, htmlPath, jsonPath };
+  }
+}

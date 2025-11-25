@@ -91,8 +91,40 @@ See `.env.local` for all required variables. Key vars:
 
 ## 🧪 Testing
 
+### Unit Tests
+
 - **Run tests:** `bun test`
 - **Vitest** for unit tests (see `tests/`)
+
+### Comprehensive System Testing
+
+**NEW!** Complete testing suite with beautiful, user-friendly reports:
+
+```bash
+# Run all comprehensive tests (~8 minutes)
+bun run test:comprehensive
+
+# Run specific categories
+bun run test:auth         # Authentication & Security
+bun run test:reminder     # Reminder System
+bun run test:whatsapp     # WhatsApp Integration
+bun run test:content      # Video & Berita (Articles)
+bun run test:load         # Load Testing (10, 25, 50, 100 users)
+```
+
+**Features:**
+
+- 65+ test cases covering Auth, Reminders, WhatsApp, Content, Load Testing
+- Beautiful HTML reports (Indonesian language for non-technical users)
+- Performance metrics (response times, P50/P95/P99 percentiles)
+- Concurrent user testing (10, 25, 50, 100 users)
+- Actionable recommendations
+
+**Documentation:**
+
+- Quick Start: [`tests/comprehensive-suite/QUICKSTART.md`](tests/comprehensive-suite/QUICKSTART.md)
+- User Guide (Indonesian): [`docs/PANDUAN_PENGUJIAN.md`](docs/PANDUAN_PENGUJIAN.md)
+- Technical Docs: [`tests/comprehensive-suite/README.md`](tests/comprehensive-suite/README.md)
 
 ---
 

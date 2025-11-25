@@ -22,7 +22,13 @@
     "nuke-recreate-db": "bun run scripts/nuke-recreate-database.ts",
     "setup-first-user": "bun run scripts/setup-first-user.ts",
     "start-message-worker": "bun run scripts/start-message-worker.ts",
-    "db:apply-indexes": "bun run scripts/apply-indexes.ts"
+    "db:apply-indexes": "bun run scripts/apply-indexes.ts",
+    "test:comprehensive": "bun run tests/comprehensive-suite/index.ts",
+    "test:auth": "bun run tests/comprehensive-suite/index.ts --category auth",
+    "test:reminder": "bun run tests/comprehensive-suite/index.ts --category reminder",
+    "test:whatsapp": "bun run tests/comprehensive-suite/index.ts --category whatsapp",
+    "test:content": "bun run tests/comprehensive-suite/index.ts --category content",
+    "test:load": "bun run tests/comprehensive-suite/index.ts --category load"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.63.0",

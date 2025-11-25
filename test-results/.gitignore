@@ -1,0 +1,7 @@
+# Ignore all test result files
+*.html
+*.txt
+*.json
+
+# Keep this README
+!README.md
