@@ -97,6 +97,7 @@ This file surfaces the essential knowledge an AI agent (or Copilot) needs to be 
   - Respect type-safety and run `bunx tsc --noEmit` or `bun run precommit` before PRs.
   - Always run `bun run precommit` before committing; it runs lint and type checks defined in `package.json` (helps prevent CI failures).
   - Avoid large refactor PRs without first proposing via `openspec/AGENTS.md` or `CLAUDE.md` (spec-driven development).
+  - Do NOT write excessive documentation markdown files; keep docs in existing files or inline code comments only unless explicitly requested.
 
 - TypeScript DOs & DON'Ts (quick guide):
 
