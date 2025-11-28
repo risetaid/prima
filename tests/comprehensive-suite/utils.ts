@@ -283,13 +283,22 @@ export class TestUtils {
       headers: {} as Record<string, string>,
 
       setAuth(token: string) {
+        // Clerk uses cookie-based auth with __session cookie
+        // Also set Authorization header as fallback
+        this.headers["Cookie"] = `__session=${token}`;
         this.headers["Authorization"] = `Bearer ${token}`;
+      },
+
+      setApiKey(apiKey: string) {
+        // Internal API key for service-level access
+        this.headers["X-API-Key"] = apiKey;
       },
 
       async get(path: string, options: RequestInit = {}) {
         const response = await fetch(`${this.baseURL}${path}`, {
           method: "GET",
           headers: { ...this.headers, ...options.headers },
+          credentials: "include",
           ...options,
         });
         return this.handleResponse(response);
@@ -303,6 +312,7 @@ export class TestUtils {
             ...this.headers,
             ...options.headers,
           },
+          credentials: "include",
           body: JSON.stringify(body),
           ...options,
         });
@@ -317,6 +327,7 @@ export class TestUtils {
             ...this.headers,
             ...options.headers,
           },
+          credentials: "include",
           body: JSON.stringify(body),
           ...options,
         });
@@ -327,6 +338,7 @@ export class TestUtils {
         const response = await fetch(`${this.baseURL}${path}`, {
           method: "DELETE",
           headers: { ...this.headers, ...options.headers },
+          credentials: "include",
           ...options,
         });
         return this.handleResponse(response);

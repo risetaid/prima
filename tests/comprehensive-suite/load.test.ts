@@ -2,9 +2,14 @@
  * Load Testing Suite
  * Tests system performance under various concurrent user loads
  *
- * Supports two modes:
+ * Supports three modes:
  * 1. Unauthenticated (default) - Tests security by verifying protected endpoints reject requests
- * 2. Authenticated - Uses TEST_AUTH_TOKEN env var for real load testing with registered user
+ * 2. Authenticated via Session - Uses TEST_AUTH_TOKEN (Clerk session, expires quickly ~60s)
+ * 3. Authenticated via API Key - Uses TEST_API_KEY (internal API key, doesn't expire)
+ *
+ * For production load testing, use TEST_API_KEY which requires:
+ * - Setting X-API-Key header in requests
+ * - Configuring INTERNAL_API_KEY in server environment
  */
 
 import { LoadTestResult, PerformanceMetrics } from "./types";
@@ -13,15 +18,23 @@ import { TestUtils } from "./utils";
 export class LoadTests {
   private client = TestUtils.createTestClient();
   private authToken: string | null = null;
+  private apiKey: string | null = null;
   private isAuthenticated = false;
+  private authMethod: "none" | "session" | "api-key" = "none";
 
   constructor() {
-    // Check for authentication token
+    // Check for API key first (preferred for load testing)
+    this.apiKey = process.env.TEST_API_KEY || null;
     this.authToken = process.env.TEST_AUTH_TOKEN || null;
-    this.isAuthenticated = !!this.authToken;
 
-    if (this.isAuthenticated) {
-      this.client.setAuth(this.authToken!);
+    if (this.apiKey) {
+      this.isAuthenticated = true;
+      this.authMethod = "api-key";
+      this.client.setApiKey(this.apiKey);
+    } else if (this.authToken) {
+      this.isAuthenticated = true;
+      this.authMethod = "session";
+      this.client.setAuth(this.authToken);
     }
   }
 
@@ -31,20 +44,24 @@ export class LoadTests {
   async runAll() {
     console.log("\n🔥 Running Load Tests...");
 
-    if (this.isAuthenticated) {
+    if (this.authMethod === "api-key") {
       console.log(
-        "  ✅ Authenticated mode: Using TEST_AUTH_TOKEN for real load testing"
+        "  ✅ Authenticated mode: Using TEST_API_KEY (internal API key)"
       );
       console.log(
-        "     Testing protected endpoints with registered user simulation\n"
+        "     Testing protected endpoints with service-level access\n"
       );
+    } else if (this.authMethod === "session") {
+      console.log(
+        "  ⚠️  Authenticated mode: Using TEST_AUTH_TOKEN (Clerk session)"
+      );
+      console.log("     Warning: Clerk session tokens expire in ~60 seconds!");
+      console.log("     Consider using TEST_API_KEY for longer tests\n");
     } else {
       console.log(
         "  ℹ️  Unauthenticated mode: Testing security + public endpoints"
       );
-      console.log(
-        "     Set TEST_AUTH_TOKEN env var for authenticated load testing\n"
-      );
+      console.log("     Set TEST_API_KEY for authenticated load testing\n");
     }
 
     const results = {
@@ -88,7 +105,9 @@ export class LoadTests {
       .map(async (_, userIndex) => {
         // Create client per user (simulates separate sessions)
         const userClient = TestUtils.createTestClient();
-        if (this.authToken) {
+        if (this.apiKey) {
+          userClient.setApiKey(this.apiKey);
+        } else if (this.authToken) {
           userClient.setAuth(this.authToken);
         }
 
@@ -197,7 +216,9 @@ export class LoadTests {
       .fill(null)
       .map(async (_, userIndex) => {
         const userClient = TestUtils.createTestClient();
-        if (this.authToken) {
+        if (this.apiKey) {
+          userClient.setApiKey(this.apiKey);
+        } else if (this.authToken) {
           userClient.setAuth(this.authToken);
         }
 
