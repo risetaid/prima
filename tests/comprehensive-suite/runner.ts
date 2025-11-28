@@ -7,6 +7,7 @@ import { mkdirSync } from "fs";
 import { join } from "path";
 import { TestSuiteReport, TestCategoryResult } from "./types";
 import { TestReporter } from "./reporter";
+import { CLIReporter } from "./cli-reporter";
 import { AuthTests } from "./auth.test";
 import { ReminderTests } from "./reminder.test";
 import { WhatsAppTests } from "./whatsapp.test";
@@ -15,6 +16,8 @@ import { LoadTests } from "./load.test";
 
 export class ComprehensiveTestRunner {
   private reporter = new TestReporter();
+  private cliReporter = new CLIReporter();
+  private responseTimeResults: any[] = [];
 
   /**
    * Run all comprehensive tests
@@ -65,9 +68,9 @@ export class ComprehensiveTestRunner {
 
     const loadResults = await loadTests.runAll();
 
-    // Optional: Response time analysis
+    // Response time analysis and save results
     console.log("\n" + "═".repeat(55));
-    await loadTests.analyzeResponseTimes();
+    this.responseTimeResults = await loadTests.analyzeResponseTimes();
 
     const duration = Date.now() - startTime;
 
@@ -151,92 +154,11 @@ export class ComprehensiveTestRunner {
   }
 
   /**
-   * Print console summary
+   * Print console summary - Tabular Format
    */
   private printConsoleSummary(report: TestSuiteReport) {
-    const passRate = ((report.passed / report.totalTests) * 100).toFixed(1);
-    const status =
-      report.failed === 0 ? "✅ SEMUA TES BERHASIL" : "⚠️ ADA TES YANG GAGAL";
-
-    console.log("\n" + "═".repeat(55));
-    console.log("  RINGKASAN HASIL PENGUJIAN");
-    console.log("═".repeat(55));
-    console.log(`\nStatus: ${status}`);
-    console.log(`\n📊 Total Tes: ${report.totalTests}`);
-    console.log(`✅ Berhasil: ${report.passed} (${passRate}%)`);
-    console.log(`❌ Gagal: ${report.failed}`);
-    console.log(`⏱️  Durasi: ${(report.duration / 1000).toFixed(2)} detik\n`);
-
-    // Category breakdown
-    console.log("📋 Per Kategori:");
-    console.log(
-      `   🔐 Auth: ${report.categories.auth.passed}/${report.categories.auth.total}`
-    );
-    console.log(
-      `   ⏰ Reminder: ${report.categories.reminder.passed}/${report.categories.reminder.total}`
-    );
-    console.log(
-      `   💬 WhatsApp: ${report.categories.whatsapp.passed}/${report.categories.whatsapp.total}`
-    );
-    console.log(
-      `   📺 Content: ${report.categories.content.passed}/${report.categories.content.total}`
-    );
-
-    // Load test summary
-    console.log("\n🔥 Load Testing:");
-    const load = report.categories.load;
-    if (load.concurrent10) {
-      console.log(
-        `   10 Users: ${(load.concurrent10.metrics.successRate * 100).toFixed(
-          1
-        )}% success, ${load.concurrent10.metrics.averageResponseTime.toFixed(
-          0
-        )}ms avg`
-      );
-    }
-    if (load.concurrent25) {
-      console.log(
-        `   25 Users: ${(load.concurrent25.metrics.successRate * 100).toFixed(
-          1
-        )}% success, ${load.concurrent25.metrics.averageResponseTime.toFixed(
-          0
-        )}ms avg`
-      );
-    }
-    if (load.concurrent50) {
-      console.log(
-        `   50 Users: ${(load.concurrent50.metrics.successRate * 100).toFixed(
-          1
-        )}% success, ${load.concurrent50.metrics.averageResponseTime.toFixed(
-          0
-        )}ms avg`
-      );
-    }
-    if (load.stress100) {
-      console.log(
-        `   100 Users (Stress): ${(
-          load.stress100.metrics.successRate * 100
-        ).toFixed(
-          1
-        )}% success, ${load.stress100.metrics.averageResponseTime.toFixed(
-          0
-        )}ms avg`
-      );
-    }
-
-    // Recommendations
-    const humanReadable = this.reporter.generateHumanReadableSummary(report);
-    if (humanReadable.recommendations.length > 0) {
-      console.log("\n💡 Rekomendasi:");
-      humanReadable.recommendations.forEach((rec) => {
-        console.log(`   • ${rec}`);
-      });
-    }
-
-    console.log("\n" + "═".repeat(55));
-    console.log("  Laporan lengkap tersimpan di folder test-results/");
-    console.log("  Buka file HTML untuk tampilan yang lebih mudah dibaca");
-    console.log("═".repeat(55) + "\n");
+    // Use the new CLI Reporter for tabular output with response time data
+    this.cliReporter.printStructuredReport(report, this.responseTimeResults);
   }
 
   /**
