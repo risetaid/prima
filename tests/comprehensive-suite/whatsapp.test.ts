@@ -44,7 +44,7 @@ export class WhatsAppTests {
   }
 
   private async testSendTextMessage() {
-    const wahaEndpoint = "POST {WAHA_ENDPOINT}/api/sendText";
+    const wahaEndpoint = "{WAHA_ENDPOINT}/api/sendText";
     const result = await TestUtils.runTest(
       "Send Plain Text Message",
       "whatsapp",

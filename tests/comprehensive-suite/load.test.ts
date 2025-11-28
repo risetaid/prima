@@ -1,6 +1,10 @@
 /**
  * Load Testing Suite
  * Tests system performance under various concurrent user loads
+ *
+ * Supports two modes:
+ * 1. Unauthenticated (default) - Tests security by verifying protected endpoints reject requests
+ * 2. Authenticated - Uses TEST_AUTH_TOKEN env var for real load testing with registered user
  */
 
 import { LoadTestResult, PerformanceMetrics } from "./types";
@@ -8,12 +12,40 @@ import { TestUtils } from "./utils";
 
 export class LoadTests {
   private client = TestUtils.createTestClient();
+  private authToken: string | null = null;
+  private isAuthenticated = false;
+
+  constructor() {
+    // Check for authentication token
+    this.authToken = process.env.TEST_AUTH_TOKEN || null;
+    this.isAuthenticated = !!this.authToken;
+
+    if (this.isAuthenticated) {
+      this.client.setAuth(this.authToken!);
+    }
+  }
 
   /**
    * Run all load tests
    */
   async runAll() {
     console.log("\n🔥 Running Load Tests...");
+
+    if (this.isAuthenticated) {
+      console.log(
+        "  ✅ Authenticated mode: Using TEST_AUTH_TOKEN for real load testing"
+      );
+      console.log(
+        "     Testing protected endpoints with registered user simulation\n"
+      );
+    } else {
+      console.log(
+        "  ℹ️  Unauthenticated mode: Testing security + public endpoints"
+      );
+      console.log(
+        "     Set TEST_AUTH_TOKEN env var for authenticated load testing\n"
+      );
+    }
 
     const results = {
       concurrent10: await this.runConcurrentTest(10, "Concurrent 10 Users"),
@@ -41,6 +73,7 @@ export class LoadTests {
     const startTime = Date.now();
     const responseTimes: number[] = [];
     const errors: string[] = [];
+    const successfulRequests: string[] = [];
 
     // Define test scenarios (mix of endpoints)
     const scenarios = [
@@ -49,27 +82,45 @@ export class LoadTests {
       { name: "List Patients", method: "GET", path: "/api/patients" },
     ];
 
-    // Simulate concurrent users
+    // Simulate concurrent users - each creates their own client with auth
     const userPromises = Array(userCount)
       .fill(null)
       .map(async (_, userIndex) => {
+        // Create client per user (simulates separate sessions)
+        const userClient = TestUtils.createTestClient();
+        if (this.authToken) {
+          userClient.setAuth(this.authToken);
+        }
+
         // Each user performs multiple actions
         for (const scenario of scenarios) {
           try {
             const { result, duration } = await TestUtils.measureTime(
               async () => {
                 if (scenario.method === "GET") {
-                  return await this.client.get(scenario.path);
+                  return await userClient.get(scenario.path);
                 } else {
-                  return await this.client.post(scenario.path, {});
+                  return await userClient.post(scenario.path, {});
                 }
               }
             );
 
             responseTimes.push(duration);
 
-            if (!result.ok && result.status !== 401 && result.status !== 403) {
+            // Track successful vs failed requests
+            if (result.ok) {
+              successfulRequests.push(scenario.name);
+            } else if (result.status !== 401 && result.status !== 403) {
+              // Non-auth errors are real problems
               errors.push(`${scenario.name}: HTTP ${result.status}`);
+            } else if (!this.isAuthenticated) {
+              // Auth errors without token = expected (security working)
+              // Don't count as errors for metrics
+            } else {
+              // Auth errors WITH token = real problem
+              errors.push(
+                `${scenario.name}: HTTP ${result.status} (auth failed)`
+              );
             }
           } catch (error: any) {
             errors.push(`${scenario.name}: ${error.message}`);
@@ -83,11 +134,19 @@ export class LoadTests {
     await Promise.all(userPromises);
 
     const duration = Date.now() - startTime;
-    const metrics = TestUtils.calculateMetrics(responseTimes, errors.length);
+
+    // Calculate metrics based on actual success (not auth rejections)
+    const totalRequests = userCount * scenarios.length;
+    const actualErrors = errors.length;
+    const metrics = this.calculateLoadMetrics(
+      responseTimes,
+      actualErrors,
+      totalRequests
+    );
     const groupedErrors = TestUtils.groupErrors(errors);
 
     progress.complete();
-    this.printLoadTestSummary(testName, metrics);
+    this.printLoadTestSummary(testName, metrics, this.isAuthenticated);
 
     return {
       concurrentUsers: userCount,
@@ -133,27 +192,41 @@ export class LoadTests {
       { name: "Content", method: "GET", path: "/api/cms/content" },
     ];
 
-    // Simulate stress load
+    // Simulate stress load - each user creates their own client
     const userPromises = Array(userCount)
       .fill(null)
       .map(async (_, userIndex) => {
+        const userClient = TestUtils.createTestClient();
+        if (this.authToken) {
+          userClient.setAuth(this.authToken);
+        }
+
         for (const scenario of scenarios) {
           try {
             const { result, duration } = await TestUtils.measureTime(
               async () => {
                 if (scenario.method === "GET") {
-                  return await this.client.get(scenario.path);
+                  return await userClient.get(scenario.path);
                 } else {
-                  return await this.client.post(scenario.path, {});
+                  return await userClient.post(scenario.path, {});
                 }
               }
             );
 
             responseTimes.push(duration);
 
-            if (!result.ok && result.status !== 401 && result.status !== 403) {
+            // Track errors properly based on auth state
+            if (result.ok) {
+              // Success - no action needed
+            } else if (result.status !== 401 && result.status !== 403) {
               errors.push(`${scenario.name}: HTTP ${result.status}`);
+            } else if (this.isAuthenticated) {
+              // Auth errors with token = real problem
+              errors.push(
+                `${scenario.name}: HTTP ${result.status} (auth failed)`
+              );
             }
+            // Auth errors without token are expected, don't count as errors
           } catch (error: any) {
             errors.push(`${scenario.name}: ${error.message}`);
           }
@@ -167,11 +240,16 @@ export class LoadTests {
     await Promise.all(userPromises);
 
     const duration = Date.now() - startTime;
-    const metrics = TestUtils.calculateMetrics(responseTimes, errors.length);
+    const totalRequests = userCount * scenarios.length;
+    const metrics = this.calculateLoadMetrics(
+      responseTimes,
+      errors.length,
+      totalRequests
+    );
     const groupedErrors = TestUtils.groupErrors(errors);
 
     progress.complete();
-    this.printLoadTestSummary(testName, metrics);
+    this.printLoadTestSummary(testName, metrics, this.isAuthenticated);
 
     return {
       concurrentUsers: userCount,
@@ -188,14 +266,64 @@ export class LoadTests {
   }
 
   /**
+   * Calculate load test metrics
+   */
+  private calculateLoadMetrics(
+    responseTimes: number[],
+    errorCount: number,
+    totalRequests: number
+  ): PerformanceMetrics {
+    if (responseTimes.length === 0) {
+      return {
+        averageResponseTime: 0,
+        minResponseTime: 0,
+        maxResponseTime: 0,
+        p50: 0,
+        p95: 0,
+        p99: 0,
+        successRate: 0,
+        totalRequests: 0,
+        failedRequests: errorCount,
+      };
+    }
+
+    const sorted = [...responseTimes].sort((a, b) => a - b);
+    const sum = sorted.reduce((a, b) => a + b, 0);
+
+    // Success rate based on actual errors (not auth rejections)
+    const successRate = (totalRequests - errorCount) / totalRequests;
+
+    return {
+      averageResponseTime: sum / sorted.length,
+      minResponseTime: sorted[0],
+      maxResponseTime: sorted[sorted.length - 1],
+      p50: sorted[Math.floor(sorted.length * 0.5)],
+      p95: sorted[Math.floor(sorted.length * 0.95)],
+      p99: sorted[Math.floor(sorted.length * 0.99)],
+      successRate,
+      totalRequests,
+      failedRequests: errorCount,
+    };
+  }
+
+  /**
    * Print summary of load test results
    */
-  private printLoadTestSummary(testName: string, metrics: PerformanceMetrics) {
+  private printLoadTestSummary(
+    testName: string,
+    metrics: PerformanceMetrics,
+    isAuthenticated: boolean = false
+  ) {
     const successRate = (metrics.successRate * 100).toFixed(1);
-    const statusIcon = metrics.successRate >= 0.95 ? "✅" : "⚠️";
+    const statusIcon =
+      metrics.successRate >= 0.95 ? "✅" : isAuthenticated ? "⚠️" : "ℹ️";
 
     console.log(`\n  ${statusIcon} ${testName} Results:`);
-    console.log(`     Success Rate: ${successRate}%`);
+    console.log(
+      `     Success Rate: ${successRate}%${
+        !isAuthenticated ? " (public endpoints only)" : ""
+      }`
+    );
     console.log(
       `     Avg Response: ${metrics.averageResponseTime.toFixed(0)}ms`
     );

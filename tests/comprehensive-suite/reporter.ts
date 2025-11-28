@@ -145,9 +145,14 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
     let output = "🔥 UJI BEBAN (Load Testing)\n\n";
 
     const isProduction = TestUtils.isProduction();
+    const hasAuthToken = !!process.env.TEST_AUTH_TOKEN;
 
-    // Explanation header
-    if (isProduction) {
+    // Mode explanation header
+    if (hasAuthToken) {
+      output += "  ✅ MODE: Authenticated Load Testing\n";
+      output += "     Test dijalankan dengan user yang terautentikasi.\n";
+      output += "     Semua protected endpoints dapat diakses.\n\n";
+    } else if (isProduction) {
       output += "  ℹ️  CATATAN PENTING:\n";
       output += "     Load test di production menggunakan mix endpoint:\n";
       output += "     • 1 endpoint PUBLIC (/api/health) - Dapat diakses ✅\n";
@@ -159,7 +164,10 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
       output +=
         "     - Protected endpoints reject unauthenticated requests (SECURITY BEKERJA!)\n";
       output +=
-        "     - Yang penting: Response time tetap cepat = Server performa baik\n\n";
+        "     - Yang penting: Response time tetap cepat = Server performa baik\n";
+      output += "     \n";
+      output +=
+        "     💡 Untuk authenticated load test, set: TEST_AUTH_TOKEN=<clerk_token>\n\n";
     }
 
     const tests = [

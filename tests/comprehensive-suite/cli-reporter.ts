@@ -309,8 +309,14 @@ export class CLIReporter {
       const protectedCount =
         data.endpoints?.filter((e: any) => e.type === "protected").length || 2;
 
+      const hasAuthToken = !!process.env.TEST_AUTH_TOKEN;
       let notes = "";
-      if (this.isProduction && data.metrics.successRate < 0.5) {
+      if (hasAuthToken) {
+        // Authenticated mode - show actual success rate
+        notes = `Success: ${(data.metrics.successRate * 100).toFixed(
+          1
+        )}% (authenticated)`;
+      } else if (this.isProduction && data.metrics.successRate < 0.5) {
         notes = `${publicCount} public OK, ${protectedCount} protected (need auth)`;
       } else {
         notes = `Success: ${(data.metrics.successRate * 100).toFixed(1)}%`;
@@ -327,8 +333,15 @@ export class CLIReporter {
       "└────────┴─────────────────────────────┴──────────────────────────────────────┘"
     );
 
-    // Print explanation if in production
-    if (this.isProduction) {
+    // Print explanation based on auth mode
+    const hasAuthToken = !!process.env.TEST_AUTH_TOKEN;
+    if (hasAuthToken) {
+      console.log("\n  ✅ MODE: Authenticated Load Testing");
+      console.log(
+        "     • Menggunakan TEST_AUTH_TOKEN untuk simulasi user login"
+      );
+      console.log("     • Semua protected endpoints dapat diakses");
+    } else if (this.isProduction) {
       console.log(
         "\n  ℹ️  CATATAN: Load test di production menguji mix endpoint:"
       );
@@ -339,6 +352,7 @@ export class CLIReporter {
       console.log(
         "     • Success rate rendah adalah NORMAL (security bekerja dengan benar)"
       );
+      console.log("     💡 Set TEST_AUTH_TOKEN untuk authenticated load test");
     }
   }
 
