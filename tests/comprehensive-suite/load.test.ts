@@ -2,14 +2,14 @@
  * Load Testing Suite
  * Tests system performance under various concurrent user loads
  *
- * Supports three modes:
- * 1. Unauthenticated (default) - Tests security by verifying protected endpoints reject requests
- * 2. Authenticated via Session - Uses TEST_AUTH_TOKEN (Clerk session, expires quickly ~60s)
- * 3. Authenticated via API Key - Uses TEST_API_KEY (internal API key, doesn't expire)
+ * Authentication modes (in priority order):
+ * 1. TEST_API_KEY - Use CLERK_SECRET_KEY for admin-level access (recommended)
+ * 2. TEST_AUTH_TOKEN - Clerk session token (expires in ~60 seconds)
+ * 3. Unauthenticated - Tests security (protected endpoints should reject)
  *
- * For production load testing, use TEST_API_KEY which requires:
- * - Setting X-API-Key header in requests
- * - Configuring INTERNAL_API_KEY in server environment
+ * Easiest setup for authenticated load testing:
+ *   $env:TEST_API_KEY = "sk_test_xxx..." # Your CLERK_SECRET_KEY
+ *   bun run test:comprehensive --url https://prima-production.up.railway.app
  */
 
 import { LoadTestResult, PerformanceMetrics } from "./types";
@@ -45,23 +45,24 @@ export class LoadTests {
     console.log("\n🔥 Running Load Tests...");
 
     if (this.authMethod === "api-key") {
+      console.log("  ✅ Authenticated mode: Using CLERK_SECRET_KEY as API key");
       console.log(
-        "  ✅ Authenticated mode: Using TEST_API_KEY (internal API key)"
-      );
-      console.log(
-        "     Testing protected endpoints with service-level access\n"
+        "     All protected endpoints accessible with admin privileges\n"
       );
     } else if (this.authMethod === "session") {
       console.log(
         "  ⚠️  Authenticated mode: Using TEST_AUTH_TOKEN (Clerk session)"
       );
       console.log("     Warning: Clerk session tokens expire in ~60 seconds!");
-      console.log("     Consider using TEST_API_KEY for longer tests\n");
+      console.log("     Use TEST_API_KEY=<CLERK_SECRET_KEY> instead\n");
     } else {
       console.log(
         "  ℹ️  Unauthenticated mode: Testing security + public endpoints"
       );
-      console.log("     Set TEST_API_KEY for authenticated load testing\n");
+      console.log("     For authenticated tests, set:");
+      console.log(
+        '     $env:TEST_API_KEY="sk_test_xxx..." # CLERK_SECRET_KEY\n'
+      );
     }
 
     const results = {

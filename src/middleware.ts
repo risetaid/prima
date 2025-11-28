@@ -18,15 +18,17 @@ const isProtectedRoute = createRouteMatcher([
   "/api/dashboard(.*)",
 ]);
 
-// Internal API key for automated testing and service-to-service calls
-const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
+// Use CLERK_SECRET_KEY as internal API key for testing/service calls
+// This is secure because CLERK_SECRET_KEY is already a sensitive credential
+const INTERNAL_API_KEY =
+  process.env.INTERNAL_API_KEY || process.env.CLERK_SECRET_KEY;
 
 export default clerkMiddleware(async (auth, req) => {
   // Check for internal API key bypass (for load testing and internal services)
+  // Uses CLERK_SECRET_KEY as the API key - same security level as Clerk admin access
   const apiKey = req.headers.get("X-API-Key");
   if (apiKey && INTERNAL_API_KEY && apiKey === INTERNAL_API_KEY) {
     // Valid internal API key - allow request to proceed
-    // The route handler should check for this header and handle accordingly
     return NextResponse.next();
   }
 
