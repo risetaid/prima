@@ -96,7 +96,7 @@ export class LoadTests {
     // Define test scenarios (mix of endpoints)
     const scenarios = [
       { name: "Health Check", method: "GET", path: "/api/health" },
-      { name: "Dashboard Stats", method: "GET", path: "/api/dashboard/stats" },
+      { name: "Dashboard Overview", method: "GET", path: "/api/dashboard/overview" },
       { name: "List Patients", method: "GET", path: "/api/patients" },
     ];
 
@@ -206,7 +206,7 @@ export class LoadTests {
     // More aggressive test scenarios
     const scenarios = [
       { name: "Health Check", method: "GET", path: "/api/health" },
-      { name: "Dashboard", method: "GET", path: "/api/dashboard/stats" },
+      { name: "Dashboard", method: "GET", path: "/api/dashboard/overview" },
       { name: "Patients", method: "GET", path: "/api/patients" },
       { name: "Reminders", method: "GET", path: "/api/reminders/scheduled" },
       { name: "Content", method: "GET", path: "/api/cms/content" },
@@ -366,7 +366,7 @@ export class LoadTests {
 
     const endpoints = [
       { name: "Health Check", path: "/api/health" },
-      { name: "Dashboard Stats", path: "/api/dashboard/stats" },
+      { name: "Dashboard Overview", path: "/api/dashboard/overview" },
       { name: "Patient List", path: "/api/patients" },
       { name: "Reminder List", path: "/api/reminders/scheduled" },
       { name: "Content List", path: "/api/cms/content" },
