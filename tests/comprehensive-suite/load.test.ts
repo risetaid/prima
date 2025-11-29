@@ -96,7 +96,11 @@ export class LoadTests {
     // Define test scenarios (mix of endpoints)
     const scenarios = [
       { name: "Health Check", method: "GET", path: "/api/health" },
-      { name: "Dashboard Overview", method: "GET", path: "/api/dashboard/overview" },
+      {
+        name: "Dashboard Overview",
+        method: "GET",
+        path: "/api/dashboard/overview",
+      },
       { name: "List Patients", method: "GET", path: "/api/patients" },
     ];
 
