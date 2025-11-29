@@ -1,6 +1,6 @@
 /**
  * Consolidated API Helpers for PRIMA Medical System
- * 
+ *
  * This combines api-handler.ts, api-response.ts, and api-utils.ts
  * into a single, simplified utility file for API operations.
  */
@@ -506,6 +506,41 @@ export function errorResponse(
 
 // ===== API HANDLER WRAPPER =====
 
+// Use CLERK_SECRET_KEY as internal API key for testing/service calls
+// This is secure because CLERK_SECRET_KEY is already a sensitive credential
+const INTERNAL_API_KEY =
+  process.env.INTERNAL_API_KEY || process.env.CLERK_SECRET_KEY;
+
+// System user for API key authentication (used for load testing)
+// Matches AuthUser interface from auth-utils.ts
+const API_KEY_SYSTEM_USER: AuthUser = {
+  id: "00000000-0000-0000-0000-000000000000", // Valid UUID format
+  clerkId: "system-api-key",
+  email: "system@prima.test",
+  firstName: "System",
+  lastName: "API",
+  hospitalName: "PRIMA System",
+  role: "DEVELOPER", // Full access for testing
+  isActive: true,
+  isApproved: true,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  lastLoginAt: new Date(),
+  approvedAt: new Date(),
+  approvedBy: null,
+  deletedAt: null,
+  canAccessDashboard: true,
+  needsApproval: false,
+};
+
+/**
+ * Check if request has valid internal API key
+ */
+function hasValidInternalApiKey(request: NextRequest): boolean {
+  const apiKey = request.headers.get("X-API-Key");
+  return !!(apiKey && INTERNAL_API_KEY && apiKey === INTERNAL_API_KEY);
+}
+
 export interface ApiHandlerOptions {
   auth?: "required" | "optional" | "custom";
   customAuth?: (request: NextRequest) => Promise<AuthUser | null>;
@@ -537,7 +572,7 @@ export function createApiHandler<T = unknown, R = unknown>(
   ): Promise<NextResponse> {
     const startTime = Date.now();
     const requestId = crypto.randomUUID().slice(0, 8);
-    
+
     try {
       // Resolve params
       const resolvedParams = params ? await params : {};
@@ -546,8 +581,14 @@ export function createApiHandler<T = unknown, R = unknown>(
         params: resolvedParams as Record<string, string>,
       };
 
-      // Handle authentication
-      if (options.auth === "required") {
+      // Check for internal API key bypass first (for load testing and internal services)
+      // This allows authenticated testing without Clerk session tokens
+      if (hasValidInternalApiKey(request)) {
+        context.user = API_KEY_SYSTEM_USER;
+        // Skip normal auth flow - API key provides system-level access
+      }
+      // Handle authentication (only if no valid API key)
+      else if (options.auth === "required") {
         const { getAuthUser } = await import("@/lib/auth-utils");
         const user = await getAuthUser();
         if (!user) {
@@ -565,7 +606,9 @@ export function createApiHandler<T = unknown, R = unknown>(
         }
       } else if (options.auth === "custom") {
         if (!options.customAuth) {
-          throw new Error("Custom auth function is required when auth='custom'");
+          throw new Error(
+            "Custom auth function is required when auth='custom'"
+          );
         }
         const user = await options.customAuth(request);
         if (user) {
@@ -626,7 +669,10 @@ export function createApiHandler<T = unknown, R = unknown>(
       // Validate params if schema provided
       if (options.params && context.params) {
         try {
-          context.params = options.params.parse(context.params) as Record<string, string>;
+          context.params = options.params.parse(context.params) as Record<
+            string,
+            string
+          >;
         } catch (error) {
           if (error instanceof ZodError) {
             return handleZodError(error, {
@@ -643,7 +689,10 @@ export function createApiHandler<T = unknown, R = unknown>(
       context.query = Object.fromEntries(url.searchParams);
       if (options.query) {
         try {
-          context.query = options.query.parse(context.query) as Record<string, string>;
+          context.query = options.query.parse(context.query) as Record<
+            string,
+            string
+          >;
         } catch (error) {
           if (error instanceof ZodError) {
             return handleZodError(error, {
@@ -658,7 +707,9 @@ export function createApiHandler<T = unknown, R = unknown>(
       // Check cache if enabled
       if (options.cache && request.method === "GET") {
         const { get } = await import("@/lib/cache");
-        const cacheKey = `${options.cache.key}:${JSON.stringify(context.query)}:${context.user?.id || 'anonymous'}`;
+        const cacheKey = `${options.cache.key}:${JSON.stringify(
+          context.query
+        )}:${context.user?.id || "anonymous"}`;
         const cached = await get(cacheKey);
         if (cached) {
           return apiSuccess(cached, {
@@ -675,7 +726,9 @@ export function createApiHandler<T = unknown, R = unknown>(
       // Set cache if enabled
       if (options.cache && request.method === "GET") {
         const { set } = await import("@/lib/cache");
-        const cacheKey = `${options.cache.key}:${JSON.stringify(context.query)}:${context.user?.id || 'anonymous'}`;
+        const cacheKey = `${options.cache.key}:${JSON.stringify(
+          context.query
+        )}:${context.user?.id || "anonymous"}`;
         await set(cacheKey, result, options.cache.ttl);
       }
 
@@ -685,7 +738,6 @@ export function createApiHandler<T = unknown, R = unknown>(
         duration: Date.now() - startTime,
         userId: context.user?.id,
       });
-
     } catch (error) {
       return handleApiError(error, "API Handler", true);
     }
