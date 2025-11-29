@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/pasien(.*)",
@@ -23,12 +23,16 @@ const isProtectedRoute = createRouteMatcher([
 const INTERNAL_API_KEY =
   process.env.INTERNAL_API_KEY || process.env.CLERK_SECRET_KEY;
 
-export default clerkMiddleware(async (auth, req) => {
-  // Check for internal API key bypass (for load testing and internal services)
-  // Uses CLERK_SECRET_KEY as the API key - same security level as Clerk admin access
+// Check if request has valid internal API key for testing/service calls
+function hasValidApiKey(req: NextRequest): boolean {
   const apiKey = req.headers.get("X-API-Key");
-  if (apiKey && INTERNAL_API_KEY && apiKey === INTERNAL_API_KEY) {
-    // Valid internal API key - allow request to proceed
+  return !!(apiKey && INTERNAL_API_KEY && apiKey === INTERNAL_API_KEY);
+}
+
+// Clerk middleware with conditional protection
+const clerkProtection = clerkMiddleware(async (auth, req) => {
+  // Skip Clerk protection if valid API key is present
+  if (hasValidApiKey(req)) {
     return NextResponse.next();
   }
 
@@ -37,6 +41,17 @@ export default clerkMiddleware(async (auth, req) => {
     await auth.protect();
   }
 });
+
+// Main middleware - check API key first, then Clerk
+export default async function middleware(req: NextRequest) {
+  // Fast path: if valid API key, bypass Clerk entirely
+  if (hasValidApiKey(req)) {
+    return NextResponse.next();
+  }
+
+  // Otherwise, use Clerk middleware
+  return clerkProtection(req, {} as any);
+}
 
 export const config = {
   matcher: [
