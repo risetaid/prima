@@ -24,6 +24,36 @@ bun run test:auth --url https://prima.railway.app
 bun run test:load --url https://prima.railway.app
 ```
 
+### 🔐 Authenticated Load Testing (Recommended)
+
+For realistic load testing that tests protected endpoints with real authentication:
+
+```powershell
+# PowerShell - Set API key and run load tests
+$env:TEST_API_KEY = "sk_test_xxx..." # Your CLERK_SECRET_KEY
+bun run test:load --url https://prima-production.up.railway.app
+```
+
+```bash
+# Bash/Linux - Set API key and run load tests
+TEST_API_KEY="sk_test_xxx..." bun run test:load --url https://prima-production.up.railway.app
+```
+
+**Why use TEST_API_KEY?**
+
+- ✅ Tests protected endpoints (dashboard, patients, reminders, etc.)
+- ✅ Simulates real authenticated user load
+- ✅ No session expiration issues (API keys don't expire)
+- ✅ Uses existing `CLERK_SECRET_KEY` from .env (no new secrets needed)
+
+**Authentication Modes:**
+
+| Mode               | How to Set                | Access Level | Notes                 |
+| ------------------ | ------------------------- | ------------ | --------------------- |
+| **API Key** ⭐     | `TEST_API_KEY=sk_test_..` | Full admin   | Best for load testing |
+| Session Token      | `TEST_AUTH_TOKEN=sess_..` | User level   | Expires in ~60 sec    |
+| Unauthenticated    | (none)                    | Public only  | Tests security        |
+
 ⚠️ **Production Testing Warning**: When testing production environments:
 
 - Tests will create real data (test patients, reminders, etc.)
