@@ -61,11 +61,13 @@ export class LoadTests {
   private async fetchServerMetrics(): Promise<ServerMetrics | null> {
     try {
       const response = await this.client.get("/api/health");
-      if (response.ok && response.data?.metrics) {
+      // API returns { success, data: { metrics, ... } }
+      const metrics = response.data?.data?.metrics || response.data?.metrics;
+      if (response.ok && metrics) {
         return {
-          cpu: response.data.metrics.cpu,
-          memory: response.data.metrics.memory,
-          uptime: response.data.metrics.uptime,
+          cpu: metrics.cpu,
+          memory: metrics.memory,
+          uptime: metrics.uptime,
           timestamp: new Date().toISOString(),
         };
       }
