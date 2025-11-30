@@ -167,9 +167,21 @@ export class ComprehensiveTestRunner {
   async runCategory(
     category: "auth" | "reminder" | "whatsapp" | "content" | "load"
   ) {
-    console.log(`\nRunning ${category.toUpperCase()} tests only...\n`);
+    const baseURL =
+      process.env.TEST_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:3000";
+    const isProduction = !baseURL.includes("localhost");
 
-    let results;
+    console.log("═══════════════════════════════════════════════════════");
+    console.log(`    PRIMA ${category.toUpperCase()} TEST SUITE`);
+    console.log("═══════════════════════════════════════════════════════");
+    console.log(`\n🌐 Target: ${isProduction ? "🚀 Production" : "💻 Local"}`);
+    console.log(`📍 URL: ${baseURL}\n`);
+
+    const startTime = Date.now();
+    let results: any;
+    let loadResults: any = null;
 
     switch (category) {
       case "auth":
@@ -186,12 +198,120 @@ export class ComprehensiveTestRunner {
         break;
       case "load":
         const loadTests = new LoadTests();
-        results = await loadTests.runAll();
-        await loadTests.analyzeResponseTimes();
+        loadResults = await loadTests.runAll();
+        this.responseTimeResults = await loadTests.analyzeResponseTimes();
         break;
     }
 
-    return results;
+    const duration = Date.now() - startTime;
+
+    // Print category summary
+    this.printCategorySummary(category, results, loadResults, duration);
+
+    return results || loadResults;
+  }
+
+  /**
+   * Print summary for single category test
+   */
+  private printCategorySummary(
+    category: string,
+    results: any[] | null,
+    loadResults: any | null,
+    duration: number
+  ) {
+    console.log("\n" + "═".repeat(55));
+    console.log("  TEST RESULTS SUMMARY");
+    console.log("═".repeat(55));
+
+    if (category === "load" && loadResults) {
+      // Load test summary
+      console.log(`\n🔥 Load Testing Results:\n`);
+
+      const scenarios = [
+        { name: "10 Users", data: loadResults.concurrent10 },
+        { name: "25 Users", data: loadResults.concurrent25 },
+        { name: "50 Users", data: loadResults.concurrent50 },
+        { name: "100 Users (Stress)", data: loadResults.stress100 },
+      ];
+
+      scenarios.forEach(({ name, data }) => {
+        if (data) {
+          const icon =
+            data.metrics.successRate >= 0.95
+              ? "✅"
+              : data.metrics.successRate >= 0.8
+              ? "⚠️"
+              : "❌";
+          console.log(
+            `   ${icon} ${name.padEnd(20)} Success: ${(
+              data.metrics.successRate * 100
+            ).toFixed(1)}%  Avg: ${data.metrics.averageResponseTime.toFixed(
+              0
+            )}ms`
+          );
+        }
+      });
+
+      if (this.responseTimeResults.length > 0) {
+        console.log(`\n📊 Response Time Analysis:\n`);
+        this.responseTimeResults.forEach((r: any) => {
+          const avgNum = parseInt(r.avg);
+          const icon = avgNum < 200 ? "✅" : avgNum < 500 ? "⚠️" : "❌";
+          console.log(
+            `   ${icon} ${r.endpoint.padEnd(22)} Avg: ${r.avg}ms  Min: ${
+              r.min
+            }ms  Max: ${r.max}ms`
+          );
+        });
+      }
+    } else if (results && Array.isArray(results)) {
+      // Regular test summary
+      const passed = results.filter((r) => r.status === "passed").length;
+      const failed = results.filter((r) => r.status === "failed").length;
+      const total = results.length;
+      const successRate = total > 0 ? ((passed / total) * 100).toFixed(1) : "0";
+
+      const statusIcon = failed === 0 ? "✅" : "❌";
+      const statusText =
+        failed === 0 ? "ALL TESTS PASSED" : `${failed} TESTS FAILED`;
+
+      console.log(`\n   ${statusIcon} ${statusText}`);
+      console.log(
+        `\n   📊 Results: ${passed}/${total} passed (${successRate}%)`
+      );
+      console.log(`   ⏱️  Duration: ${(duration / 1000).toFixed(2)}s\n`);
+
+      // Show passed tests
+      const passedTests = results.filter((r) => r.status === "passed");
+      if (passedTests.length > 0) {
+        console.log("   ✅ Passed Tests:");
+        passedTests.forEach((t) => {
+          const endpoint = t.details?.endpoint
+            ? ` (${t.details.method || "GET"} ${t.details.endpoint})`
+            : "";
+          console.log(
+            `      • ${t.name}${endpoint} - ${t.duration.toFixed(0)}ms`
+          );
+        });
+      }
+
+      // Show failed tests with errors
+      const failedTests = results.filter((r) => r.status === "failed");
+      if (failedTests.length > 0) {
+        console.log("\n   ❌ Failed Tests:");
+        failedTests.forEach((t) => {
+          console.log(`      • ${t.name}`);
+          if (t.error) {
+            console.log(`        Error: ${t.error}`);
+          }
+        });
+      }
+    }
+
+    console.log("\n" + "═".repeat(55));
+    console.log(`  Completed in ${(duration / 1000).toFixed(2)} seconds`);
+    console.log("═".repeat(55) + "\n");
   }
 }
 
