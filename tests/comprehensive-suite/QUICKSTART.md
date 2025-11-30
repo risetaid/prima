@@ -48,11 +48,11 @@ TEST_API_KEY="sk_test_xxx..." bun run test:load --url https://prima-production.u
 
 **Authentication Modes:**
 
-| Mode               | How to Set                | Access Level | Notes                 |
-| ------------------ | ------------------------- | ------------ | --------------------- |
-| **API Key** ⭐     | `TEST_API_KEY=sk_test_..` | Full admin   | Best for load testing |
-| Session Token      | `TEST_AUTH_TOKEN=sess_..` | User level   | Expires in ~60 sec    |
-| Unauthenticated    | (none)                    | Public only  | Tests security        |
+| Mode            | How to Set                | Access Level | Notes                 |
+| --------------- | ------------------------- | ------------ | --------------------- |
+| **API Key** ⭐  | `TEST_API_KEY=sk_test_..` | Full admin   | Best for load testing |
+| Session Token   | `TEST_AUTH_TOKEN=sess_..` | User level   | Expires in ~60 sec    |
+| Unauthenticated | (none)                    | Public only  | Tests security        |
 
 ⚠️ **Production Testing Warning**: When testing production environments:
 
