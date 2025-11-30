@@ -847,13 +847,32 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
   }
 
   /**
+   * Generate timestamp in GMT+7 (WIB) format: YYYYMMDD-HHmmssSSSS
+   */
+  private generateTimestamp(): string {
+    const now = new Date();
+    // Add 7 hours for GMT+7 (WIB - Waktu Indonesia Barat)
+    const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+    const year = wib.getUTCFullYear();
+    const month = String(wib.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(wib.getUTCDate()).padStart(2, "0");
+    const hours = String(wib.getUTCHours()).padStart(2, "0");
+    const minutes = String(wib.getUTCMinutes()).padStart(2, "0");
+    const seconds = String(wib.getUTCSeconds()).padStart(2, "0");
+    const ms = String(wib.getUTCMilliseconds()).padStart(4, "0");
+
+    return `${year}${month}${day}-${hours}${minutes}${seconds}${ms}`;
+  }
+
+  /**
    * Save reports to disk
    */
   async saveReports(
     report: TestSuiteReport,
     outputDir: string = "./test-results"
   ) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const timestamp = this.generateTimestamp();
 
     // Generate reports
     const humanReadable = this.generateHumanReadableSummary(report);
