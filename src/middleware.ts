@@ -50,6 +50,7 @@ export default async function middleware(req: NextRequest) {
   }
 
   // Otherwise, use Clerk middleware
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return clerkProtection(req, {} as any);
 }
 

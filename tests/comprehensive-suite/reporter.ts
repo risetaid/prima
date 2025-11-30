@@ -223,6 +223,43 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
         0
       )}ms\n`;
 
+      // Server metrics
+      if (
+        data.serverMetrics &&
+        (data.serverMetrics.before || data.serverMetrics.after)
+      ) {
+        output += `    📊 Server Metrics:\n`;
+        const before = data.serverMetrics.before;
+        const after = data.serverMetrics.after;
+
+        if (before && after) {
+          const cpuDelta = after.cpu.percent - before.cpu.percent;
+          const memDelta = after.memory.percent - before.memory.percent;
+          output += `       CPU: ${before.cpu.percent.toFixed(
+            1
+          )}% → ${after.cpu.percent.toFixed(1)}% (${
+            cpuDelta >= 0 ? "+" : ""
+          }${cpuDelta.toFixed(1)}%)\n`;
+          output += `       Memory: ${before.memory.percent.toFixed(
+            1
+          )}% → ${after.memory.percent.toFixed(1)}% (${
+            memDelta >= 0 ? "+" : ""
+          }${memDelta.toFixed(1)}%)\n`;
+          output += `       Heap: ${before.memory.heapUsedMB.toFixed(
+            0
+          )}MB → ${after.memory.heapUsedMB.toFixed(0)}MB\n`;
+        } else if (after) {
+          output += `       CPU: ${after.cpu.percent.toFixed(1)}% (${
+            after.cpu.cores
+          } cores)\n`;
+          output += `       Memory: ${after.memory.percent.toFixed(
+            1
+          )}% (${after.memory.usedMB.toFixed(
+            0
+          )}MB / ${after.memory.totalMB.toFixed(0)}MB)\n`;
+        }
+      }
+
       if (data.errors.length > 0) {
         output += `    ⚠️ Error yang ditemukan:\n`;
         data.errors.slice(0, 3).forEach((err: any) => {
@@ -788,6 +825,74 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
             </div>`;
         }
 
+        // Server metrics section
+        let serverMetricsHTML = "";
+        if (
+          data.serverMetrics &&
+          (data.serverMetrics.before || data.serverMetrics.after)
+        ) {
+          const before = data.serverMetrics.before;
+          const after = data.serverMetrics.after;
+
+          serverMetricsHTML = `
+            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+              <div style="font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 8px;">📊 Server Metrics</div>`;
+
+          if (before && after) {
+            const cpuDelta = after.cpu.percent - before.cpu.percent;
+            const memDelta = after.memory.percent - before.memory.percent;
+            serverMetricsHTML += `
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">CPU Sebelum</span>
+                <span class="metric-value">${before.cpu.percent.toFixed(
+                  1
+                )}%</span>
+              </div>
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">CPU Sesudah</span>
+                <span class="metric-value">${after.cpu.percent.toFixed(
+                  1
+                )}% <span style="color: ${
+              cpuDelta >= 0 ? "#dc2626" : "#16a34a"
+            }; font-size: 12px;">(${cpuDelta >= 0 ? "+" : ""}${cpuDelta.toFixed(
+              1
+            )}%)</span></span>
+              </div>
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">Memory Sebelum</span>
+                <span class="metric-value">${before.memory.percent.toFixed(
+                  1
+                )}%</span>
+              </div>
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">Memory Sesudah</span>
+                <span class="metric-value">${after.memory.percent.toFixed(
+                  1
+                )}% <span style="color: ${
+              memDelta >= 0 ? "#dc2626" : "#16a34a"
+            }; font-size: 12px;">(${memDelta >= 0 ? "+" : ""}${memDelta.toFixed(
+              1
+            )}%)</span></span>
+              </div>`;
+          } else if (after) {
+            serverMetricsHTML += `
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">CPU</span>
+                <span class="metric-value">${after.cpu.percent.toFixed(
+                  1
+                )}%</span>
+              </div>
+              <div class="metric" style="padding: 4px 0;">
+                <span class="metric-label">Memory</span>
+                <span class="metric-value">${after.memory.percent.toFixed(
+                  1
+                )}%</span>
+              </div>`;
+          }
+
+          serverMetricsHTML += `</div>`;
+        }
+
         return `
         <div class="load-card">
           <h4>${name}</h4>
@@ -818,6 +923,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
             <span class="metric-label">Total Permintaan</span>
             <span class="metric-value">${data.metrics.totalRequests}</span>
           </div>
+          ${serverMetricsHTML}
         </div>`;
       })
       .join("");

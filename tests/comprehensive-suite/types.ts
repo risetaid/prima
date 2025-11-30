@@ -32,6 +32,23 @@ export interface PerformanceMetrics {
   failedRequests: number;
 }
 
+// Server metrics captured from /api/health endpoint
+export interface ServerMetrics {
+  cpu: {
+    percent: number;
+    cores: number;
+  };
+  memory: {
+    usedMB: number;
+    totalMB: number;
+    percent: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+  };
+  uptime: number;
+  timestamp: string;
+}
+
 export interface LoadTestResult {
   concurrentUsers: number;
   duration: number;
@@ -43,6 +60,10 @@ export interface LoadTestResult {
     path: string;
     type: "public" | "protected";
   }>;
+  serverMetrics?: {
+    before: ServerMetrics | null;
+    after: ServerMetrics | null;
+  };
 }
 
 export interface TestSuiteReport {

@@ -15,6 +15,23 @@
 import { LoadTestResult, PerformanceMetrics } from "./types";
 import { TestUtils } from "./utils";
 
+// Server metrics captured from /api/health endpoint
+interface ServerMetrics {
+  cpu: {
+    percent: number;
+    cores: number;
+  };
+  memory: {
+    usedMB: number;
+    totalMB: number;
+    percent: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+  };
+  uptime: number;
+  timestamp: string;
+}
+
 export class LoadTests {
   private client = TestUtils.createTestClient();
   private authToken: string | null = null;
@@ -35,6 +52,103 @@ export class LoadTests {
       this.isAuthenticated = true;
       this.authMethod = "session";
       this.client.setAuth(this.authToken);
+    }
+  }
+
+  /**
+   * Fetch server metrics from /api/health endpoint
+   */
+  private async fetchServerMetrics(): Promise<ServerMetrics | null> {
+    try {
+      const response = await this.client.get("/api/health");
+      if (response.ok && response.data?.metrics) {
+        return {
+          cpu: response.data.metrics.cpu,
+          memory: response.data.metrics.memory,
+          uptime: response.data.metrics.uptime,
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      // Health endpoint might not have metrics yet
+    }
+    return null;
+  }
+
+  /**
+   * Print server metrics comparison (before vs after load)
+   */
+  private printServerMetricsComparison(
+    testName: string,
+    before: ServerMetrics | null,
+    after: ServerMetrics | null
+  ) {
+    if (!before && !after) {
+      console.log(
+        `\n  📊 Server Metrics: Not available (health endpoint may not support metrics)`
+      );
+      return;
+    }
+
+    console.log(`\n  📊 Server Metrics for ${testName}:`);
+
+    if (before) {
+      console.log(`     Before Load:`);
+      console.log(
+        `       CPU: ${before.cpu.percent.toFixed(1)}% (${
+          before.cpu.cores
+        } cores)`
+      );
+      console.log(
+        `       Memory: ${before.memory.usedMB.toFixed(
+          0
+        )}MB / ${before.memory.totalMB.toFixed(
+          0
+        )}MB (${before.memory.percent.toFixed(1)}%)`
+      );
+      console.log(
+        `       Heap: ${before.memory.heapUsedMB.toFixed(
+          0
+        )}MB / ${before.memory.heapTotalMB.toFixed(0)}MB`
+      );
+    }
+
+    if (after) {
+      console.log(`     After Load:`);
+      console.log(
+        `       CPU: ${after.cpu.percent.toFixed(1)}% (${
+          after.cpu.cores
+        } cores)`
+      );
+      console.log(
+        `       Memory: ${after.memory.usedMB.toFixed(
+          0
+        )}MB / ${after.memory.totalMB.toFixed(
+          0
+        )}MB (${after.memory.percent.toFixed(1)}%)`
+      );
+      console.log(
+        `       Heap: ${after.memory.heapUsedMB.toFixed(
+          0
+        )}MB / ${after.memory.heapTotalMB.toFixed(0)}MB`
+      );
+    }
+
+    if (before && after) {
+      const cpuDelta = after.cpu.percent - before.cpu.percent;
+      const memDelta = after.memory.percent - before.memory.percent;
+      const heapDelta = after.memory.heapUsedMB - before.memory.heapUsedMB;
+
+      console.log(`     Delta (After - Before):`);
+      console.log(
+        `       CPU: ${cpuDelta >= 0 ? "+" : ""}${cpuDelta.toFixed(1)}%`
+      );
+      console.log(
+        `       Memory: ${memDelta >= 0 ? "+" : ""}${memDelta.toFixed(1)}%`
+      );
+      console.log(
+        `       Heap: ${heapDelta >= 0 ? "+" : ""}${heapDelta.toFixed(0)}MB`
+      );
     }
   }
 
@@ -65,12 +179,50 @@ export class LoadTests {
       );
     }
 
+    // Capture initial server metrics
+    console.log("  📊 Fetching initial server metrics...");
+    const initialMetrics = await this.fetchServerMetrics();
+    if (initialMetrics) {
+      console.log(
+        `     CPU: ${initialMetrics.cpu.percent.toFixed(
+          1
+        )}% | Memory: ${initialMetrics.memory.percent.toFixed(1)}%`
+      );
+    } else {
+      console.log("     Server metrics not available");
+    }
+
     const results = {
       concurrent10: await this.runConcurrentTest(10, "Concurrent 10 Users"),
       concurrent25: await this.runConcurrentTest(25, "Concurrent 25 Users"),
       concurrent50: await this.runConcurrentTest(50, "Concurrent 50 Users"),
       stress100: await this.runStressTest(100, "Stress Test 100 Users"),
     };
+
+    // Capture final server metrics
+    console.log("\n  📊 Fetching final server metrics...");
+    const finalMetrics = await this.fetchServerMetrics();
+    if (finalMetrics && initialMetrics) {
+      const cpuDelta = finalMetrics.cpu.percent - initialMetrics.cpu.percent;
+      const memDelta =
+        finalMetrics.memory.percent - initialMetrics.memory.percent;
+      console.log(
+        `     CPU: ${finalMetrics.cpu.percent.toFixed(1)}% (${
+          cpuDelta >= 0 ? "+" : ""
+        }${cpuDelta.toFixed(1)}%)`
+      );
+      console.log(
+        `     Memory: ${finalMetrics.memory.percent.toFixed(1)}% (${
+          memDelta >= 0 ? "+" : ""
+        }${memDelta.toFixed(1)}%)`
+      );
+    } else if (finalMetrics) {
+      console.log(
+        `     CPU: ${finalMetrics.cpu.percent.toFixed(
+          1
+        )}% | Memory: ${finalMetrics.memory.percent.toFixed(1)}%`
+      );
+    }
 
     return results;
   }
@@ -83,6 +235,10 @@ export class LoadTests {
     testName: string
   ): Promise<LoadTestResult> {
     console.log(`\n  Running: ${testName}...`);
+
+    // Capture metrics before load
+    const metricsBefore = await this.fetchServerMetrics();
+
     const progress = TestUtils.createProgressLogger(
       userCount * 3,
       `  ${testName}`
@@ -159,6 +315,9 @@ export class LoadTests {
 
     const duration = Date.now() - startTime;
 
+    // Capture metrics after load
+    const metricsAfter = await this.fetchServerMetrics();
+
     // Calculate metrics based on actual success (not auth rejections)
     const totalRequests = userCount * scenarios.length;
     const actualErrors = errors.length;
@@ -171,6 +330,7 @@ export class LoadTests {
 
     progress.complete();
     this.printLoadTestSummary(testName, metrics, this.isAuthenticated);
+    this.printServerMetricsComparison(testName, metricsBefore, metricsAfter);
 
     return {
       concurrentUsers: userCount,
@@ -183,6 +343,10 @@ export class LoadTests {
         path: s.path,
         type: s.path === "/api/health" ? "public" : "protected",
       })),
+      serverMetrics: {
+        before: metricsBefore,
+        after: metricsAfter,
+      },
     };
   }
 
@@ -197,6 +361,9 @@ export class LoadTests {
     console.log(
       `  ⚠️  This test is designed to push limits - some failures are expected\n`
     );
+
+    // Capture metrics before load
+    const metricsBefore = await this.fetchServerMetrics();
 
     const progress = TestUtils.createProgressLogger(
       userCount * 5,
@@ -266,6 +433,10 @@ export class LoadTests {
     await Promise.all(userPromises);
 
     const duration = Date.now() - startTime;
+
+    // Capture metrics after load
+    const metricsAfter = await this.fetchServerMetrics();
+
     const totalRequests = userCount * scenarios.length;
     const metrics = this.calculateLoadMetrics(
       responseTimes,
@@ -276,6 +447,7 @@ export class LoadTests {
 
     progress.complete();
     this.printLoadTestSummary(testName, metrics, this.isAuthenticated);
+    this.printServerMetricsComparison(testName, metricsBefore, metricsAfter);
 
     return {
       concurrentUsers: userCount,
@@ -288,6 +460,10 @@ export class LoadTests {
         path: s.path,
         type: s.path === "/api/health" ? "public" : "protected",
       })),
+      serverMetrics: {
+        before: metricsBefore,
+        after: metricsAfter,
+      },
     };
   }
 
