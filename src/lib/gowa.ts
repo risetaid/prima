@@ -12,6 +12,59 @@ const ALLOW_UNSIGNED_WEBHOOKS =
   (process.env.ALLOW_UNSIGNED_WEBHOOKS || "").toLowerCase() === "true" ||
   process.env.NODE_ENV !== "production";
 
+/**
+ * Convert Markdown formatting to WhatsApp-compatible formatting
+ * WhatsApp supports: *bold*, _italic_, ~strikethrough~, ```monospace```
+ * Markdown uses: **bold**, *italic*, ~~strikethrough~~, `code`
+ *
+ * Also handles:
+ * - Markdown headers (# ## ###) → remove formatting, keep text
+ * - Markdown bullet lists (- or *) → clean numbered or emoji lists
+ * - Markdown numbered lists (1. 2. 3.) → keep as-is
+ * - Markdown links [text](url) → text: url
+ */
+export const formatForWhatsApp = (text: string): string => {
+  let result = text;
+
+  // Convert Markdown bold **text** to WhatsApp bold *text*
+  result = result.replace(/\*\*([^*]+)\*\*/g, "*$1*");
+
+  // Convert Markdown italic _text_ stays same, but handle *text* (single asterisk is italic in MD)
+  // WhatsApp uses _italic_, but we should convert MD italic to WA italic
+  // Note: Be careful not to convert already-converted bold
+  // MD uses *italic* but WA uses _italic_ - convert carefully
+  // Skip this conversion as it may conflict with bold
+
+  // Convert Markdown strikethrough ~~text~~ to WhatsApp ~text~
+  result = result.replace(/~~([^~]+)~~/g, "~$1~");
+
+  // Convert inline code `text` to WhatsApp monospace ```text```
+  // But skip if it's already triple backticks
+  result = result.replace(/(?<!`)`([^`]+)`(?!`)/g, "```$1```");
+
+  // Remove Markdown headers but keep the text
+  // # Heading → Heading (optionally bold it)
+  result = result.replace(/^#{1,6}\s+(.+)$/gm, "*$1*");
+
+  // Convert Markdown bullet lists using - or * at start of line
+  // - item → • item (or just remove the dash)
+  result = result.replace(/^[\s]*[-*]\s+/gm, "• ");
+
+  // Convert Markdown links [text](url) → text: url
+  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1: $2");
+
+  // Remove horizontal rules (--- or ***)
+  result = result.replace(/^[-*_]{3,}$/gm, "");
+
+  // Clean up excessive newlines (more than 2 consecutive)
+  result = result.replace(/\n{3,}/g, "\n\n");
+
+  // Trim whitespace
+  result = result.trim();
+
+  return result;
+};
+
 export interface WhatsAppMessage {
   to: string; // Format: 6281234567890 (no @ suffix, will be added in sendWhatsAppMessage)
   body: string;

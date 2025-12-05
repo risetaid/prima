@@ -1,7 +1,7 @@
 // AI Prompt Templates for PRIMA Healthcare System
 // Indonesian healthcare context with safety guidelines
 
-import type { AIPromptTemplate } from '@/lib/ai-types';
+import type { AIPromptTemplate } from "@/lib/ai-types";
 
 /**
  * System prompt for intent classification
@@ -53,38 +53,46 @@ RESPONSE FORMAT (JSON):
 
   examples: [
     {
-      input: 'sudah minum obat tadi pagi',
-      output: '{"intent":"reminder_confirmed","confidence":95,"reasoning":"Pasien secara eksplisit menyatakan sudah minum obat"}'
+      input: "sudah minum obat tadi pagi",
+      output:
+        '{"intent":"reminder_confirmed","confidence":95,"reasoning":"Pasien secara eksplisit menyatakan sudah minum obat"}',
     },
     {
-      input: 'belum sempat, nanti sore ya',
-      output: '{"intent":"reminder_missed","confidence":90,"reasoning":"Pasien mengindikasikan belum menyelesaikan tindakan"}'
+      input: "belum sempat, nanti sore ya",
+      output:
+        '{"intent":"reminder_missed","confidence":90,"reasoning":"Pasien mengindikasikan belum menyelesaikan tindakan"}',
     },
     {
-      input: 'boleh dong, kirim aja',
-      output: '{"intent":"verification_accept","confidence":88,"reasoning":"Kata \'boleh\' menunjukkan persetujuan"}'
+      input: "boleh dong, kirim aja",
+      output:
+        '{"intent":"verification_accept","confidence":88,"reasoning":"Kata \'boleh\' menunjukkan persetujuan"}',
     },
     {
-      input: 'ga mau, jangan ganggu',
-      output: '{"intent":"verification_decline","confidence":92,"reasoning":"Penolakan jelas dengan \'ga mau\' dan \'jangan ganggu\'"}'
+      input: "ga mau, jangan ganggu",
+      output:
+        '{"intent":"verification_decline","confidence":92,"reasoning":"Penolakan jelas dengan \'ga mau\' dan \'jangan ganggu\'"}',
     },
     {
-      input: 'dok, obat ini bikin mual ya?',
-      output: '{"intent":"health_question","confidence":93,"reasoning":"Pertanyaan tentang efek samping obat"}'
+      input: "dok, obat ini bikin mual ya?",
+      output:
+        '{"intent":"health_question","confidence":93,"reasoning":"Pertanyaan tentang efek samping obat"}',
     },
     {
-      input: 'sesak nafas parah tolong',
-      output: '{"intent":"emergency","confidence":98,"reasoning":"Gejala darurat (sesak nafas) dengan permintaan bantuan"}'
+      input: "sesak nafas parah tolong",
+      output:
+        '{"intent":"emergency","confidence":98,"reasoning":"Gejala darurat (sesak nafas) dengan permintaan bantuan"}',
     },
     {
-      input: 'stop aja deh',
-      output: '{"intent":"unsubscribe_request","confidence":85,"reasoning":"Kata \'stop\' mengindikasikan permintaan berhenti"}'
+      input: "stop aja deh",
+      output:
+        '{"intent":"unsubscribe_request","confidence":85,"reasoning":"Kata \'stop\' mengindikasikan permintaan berhenti"}',
     },
     {
-      input: '👍',
-      output: '{"intent":"unclear","confidence":40,"reasoning":"Hanya emoji tanpa konteks, perlu klarifikasi"}'
-    }
-  ]
+      input: "👍",
+      output:
+        '{"intent":"unclear","confidence":40,"reasoning":"Hanya emoji tanpa konteks, perlu klarifikasi"}',
+    },
+  ],
 };
 
 /**
@@ -135,7 +143,16 @@ TONE:
 - Tidak menggurui
 - Tidak over-promise
 - Praktis dan actionable
-- Selalu remind bahwa Anda bukan pengganti dokter`,
+- Selalu remind bahwa Anda bukan pengganti dokter
+
+FORMAT PESAN (PENTING!):
+- Gunakan teks biasa/plain text
+- JANGAN gunakan format Markdown seperti **bold**, ## heading, - bullet list
+- Untuk penekanan, gunakan format WhatsApp: *bold* (satu asterisk), _italic_ (underscore)
+- Gunakan emoji untuk visual, bukan simbol Markdown
+- Gunakan baris baru (enter) untuk memisahkan paragraf
+- Contoh benar: *penting* bukan **penting**
+- Contoh benar: Langkah pertama... (baru baris) Langkah kedua... (bukan - Langkah pertama)`,
 };
 
 /**
@@ -165,7 +182,7 @@ export function buildIntentClassificationPrompt(
   message: string,
   context?: {
     conversationHistory?: string[];
-    expectedContext?: 'verification' | 'reminder_confirmation' | 'general';
+    expectedContext?: "verification" | "reminder_confirmation" | "general";
     recentReminderSent?: boolean;
   }
 ): string {
@@ -198,7 +215,7 @@ export function buildConversationPrompt(
   message: string,
   context: {
     patientName: string;
-    conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+    conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
     patientContext?: {
       cancerStage?: string;
       currentMedications?: string[];
@@ -213,11 +230,19 @@ export function buildConversationPrompt(
     prompt += `Stadium: ${context.patientContext.cancerStage}\n`;
   }
 
-  if (context.patientContext?.currentMedications && context.patientContext.currentMedications.length > 0) {
-    prompt += `Obat saat ini: ${context.patientContext.currentMedications.join(', ')}\n`;
+  if (
+    context.patientContext?.currentMedications &&
+    context.patientContext.currentMedications.length > 0
+  ) {
+    prompt += `Obat saat ini: ${context.patientContext.currentMedications.join(
+      ", "
+    )}\n`;
   }
 
-  if (context.patientContext?.recentReminders && context.patientContext.recentReminders.length > 0) {
+  if (
+    context.patientContext?.recentReminders &&
+    context.patientContext.recentReminders.length > 0
+  ) {
     prompt += `\nReminder terbaru:\n`;
     context.patientContext.recentReminders.forEach((r, i) => {
       prompt += `${i + 1}. ${r}\n`;
@@ -227,7 +252,7 @@ export function buildConversationPrompt(
   if (context.conversationHistory.length > 0) {
     prompt += `\nRIWAYAT PERCAKAPAN:\n`;
     context.conversationHistory.forEach((msg) => {
-      const role = msg.role === 'user' ? 'Pasien' : 'Asisten';
+      const role = msg.role === "user" ? "Pasien" : "Asisten";
       prompt += `${role}: ${msg.content}\n`;
     });
   }
