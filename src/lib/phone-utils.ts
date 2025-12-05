@@ -5,7 +5,7 @@
  * consistency across the application, especially for Indonesian phone numbers.
  */
 
-import { formatWhatsAppNumber } from "@/lib/waha";
+import { formatWhatsAppNumber } from "@/lib/gowa";
 
 /**
  * Phone number format information
@@ -213,4 +213,3 @@ export function phonesMatch(phone1: string, phone2: string): boolean {
     return phone1 === phone2;
   }
 }
-

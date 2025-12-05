@@ -1,9 +1,10 @@
 // WhatsApp Messaging Service - centralizes WA message building and sending
+// Uses GOWA (go-whatsapp-web-multidevice) as the WhatsApp provider
 import {
   sendWhatsAppMessage,
   formatWhatsAppNumber,
   WhatsAppMessageResult,
-} from "@/lib/waha";
+} from "@/lib/gowa";
 import { ValidatedContent } from "@/services/reminder/reminder.types";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";

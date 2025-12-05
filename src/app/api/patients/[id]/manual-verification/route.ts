@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-utils";
 import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/waha";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/gowa";
 
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 // Manual verification by volunteer
 export async function POST(
   request: NextRequest,
@@ -44,11 +44,7 @@ export async function POST(
 
     // Update patient verification status
     const updateData: {
-      verificationStatus:
-        | "PENDING"
-        | "VERIFIED"
-        | "DECLINED"
-        | "EXPIRED";
+      verificationStatus: "PENDING" | "VERIFIED" | "DECLINED" | "EXPIRED";
       updatedAt: Date;
       verificationResponseAt?: Date | null;
       verificationExpiresAt?: Date | null;
@@ -84,7 +80,10 @@ export async function POST(
       processedBy: `${user.firstName} ${user.lastName}`.trim() || user.email,
     });
   } catch (error: unknown) {
-    logger.error("Manual verification error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "Manual verification error:",
+      error instanceof Error ? error : new Error(String(error))
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -127,11 +126,13 @@ async function sendConfirmationMessage(phoneNumber: string, message: string) {
     if (!result.success) {
       logger.warn("Failed to send confirmation message", {
         error: result.error,
-        phoneNumber: formattedPhone
+        phoneNumber: formattedPhone,
       });
     }
   } catch (error: unknown) {
-    logger.warn("Error sending confirmation message", { error: error instanceof Error ? error.message : String(error) });
+    logger.warn("Error sending confirmation message", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     // Don't throw error, just log it as confirmation message is optional
   }
 }

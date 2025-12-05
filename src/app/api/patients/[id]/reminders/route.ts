@@ -3,10 +3,24 @@ import { z } from "zod";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations, patients } from "@/db";
-import { eq, and, isNull, desc, asc, gte, lte, inArray, count } from "drizzle-orm";
-import { getWIBTime, shouldSendReminderNow, createWIBDateRange } from "@/lib/datetime";
+import {
+  eq,
+  and,
+  isNull,
+  desc,
+  asc,
+  gte,
+  lte,
+  inArray,
+  count,
+} from "drizzle-orm";
+import {
+  getWIBTime,
+  shouldSendReminderNow,
+  createWIBDateRange,
+} from "@/lib/datetime";
 import { del, CACHE_KEYS } from "@/lib/cache";
-import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/waha";
+import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/gowa";
 import { cmsArticles, cmsVideos } from "@/db";
 
 interface CompletedReminder {
@@ -18,8 +32,8 @@ interface CompletedReminder {
   confirmedAt: string;
   sentAt: string | null;
   notes?: string | null;
-  completionType: 'AUTOMATED' | 'MANUAL' | 'NONE';
-  responseSource?: 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM';
+  completionType: "AUTOMATED" | "MANUAL" | "NONE";
+  responseSource?: "PATIENT_TEXT" | "MANUAL_ENTRY" | "SYSTEM";
   manuallyConfirmed?: boolean;
 }
 
@@ -63,30 +77,48 @@ const querySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   date: z.string().optional(),
-  includeDeleted: z.enum(["true", "false"]).transform((val: string) => val === "true").optional(),
+  includeDeleted: z
+    .enum(["true", "false"])
+    .transform((val: string) => val === "true")
+    .optional(),
 });
 
 const createReminderBodySchema = z.object({
   message: z.string().min(1, "Message is required"),
-  time: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format, use HH:MM"),
+  time: z
+    .string()
+    .regex(
+      /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+      "Invalid time format, use HH:MM"
+    ),
   selectedDates: z.array(z.string()).optional(),
-  customRecurrence: z.object({
-    frequency: z.enum(["day", "week", "month"]),
-    interval: z.number().int().min(1),
-    occurrences: z.number().int().min(1).max(1000).optional(),
-    endType: z.enum(["never", "on", "after"]),
-    endDate: z.string().optional(),
-    daysOfWeek: z.array(z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"])).optional(),
-  }).optional(),
-  attachedContent: z.array(z.object({
-    id: z.string(),
-    type: z.enum(["article", "video", "ARTICLE", "VIDEO"]),
-    title: z.string(),
-  })).optional(),
+  customRecurrence: z
+    .object({
+      frequency: z.enum(["day", "week", "month"]),
+      interval: z.number().int().min(1),
+      occurrences: z.number().int().min(1).max(1000).optional(),
+      endType: z.enum(["never", "on", "after"]),
+      endDate: z.string().optional(),
+      daysOfWeek: z
+        .array(z.enum(["sun", "mon", "tue", "wed", "thu", "fri", "sat"]))
+        .optional(),
+    })
+    .optional(),
+  attachedContent: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.enum(["article", "video", "ARTICLE", "VIDEO"]),
+        title: z.string(),
+      })
+    )
+    .optional(),
 });
 
 const deleteRemindersBodySchema = z.object({
-  reminderIds: z.array(z.string().uuid()).min(1, "At least one reminder ID is required"),
+  reminderIds: z
+    .array(z.string().uuid())
+    .min(1, "At least one reminder ID is required"),
 });
 
 // GET /api/patients/[id]/reminders - Get patient reminders
@@ -104,16 +136,26 @@ export const GET = createApiHandler(
     );
 
     const { filter, page, limit, date: dateFilter, includeDeleted } = query!;
-    const offset = (Number(page) - 1) * Number(limit);
+    // Note: offset calculation moved to individual filter functions
 
     // Handle different filter types
     switch (filter) {
       case "completed":
         return await getCompletedReminders(patientId, user!.id, page, limit);
       case "pending":
-        return await getPendingReminders(patientId, Number(page), Number(limit), dateFilter);
+        return await getPendingReminders(
+          patientId,
+          Number(page),
+          Number(limit),
+          dateFilter
+        );
       case "scheduled":
-        return await getScheduledReminders(patientId, Number(page), Number(limit), dateFilter);
+        return await getScheduledReminders(
+          patientId,
+          Number(page),
+          Number(limit),
+          dateFilter
+        );
       case "all":
       default:
         // For "all" filter, return all reminders without pagination limit
@@ -123,7 +165,12 @@ export const GET = createApiHandler(
   }
 );
 
-async function getCompletedReminders(patientId: string, userId: string, page?: number | string, limit?: number | string) {
+async function getCompletedReminders(
+  patientId: string,
+  userId: string,
+  page?: number | string,
+  limit?: number | string
+) {
   // Get completed reminders (confirmed status or manually confirmed)
   const allReminders = await db
     .select({
@@ -143,29 +190,35 @@ async function getCompletedReminders(patientId: string, userId: string, page?: n
         eq(reminders.patientId, patientId),
         eq(reminders.isActive, true),
         isNull(reminders.deletedAt),
-        inArray(reminders.status, ['DELIVERED', 'SENT', 'PENDING', 'FAILED'] as const)
+        inArray(reminders.status, [
+          "DELIVERED",
+          "SENT",
+          "PENDING",
+          "FAILED",
+        ] as const)
       )
     );
 
   // Get manual confirmations for these reminders
-  const reminderIds = allReminders.map(r => r.id);
-  const manualConfs = reminderIds.length > 0
-    ? await db
-        .select({
-          reminderId: manualConfirmations.reminderId,
-          confirmedAt: manualConfirmations.confirmedAt,
-          notes: manualConfirmations.notes,
-        })
-        .from(manualConfirmations)
-        .where(inArray(manualConfirmations.reminderId, reminderIds))
-    : [];
+  const reminderIds = allReminders.map((r) => r.id);
+  const manualConfs =
+    reminderIds.length > 0
+      ? await db
+          .select({
+            reminderId: manualConfirmations.reminderId,
+            confirmedAt: manualConfirmations.confirmedAt,
+            notes: manualConfirmations.notes,
+          })
+          .from(manualConfirmations)
+          .where(inArray(manualConfirmations.reminderId, reminderIds))
+      : [];
 
-  const manualConfMap = new Map(manualConfs.map(c => [c.reminderId, c]));
+  const manualConfMap = new Map(manualConfs.map((c) => [c.reminderId, c]));
 
   const transformedReminders: CompletedReminder[] = allReminders
     .filter((reminder) => {
       const manualConf = manualConfMap.get(reminder.id);
-      return reminder.confirmationStatus === 'CONFIRMED' || !!manualConf;
+      return reminder.confirmationStatus === "CONFIRMED" || !!manualConf;
     })
     .map((reminder) => {
       const manualConf = manualConfMap.get(reminder.id);
@@ -174,14 +227,26 @@ async function getCompletedReminders(patientId: string, userId: string, page?: n
       return {
         id: reminder.id,
         scheduledTime: reminder.scheduledTime,
-        reminderDate: reminder.startDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        reminderDate:
+          reminder.startDate?.toISOString().split("T")[0] ||
+          new Date().toISOString().split("T")[0],
         customMessage: reminder.message || undefined,
-        confirmationStatus: 'CONFIRMED',
-        confirmedAt: (manualConf?.confirmedAt || reminder.confirmationResponseAt || new Date()).toISOString(),
+        confirmationStatus: "CONFIRMED",
+        confirmedAt: (
+          manualConf?.confirmedAt ||
+          reminder.confirmationResponseAt ||
+          new Date()
+        ).toISOString(),
         sentAt: reminder.sentAt?.toISOString() || null,
         notes: manualConf?.notes || reminder.confirmationResponse || undefined,
-        completionType: (isManual ? 'MANUAL' : 'AUTOMATED') as 'AUTOMATED' | 'MANUAL' | 'NONE',
-        responseSource: (isManual ? 'MANUAL_ENTRY' : 'PATIENT_TEXT') as 'PATIENT_TEXT' | 'MANUAL_ENTRY' | 'SYSTEM',
+        completionType: (isManual ? "MANUAL" : "AUTOMATED") as
+          | "AUTOMATED"
+          | "MANUAL"
+          | "NONE",
+        responseSource: (isManual ? "MANUAL_ENTRY" : "PATIENT_TEXT") as
+          | "PATIENT_TEXT"
+          | "MANUAL_ENTRY"
+          | "SYSTEM",
         manuallyConfirmed: isManual,
       };
     })
@@ -198,16 +263,19 @@ async function getCompletedReminders(patientId: string, userId: string, page?: n
   const offset = (pageNum - 1) * limitNum;
   const total = transformedReminders.length;
   const totalPages = Math.ceil(total / limitNum);
-  const paginatedReminders = transformedReminders.slice(offset, offset + limitNum);
+  const paginatedReminders = transformedReminders.slice(
+    offset,
+    offset + limitNum
+  );
 
-  logger.info('Completed reminders fetched', {
+  logger.info("Completed reminders fetched", {
     patientId,
     userId,
     count: paginatedReminders.length,
     page: pageNum,
     limit: limitNum,
     total,
-    operation: 'fetch_completed_reminders'
+    operation: "fetch_completed_reminders",
   });
 
   return {
@@ -219,20 +287,25 @@ async function getCompletedReminders(patientId: string, userId: string, page?: n
       totalPages,
       hasNextPage: pageNum < totalPages,
       hasPreviousPage: pageNum > 1,
-    }
+    },
   };
 }
 
-async function getPendingReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
+async function getPendingReminders(
+  patientId: string,
+  page: number,
+  limit: number,
+  dateFilter: string | null
+) {
   const offset = (Number(page) - 1) * Number(limit);
 
-  const sentStatuses: Array<"SENT" | "DELIVERED"> = ['SENT', 'DELIVERED'];
+  const sentStatuses: Array<"SENT" | "DELIVERED"> = ["SENT", "DELIVERED"];
 
   const whereConditions = [
     eq(reminders.patientId, patientId),
     eq(reminders.isActive, true),
     isNull(reminders.deletedAt),
-    inArray(reminders.status, sentStatuses)
+    inArray(reminders.status, sentStatuses),
   ];
 
   if (dateFilter) {
@@ -241,7 +314,10 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
       whereConditions.push(gte(reminders.sentAt, start));
       whereConditions.push(lte(reminders.sentAt, end));
     } catch (dateError: unknown) {
-      logger.error("Error in date filtering:", dateError instanceof Error ? dateError : new Error(String(dateError)));
+      logger.error(
+        "Error in date filtering:",
+        dateError instanceof Error ? dateError : new Error(String(dateError))
+      );
     }
   }
 
@@ -274,9 +350,12 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
     manualConfirmationsByReminder.map((entry) => entry.reminderId)
   );
 
-  const filteredReminders = allReminders.filter((reminder) =>
-    (reminder.confirmationStatus === 'PENDING' || reminder.confirmationStatus === 'MISSED' || reminder.confirmationStatus === null) &&
-    !manuallyConfirmedIds.has(reminder.id)
+  const filteredReminders = allReminders.filter(
+    (reminder) =>
+      (reminder.confirmationStatus === "PENDING" ||
+        reminder.confirmationStatus === "MISSED" ||
+        reminder.confirmationStatus === null) &&
+      !manuallyConfirmedIds.has(reminder.id)
   );
 
   const total = filteredReminders.length;
@@ -286,7 +365,9 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
     .map((reminder) => ({
       id: reminder.id,
       scheduledTime: reminder.scheduledTime || "12:00",
-      reminderDate: reminder.sentAt ? reminder.sentAt.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+      reminderDate: reminder.sentAt
+        ? reminder.sentAt.toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0],
       customMessage: reminder.customMessage,
       status: "PENDING_UPDATE",
       confirmationStatus: reminder.confirmationStatus,
@@ -305,13 +386,18 @@ async function getPendingReminders(patientId: string, page: number, limit: numbe
       totalPages,
       hasNextPage: page < totalPages,
       hasPreviousPage: page > 1,
-    }
+    },
   };
 }
 
-async function getScheduledReminders(patientId: string, page: number, limit: number, dateFilter: string | null) {
+async function getScheduledReminders(
+  patientId: string,
+  page: number,
+  limit: number,
+  dateFilter: string | null
+) {
   const offset = (Number(page) - 1) * Number(limit);
-  const scheduledStatuses: Array<"PENDING" | "FAILED"> = ['PENDING', 'FAILED'];
+  const scheduledStatuses: Array<"PENDING" | "FAILED"> = ["PENDING", "FAILED"];
 
   const conditions = [
     eq(reminders.patientId, patientId),
@@ -326,7 +412,10 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
       conditions.push(gte(reminders.startDate, start));
       conditions.push(lte(reminders.startDate, end));
     } catch (dateError: unknown) {
-      logger.error("Error in date filtering:", dateError instanceof Error ? dateError : new Error(String(dateError)));
+      logger.error(
+        "Error in date filtering:",
+        dateError instanceof Error ? dateError : new Error(String(dateError))
+      );
     }
   }
 
@@ -353,19 +442,20 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
     .limit(limit)
     .offset(offset);
 
-  const paginatedReminders = scheduledReminders
-    .map((reminder) => {
-      const metadata = reminder.metadata as { attachedContent?: unknown[] } | null;
-      const attachedContent = metadata?.attachedContent;
+  const paginatedReminders = scheduledReminders.map((reminder) => {
+    const metadata = reminder.metadata as {
+      attachedContent?: unknown[];
+    } | null;
+    const attachedContent = metadata?.attachedContent;
 
-      return {
-        id: reminder.id,
-        scheduledTime: reminder.scheduledTime,
-        nextReminderDate: reminder.startDate.toISOString().split("T")[0],
-        customMessage: reminder.customMessage,
-        attachedContent: Array.isArray(attachedContent) ? attachedContent : [],
-      };
-    });
+    return {
+      id: reminder.id,
+      scheduledTime: reminder.scheduledTime,
+      nextReminderDate: reminder.startDate.toISOString().split("T")[0],
+      customMessage: reminder.customMessage,
+      attachedContent: Array.isArray(attachedContent) ? attachedContent : [],
+    };
+  });
 
   return {
     data: paginatedReminders,
@@ -376,11 +466,16 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
       totalPages,
       hasNextPage: page < totalPages,
       hasPreviousPage: page > 1,
-    }
+    },
   };
 }
 
-async function getAllReminders(patientId: string, includeDeleted: boolean, limit: number, offset: number) {
+async function getAllReminders(
+  patientId: string,
+  includeDeleted: boolean,
+  limit: number,
+  offset: number
+) {
   // Build the where condition - must match stats endpoint logic
   const whereCondition = includeDeleted
     ? eq(reminders.patientId, patientId)
@@ -437,7 +532,9 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
   );
 
   // Apply pagination if specified
-  const paginatedReminders = limit ? patientReminders.slice(offset, offset + limit) : patientReminders;
+  const paginatedReminders = limit
+    ? patientReminders.slice(offset, offset + limit)
+    : patientReminders;
 
   // Format response to match expected structure
   // Category logic must match stats endpoint exactly:
@@ -446,19 +543,21 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
   // - terjadwal: everything else
   const formattedReminders = paginatedReminders.map((reminder) => {
     const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
-    
+
     // Determine category using same logic as stats endpoint
-    let category: 'selesai' | 'perluDiperbarui' | 'terjadwal';
-    if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
-      category = 'selesai';
+    let category: "selesai" | "perluDiperbarui" | "terjadwal";
+    if (reminder.confirmationStatus === "CONFIRMED" || isManuallyConfirmed) {
+      category = "selesai";
     } else if (
-      (reminder.status === 'SENT' || reminder.status === 'DELIVERED') &&
-      (reminder.confirmationStatus === 'PENDING' || reminder.confirmationStatus === 'MISSED' || reminder.confirmationStatus === null) &&
+      (reminder.status === "SENT" || reminder.status === "DELIVERED") &&
+      (reminder.confirmationStatus === "PENDING" ||
+        reminder.confirmationStatus === "MISSED" ||
+        reminder.confirmationStatus === null) &&
       !isManuallyConfirmed
     ) {
-      category = 'perluDiperbarui';
+      category = "perluDiperbarui";
     } else {
-      category = 'terjadwal';
+      category = "terjadwal";
     }
 
     return {
@@ -486,12 +585,12 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
       category, // Pre-computed category for frontend
       reminderDate: (() => {
         const toDateString = (date: Date | null | undefined) =>
-          date ? date.toISOString().split('T')[0] : null;
+          date ? date.toISOString().split("T")[0] : null;
 
         const startDateString = toDateString(reminder.startDate);
         const sentDateString = toDateString(reminder.sentAt);
 
-        if (reminder.status === 'PENDING' || reminder.status === 'FAILED') {
+        if (reminder.status === "PENDING" || reminder.status === "FAILED") {
           return startDateString;
         }
 
@@ -512,9 +611,9 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
       pagination: {
         limit,
         offset,
-        remaining: Math.max(0, patientReminders.length - (offset + limit))
-      }
-    })
+        remaining: Math.max(0, patientReminders.length - (offset + limit)),
+      },
+    }),
   };
 
   return response;
@@ -566,7 +665,7 @@ export const POST = createApiHandler(
       };
       attachedContent?: {
         id: string;
-        type: 'article' | 'video' | 'ARTICLE' | 'VIDEO';
+        type: "article" | "video" | "ARTICLE" | "VIDEO";
         title: string;
         url?: string;
       }[];
@@ -587,7 +686,13 @@ export const POST = createApiHandler(
     );
 
     // Handle immediate reminders if any should be sent now
-    await sendImmediateReminders(createdSchedules, patient, message, validatedContent, time);
+    await sendImmediateReminders(
+      createdSchedules,
+      patient,
+      message,
+      validatedContent,
+      time
+    );
 
     return {
       message: "Reminders created successfully",
@@ -658,8 +763,18 @@ class PatientVerificationError extends Error {
   }
 }
 
-async function validateReminderInput(requestBody: { message: string; time: string; selectedDates?: string[]; customRecurrence?: CustomRecurrence; attachedContent?: AttachedContent[] }, patient: Patient) {
-  const { message, time, selectedDates, customRecurrence, attachedContent } = requestBody;
+async function validateReminderInput(
+  requestBody: {
+    message: string;
+    time: string;
+    selectedDates?: string[];
+    customRecurrence?: CustomRecurrence;
+    attachedContent?: AttachedContent[];
+  },
+  patient: Patient
+) {
+  const { message, time, selectedDates, customRecurrence, attachedContent } =
+    requestBody;
 
   if (!message || !time) {
     throw new ValidationError("Missing required fields: message and time");
@@ -685,16 +800,20 @@ async function validateReminderInput(requestBody: { message: string; time: strin
 
     datesToSchedule = generateRecurrenceDates(customRecurrence);
   } else {
-    if (!selectedDates || !Array.isArray(selectedDates) || selectedDates.length === 0) {
+    if (
+      !selectedDates ||
+      !Array.isArray(selectedDates) ||
+      selectedDates.length === 0
+    ) {
       throw new ValidationError("Missing required field: selectedDates");
     }
     datesToSchedule = selectedDates;
   }
 
   // Enforce verification before allowing reminder creation
-  if (patient.verificationStatus !== 'VERIFIED' || !patient.isActive) {
+  if (patient.verificationStatus !== "VERIFIED" || !patient.isActive) {
     throw new PatientVerificationError(
-      'Patient must be verified and active to create reminders',
+      "Patient must be verified and active to create reminders",
       {
         verificationStatus: patient.verificationStatus,
         isActive: patient.isActive,
@@ -709,10 +828,16 @@ async function validateReminderInput(requestBody: { message: string; time: strin
     title: string;
     url: string;
   }> = [];
-  if (attachedContent && Array.isArray(attachedContent) && attachedContent.length > 0) {
+  if (
+    attachedContent &&
+    Array.isArray(attachedContent) &&
+    attachedContent.length > 0
+  ) {
     validatedContent = await validateContentAttachments(attachedContent);
     if (validatedContent.length === 0) {
-      throw new ValidationError("None of the selected content items are valid or published");
+      throw new ValidationError(
+        "None of the selected content items are valid or published"
+      );
     }
   }
 
@@ -748,14 +873,16 @@ async function createReminderSchedules(
         endDate: reminderDate, // Each reminder has its own single date
         isActive: true,
         createdById: userId,
-        metadata: validatedContent.length > 0 ? { attachedContent: validatedContent } : null,
+        metadata:
+          validatedContent.length > 0
+            ? { attachedContent: validatedContent }
+            : null,
       })
       .returning();
 
     const reminder = reminderResult[0];
 
     createdSchedules.push(reminder);
-
   }
 
   return createdSchedules;
@@ -778,7 +905,11 @@ async function sendImmediateReminders(
 
     if (shouldSendReminderNow(scheduleDate, time)) {
       // Generate enhanced message with content attachments and template replacement
-      const enhancedMessage = generateEnhancedMessage(message, validatedContent, patient.name);
+      const enhancedMessage = generateEnhancedMessage(
+        message,
+        validatedContent,
+        patient.name
+      );
 
       // Send via Fonnte
       const result = await sendWhatsAppMessage({
@@ -789,12 +920,15 @@ async function sendImmediateReminders(
       // Update reminder with sent status
       const status: "SENT" | "FAILED" = result.success ? "SENT" : "FAILED";
 
-      await db.update(reminders).set({
-        sentAt: getWIBTime(),
-        status: status,
-        wahaMessageId: result.messageId,
-        updatedAt: getWIBTime(),
-      }).where(eq(reminders.id, schedule.id));
+      await db
+        .update(reminders)
+        .set({
+          sentAt: getWIBTime(),
+          status: status,
+          wahaMessageId: result.messageId,
+          updatedAt: getWIBTime(),
+        })
+        .where(eq(reminders.id, schedule.id));
 
       // Invalidate cache after creating reminder log
       await del(CACHE_KEYS.reminderStats(patient.id));
@@ -1069,7 +1203,7 @@ function replaceTemplateVariables(
       const placeholder = `{${key}}`;
       if (processedMessage.includes(placeholder)) {
         processedMessage = processedMessage.replace(
-          new RegExp(placeholder, 'g'),
+          new RegExp(placeholder, "g"),
           additionalVars[key] || ""
         );
       }
@@ -1108,7 +1242,6 @@ function generateEnhancedMessage(
     if (!contentByType[type]) {
       contentByType[type] = [];
     }
-
 
     contentByType[type].push(content);
   });
