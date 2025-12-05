@@ -1,16 +1,16 @@
 import { createApiHandler } from "@/lib/api-helpers";
 import { z } from "zod";
-import { schemas } from "@/lib/api-schemas";
 import { db, users } from "@/db";
 import { eq, desc, asc, ilike, and, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-// Query schema for admin users listing
-const adminUsersQuerySchema = schemas.list.merge(
-  z.object({
-    status: z.enum(["all", "pending", "approved"]).default("all"),
-  })
-);
+// Query schema for admin users listing - custom schema to avoid conflicts with generic list schema
+const adminUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(1000).default(20),
+  search: z.string().optional(),
+  status: z.enum(["all", "pending", "approved"]).default("all"),
+});
 
 // GET /api/admin/users - List users for admin management
 export const GET = createApiHandler(
