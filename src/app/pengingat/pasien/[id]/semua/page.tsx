@@ -89,17 +89,22 @@ export default function AllRemindersPage() {
 
         let mappedStatus: AllReminder["status"] = "scheduled";
 
+        // Match the stats endpoint logic exactly:
+        // Selesai (completed): confirmationStatus === 'CONFIRMED' OR manuallyConfirmed
         if (confirmationStatus === "CONFIRMED" || manuallyConfirmed) {
           mappedStatus = "completed_taken";
-        } else if (confirmationStatus === "MISSED") {
-          mappedStatus = "completed_not_taken";
-        } else if (
+        }
+        // Perlu Diperbarui (pending): SENT/DELIVERED with PENDING/MISSED/null confirmation and not manually confirmed
+        else if (
           status &&
           ["SENT", "DELIVERED"].includes(status) &&
+          (confirmationStatus === "PENDING" || confirmationStatus === "MISSED" || !confirmationStatus) &&
           !manuallyConfirmed
         ) {
           mappedStatus = "pending";
-        } else if (status && ["PENDING", "FAILED"].includes(status)) {
+        }
+        // Terjadwal (scheduled): everything else (PENDING, FAILED status)
+        else {
           mappedStatus = "scheduled";
         }
 
@@ -351,9 +356,7 @@ export default function AllRemindersPage() {
           {/* 3. Selesai Section */}
           {(() => {
             const completedReminders = reminders.filter(
-              (r) =>
-                r.status === "completed_taken" ||
-                r.status === "completed_not_taken"
+              (r) => r.status === "completed_taken"
             );
             return (
               completedReminders.length > 0 && (
