@@ -38,6 +38,76 @@ if (!GOWA_BASIC_AUTH_PASSWORD) {
 }
 
 /**
+ * Send chat presence (typing indicator) via GOWA API
+ * API: POST /send/chat-presence
+ * Payload: { phone: "628xxx@s.whatsapp.net", action: "start" | "stop" }
+ */
+export const sendChatPresence = async (
+  to: string,
+  action: "start" | "stop"
+): Promise<{ success: boolean; error?: string }> => {
+  if (!GOWA_BASIC_AUTH_PASSWORD) {
+    return { success: false, error: "GOWA not configured" };
+  }
+
+  try {
+    const phone = `${to}@s.whatsapp.net`;
+
+    const response = await fetch(`${GOWA_ENDPOINT}/send/chat-presence`, {
+      method: "POST",
+      headers: {
+        Authorization: getBasicAuthHeader(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ phone, action }),
+    });
+
+    const result = await response.json();
+
+    if (result.code === "SUCCESS" || response.ok) {
+      logger.debug(`Typing indicator ${action} sent to ${to}`);
+      return { success: true };
+    } else {
+      return {
+        success: false,
+        error: result.message || "GOWA chat-presence API error",
+      };
+    }
+  } catch (error) {
+    logger.warn(`Failed to send typing indicator (${action})`, {
+      error: error instanceof Error ? error.message : String(error),
+      phoneNumber: to,
+    });
+    // Don't fail the whole flow just because typing indicator failed
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
+
+/**
+ * Helper to wrap async operation with typing indicator
+ * Automatically starts typing before operation and stops after
+ */
+export const withTypingIndicator = async <T>(
+  phoneNumber: string,
+  operation: () => Promise<T>
+): Promise<T> => {
+  // Start typing indicator
+  await sendChatPresence(phoneNumber, "start");
+
+  try {
+    // Execute the operation (e.g., AI processing)
+    const result = await operation();
+    return result;
+  } finally {
+    // Always stop typing indicator, even if operation fails
+    await sendChatPresence(phoneNumber, "stop");
+  }
+};
+
+/**
  * Send WhatsApp message via GOWA API
  * API: POST /send/message
  * Payload: { phone: "628xxx@s.whatsapp.net", message: "text" }

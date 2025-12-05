@@ -6,7 +6,7 @@ import { SimpleConfirmationService } from "@/services/simple-confirmation.servic
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
 import { logger } from "@/lib/logger";
-import { validateWebhookRequest } from "@/lib/gowa";
+import { validateWebhookRequest, withTypingIndicator } from "@/lib/gowa";
 
 // GOWA webhook payload structure
 // See: https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/main/docs/webhook-payload.md
@@ -302,26 +302,29 @@ export async function POST(request: NextRequest) {
         );
 
         // Priority 3: Handle general health inquiries with conversational AI
-        const { getAIGeneralInquiryService } = await import(
-          "@/services/ai/ai-general-inquiry.service"
-        );
-        const aiGeneralInquiryService = getAIGeneralInquiryService();
+        // Use typing indicator while AI is processing
+        const inquiryResult = await withTypingIndicator(sender, async () => {
+          const { getAIGeneralInquiryService } = await import(
+            "@/services/ai/ai-general-inquiry.service"
+          );
+          const aiGeneralInquiryService = getAIGeneralInquiryService();
 
-        const inquiryResult = await aiGeneralInquiryService.handleInquiry(
-          message,
-          {
-            id: patient.id,
-            name: patient.name,
-            phoneNumber: patient.phoneNumber,
-            cancerStage: patient.cancerStage,
-          },
-          patient.assignedVolunteerId
-            ? {
-                id: patient.assignedVolunteerId,
-                name: "Assigned Volunteer",
-              }
-            : undefined
-        );
+          return await aiGeneralInquiryService.handleInquiry(
+            message,
+            {
+              id: patient.id,
+              name: patient.name,
+              phoneNumber: patient.phoneNumber,
+              cancerStage: patient.cancerStage,
+            },
+            patient.assignedVolunteerId
+              ? {
+                  id: patient.assignedVolunteerId,
+                  name: "Assigned Volunteer",
+                }
+              : undefined
+          );
+        });
 
         return NextResponse.json({
           ok: true,
