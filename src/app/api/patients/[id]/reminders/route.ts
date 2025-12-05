@@ -116,7 +116,9 @@ export const GET = createApiHandler(
         return await getScheduledReminders(patientId, Number(page), Number(limit), dateFilter);
       case "all":
       default:
-        return await getAllReminders(patientId, Boolean(includeDeleted), Number(limit), offset);
+        // For "all" filter, return all reminders without pagination limit
+        // This ensures the /semua page shows all reminders matching the stats
+        return await getAllReminders(patientId, Boolean(includeDeleted), 0, 0);
     }
   }
 );
