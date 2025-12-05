@@ -379,11 +379,12 @@ async function getScheduledReminders(patientId: string, page: number, limit: num
 }
 
 async function getAllReminders(patientId: string, includeDeleted: boolean, limit: number, offset: number) {
-  // Build the where condition
+  // Build the where condition - must match stats endpoint logic
   const whereCondition = includeDeleted
     ? eq(reminders.patientId, patientId)
     : and(
         eq(reminders.patientId, patientId),
+        eq(reminders.isActive, true),
         isNull(reminders.deletedAt)
       );
 
@@ -437,46 +438,69 @@ async function getAllReminders(patientId: string, includeDeleted: boolean, limit
   const paginatedReminders = limit ? patientReminders.slice(offset, offset + limit) : patientReminders;
 
   // Format response to match expected structure
-  const formattedReminders = paginatedReminders.map((reminder) => ({
-    id: reminder.id,
-    patientId: reminder.patientId,
-    reminderType: reminder.reminderType,
-    scheduledTime: reminder.scheduledTime,
-    message: reminder.message,
-    startDate: reminder.startDate,
-    endDate: reminder.endDate,
-    isActive: reminder.isActive,
-    status: reminder.status,
-    confirmationStatus: reminder.confirmationStatus,
-    sentAt: reminder.sentAt,
-    confirmationResponseAt: reminder.confirmationResponseAt,
-    confirmationResponse: reminder.confirmationResponse,
-    title: reminder.title,
-    description: reminder.description,
-    priority: reminder.priority,
-    createdById: reminder.createdById,
-    createdAt: reminder.createdAt,
-    updatedAt: reminder.updatedAt,
-    deletedAt: reminder.deletedAt,
-    manuallyConfirmed: manuallyConfirmedIds.has(reminder.id),
-    reminderDate: (() => {
-      const toDateString = (date: Date | null | undefined) =>
-        date ? date.toISOString().split('T')[0] : null;
+  // Category logic must match stats endpoint exactly:
+  // - selesai: confirmationStatus === 'CONFIRMED' OR manuallyConfirmed
+  // - perluDiperbarui: status in ('SENT','DELIVERED') AND confirmationStatus in ('PENDING','MISSED', null) AND !manuallyConfirmed
+  // - terjadwal: everything else
+  const formattedReminders = paginatedReminders.map((reminder) => {
+    const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
+    
+    // Determine category using same logic as stats endpoint
+    let category: 'selesai' | 'perluDiperbarui' | 'terjadwal';
+    if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
+      category = 'selesai';
+    } else if (
+      (reminder.status === 'SENT' || reminder.status === 'DELIVERED') &&
+      (reminder.confirmationStatus === 'PENDING' || reminder.confirmationStatus === 'MISSED' || reminder.confirmationStatus === null) &&
+      !isManuallyConfirmed
+    ) {
+      category = 'perluDiperbarui';
+    } else {
+      category = 'terjadwal';
+    }
 
-      const startDateString = toDateString(reminder.startDate);
-      const sentDateString = toDateString(reminder.sentAt);
+    return {
+      id: reminder.id,
+      patientId: reminder.patientId,
+      reminderType: reminder.reminderType,
+      scheduledTime: reminder.scheduledTime,
+      message: reminder.message,
+      startDate: reminder.startDate,
+      endDate: reminder.endDate,
+      isActive: reminder.isActive,
+      status: reminder.status,
+      confirmationStatus: reminder.confirmationStatus,
+      sentAt: reminder.sentAt,
+      confirmationResponseAt: reminder.confirmationResponseAt,
+      confirmationResponse: reminder.confirmationResponse,
+      title: reminder.title,
+      description: reminder.description,
+      priority: reminder.priority,
+      createdById: reminder.createdById,
+      createdAt: reminder.createdAt,
+      updatedAt: reminder.updatedAt,
+      deletedAt: reminder.deletedAt,
+      manuallyConfirmed: isManuallyConfirmed,
+      category, // Pre-computed category for frontend
+      reminderDate: (() => {
+        const toDateString = (date: Date | null | undefined) =>
+          date ? date.toISOString().split('T')[0] : null;
 
-      if (reminder.status === 'PENDING' || reminder.status === 'FAILED') {
-        return startDateString;
-      }
+        const startDateString = toDateString(reminder.startDate);
+        const sentDateString = toDateString(reminder.sentAt);
 
-      return sentDateString ?? startDateString;
-    })(),
-    patient: {
-      name: reminder.patientName,
-      phoneNumber: reminder.patientPhoneNumber,
-    },
-  }));
+        if (reminder.status === 'PENDING' || reminder.status === 'FAILED') {
+          return startDateString;
+        }
+
+        return sentDateString ?? startDateString;
+      })(),
+      patient: {
+        name: reminder.patientName,
+        phoneNumber: reminder.patientPhoneNumber,
+      },
+    };
+  });
 
   // Include pagination metadata if pagination is requested
   const response = {
