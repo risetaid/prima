@@ -9,6 +9,9 @@ import { NextResponse, NextRequest } from "next/server";
 import { ZodError, z } from "zod";
 import { logger } from "@/lib/logger";
 import type { AuthUser } from "@/lib/auth-utils";
+// Top-level imports for better performance (avoid dynamic imports in hot paths)
+import { getAuthUser } from "@/lib/auth-utils";
+import { get as cacheGet, set as cacheSet } from "@/lib/cache";
 
 // ===== TYPES =====
 
@@ -589,7 +592,6 @@ export function createApiHandler<T = unknown, R = unknown>(
       }
       // Handle authentication (only if no valid API key)
       else if (options.auth === "required") {
-        const { getAuthUser } = await import("@/lib/auth-utils");
         const user = await getAuthUser();
         if (!user) {
           return apiAuthError("Authentication required", {
@@ -599,7 +601,6 @@ export function createApiHandler<T = unknown, R = unknown>(
         }
         context.user = user;
       } else if (options.auth === "optional") {
-        const { getAuthUser } = await import("@/lib/auth-utils");
         const user = await getAuthUser();
         if (user) {
           context.user = user;
@@ -704,13 +705,12 @@ export function createApiHandler<T = unknown, R = unknown>(
         }
       }
 
-      // Check cache if enabled
+      // Check cache if enabled (using top-level imports for performance)
       if (options.cache && request.method === "GET") {
-        const { get } = await import("@/lib/cache");
         const cacheKey = `${options.cache.key}:${JSON.stringify(
           context.query
         )}:${context.user?.id || "anonymous"}`;
-        const cached = await get(cacheKey);
+        const cached = await cacheGet(cacheKey);
         if (cached) {
           return apiSuccess(cached, {
             requestId,
@@ -723,13 +723,12 @@ export function createApiHandler<T = unknown, R = unknown>(
       // Execute the handler
       const result = await handler(body, context);
 
-      // Set cache if enabled
+      // Set cache if enabled (using top-level imports for performance)
       if (options.cache && request.method === "GET") {
-        const { set } = await import("@/lib/cache");
         const cacheKey = `${options.cache.key}:${JSON.stringify(
           context.query
         )}:${context.user?.id || "anonymous"}`;
-        await set(cacheKey, result, options.cache.ttl);
+        await cacheSet(cacheKey, result, options.cache.ttl);
       }
 
       return apiSuccess(result, {

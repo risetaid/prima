@@ -40,13 +40,27 @@ export interface LogEntry {
 
 class Logger {
   private isDevelopment = process.env.NODE_ENV === "development";
+  // Cache for timestamp formatting - reuse Date object to reduce GC pressure
+  private lastTimestamp = 0;
+  private cachedTimestampStr = "";
+
+  private getTimestamp(): string {
+    const now = Date.now();
+    // Only regenerate timestamp string if more than 1 second has passed
+    // This reduces Date object creation in high-frequency logging scenarios
+    if (now - this.lastTimestamp >= 1000) {
+      this.lastTimestamp = now;
+      this.cachedTimestampStr = new Date(now).toISOString();
+    }
+    return this.cachedTimestampStr;
+  }
 
   private formatMessage(
     level: LogLevel,
     message: string,
     context?: LogContext
   ): string {
-    const timestamp = new Date().toISOString();
+    const timestamp = this.getTimestamp();
     const contextStr = context ? ` | ${JSON.stringify(context)}` : "";
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${contextStr}`;
   }

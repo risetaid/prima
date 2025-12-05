@@ -254,8 +254,12 @@ export class AIClient {
           return parseInt(String(retryAfterHeader), 10);
         }
       }
-    } catch {
-      // Ignore parsing errors
+    } catch (parseError) {
+      // Log parse failures for debugging
+      logger.warn('Failed to parse retry-after header', {
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        originalError: error instanceof Error ? error.message : 'unknown',
+      });
     }
     return 60; // Default 60 seconds
   }

@@ -25,32 +25,46 @@ interface PatientListProps {
   virtualScrollHeight?: number
 }
 
+// Utility functions moved outside component to prevent recreation on each render
+// These are pure functions that don't depend on component state
+const getInitials = (name: string): string => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase()
+}
+
+const getComplianceColor = (rate: number): string => {
+  if (rate >= 80) return 'bg-green-500'
+  if (rate >= 50) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
+
+const getComplianceLabelUtil = (rate: number): { text: string; bg: string; color: string } => {
+  if (rate >= 80) return { text: 'Tinggi', bg: 'bg-green-100', color: 'text-green-800' }
+  if (rate >= 50) return { text: 'Sedang', bg: 'bg-yellow-100', color: 'text-yellow-800' }
+  return { text: 'Rendah', bg: 'bg-red-100', color: 'text-red-800' }
+}
+
+const getStatusLabelUtil = (isActive: boolean): { text: string; bg: string; color: string } => {
+  return isActive
+    ? { text: 'Aktif', bg: 'bg-blue-100', color: 'text-blue-800' }
+    : { text: 'Nonaktif', bg: 'bg-gray-100', color: 'text-gray-800' }
+}
+
 // Memoized PatientCard component to prevent unnecessary re-renders
 interface PatientCardProps {
   patient: Patient
   onPatientClick: (patient: Patient) => void
-  getInitials: (name: string) => string
-  getComplianceColor: (rate: number) => string
-  getComplianceLabel: (rate: number) => { text: string; bg: string; color: string }
-  getStatusLabel: (isActive: boolean) => { text: string; bg: string; color: string }
 }
 
-const PatientCard = memo<PatientCardProps>(({ 
-  patient, 
-  onPatientClick, 
-  getInitials, 
-  getComplianceColor, 
-  getComplianceLabel, 
-  getStatusLabel 
-}) => {
+const PatientCard = memo<PatientCardProps>(({ patient, onPatientClick }) => {
   const handleClick = useCallback(() => {
     onPatientClick(patient)
   }, [patient, onPatientClick])
 
-  const complianceLabel = useMemo(() => getComplianceLabel(patient.complianceRate), [patient.complianceRate, getComplianceLabel])
-  const statusLabel = useMemo(() => getStatusLabel(patient.isActive), [patient.isActive, getStatusLabel])
-  const initials = useMemo(() => getInitials(patient.name), [patient.name, getInitials])
-  const complianceColor = useMemo(() => getComplianceColor(patient.complianceRate), [patient.complianceRate, getComplianceColor])
+  // Use external utility functions directly - no need for useMemo since they're stable
+  const complianceLabel = getComplianceLabelUtil(patient.complianceRate)
+  const statusLabel = getStatusLabelUtil(patient.isActive)
+  const initials = getInitials(patient.name)
+  const complianceColor = getComplianceColor(patient.complianceRate)
 
   return (
     <div
@@ -143,29 +157,7 @@ function PatientList({
     })
   }, [patients, searchTerm, statusFilter, complianceFilter])
 
-  // Memoized utility functions to prevent recreating on every render
-  const getInitials = useCallback((name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase()
-  }, [])
-
-  const getComplianceColor = useCallback((rate: number) => {
-    if (rate >= 80) return 'bg-green-500'
-    if (rate >= 50) return 'bg-yellow-500'
-    return 'bg-red-500'
-  }, [])
-
-  const getComplianceLabel = useCallback((rate: number) => {
-    if (rate >= 80) return { text: 'Tinggi', bg: 'bg-green-100', color: 'text-green-800' }
-    if (rate >= 50) return { text: 'Sedang', bg: 'bg-yellow-100', color: 'text-yellow-800' }
-    return { text: 'Rendah', bg: 'bg-red-100', color: 'text-red-800' }
-  }, [])
-
-  const getStatusLabel = useCallback((isActive: boolean) => {
-    return isActive
-      ? { text: 'Aktif', bg: 'bg-blue-100', color: 'text-blue-800' }
-      : { text: 'Nonaktif', bg: 'bg-gray-100', color: 'text-gray-800' }
-  }, [])
-
+  // handlePatientClick uses external utility functions (moved outside component)
   const handlePatientClick = useCallback((patient: Patient) => {
     if (onPatientClick) {
       onPatientClick(patient)
@@ -238,10 +230,6 @@ function PatientList({
               <PatientCard
                 patient={patient}
                 onPatientClick={handlePatientClick}
-                getInitials={getInitials}
-                getComplianceColor={getComplianceColor}
-                getComplianceLabel={getComplianceLabel}
-                getStatusLabel={getStatusLabel}
               />
             </div>
           )}
@@ -253,10 +241,6 @@ function PatientList({
               key={patient.id}
               patient={patient}
               onPatientClick={handlePatientClick}
-              getInitials={getInitials}
-              getComplianceColor={getComplianceColor}
-              getComplianceLabel={getComplianceLabel}
-              getStatusLabel={getStatusLabel}
             />
           ))}
         </div>
@@ -272,7 +256,8 @@ function PatientList({
 }
 
 // Export memoized PatientList to prevent unnecessary re-renders
-export default memo(PatientList)
+const MemoizedPatientList = memo(PatientList)
+export default MemoizedPatientList
 
 // Also export named export for backward compatibility
 export { PatientList }

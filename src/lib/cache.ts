@@ -84,8 +84,12 @@ export async function del(key: string): Promise<void> {
 
 // ===== CONVENIENCE FUNCTIONS =====
 
+// In-flight request tracking to prevent cache stampede (thundering herd)
+const inFlightRequests = new Map<string, Promise<unknown>>();
+
 /**
  * Cache with automatic fallback to database
+ * Includes cache stampede protection via request deduplication
  */
 export async function cacheWithFallback<T>(
   cacheKey: string,
@@ -98,17 +102,38 @@ export async function cacheWithFallback<T>(
     return cachedData;
   }
 
-  // Fallback to fetch function
-  const freshData = await fetchFunction();
+  // Check if there's already an in-flight request for this key
+  // This prevents multiple concurrent requests from all hitting the database
+  const existingRequest = inFlightRequests.get(cacheKey);
+  if (existingRequest) {
+    return existingRequest as Promise<T>;
+  }
 
-  // Cache the fresh data (don't wait for it)
-  set(cacheKey, freshData, ttl).catch((error) => {
-    logger.warn("Background cache set failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  });
+  // Create new request and track it
+  const fetchPromise = (async () => {
+    try {
+      const freshData = await fetchFunction();
 
-  return freshData;
+      // Cache the fresh data (don't wait for it)
+      set(cacheKey, freshData, ttl).catch((error) => {
+        // Only log unexpected errors, not connection issues
+        if (error instanceof Error && !error.message.includes('connection')) {
+          logger.warn("Background cache set failed", {
+            error: error.message,
+            cacheKey,
+          });
+        }
+      });
+
+      return freshData;
+    } finally {
+      // Clean up in-flight tracking
+      inFlightRequests.delete(cacheKey);
+    }
+  })();
+
+  inFlightRequests.set(cacheKey, fetchPromise);
+  return fetchPromise;
 }
 
 /**

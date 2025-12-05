@@ -125,12 +125,17 @@ export class ReminderService {
       throw new ValidationError("No dates specified for reminder");
     }
 
-    const createdSchedules = [];
+    // Filter valid dates first
+    const validDates = dates
+      .map(dateString => ({ dateString, date: new Date(dateString) }))
+      .filter(({ date }) => !isNaN(date.getTime()));
 
-    for (const dateString of dates) {
-      const reminderDate = new Date(dateString);
-      if (isNaN(reminderDate.getTime())) continue;
+    if (!validDates.length) {
+      throw new ValidationError("No valid dates specified for reminder");
+    }
 
+    // Create all schedules in parallel for better performance
+    const schedulePromises = validDates.map(async ({ date: reminderDate }) => {
       const schedule = await this.repository.insert({
         patientId: dto.patientId,
         scheduledTime: dto.time,
@@ -146,8 +151,14 @@ export class ReminderService {
         createdById: dto.createdById,
       });
 
-      createdSchedules.push(schedule);
+      return { schedule, reminderDate };
+    });
 
+    const scheduleResults = await Promise.all(schedulePromises);
+    const createdSchedules = scheduleResults.map(r => r.schedule);
+
+    // Process attachments and immediate sends after all schedules are created
+    for (const { schedule } of scheduleResults) {
       // Add content attachments
       if (validatedContent.length) {
         await this.repository.addAttachments(

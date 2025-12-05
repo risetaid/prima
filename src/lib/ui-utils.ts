@@ -101,16 +101,13 @@ export function getStatusLabel(isActive: boolean): StatusLabel {
 
 /**
  * Phone number formatting utilities
+ * Uses centralized phone-utils for consistency
  */
+import { getDisplayPhoneNumber } from "@/lib/phone-utils";
+
 export function formatIndonesianPhone(phone?: string): string {
   if (!phone) return "-";
-
-  // Format Indonesian phone number for display
-  if (phone.startsWith("62")) {
-    return "+62" + phone.substring(2);
-  }
-
-  return phone;
+  return getDisplayPhoneNumber(phone);
 }
 
 /**

@@ -117,29 +117,29 @@ export class PatientService {
       let action = 'Pesan masuk';
       let result = undefined;
 
+      // Use lookup tables for action/result mapping (more efficient than if-else chains)
+      const OUTBOUND_ACTIONS: Record<string, string> = {
+        'verification': '📱 Verifikasi dikirim',
+        'reminder': '⏰ Pengingat dikirim',
+        'confirmation': '✅ Konfirmasi dikirim',
+      };
+
+      const INBOUND_INTENTS: Record<string, { action: string; result: string }> = {
+        'verification_accept': { action: '✅ Verifikasi diterima', result: 'verified' },
+        'verification_decline': { action: '❌ Verifikasi ditolak', result: 'declined' },
+        'reminder_confirmed': { action: '✅ Pengingat dikonfirmasi', result: 'confirmed' },
+        'reminder_missed': { action: '❌ Pengingat dilewatkan', result: 'missed' },
+      };
+
       if (msg.direction === 'outbound') {
-        action = 'Pesan keluar';
-        if (msg.messageType === 'verification') {
-          action = '📱 Verifikasi dikirim';
-        } else if (msg.messageType === 'reminder') {
-          action = '⏰ Pengingat dikirim';
-        } else if (msg.messageType === 'confirmation') {
-          action = '✅ Konfirmasi dikirim';
-        }
+        action = OUTBOUND_ACTIONS[msg.messageType] || 'Pesan keluar';
       } else if (msg.direction === 'inbound') {
-        action = '💬 Respon pasien';
-        if (msg.intent === 'verification_accept') {
-          action = '✅ Verifikasi diterima';
-          result = 'verified';
-        } else if (msg.intent === 'verification_decline') {
-          action = '❌ Verifikasi ditolak';
-          result = 'declined';
-        } else if (msg.intent === 'reminder_confirmed') {
-          action = '✅ Pengingat dikonfirmasi';
-          result = 'confirmed';
-        } else if (msg.intent === 'reminder_missed') {
-          action = '❌ Pengingat dilewatkan';
-          result = 'missed';
+        const intentData = msg.intent ? INBOUND_INTENTS[msg.intent] : null;
+        if (intentData) {
+          action = intentData.action;
+          result = intentData.result;
+        } else {
+          action = '💬 Respon pasien';
         }
       }
 

@@ -16,6 +16,17 @@ export class WhatsAppService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
+  /**
+   * Calculate delay with exponential backoff and jitter
+   * Jitter prevents synchronized retries under load (thundering herd)
+   */
+  private calculateRetryDelay(attempt: number): number {
+    const baseDelay = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1);
+    // Add 50-100% jitter to prevent synchronized retries
+    const jitter = 0.5 + Math.random() * 0.5;
+    return Math.round(baseDelay * jitter);
+  }
+
   private async sendWithRetry(
     toPhoneNumber: string,
     message: string,
@@ -46,7 +57,7 @@ export class WhatsAppService {
       });
 
       if (attempt < this.MAX_RETRY_ATTEMPTS) {
-        const delayMs = this.RETRY_DELAY_MS * Math.pow(2, attempt - 1); // Exponential backoff
+        const delayMs = this.calculateRetryDelay(attempt);
         logger.info("Retrying WhatsApp send", {
           phoneNumber: toPhoneNumber,
           attempt: attempt + 1,

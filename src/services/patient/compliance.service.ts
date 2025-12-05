@@ -1,4 +1,5 @@
 // ComplianceService centralizes compliance calculations for patients
+// Optimized: Batch queries to avoid N+1 problem
 import { logger } from "@/lib/logger";
 import { db, reminders, manualConfirmations } from "@/db";
 import { eq, and, isNull, inArray } from "drizzle-orm";
@@ -21,6 +22,17 @@ export interface ComplianceStats {
   manualCompletions: number; // Completions via manual relawan entry
 }
 
+// Internal type for batch processing
+interface PatientStatsInternal {
+  totalReminders: number;
+  completedReminders: number;
+  pendingReminders: number;
+  failedReminders: number;
+  automatedCompletions: number;
+  manualCompletions: number;
+  complianceRate: number;
+}
+
 export class ComplianceService {
   /**
    * Calculate compliance rate
@@ -35,26 +47,32 @@ export class ComplianceService {
   }
 
   /**
-   * Get patient completion stats (inline simplified version)
+   * Batch fetch all reminders and confirmations for multiple patients
+   * Optimized: 2 queries total instead of 2N queries
    */
-  private async getPatientStats(patientId: string) {
-    // Get all active reminders
+  private async getBatchPatientStats(patientIds: string[]): Promise<Map<string, PatientStatsInternal>> {
+    if (!patientIds.length) {
+      return new Map();
+    }
+
+    // Single query for all reminders across all patients
     const allReminders = await db
       .select({
         id: reminders.id,
+        patientId: reminders.patientId,
         status: reminders.status,
         confirmationStatus: reminders.confirmationStatus,
       })
       .from(reminders)
       .where(
         and(
-          eq(reminders.patientId, patientId),
+          inArray(reminders.patientId, patientIds),
           eq(reminders.isActive, true),
           isNull(reminders.deletedAt)
         )
       );
 
-    // Get manual confirmations
+    // Single query for all manual confirmations
     const reminderIds = allReminders.map(r => r.id);
     const manualConfs = reminderIds.length > 0
       ? await db
@@ -65,70 +83,82 @@ export class ComplianceService {
 
     const manuallyConfirmedIds = new Set(manualConfs.map(c => c.reminderId));
 
-    // Count stats
-    let completed = 0;
-    let pending = 0;
-    let failed = 0;
-    let automated = 0;
-    let manual = 0;
-    let dipatuhi = 0;
-    let tidakDipatuhi = 0;
+    // Group reminders by patient and calculate stats in memory
+    const statsMap = new Map<string, PatientStatsInternal>();
 
+    // Initialize all patients with zero stats
+    for (const patientId of patientIds) {
+      statsMap.set(patientId, {
+        totalReminders: 0,
+        completedReminders: 0,
+        pendingReminders: 0,
+        failedReminders: 0,
+        automatedCompletions: 0,
+        manualCompletions: 0,
+        complianceRate: 0,
+      });
+    }
+
+    // Process all reminders in single pass
     for (const reminder of allReminders) {
+      const stats = statsMap.get(reminder.patientId)!;
+      stats.totalReminders++;
+
       const isManuallyConfirmed = manuallyConfirmedIds.has(reminder.id);
 
       if (reminder.confirmationStatus === 'CONFIRMED' || isManuallyConfirmed) {
-        completed++;
-        dipatuhi++;  // All completed reminders are considered complied
-        if (isManuallyConfirmed) manual++;
-        else automated++;
+        stats.completedReminders++;
+        if (isManuallyConfirmed) {
+          stats.manualCompletions++;
+        } else {
+          stats.automatedCompletions++;
+        }
       } else if (reminder.status === 'FAILED') {
-        failed++;
+        stats.failedReminders++;
       } else if (reminder.status === 'PENDING') {
-        pending++;
+        stats.pendingReminders++;
       }
     }
 
-    // Currently no explicit "tidakDipatuhi" tracking
-    // In future: track explicit non-compliance from volunteer reports
-    tidakDipatuhi = 0;
+    // Calculate compliance rates
+    for (const stats of statsMap.values()) {
+      stats.complianceRate = this.computeRate(stats.completedReminders, 0);
+    }
 
-    const total = allReminders.length;
-    const complianceRate = this.computeRate(dipatuhi, tidakDipatuhi);
+    return statsMap;
+  }
 
-    return {
-      totalReminders: total,
-      completedReminders: completed,
-      pendingReminders: pending,
-      failedReminders: failed,
-      automatedCompletions: automated,
-      manualCompletions: manual,
-      complianceRate,
+  /**
+   * Get patient completion stats (single patient - uses batch internally)
+   */
+  private async getPatientStats(patientId: string): Promise<PatientStatsInternal> {
+    const statsMap = await this.getBatchPatientStats([patientId]);
+    return statsMap.get(patientId) || {
+      totalReminders: 0,
+      completedReminders: 0,
+      pendingReminders: 0,
+      failedReminders: 0,
+      automatedCompletions: 0,
+      manualCompletions: 0,
+      complianceRate: 0,
     };
   }
 
+  /**
+   * Optimized: Get rates for multiple patients with only 2 DB queries
+   */
   async getRatesMap(patientIds: string[]) {
-    const results = await Promise.all(
-      patientIds.map(async (patientId) => {
-        const stats = await this.getPatientStats(patientId);
-        return {
-          patientId,
-          totalReminders: stats.totalReminders,
-          completedReminders: stats.completedReminders,
-          complianceRate: stats.complianceRate,
-        };
-      })
-    );
+    const statsMap = await this.getBatchPatientStats(patientIds);
 
     const totalMap = new Map<string, number>();
     const completedMap = new Map<string, number>();
     const rateMap = new Map<string, number>();
 
-    results.forEach(result => {
-      totalMap.set(result.patientId, result.totalReminders);
-      completedMap.set(result.patientId, result.completedReminders);
-      rateMap.set(result.patientId, result.complianceRate);
-    });
+    for (const [patientId, stats] of statsMap) {
+      totalMap.set(patientId, stats.totalReminders);
+      completedMap.set(patientId, stats.completedReminders);
+      rateMap.set(patientId, stats.complianceRate);
+    }
 
     return { totalMap, completedMap, rateMap };
   }

@@ -23,7 +23,8 @@ export interface RateLimitInfo {
 }
 
 /**
- * Rate limiting utility using Redis for distributed rate limiting
+ * Rate limiting utility using Redis sorted sets for distributed rate limiting
+ * Optimized: Uses ZADD/ZRANGEBYSCORE instead of JSON parsing for better performance
  */
 export class RateLimiter {
   private static readonly DEFAULT_CONFIG: Partial<RateLimitConfig> = {
@@ -34,55 +35,35 @@ export class RateLimiter {
 
   /**
    * Check if request should be rate limited
+   * Uses Redis sorted sets for O(log N) operations instead of JSON parsing
    */
   static async checkRateLimit(
     identifier: string,
     config: RateLimitConfig
   ): Promise<RateLimitResult> {
     const fullConfig = { ...this.DEFAULT_CONFIG, ...config }
-    const key = `${fullConfig.keyPrefix}:${identifier}`
+    const key = `${fullConfig.keyPrefix}:zset:${identifier}`
     const now = Date.now()
     const windowStart = now - fullConfig.windowMs
 
     try {
-      // Get current request data
-      const currentData = await redis.get(key)
-      let requestData: { requests: number[]; windowStart: number } = {
-        requests: [],
-        windowStart: now
-      }
+      // Use sorted set operations for better performance
+      // 1. Remove old entries outside the window
+      await redis.zremrangebyscore(key, '-inf', windowStart)
 
-      if (currentData) {
-        try {
-          requestData = JSON.parse(currentData)
-        } catch {
-          // Reset data if parsing fails
-          requestData = { requests: [], windowStart: now }
-        }
-      }
+      // 2. Add current request with timestamp as score
+      const requestId = `${now}:${Math.random().toString(36).slice(2, 8)}`
+      await redis.zadd(key, now, requestId)
 
-      // Clean old requests outside the window
-      requestData.requests = requestData.requests.filter(timestamp => timestamp > windowStart)
-      requestData.windowStart = windowStart
+      // 3. Set expiration on the key
+      await redis.expire(key, Math.ceil(fullConfig.windowMs / 1000) + 60)
 
-      // Add current request
-      requestData.requests.push(now)
+      // 4. Count requests in current window
+      const requestCount = await redis.zcard(key)
 
-      const requestCount = requestData.requests.length
       const allowed = requestCount <= fullConfig.maxRequests
       const remaining = Math.max(0, fullConfig.maxRequests - requestCount)
       const resetTime = now + fullConfig.windowMs
-
-      // Save updated data with expiration
-      const success = await redis.set(
-        key,
-        JSON.stringify(requestData),
-        Math.ceil(fullConfig.windowMs / 1000) + 60 // TTL in seconds + buffer
-      )
-
-      if (!success) {
-        logger.warn('Failed to save rate limit data to Redis', { identifier })
-      }
 
       const result: RateLimitResult = {
         allowed,
@@ -111,6 +92,69 @@ export class RateLimiter {
       })
 
       // On Redis error, allow the request to prevent blocking legitimate users
+      return {
+        allowed: true,
+        remaining: fullConfig.maxRequests,
+        resetTime: now + fullConfig.windowMs,
+        totalRequests: 0
+      }
+    }
+  }
+
+  /**
+   * Legacy JSON-based rate limiting (kept for backward compatibility)
+   * @deprecated Use checkRateLimit which uses sorted sets
+   */
+  static async checkRateLimitLegacy(
+    identifier: string,
+    config: RateLimitConfig
+  ): Promise<RateLimitResult> {
+    const fullConfig = { ...this.DEFAULT_CONFIG, ...config }
+    const key = `${fullConfig.keyPrefix}:${identifier}`
+    const now = Date.now()
+    const windowStart = now - fullConfig.windowMs
+
+    try {
+      const currentData = await redis.get(key)
+      let requestData: { requests: number[]; windowStart: number } = {
+        requests: [],
+        windowStart: now
+      }
+
+      if (currentData) {
+        try {
+          requestData = JSON.parse(currentData)
+        } catch {
+          requestData = { requests: [], windowStart: now }
+        }
+      }
+
+      requestData.requests = requestData.requests.filter(timestamp => timestamp > windowStart)
+      requestData.windowStart = windowStart
+      requestData.requests.push(now)
+
+      const requestCount = requestData.requests.length
+      const allowed = requestCount <= fullConfig.maxRequests
+      const remaining = Math.max(0, fullConfig.maxRequests - requestCount)
+      const resetTime = now + fullConfig.windowMs
+
+      await redis.set(
+        key,
+        JSON.stringify(requestData),
+        Math.ceil(fullConfig.windowMs / 1000) + 60
+      )
+
+      return {
+        allowed,
+        remaining,
+        resetTime,
+        totalRequests: requestCount
+      }
+    } catch (error) {
+      logger.error('Rate limiter legacy error', error instanceof Error ? error : new Error(String(error)), {
+        identifier
+      })
+
       return {
         allowed: true,
         remaining: fullConfig.maxRequests,

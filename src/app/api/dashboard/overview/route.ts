@@ -2,10 +2,9 @@ import { createApiHandler } from "@/lib/api-helpers";
 import { db, patients } from "@/db";
 import { eq, and, isNull, count, sql } from "drizzle-orm";
 import { ComplianceService } from "@/services/patient/compliance.service";
-import { get, set } from "@/lib/cache";
-import { logger } from '@/lib/logger';
 
 // GET /api/dashboard/overview - Get dashboard overview with caching
+// Note: Caching is handled by createApiHandler - removed duplicate manual caching
 export const GET = createApiHandler(
   {
     auth: "required",
@@ -14,14 +13,6 @@ export const GET = createApiHandler(
   async (_, { user }) => {
     if (!user) {
       throw new Error("User not found");
-    }
-
-    // Try to get from cache first (Phase 4 optimization)
-    const cacheKey = `dashboard:overview:${user!.id}`;
-    const cachedData = await get(cacheKey);
-    if (cachedData) {
-      logger.info("Dashboard overview cache hit", { userId: user!.id, cache: true });
-      return cachedData;
     }
 
     // Combine all dashboard data in optimized Drizzle queries
@@ -129,7 +120,7 @@ export const GET = createApiHandler(
           inactivePatients: 0,
         };
 
-    const responseData = {
+    return {
       user: {
         id: user!.id,
         role: user!.role,
@@ -140,12 +131,5 @@ export const GET = createApiHandler(
       patients: patientsFormatted,
       stats,
     };
-
-    // Cache the dashboard data (Phase 4 optimization)
-    // Use shorter TTL for dashboard since patient data changes frequently
-    await set(cacheKey, responseData, 180); // 3 minutes
-    logger.info("Dashboard overview cached", { userId: user!.id, cache: true });
-
-    return responseData;
   }
 );

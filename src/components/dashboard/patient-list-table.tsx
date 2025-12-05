@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { useCallback, memo } from "react";
 import {
   generateAvatar,
   getComplianceLabel,
@@ -23,12 +24,13 @@ interface PatientListTableProps {
   loading: boolean;
 }
 
-export function PatientListTable({ patients, loading }: PatientListTableProps) {
+function PatientListTableComponent({ patients, loading }: PatientListTableProps) {
   const router = useRouter();
 
-  const handlePatientClick = (patientId: string) => {
+  // Memoized click handler to prevent unnecessary re-renders
+  const handlePatientClick = useCallback((patientId: string) => {
     router.push(`/pasien/${patientId}`);
-  };
+  }, [router]);
 
   if (loading) {
     return null;
@@ -143,3 +145,5 @@ export function PatientListTable({ patients, loading }: PatientListTableProps) {
   );
 }
 
+// Export memoized component to prevent unnecessary re-renders
+export const PatientListTable = memo(PatientListTableComponent);

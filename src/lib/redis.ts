@@ -488,6 +488,21 @@ class RedisClient {
     }
   }
 
+  async zremrangebyscore(key: string, min: string | number, max: string | number): Promise<number> {
+    if (!this.client) return 0
+
+    try {
+      return await this.client.zremrangebyscore(key, min, max)
+    } catch (error) {
+      logger.warn('IORedis ZREMRANGEBYSCORE failed', {
+        redis: true,
+        operation: 'zremrangebyscore',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return 0
+    }
+  }
+
   // For health checks
   isConnected(): boolean {
     return this.client !== null && this.client.status === 'ready'
