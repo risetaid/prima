@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { db, patients } from "@/db";
 import { eq, and } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/gowa";
+import { invalidatePatientCache } from "@/lib/cache";
 
 import { logger } from "@/lib/logger";
 // Manual verification by volunteer
@@ -65,6 +66,9 @@ export async function POST(
 
     await db.update(patients).set(updateData).where(eq(patients.id, patientId));
 
+    // Invalidate patient cache to ensure UI shows updated status
+    await invalidatePatientCache(patientId);
+
     // DISABLED: Verification logging - verificationLogs table removed in schema cleanup
 
     // Send confirmation message to patient if verified or declined
@@ -72,6 +76,12 @@ export async function POST(
       const confirmationMessage = generateConfirmationMessage(patient, status);
       await sendConfirmationMessage(patient.phoneNumber, confirmationMessage);
     }
+
+    logger.info("Manual verification completed", {
+      patientId,
+      newStatus: status,
+      processedBy: user.id,
+    });
 
     return NextResponse.json({
       success: true,

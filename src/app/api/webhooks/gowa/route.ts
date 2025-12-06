@@ -260,23 +260,52 @@ export async function POST(request: NextRequest) {
 
     // Priority 1: Check verification responses for pending patients
     if (patient.verificationStatus === "PENDING") {
-      logger.info("Processing verification response", {
+      logger.info("🔐 Processing verification response", {
         patientId: patient.id,
+        patientName: patient.name,
+        patientVerificationStatus: patient.verificationStatus,
         message: message?.substring(0, 50),
       });
 
-      const result = await simpleVerificationService.processResponse(
-        message,
-        patient.id
-      );
+      try {
+        const result = await simpleVerificationService.processResponse(
+          message,
+          patient.id
+        );
 
-      return NextResponse.json({
-        ok: true,
-        processed: true,
-        action: result.action,
-        source: "verification",
-        message: result.message,
-      });
+        logger.info("🔐 Verification response processed", {
+          patientId: patient.id,
+          action: result.action,
+          processed: result.processed,
+          resultMessage: result.message,
+        });
+
+        return NextResponse.json({
+          ok: true,
+          processed: true,
+          action: result.action,
+          source: "verification",
+          message: result.message,
+        });
+      } catch (verificationError) {
+        logger.error(
+          "🔐 Verification processing error",
+          verificationError instanceof Error
+            ? verificationError
+            : new Error(String(verificationError)),
+          {
+            patientId: patient.id,
+            message: message?.substring(0, 50),
+          }
+        );
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Verification processing failed",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Priority 2: Process reminder confirmations for verified patients

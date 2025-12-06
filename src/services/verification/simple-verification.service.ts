@@ -369,10 +369,26 @@ Terima kasih! 💙 Tim PRIMA`;
             ? `Terima kasih ${patient[0].name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
             : `Baik ${patient[0].name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`;
 
-        await sendWhatsAppMessage({
+        logger.info("📤 Sending verification acknowledgment", {
+          patientId,
+          patientName: patient[0].name,
+          phoneNumber: patient[0].phoneNumber,
+          action,
+        });
+
+        const sendResult = await sendWhatsAppMessage({
           to: formatWhatsAppNumber(patient[0].phoneNumber),
           body: ackMessage,
         });
+
+        logger.info("📤 Verification acknowledgment result", {
+          patientId,
+          success: sendResult.success,
+          messageId: sendResult.messageId,
+          error: sendResult.error,
+        });
+      } else {
+        logger.warn("❌ Patient not found for acknowledgment", { patientId });
       }
 
       // Clear conversation context after successful verification
