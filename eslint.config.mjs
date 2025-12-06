@@ -15,26 +15,26 @@ const eslintConfig = [
     rules: {
       // Downgrade unused variable warnings to warnings (not errors)
       "@typescript-eslint/no-unused-vars": "warn",
-      
+
       // Enforce no explicit any types (strict TypeScript rules)
       "@typescript-eslint/no-explicit-any": "error",
-      
+
       // Allow empty object types (common in UI libraries)
       "@typescript-eslint/no-empty-object-type": "warn",
-      
+
       // React Hook dependency warnings (can be complex to fix without breaking functionality)
       "react-hooks/exhaustive-deps": "warn",
-      
+
       // Allow unescaped entities (common in medical text)
       "react/no-unescaped-entities": "warn",
-      
+
       // Allow img elements (Next.js Image might not work in all medical contexts)
       "@next/next/no-img-element": "warn",
-      
+
       // Allow const reassignment warnings
       "prefer-const": "warn",
-    }
-  }
+    },
+  },
 ];
 
 export default eslintConfig;
