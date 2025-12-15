@@ -12,7 +12,9 @@
       "Skill(superpowers:brainstorming)",
       "Bash(cat:*)",
       "Skill(superpowers:subagent-driven-development)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(bun run lint)",
+      "Bash(bun run precommit:*)"
     ]
   }
 }
