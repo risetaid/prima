@@ -32,8 +32,8 @@ export const GET = createApiHandler(
       includeDeleted: searchParams.get("includeDeleted") === "true",
       status: (searchParams.get("status") as "active" | "inactive") || "all",
       search: searchParams.get("search") || undefined,
-      page: parseInt(searchParams.get("page") || "1"),
-      limit: parseInt(searchParams.get("limit") || "50"),
+      page: Math.min(Math.max(parseInt(searchParams.get("page") || "1"), 1), 10000),
+      limit: Math.min(Math.max(parseInt(searchParams.get("limit") || "50"), 1), 100),
     };
 
     // For non-admin and non-developer users, filter by their assigned patients using consolidated access control
