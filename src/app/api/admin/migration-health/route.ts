@@ -1,12 +1,11 @@
 // src/app/api/admin/migration-health/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { metrics } from "@/lib/metrics";
 import { featureFlags } from "@/lib/feature-flags";
-import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +36,12 @@ async function getIndexUsageStats() {
     `;
     
     return result.rows;
-  } catch (error) {
+  } catch {
     return [];
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   // Require admin authentication
   const { userId } = await auth();
   

@@ -77,7 +77,7 @@ export class FeatureFlags {
    */
   public getEnabledFlags(): string[] {
     return Array.from(this.flags.entries())
-      .filter(([_, enabled]) => enabled)
+      .filter(([, enabled]) => enabled)
       .map(([name]) => name);
   }
 

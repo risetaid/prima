@@ -209,7 +209,7 @@ export const POST = createApiHandler(
 
     // Import dependencies
     const { db, conversationStates, conversationMessages } = await import('@/db')
-    const { and, lt, eq, isNull, count, inArray } = await import('drizzle-orm')
+    const { and, lt, eq, isNull, count } = await import('drizzle-orm')
 
     // Cleanup parameters
     const INACTIVE_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago

@@ -5,6 +5,7 @@
 
 import { redis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
+import { createHash } from 'crypto'
 
 export interface CachedResponse {
   response: string
@@ -20,8 +21,7 @@ export class ResponseCacheService {
   private generateCacheKey(intent: string, patientContext: Record<string, unknown>): string {
     const contextStr = JSON.stringify(patientContext)
     // Use SHA256 hash instead of truncated base64 to prevent collisions
-    const crypto = require('crypto')
-    const hash = crypto.createHash('sha256').update(contextStr).digest('hex')
+    const hash = createHash('sha256').update(contextStr).digest('hex')
     return `llm:${intent}:${hash}`
   }
 

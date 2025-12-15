@@ -44,9 +44,8 @@ async function shutdown(signal: string) {
     // Step 4: Close database connection pool
     logger.info('Closing database connection pool');
     try {
-      const { db } = await import('@/db');
       // postgres.js closes connections automatically on process exit
-      // but we can explicitly end it
+      // No explicit close needed
       logger.info('Database connections will close on process exit');
     } catch (error) {
       logger.error('Failed to close database connections', error instanceof Error ? error : undefined);

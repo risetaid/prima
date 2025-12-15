@@ -185,9 +185,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Disable ESLint during build to avoid configuration issues
+  // ESLint enabled during builds for code quality
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 };
 
