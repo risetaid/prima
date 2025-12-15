@@ -233,6 +233,10 @@ export const conversationStates = pgTable(
   (table) => ({
     patientIdIdx: index("conversation_states_patient_id_idx").on(table.patientId),
     deletedAtIdx: index("conversation_states_deleted_at_idx").on(table.deletedAt),
+    // NEW: Composite index for active conversation lookup (Phase 3 optimization)
+    // Query pattern: "Get active conversations for patient that haven't expired"
+    patientActiveExpiresIdx: index("conversation_states_patient_active_expires_idx")
+      .on(table.patientId, table.isActive, table.expiresAt),
     // Foreign key to patients
     patientIdFk: foreignKey({
       columns: [table.patientId],
@@ -265,6 +269,10 @@ export const conversationMessages = pgTable(
   },
   (table) => ({
     conversationStateIdIdx: index("conversation_messages_conversation_state_id_idx").on(table.conversationStateId),
+    // NEW: Composite index for message history retrieval (Phase 3 optimization)
+    // Query pattern: "Get all messages for conversation ordered by time"
+    stateCreatedIdx: index("conversation_messages_state_created_idx")
+      .on(table.conversationStateId, table.createdAt),
     conversationStateIdFk: foreignKey({
       columns: [table.conversationStateId],
       foreignColumns: [conversationStates.id],
