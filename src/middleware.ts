@@ -134,6 +134,32 @@ const clerkProtection = clerkMiddleware(async (auth, req) => {
 
 // Main middleware - check API key first, then Clerk
 export default async function middleware(req: NextRequest) {
+  // CSRF Protection: Verify Origin header for state-changing requests
+  const method = req.method;
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+    const origin = req.headers.get('origin');
+    const host = req.headers.get('host');
+    
+    // Allow requests from same origin or if no origin header (native apps, curl, etc.)
+    // Skip CSRF for webhooks (they use HMAC signatures)
+    if (origin && host && !req.url.includes('/api/webhooks/') && !req.url.includes('/api/cron/')) {
+      const originHost = new URL(origin).host;
+      if (originHost !== host) {
+        logger.security('CSRF attempt detected', {
+          operation: 'csrf.check',
+          origin,
+          host,
+          method,
+          url: req.url,
+        });
+        return NextResponse.json(
+          { error: 'Invalid origin' },
+          { status: 403 }
+        );
+      }
+    }
+  }
+  
   // Fast path: if valid API key, bypass Clerk entirely
   if (hasValidApiKey(req)) {
     return NextResponse.next();

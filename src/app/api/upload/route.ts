@@ -19,7 +19,10 @@ async function handleUploadRequest(request: NextRequest): Promise<NextResponse> 
       const { request: req, user } = context;
       const { searchParams: sp } = new URL(req.url);
       const uploadType = sp.get("type") || "general";
-      const filename = sp.get("filename");
+      const rawFilename = sp.get("filename");
+      
+      // Security: Prevent path traversal attacks
+      const filename = rawFilename ? rawFilename.replace(/\.\./g, '').replace(/\//g, '') : null;
 
       // Validate Content-Type for FormData uploads
       const contentTypeHeader = req.headers.get("content-type");
@@ -294,7 +297,10 @@ export const DELETE = createApiHandler(
   async function (body: unknown, context: ApiHandlerContext): Promise<unknown> {
     const { request } = context;
     const { searchParams } = new URL(request.url);
-    const filename = searchParams.get("filename");
+    const rawFilename = searchParams.get("filename");
+    
+    // Security: Prevent path traversal attacks
+    const filename = rawFilename ? rawFilename.replace(/\.\./g, '').replace(/\//g, '') : null;
 
     if (!filename) {
       throw new Error("Filename required");

@@ -8,6 +8,11 @@ import { logger } from '@/lib/logger'
 export const POST = createApiHandler(
   { auth: "optional" }, // Webhooks don't require auth
   async (_, { request }) => {
+    // Security: Disable debug endpoints in production
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Debug endpoints are disabled in production');
+    }
+    
     const timestamp = new Date().toISOString()
 
     // Capture all headers
