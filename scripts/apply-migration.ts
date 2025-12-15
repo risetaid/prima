@@ -138,13 +138,13 @@ async function main() {
     log('\n📊 Verifying indexes...', colors.cyan);
     const indexes = await sql`
       SELECT 
-        indexrelname as index_name,
+        indexname as index_name,
         tablename as table_name,
         indexdef as definition
       FROM pg_indexes 
       WHERE tablename IN ('conversation_states', 'conversation_messages')
-      AND (indexrelname LIKE '%patient_active%' OR indexrelname LIKE '%state_created%')
-      ORDER BY tablename, indexrelname
+      AND (indexname LIKE '%patient_active%' OR indexname LIKE '%state_created%')
+      ORDER BY tablename, indexname
     `;
 
     if (indexes.length > 0) {
