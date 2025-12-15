@@ -5,6 +5,7 @@
 
 import { createApiHandler } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+import { featureFlags } from '@/lib/feature-flags'
 
 // Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET
@@ -37,7 +38,7 @@ export const GET = createApiHandler(
     try {
       // Import dependencies
       const { db, conversationStates, conversationMessages } = await import('@/db')
-      const { and, lt, eq, isNull, count } = await import('drizzle-orm')
+      const { and, lt, eq, isNull, count, inArray } = await import('drizzle-orm')
 
        // Cleanup parameters
        const INACTIVE_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
@@ -58,26 +59,70 @@ export const GET = createApiHandler(
           )
         )
 
-       for (const state of expiredStates) {
-         // Delete messages first (hard delete since no deletedAt column)
-         const messagesResult = await db
-           .delete(conversationMessages)
-           .where(eq(conversationMessages.conversationStateId, state.id))
-           .returning({ id: conversationMessages.id })
+       // Check if batch operations are enabled
+      const useBatchOperations = featureFlags.isEnabled('PERF_BATCH_CLEANUP');
 
-         deletedMessagesCount += messagesResult.length
+      if (useBatchOperations) {
+        // NEW: Batch operations - much faster
+        // Limit batch size to prevent long-running transactions
+        const maxBatchSize = 500;
+        const stateBatches = [];
+        for (let i = 0; i < expiredStates.length; i += maxBatchSize) {
+          stateBatches.push(expiredStates.slice(i, i + maxBatchSize));
+        }
 
-        // Soft delete conversation state
-        await db
-          .update(conversationStates)
-          .set({
-            deletedAt: new Date(),
-            isActive: false,
-            updatedAt: new Date()
-          })
-          .where(eq(conversationStates.id, state.id))
+        for (const batch of stateBatches) {
+          const stateIds = batch.map(s => s.id);
 
-        expiredStatesCount++
+          // Bulk delete messages
+          const messagesResult = await db
+            .delete(conversationMessages)
+            .where(inArray(conversationMessages.conversationStateId, stateIds))
+            .returning({ id: conversationMessages.id });
+
+          deletedMessagesCount += messagesResult.length;
+
+          // Bulk update states
+          await db
+            .update(conversationStates)
+            .set({
+              deletedAt: new Date(),
+              isActive: false,
+              updatedAt: new Date()
+            })
+            .where(inArray(conversationStates.id, stateIds));
+
+          expiredStatesCount += batch.length;
+        }
+
+        logger.info('Batch cleanup completed', {
+          operation: 'cleanup.expired',
+          batchCount: stateBatches.length,
+          statesPerBatch: maxBatchSize,
+        });
+      } else {
+        // LEGACY: Individual operations (N+1 queries)
+        for (const state of expiredStates) {
+          // Delete messages first (hard delete since no deletedAt column)
+          const messagesResult = await db
+            .delete(conversationMessages)
+            .where(eq(conversationMessages.conversationStateId, state.id))
+            .returning({ id: conversationMessages.id })
+
+          deletedMessagesCount += messagesResult.length
+
+          // Soft delete conversation state
+          await db
+            .update(conversationStates)
+            .set({
+              deletedAt: new Date(),
+              isActive: false,
+              updatedAt: new Date()
+            })
+            .where(eq(conversationStates.id, state.id))
+
+          expiredStatesCount++
+        }
       }
 
       // Step 2: Clean up old inactive conversations (30+ days old, no recent activity)
@@ -164,7 +209,7 @@ export const POST = createApiHandler(
 
     // Import dependencies
     const { db, conversationStates, conversationMessages } = await import('@/db')
-    const { and, lt, eq, isNull, count } = await import('drizzle-orm')
+    const { and, lt, eq, isNull, count, inArray } = await import('drizzle-orm')
 
     // Cleanup parameters
     const INACTIVE_CUTOFF = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 30 days ago
