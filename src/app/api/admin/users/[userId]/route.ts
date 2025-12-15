@@ -1,7 +1,7 @@
 import { createApiHandler } from '@/lib/api-helpers'
 import { type AdminUser } from '@/lib/auth-utils'
 import { db, users } from '@/db'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { getWIBTime } from '@/lib/datetime'
 import { logger } from '@/lib/logger'
 import { z } from 'zod'
@@ -180,17 +180,21 @@ async function handleToggleRole(userId: string, user: { id: string; email: strin
   // Prevent demoting the last admin/developer
   if ((user.role === "ADMIN" || user.role === "DEVELOPER") &&
       role !== "ADMIN" && role !== "DEVELOPER") {
-    const adminCount = await db
-      .select({ count: users.id })
+    // FIX: Use sql<number> aggregation to get actual count value
+    const [adminResult] = await db
+      .select({ count: sql<number>`count(*)` })
       .from(users)
       .where(eq(users.role, "ADMIN"))
 
-    const developerCount = await db
-      .select({ count: users.id })
+    const [devResult] = await db
+      .select({ count: sql<number>`count(*)` })
       .from(users)
       .where(eq(users.role, "DEVELOPER"))
 
-    if (adminCount.length + developerCount.length <= 1) {
+    // Extract count values correctly (not array length)
+    const totalPrivilegedUsers = (adminResult?.count || 0) + (devResult?.count || 0);
+
+    if (totalPrivilegedUsers <= 1) {
       throw new Error("Cannot demote the last admin/developer")
     }
   }
