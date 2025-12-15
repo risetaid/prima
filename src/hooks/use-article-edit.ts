@@ -60,16 +60,18 @@ export function useArticleEdit({ params }: UseArticleEditProps) {
         const data = await response.json();
         logger.info("✅ Edit Article: Loaded", data.data);
 
-        if (data.success) {
-          const article = data.data;
+        if (data.success && data.data) {
+          // The API returns a double-nested structure: data.data.data contains the actual article
+          const article = data.data.data || data.data;
+
           setFormData({
             title: article.title || "",
             slug: article.slug || "",
             content: article.content || "",
             excerpt: article.excerpt || "",
             featuredImageUrl: article.featuredImageUrl || "",
-            category: article.category || "general",
-            status: article.status || "draft",
+            category: article.category?.toLowerCase() || "general",
+            status: article.status?.toLowerCase() as ArticleStatus || "draft",
           });
         }
       } catch (error: unknown) {

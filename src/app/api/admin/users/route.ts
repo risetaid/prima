@@ -7,7 +7,7 @@ import { alias } from "drizzle-orm/pg-core";
 // Query schema for admin users listing - custom schema to avoid conflicts with generic list schema
 const adminUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).max(10000).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(1000).default(20), // Allow up to 1000 for client-side filtering
   search: z.string().optional(),
   status: z.enum(["all", "pending", "approved"]).default("all"),
 });

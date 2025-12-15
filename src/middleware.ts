@@ -1,6 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import crypto from 'crypto';
 import { logger } from "@/lib/logger";
 import { featureFlags } from "@/lib/feature-flags";
 import { metrics } from "@/lib/metrics";
@@ -62,16 +61,34 @@ function recordFailedAttempt(ip: string | null): void {
 }
 
 /**
+ * Timing-safe string comparison for Edge Runtime
+ * Compares two strings in constant time to prevent timing attacks
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  // Pad both strings to same length to prevent length leak
+  const maxLen = Math.max(a.length, b.length, 64);
+  const aPadded = a.padEnd(maxLen, '\0');
+  const bPadded = b.padEnd(maxLen, '\0');
+
+  let result = 0;
+  for (let i = 0; i < maxLen; i++) {
+    result |= aPadded.charCodeAt(i) ^ bPadded.charCodeAt(i);
+  }
+
+  return result === 0;
+}
+
+/**
  * Check if request has valid internal API key
  * Uses timing-safe comparison when SECURITY_TIMING_SAFE_AUTH flag is enabled
  */
 function hasValidApiKey(req: NextRequest): boolean {
   const apiKey = req.headers.get("X-API-Key");
-  
+
   if (!apiKey || !INTERNAL_API_KEY) {
     return false;
   }
-  
+
   // Check rate limiting
   const ip = (req as unknown as { ip?: string }).ip || req.headers.get('x-forwarded-for');
   if (isRateLimited(ip)) {
@@ -82,30 +99,19 @@ function hasValidApiKey(req: NextRequest): boolean {
     metrics.increment('api_key.rate_limited');
     return false;
   }
-  
+
   let isValid = false;
-  
+
   if (featureFlags.isEnabled('SECURITY_TIMING_SAFE_AUTH')) {
-    // NEW: Timing-safe comparison
-    try {
-      // Pad both strings to same length to prevent length leak
-      const keyBuffer = Buffer.from(apiKey.padEnd(64, '\0'));
-      const expectedBuffer = Buffer.from(INTERNAL_API_KEY.padEnd(64, '\0'));
-      
-      isValid = crypto.timingSafeEqual(keyBuffer, expectedBuffer);
-      
-      metrics.increment('api_key.check.timing_safe');
-    } catch (error) {
-      // timingSafeEqual throws if buffers are different lengths (shouldn't happen with padding)
-      logger.error('Timing-safe comparison failed', error instanceof Error ? error : undefined);
-      isValid = false;
-    }
+    // NEW: Timing-safe comparison (Edge Runtime compatible)
+    isValid = timingSafeEqual(apiKey, INTERNAL_API_KEY);
+    metrics.increment('api_key.check.timing_safe');
   } else {
     // LEGACY: Simple comparison (timing attack vulnerable)
     isValid = apiKey === INTERNAL_API_KEY;
     metrics.increment('api_key.check.legacy');
   }
-  
+
   if (!isValid) {
     recordFailedAttempt(ip);
     logger.security('Invalid API key attempt', {
@@ -115,7 +121,7 @@ function hasValidApiKey(req: NextRequest): boolean {
   } else {
     metrics.increment('api_key.success');
   }
-  
+
   return isValid;
 }
 
