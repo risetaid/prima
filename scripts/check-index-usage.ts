@@ -43,14 +43,14 @@ async function main() {
     const indexStats = await sql`
       SELECT 
         schemaname as schema,
-        tablename as table_name,
+        relname as table_name,
         indexrelname as index_name,
         idx_scan as scans,
         idx_tup_read as tuples_read,
         idx_tup_fetch as tuples_fetched,
         pg_size_pretty(pg_relation_size(indexrelid)) as size
       FROM pg_stat_user_indexes 
-      WHERE tablename IN ('conversation_states', 'conversation_messages')
+      WHERE relname IN ('conversation_states', 'conversation_messages')
       ORDER BY idx_scan DESC
     `;
 
@@ -70,7 +70,7 @@ async function main() {
     const newIndexes = await sql`
       SELECT 
         indexrelname as index_name,
-        tablename as table_name,
+        relname as table_name,
         pg_size_pretty(pg_relation_size(indexrelid)) as size,
         idx_scan as scans
       FROM pg_stat_user_indexes 
@@ -105,7 +105,7 @@ async function main() {
     const tableStats = await sql`
       SELECT 
         schemaname as schema,
-        tablename as table_name,
+        relname as table_name,
         n_live_tup as live_rows,
         n_dead_tup as dead_rows,
         last_vacuum,
@@ -113,7 +113,7 @@ async function main() {
         last_analyze,
         last_autoanalyze
       FROM pg_stat_user_tables
-      WHERE tablename IN ('conversation_states', 'conversation_messages')
+      WHERE relname IN ('conversation_states', 'conversation_messages')
     `;
 
     tableStats.forEach((table: { schema: string; table_name: string; live_rows: number; dead_rows: number; last_analyze: Date | null; last_autoanalyze: Date | null }) => {
