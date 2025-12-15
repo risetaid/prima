@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Skill(superpowers:writing-plans)",
+      "Bash(mkdir:*)",
+      "SlashCommand(/superpowers:write-plan)"
+    ]
+  }
+}
