@@ -73,7 +73,7 @@ function hasValidApiKey(req: NextRequest): boolean {
   }
   
   // Check rate limiting
-  const ip = req.ip || req.headers.get('x-forwarded-for');
+  const ip = (req as unknown as { ip?: string }).ip || req.headers.get('x-forwarded-for');
   if (isRateLimited(ip)) {
     logger.security('API key rate limit exceeded', {
       operation: 'api_key.validation',

@@ -35,7 +35,7 @@ async function shutdown(signal: string) {
     logger.info('Closing Redis connection');
     try {
       const { redis } = await import('./redis');
-      await redis.quit();
+      await redis.disconnect();
       logger.info('Redis connection closed successfully');
     } catch (error) {
       logger.error('Failed to close Redis connection', error instanceof Error ? error : undefined);
