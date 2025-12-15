@@ -4,13 +4,21 @@ import { logger } from "@/lib/logger";
 
 // Primary WhatsApp provider for Indonesian healthcare system
 
-const GOWA_ENDPOINT = process.env.GOWA_ENDPOINT || "http://localhost:3000";
-const GOWA_BASIC_AUTH_USER = process.env.GOWA_BASIC_AUTH_USER || "admin";
-const GOWA_BASIC_AUTH_PASSWORD = process.env.GOWA_BASIC_AUTH_PASSWORD || "";
-const GOWA_WEBHOOK_SECRET = process.env.GOWA_WEBHOOK_SECRET || "secret";
-const ALLOW_UNSIGNED_WEBHOOKS =
-  (process.env.ALLOW_UNSIGNED_WEBHOOKS || "").toLowerCase() === "true" ||
-  process.env.NODE_ENV !== "production";
+const GOWA_ENDPOINT = process.env.GOWA_ENDPOINT;
+const GOWA_BASIC_AUTH_USER = process.env.GOWA_BASIC_AUTH_USER;
+const GOWA_BASIC_AUTH_PASSWORD = process.env.GOWA_BASIC_AUTH_PASSWORD;
+const GOWA_WEBHOOK_SECRET = process.env.GOWA_WEBHOOK_SECRET;
+
+// Remove the default fallback - require explicit opt-in
+const ALLOW_UNSIGNED_WEBHOOKS = process.env.ALLOW_UNSIGNED_WEBHOOKS === "true";
+
+// Add validation check at module load
+if (!GOWA_ENDPOINT || !GOWA_WEBHOOK_SECRET) {
+  logger.error('GOWA configuration incomplete', undefined, {
+    has_endpoint: !!GOWA_ENDPOINT,
+    has_secret: !!GOWA_WEBHOOK_SECRET,
+  });
+}
 
 /**
  * Convert Markdown formatting to WhatsApp-compatible formatting
