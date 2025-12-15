@@ -4,6 +4,7 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { validateEnvironment } = await import('./lib/env-validator');
+    const { registerShutdownHandlers } = await import('./lib/shutdown');
     
     try {
       validateEnvironment();
@@ -13,5 +14,8 @@ export async function register() {
         throw error;
       }
     }
+
+    // Register graceful shutdown handlers
+    registerShutdownHandlers();
   }
 }
