@@ -1,5 +1,9 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import crypto from 'crypto';
+import { logger } from "@/lib/logger";
+import { featureFlags } from "@/lib/feature-flags";
+import { metrics } from "@/lib/metrics";
 
 const isProtectedRoute = createRouteMatcher([
   "/pasien(.*)",
@@ -18,15 +22,101 @@ const isProtectedRoute = createRouteMatcher([
   "/api/dashboard(.*)",
 ]);
 
-// Use CLERK_SECRET_KEY as internal API key for testing/service calls
-// This is secure because CLERK_SECRET_KEY is already a sensitive credential
-const INTERNAL_API_KEY =
-  process.env.INTERNAL_API_KEY || process.env.CLERK_SECRET_KEY;
+const INTERNAL_API_KEY = process.env.INTERNAL_API_KEY;
 
-// Check if request has valid internal API key for testing/service calls
+// Rate limiting for failed API key attempts (in-memory, simple)
+const failedAttempts = new Map<string, { count: number; firstAttempt: number }>();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX = 5; // 5 failures per minute
+
+function isRateLimited(ip: string | null): boolean {
+  if (!ip) return false;
+  
+  const now = Date.now();
+  const attempts = failedAttempts.get(ip);
+  
+  if (!attempts) return false;
+  
+  // Reset if window expired
+  if (now - attempts.firstAttempt > RATE_LIMIT_WINDOW) {
+    failedAttempts.delete(ip);
+    return false;
+  }
+  
+  return attempts.count >= RATE_LIMIT_MAX;
+}
+
+function recordFailedAttempt(ip: string | null): void {
+  if (!ip) return;
+  
+  const now = Date.now();
+  const attempts = failedAttempts.get(ip);
+  
+  if (!attempts || now - attempts.firstAttempt > RATE_LIMIT_WINDOW) {
+    failedAttempts.set(ip, { count: 1, firstAttempt: now });
+  } else {
+    attempts.count++;
+  }
+  
+  metrics.increment('api_key.failed_attempts');
+}
+
+/**
+ * Check if request has valid internal API key
+ * Uses timing-safe comparison when SECURITY_TIMING_SAFE_AUTH flag is enabled
+ */
 function hasValidApiKey(req: NextRequest): boolean {
   const apiKey = req.headers.get("X-API-Key");
-  return !!(apiKey && INTERNAL_API_KEY && apiKey === INTERNAL_API_KEY);
+  
+  if (!apiKey || !INTERNAL_API_KEY) {
+    return false;
+  }
+  
+  // Check rate limiting
+  const ip = req.ip || req.headers.get('x-forwarded-for');
+  if (isRateLimited(ip)) {
+    logger.security('API key rate limit exceeded', {
+      operation: 'api_key.validation',
+      ip,
+    });
+    metrics.increment('api_key.rate_limited');
+    return false;
+  }
+  
+  let isValid = false;
+  
+  if (featureFlags.isEnabled('SECURITY_TIMING_SAFE_AUTH')) {
+    // NEW: Timing-safe comparison
+    try {
+      // Pad both strings to same length to prevent length leak
+      const keyBuffer = Buffer.from(apiKey.padEnd(64, '\0'));
+      const expectedBuffer = Buffer.from(INTERNAL_API_KEY.padEnd(64, '\0'));
+      
+      isValid = crypto.timingSafeEqual(keyBuffer, expectedBuffer);
+      
+      metrics.increment('api_key.check.timing_safe');
+    } catch (error) {
+      // timingSafeEqual throws if buffers are different lengths (shouldn't happen with padding)
+      logger.error('Timing-safe comparison failed', error instanceof Error ? error : undefined);
+      isValid = false;
+    }
+  } else {
+    // LEGACY: Simple comparison (timing attack vulnerable)
+    isValid = apiKey === INTERNAL_API_KEY;
+    metrics.increment('api_key.check.legacy');
+  }
+  
+  if (!isValid) {
+    recordFailedAttempt(ip);
+    logger.security('Invalid API key attempt', {
+      operation: 'api_key.validation',
+      ip,
+    });
+  } else {
+    metrics.increment('api_key.success');
+  }
+  
+  return isValid;
 }
 
 // Clerk middleware with conditional protection
