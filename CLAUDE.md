@@ -77,8 +77,7 @@ bun run start-message-worker  # Start WhatsApp message worker
 - Key utilities:
   - `api-schemas.ts` - Zod validation schemas
   - `error-handler.ts` - Standardized error responses
-  - `gowa.ts` - WhatsApp HTTP API client (current)
-  - `waha.ts` - Legacy WhatsApp client (deprecated)
+  - `gowa.ts` - WhatsApp HTTP API client
   - `idempotency.ts` - Duplicate event prevention
   - `rate-limiter.ts` - Redis-based rate limiting
   - `logger.ts` - Structured logging
@@ -92,14 +91,13 @@ bun run start-message-worker  # Start WhatsApp message worker
 - Internal API key bypass: `X-API-Key` header with `INTERNAL_API_KEY`
 
 **WhatsApp (GOWA - go-whatsapp-web-multidevice)**
-- Current provider: GOWA (replaces legacy WAHA)
+- Provider: GOWA (go-whatsapp-web-multidevice)
 - Webhook receiver: `src/app/api/webhooks/gowa/route.ts`
 - Message sender: `src/lib/gowa.ts`
 - Features: Text messages, images, files, typing indicators, message acknowledgments
 - Idempotency via `src/lib/idempotency.ts` (prevents duplicate processing)
 - Conversation state tracking in `conversation_states` table
 - Webhook validation: HMAC SHA256 signature verification
-- Legacy WAHA webhook still exists at `src/app/api/webhooks/waha/route.ts` (deprecated)
 
 **Database (PostgreSQL via Drizzle)**
 - Connection: `src/db/index.ts`
@@ -158,9 +156,6 @@ bun run start-message-worker  # Start WhatsApp message worker
 - Conversation state managed via `SimpleConfirmationService` and `ConversationStateService`
 - Message acknowledgments (delivered/read) handled automatically in webhook
 
-**Legacy (WAHA - deprecated):**
-- Old webhook at `src/app/api/webhooks/waha/route.ts` still exists but should not be used for new features
-- Old client at `src/lib/waha.ts` is deprecated
 
 ## Important Conventions
 
@@ -205,8 +200,6 @@ Required variables (see `.env.local`):
 - `MINIO_*` - MinIO object storage credentials
 - `INTERNAL_API_KEY` - Internal API key for service-to-service calls
 
-**Legacy (deprecated):**
-- `WAHA_API_KEY`, `WAHA_ENDPOINT`, `WAHA_SESSION` - Old WAHA provider (no longer used)
 
 ## Common Patterns
 
@@ -254,7 +247,7 @@ const patient = await db.query.patients.findFirst({
 - **API routes**: `src/app/api/*`
 - **Business logic**: `src/services/*` (reminder, patient, whatsapp, ai, verification)
 - **Database schema**: `src/db/schema.ts` and domain-specific schemas
-- **Webhooks**: `src/app/api/webhooks/*` (gowa [current], clerk, waha [legacy], fonnte)
+- **Webhooks**: `src/app/api/webhooks/*` (gowa, clerk)
 - **Utilities**: `src/lib/*` (error-handler, rate-limiter, idempotency, logger)
 - **Scripts**: `scripts/*` (DB setup, workers, utilities)
 
