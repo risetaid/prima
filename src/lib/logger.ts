@@ -8,6 +8,7 @@ export enum LogLevel {
   INFO = "info",
   WARN = "warn",
   ERROR = "error",
+  ALERT = "alert",
 }
 
 export type LogValue =
@@ -133,6 +134,11 @@ class Logger {
 
   security(message: string, context?: LogContext): void {
     this.warn(`🔒 Security: ${message}`, context);
+  }
+
+  alert(message: string, context?: LogContext): void {
+    // Alert is like error but for critical production issues
+    this.log(LogLevel.ERROR, `🚨 ALERT: ${message}`, context);
   }
 }
 
