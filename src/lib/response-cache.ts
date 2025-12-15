@@ -19,7 +19,10 @@ export class ResponseCacheService {
    */
   private generateCacheKey(intent: string, patientContext: Record<string, unknown>): string {
     const contextStr = JSON.stringify(patientContext)
-    return `llm:${intent}:${Buffer.from(contextStr).toString('base64').substring(0, 20)}`
+    // Use SHA256 hash instead of truncated base64 to prevent collisions
+    const crypto = require('crypto')
+    const hash = crypto.createHash('sha256').update(contextStr).digest('hex')
+    return `llm:${intent}:${hash}`
   }
 
   /**
