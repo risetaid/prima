@@ -1,12 +1,10 @@
 // tests/app/api/health/ready.test.ts
 import { describe, it, expect, vi } from 'vitest';
 import { GET } from '@/app/api/health/ready/route';
-import { NextRequest } from 'next/server';
 
 describe('/api/health/ready', () => {
   it('should return health check structure with all service checks', async () => {
-    const request = new NextRequest('http://localhost:3000/api/health/ready');
-    const response = await GET(request);
+    const response = await GET();
     const data = await response.json();
 
     // Status should be either 200 (ready) or 503 (not ready)

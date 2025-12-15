@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (!hasValidApiKey(req)) {
     logger.security("Unauthorized metrics access attempt", {
       operation: "health.metrics",
-      ip: req.ip,
+      ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
     });
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

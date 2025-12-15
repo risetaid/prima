@@ -1,6 +1,7 @@
 // src/app/api/health/ready/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/db";
+import { sql } from "drizzle-orm";
 import { redis } from "@/lib/redis";
 import { logger } from "@/lib/logger";
 
@@ -25,7 +26,7 @@ async function checkDatabase(): Promise<HealthCheck> {
   const start = Date.now();
   try {
     // Simple query to verify DB connectivity
-    await db.execute`SELECT 1`;
+    await db.execute(sql`SELECT 1`);
     return {
       healthy: true,
       latency_ms: Date.now() - start,

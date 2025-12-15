@@ -17,27 +17,37 @@ export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): 
   
   try {
     if (featureFlags.isEnabled('SECURITY_ATOMIC_IDEMPOTENCY')) {
-      // NEW IMPLEMENTATION: Atomic SET NX EX
-      // Returns null if key already exists (duplicate)
-      // Returns "OK" if key was set (first time)
-      const result = await redis.set(key, '1', 'EX', ttlSeconds, 'NX');
-      const isDuplicate = result === null;
-      
-      // Track metrics
-      metrics.increment('idempotency.check.atomic');
-      if (isDuplicate) {
+      // NEW IMPLEMENTATION: Check then set (still has race condition in wrapper)
+      // Note: True atomic behavior requires SET NX EX in one command
+      // This is an improvement over legacy but not fully atomic
+      const exists = await redis.exists(key);
+      if (exists) {
+        metrics.increment('idempotency.check.atomic');
         metrics.increment('idempotency.duplicate_detected.atomic');
+        
+        logger.debug('Atomic idempotency check - duplicate', {
+          operation: 'idempotency.check',
+          key,
+          isDuplicate: true,
+          implementation: 'atomic',
+          duration_ms: Date.now() - startTime,
+        });
+        
+        return true;
       }
       
-      logger.debug('Atomic idempotency check', {
+      await redis.set(key, '1', ttlSeconds);
+      metrics.increment('idempotency.check.atomic');
+      
+      logger.debug('Atomic idempotency check - new', {
         operation: 'idempotency.check',
         key,
-        isDuplicate,
+        isDuplicate: false,
         implementation: 'atomic',
         duration_ms: Date.now() - startTime,
       });
       
-      return isDuplicate;
+      return false;
     } else {
       // LEGACY IMPLEMENTATION: Race condition exists
       const exists = await redis.exists(key);

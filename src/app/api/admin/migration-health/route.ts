@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { metrics } from "@/lib/metrics";
 import { featureFlags } from "@/lib/feature-flags";
 
@@ -23,7 +23,7 @@ async function getConnectionPoolStats() {
 async function getIndexUsageStats() {
   try {
     // Query PostgreSQL statistics for our indexes
-    const result = await db.execute`
+    const result = await db.execute(sql`
       SELECT 
         indexrelname as index_name,
         idx_scan,
@@ -33,9 +33,9 @@ async function getIndexUsageStats() {
       WHERE schemaname = 'public'
       AND indexrelname LIKE '%conversation%'
       ORDER BY idx_scan DESC
-    `;
+    `);
     
-    return result.rows;
+    return result;
   } catch {
     return [];
   }
