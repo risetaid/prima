@@ -7,7 +7,12 @@
       "SlashCommand(/superpowers:write-plan)",
       "Skill(superpowers:systematic-debugging)",
       "Bash(bunx tsc:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(superpowers:brainstorming)",
+      "Bash(cat:*)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(git rev-parse:*)"
     ]
   }
 }
