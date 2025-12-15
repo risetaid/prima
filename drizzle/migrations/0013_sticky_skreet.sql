@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS "conversation_messages_state_created_idx" ON "conversation_messages" USING btree ("conversation_state_id","created_at");--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "conversation_states_patient_active_expires_idx" ON "conversation_states" USING btree ("patient_id","is_active","expires_at");
