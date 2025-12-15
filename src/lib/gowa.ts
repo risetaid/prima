@@ -1,6 +1,8 @@
 // GOWA (go-whatsapp-web-multidevice) integration for PRIMA
 import * as crypto from "crypto";
 import { logger } from "@/lib/logger";
+import { featureFlags } from "@/lib/feature-flags";
+import { metrics } from "@/lib/metrics";
 
 // Primary WhatsApp provider for Indonesian healthcare system
 
@@ -169,9 +171,15 @@ export const withTypingIndicator = async <T>(
 };
 
 /**
- * Send WhatsApp message via GOWA API
+ * Send WhatsApp message via GOWA API with retry logic
  * API: POST /send/message
  * Payload: { phone: "628xxx@s.whatsapp.net", message: "text" }
+ * 
+ * Retry logic (when PERF_WHATSAPP_RETRY flag enabled):
+ * - 3 attempts with exponential backoff (1s, 2s, 4s)
+ * - 10s timeout per attempt
+ * - Don't retry on 4xx client errors
+ * - Retry on 5xx server errors and network failures
  */
 export const sendWhatsAppMessage = async (
   message: WhatsAppMessage
@@ -183,48 +191,135 @@ export const sendWhatsAppMessage = async (
     };
   }
 
-  try {
-    // Format phone number with @s.whatsapp.net suffix for GOWA
-    const phone = `${message.to}@s.whatsapp.net`;
+  const useRetry = featureFlags.isEnabled('PERF_WHATSAPP_RETRY');
+  const maxRetries = useRetry ? 3 : 1;
+  const baseDelay = 1000; // 1 second
 
-    const payload: Record<string, unknown> = {
-      phone: phone,
-      message: message.body,
-    };
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Format phone number with @s.whatsapp.net suffix for GOWA
+      const phone = `${message.to}@s.whatsapp.net`;
 
-    const response = await fetch(`${GOWA_ENDPOINT}/send/message`, {
-      method: "POST",
-      headers: {
-        Authorization: getBasicAuthHeader(),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const result = await response.json();
-
-    // GOWA response: { code: "SUCCESS", message: "Success", results: { message_id: "xxx", status: "..." } }
-    if (result.code === "SUCCESS" || response.ok) {
-      return {
-        success: true,
-        messageId: result.results?.message_id || "gowa_" + Date.now(),
+      const payload: Record<string, unknown> = {
+        phone: phone,
+        message: message.body,
       };
-    } else {
+
+      // Add timeout support
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const response = await fetch(`${GOWA_ENDPOINT}/send/message`, {
+        method: "POST",
+        headers: {
+          Authorization: getBasicAuthHeader(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      const result = await response.json();
+
+      // GOWA response: { code: "SUCCESS", message: "Success", results: { message_id: "xxx", status: "..." } }
+      if (result.code === "SUCCESS" || response.ok) {
+        if (attempt > 0) {
+          metrics.increment('whatsapp.send.success_after_retry');
+          logger.info('WhatsApp send succeeded after retry', {
+            operation: 'whatsapp.send',
+            attempt: attempt + 1,
+            to: message.to,
+          });
+        } else {
+          metrics.increment('whatsapp.send.success_first_attempt');
+        }
+
+        return {
+          success: true,
+          messageId: result.results?.message_id || "gowa_" + Date.now(),
+        };
+      }
+
+      // Don't retry on 4xx client errors (invalid request won't succeed on retry)
+      if (response.status >= 400 && response.status < 500) {
+        metrics.increment('whatsapp.send.permanent_failure');
+        logger.warn('WhatsApp send failed with client error (no retry)', {
+          operation: 'whatsapp.send',
+          status: response.status,
+          to: message.to,
+        });
+        return {
+          success: false,
+          error: result.message || "GOWA API error",
+        };
+      }
+
+      // Retry on 5xx server errors
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        logger.warn('WhatsApp send failed, retrying', {
+          operation: 'whatsapp.send',
+          attempt: attempt + 1,
+          maxRetries,
+          nextRetryDelayMs: delay,
+          status: response.status,
+        });
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Final attempt failed
+      metrics.increment('whatsapp.send.permanent_failure');
       return {
         success: false,
         error: result.message || "GOWA API error",
       };
+
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      const isLastAttempt = attempt === maxRetries - 1;
+
+      if (isTimeout) {
+        metrics.increment('whatsapp.send.timeout');
+      }
+
+      if (isLastAttempt) {
+        metrics.increment('whatsapp.send.permanent_failure');
+        logger.error(
+          "GOWA WhatsApp send error",
+          error instanceof Error ? error : new Error(String(error)),
+          {
+            operation: 'whatsapp.send',
+            attempt: attempt + 1,
+            isTimeout,
+          }
+        );
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+
+      // Retry on network failures
+      const delay = baseDelay * Math.pow(2, attempt);
+      logger.warn('WhatsApp send error, retrying', {
+        operation: 'whatsapp.send',
+        attempt: attempt + 1,
+        maxRetries,
+        nextRetryDelayMs: delay,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-  } catch (error) {
-    logger.error(
-      "GOWA WhatsApp send error",
-      error instanceof Error ? error : new Error(String(error))
-    );
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
   }
+
+  // Should never reach here
+  return {
+    success: false,
+    error: "Max retries exceeded",
+  };
 };
 
 /**
