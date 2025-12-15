@@ -161,7 +161,7 @@ export class WhatsAppTests {
         ];
 
         // Import the format function
-        const { formatWhatsAppNumber } = await import("@/lib/waha");
+        const { formatWhatsAppNumber } = await import("@/lib/gowa");
 
         testCases.forEach(({ input, expected }) => {
           const formatted = formatWhatsAppNumber(input);
@@ -500,7 +500,7 @@ export class WhatsAppTests {
       async () => {
         const invalidNumbers = ["123", "abcd", "+++", ""];
 
-        const { formatWhatsAppNumber } = await import("@/lib/waha");
+        const { formatWhatsAppNumber } = await import("@/lib/gowa");
 
         invalidNumbers.forEach((number) => {
           try {
