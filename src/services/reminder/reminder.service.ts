@@ -13,6 +13,7 @@ import { getWIBTime, shouldSendReminderNow } from "@/lib/datetime";
 import { del, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
+import { formatContentForWhatsApp, ContentItem } from "@/lib/content-formatting";
 
 import { db, patients, reminders } from "@/db";
 import { ReminderError } from "@/services/reminder/reminder.types";
@@ -397,41 +398,7 @@ export class ReminderService {
    * Append content attachments to message with proper formatting
    */
   private appendContentToMessage(message: string, attachedContent: unknown[]): string {
-    if (!attachedContent.length) return message;
-
-    let enhancedMessage = message;
-
-    // Group content by type
-    const contentByType: { [key: string]: Array<{ id: string; type: string; title: string; url: string }> } = {};
-
-    attachedContent.forEach((item: unknown) => {
-      const content = item as { id: string; type: string; title: string; url: string };
-      if (!content.type || !content.title || !content.url) return;
-
-      const type = content.type.toLowerCase();
-      if (!contentByType[type]) {
-        contentByType[type] = [];
-      }
-      contentByType[type].push(content);
-    });
-
-    // Add content sections with proper icons and formatting
-    Object.keys(contentByType).forEach((contentType) => {
-      const contents = contentByType[contentType];
-      const prefix = contentType === "article" ? "📚 Baca juga:" : contentType === "video" ? "🎥 Tonton juga:" : "📖 Lihat juga:";
-
-      enhancedMessage += `\n\n${prefix}`;
-
-      contents.forEach((content) => {
-        const icon = contentType === "article" ? "📄" : contentType === "video" ? "🎥" : "📖";
-        enhancedMessage += `\n${icon} ${content.title}`;
-        enhancedMessage += `\n   ${content.url}`;
-      });
-    });
-
-    enhancedMessage += "\n\n💙 Tim PRIMA";
-
-    return enhancedMessage;
+    return formatContentForWhatsApp(message, attachedContent as ContentItem[]);
   }
 
   /**
