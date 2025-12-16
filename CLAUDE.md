@@ -78,9 +78,11 @@ bun run start-message-worker  # Start WhatsApp message worker
   - `api-schemas.ts` - Zod validation schemas
   - `error-handler.ts` - Standardized error responses
   - `gowa.ts` - WhatsApp HTTP API client
-  - `idempotency.ts` - Duplicate event prevention
+  - `idempotency.ts` - Duplicate event prevention (atomic Redis-based)
   - `rate-limiter.ts` - Redis-based rate limiting
   - `logger.ts` - Structured logging
+  - `content-formatting.ts` - WhatsApp content formatting utilities
+  - `template-utils.ts` - Template variable replacement utilities
 
 ### Key Integration Points
 
@@ -159,12 +161,22 @@ bun run start-message-worker  # Start WhatsApp message worker
 
 ## Important Conventions
 
+### Design Principles
+
+This codebase follows **YAGNI** (You Aren't Gonna Need It), **DRY** (Don't Repeat Yourself), and **KISS** (Keep It Simple, Stupid) principles:
+
+- **YAGNI**: Don't build infrastructure until it's actually needed. Remove unused code aggressively.
+- **DRY**: Extract duplicated logic to shared utilities (see `src/lib/content-formatting.ts`, `src/lib/template-utils.ts`)
+- **KISS**: Prefer simple solutions over complex ones. Use environment variables instead of feature flag systems.
+- **Document complexity**: When complexity is justified (retry logic, idempotency), document decisions in ADRs (see `docs/architecture/adr/`)
+
 ### Code Style
 - **Bun only** - Never use npm or yarn commands
 - **TypeScript strict mode** - All code must type-check
 - **Explicit return types** - For exported functions in services
 - **Prefer `unknown` over `any`** - Use Zod for runtime validation at boundaries
 - **No premature abstraction** - Keep it simple, don't over-engineer
+- **Extract duplicated code** - If you see the same logic in multiple places, extract it to a shared utility
 
 ### Error Handling
 - Services throw typed errors
@@ -199,6 +211,10 @@ Required variables (see `.env.local`):
 - `REDIS_URL` - Redis connection for caching/rate limiting
 - `MINIO_*` - MinIO object storage credentials
 - `INTERNAL_API_KEY` - Internal API key for service-to-service calls
+
+Optional feature flags (simple env vars):
+- `FEATURE_FLAG_PERF_WHATSAPP_RETRY` - Enable WhatsApp retry logic with exponential backoff (default: true)
+- `FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY` - Enable atomic idempotency checking (default: true)
 
 
 ## Common Patterns
@@ -263,3 +279,6 @@ const patient = await db.query.patients.findFirst({
 - `README.md` - Project setup and quick start
 - `.github/copilot-instructions.md` - Detailed AI agent guidance
 - `tests/comprehensive-suite/README.md` - Comprehensive testing documentation
+- `docs/architecture/adr/` - Architecture Decision Records (ADRs) documenting significant design decisions
+  - `001-whatsapp-retry-logic.md` - WhatsApp retry logic with exponential backoff
+  - `002-idempotency-strategy.md` - Atomic idempotency for webhook processing
