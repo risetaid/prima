@@ -22,29 +22,20 @@ describe('isDuplicateEvent', () => {
     expect(isDuplicate).toBe(true);
   });
 
-  it('should handle concurrent requests atomically with feature flag', async () => {
-    // Note: This test requires FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY=true
-    // Without the flag, legacy implementation has race condition (expected)
-    
-    // Check if flag is enabled
-    const flagEnabled = process.env.FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY === 'true';
-    
+  it('should handle concurrent requests atomically', async () => {
+    // Atomic implementation should allow exactly one request to succeed
+    // even when multiple requests are made concurrently
+
     // Simulate 10 concurrent requests with same event ID
-    const promises = Array(10).fill(null).map(() => 
+    const promises = Array(10).fill(null).map(() =>
       isDuplicateEvent(testKey)
     );
-    
+
     const results = await Promise.all(promises);
     const firstEvents = results.filter(r => r === false);
-    
-    if (flagEnabled) {
-      // With atomic implementation: exactly one should succeed
-      expect(firstEvents.length).toBe(1);
-    } else {
-      // Without flag (legacy): race condition allows multiple (this is the bug)
-      // We accept this as expected behavior when flag is disabled
-      expect(firstEvents.length).toBeGreaterThanOrEqual(1);
-    }
+
+    // With atomic implementation: exactly one should succeed
+    expect(firstEvents.length).toBe(1);
   });
 
   it('should expire after TTL', async () => {
@@ -60,12 +51,12 @@ describe('isDuplicateEvent', () => {
 
   it('should fail closed on Redis error', async () => {
     // Mock Redis error
-    const originalSet = redis.set;
-    redis.set = vi.fn().mockRejectedValue(new Error('Redis down'));
-    
+    const originalSetnx = redis.setnx;
+    redis.setnx = vi.fn().mockRejectedValue(new Error('Redis down'));
+
     const isDuplicate = await isDuplicateEvent(testKey);
     expect(isDuplicate).toBe(true); // Fail closed
-    
-    redis.set = originalSet;
+
+    redis.setnx = originalSetnx;
   });
 });

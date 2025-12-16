@@ -260,7 +260,7 @@ class RedisClient {
 
   async set(key: string, value: string, ttl?: number): Promise<boolean> {
     if (!this.client) return false
-    
+
     try {
       if (ttl) {
         await this.client.setex(key, ttl, value)
@@ -272,6 +272,29 @@ class RedisClient {
       logger.warn('IORedis SET failed', {
         redis: true,
         operation: 'set',
+        error: error instanceof Error ? error.message : String(error)
+      })
+      return false
+    }
+  }
+
+  async setnx(key: string, value: string, ttl?: number): Promise<boolean> {
+    if (!this.client) return false
+
+    try {
+      if (ttl) {
+        // Use SET with NX and EX options for atomic operation
+        const result = await this.client.set(key, value, 'EX', ttl, 'NX')
+        return result === 'OK'
+      } else {
+        // Use SETNX for atomic set-if-not-exists
+        const result = await this.client.setnx(key, value)
+        return result === 1
+      }
+    } catch (error) {
+      logger.warn('IORedis SETNX failed', {
+        redis: true,
+        operation: 'setnx',
         error: error instanceof Error ? error.message : String(error)
       })
       return false

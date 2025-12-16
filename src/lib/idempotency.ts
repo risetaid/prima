@@ -4,74 +4,45 @@ import { logger } from '@/lib/logger'
 import { metrics } from '@/lib/metrics'
 
 /**
- * Check if an event is a duplicate using idempotency key
- * 
- * LEGACY (race condition): Uses exists() + set() - gap allows duplicates
- * NEW (atomic): Uses SET NX EX - atomic operation prevents race condition
- * 
- * Controlled by feature flag: SECURITY_ATOMIC_IDEMPOTENCY
+ * Check if an event is a duplicate using atomic idempotency key
+ * Uses SET NX EX for atomic operation to prevent race conditions
  */
 export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): Promise<boolean> {
   const startTime = Date.now();
-  
+
   try {
-    if (process.env.FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY === 'true') {
-      // NEW IMPLEMENTATION: Check then set (still has race condition in wrapper)
-      // Note: True atomic behavior requires SET NX EX in one command
-      // This is an improvement over legacy but not fully atomic
-      const exists = await redis.exists(key);
-      if (exists) {
-        metrics.increment('idempotency.check.atomic');
-        metrics.increment('idempotency.duplicate_detected.atomic');
-        
-        logger.debug('Atomic idempotency check - duplicate', {
-          operation: 'idempotency.check',
-          key,
-          isDuplicate: true,
-          implementation: 'atomic',
-          duration_ms: Date.now() - startTime,
-        });
-        
-        return true;
-      }
-      
-      await redis.set(key, '1', ttlSeconds);
-      metrics.increment('idempotency.check.atomic');
-      
-      logger.debug('Atomic idempotency check - new', {
+    // Atomic check-and-set operation using SET NX EX
+    // Returns true if key was set (not a duplicate), false if key already exists (duplicate)
+    const wasSet = await redis.setnx(key, '1', ttlSeconds);
+
+    if (!wasSet) {
+      // Key already exists - this is a duplicate
+      metrics.increment('idempotency.duplicate_detected');
+
+      logger.debug('Idempotency check - duplicate', {
         operation: 'idempotency.check',
         key,
-        isDuplicate: false,
-        implementation: 'atomic',
+        isDuplicate: true,
         duration_ms: Date.now() - startTime,
       });
-      
-      return false;
-    } else {
-      // LEGACY IMPLEMENTATION: Race condition exists
-      const exists = await redis.exists(key);
-      if (exists) {
-        metrics.increment('idempotency.check.legacy');
-        metrics.increment('idempotency.duplicate_detected.legacy');
-        return true;
-      }
-      
-      await redis.set(key, '1', ttlSeconds);
-      metrics.increment('idempotency.check.legacy');
-      
-      logger.debug('Legacy idempotency check', {
-        operation: 'idempotency.check',
-        key,
-        isDuplicate: false,
-        implementation: 'legacy',
-        duration_ms: Date.now() - startTime,
-      });
-      
-      return false;
+
+      return true;
     }
+
+    // Key was set successfully - this is a new event
+    metrics.increment('idempotency.check');
+
+    logger.debug('Idempotency check - new', {
+      operation: 'idempotency.check',
+      key,
+      isDuplicate: false,
+      duration_ms: Date.now() - startTime,
+    });
+
+    return false;
   } catch (error) {
     // Fail closed: If Redis is unavailable, treat as duplicate to be safe
-    logger.error('Idempotency check failed - rejecting to be safe', 
+    logger.error('Idempotency check failed - rejecting to be safe',
       error instanceof Error ? error : undefined,
       {
         operation: 'idempotency.check',
