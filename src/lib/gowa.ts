@@ -1,7 +1,6 @@
 // GOWA (go-whatsapp-web-multidevice) integration for PRIMA
 import * as crypto from "crypto";
 import { logger } from "@/lib/logger";
-import { metrics } from "@/lib/metrics";
 
 // Primary WhatsApp provider for Indonesian healthcare system
 
@@ -225,14 +224,11 @@ export const sendWhatsAppMessage = async (
       // GOWA response: { code: "SUCCESS", message: "Success", results: { message_id: "xxx", status: "..." } }
       if (result.code === "SUCCESS" || response.ok) {
         if (attempt > 0) {
-          metrics.increment('whatsapp.send.success_after_retry');
           logger.info('WhatsApp send succeeded after retry', {
             operation: 'whatsapp.send',
             attempt: attempt + 1,
             to: message.to,
           });
-        } else {
-          metrics.increment('whatsapp.send.success_first_attempt');
         }
 
         return {
@@ -243,7 +239,6 @@ export const sendWhatsAppMessage = async (
 
       // Don't retry on 4xx client errors (invalid request won't succeed on retry)
       if (response.status >= 400 && response.status < 500) {
-        metrics.increment('whatsapp.send.permanent_failure');
         logger.warn('WhatsApp send failed with client error (no retry)', {
           operation: 'whatsapp.send',
           status: response.status,
@@ -270,7 +265,6 @@ export const sendWhatsAppMessage = async (
       }
 
       // Final attempt failed
-      metrics.increment('whatsapp.send.permanent_failure');
       return {
         success: false,
         error: result.message || "GOWA API error",
@@ -280,12 +274,7 @@ export const sendWhatsAppMessage = async (
       const isTimeout = error instanceof Error && error.name === 'AbortError';
       const isLastAttempt = attempt === maxRetries - 1;
 
-      if (isTimeout) {
-        metrics.increment('whatsapp.send.timeout');
-      }
-
       if (isLastAttempt) {
-        metrics.increment('whatsapp.send.permanent_failure');
         logger.error(
           "GOWA WhatsApp send error",
           error instanceof Error ? error : new Error(String(error)),

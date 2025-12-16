@@ -1,7 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { metrics } from "@/lib/metrics";
 
 const isProtectedRoute = createRouteMatcher([
   "/pasien(.*)",
@@ -46,17 +45,15 @@ function isRateLimited(ip: string | null): boolean {
 
 function recordFailedAttempt(ip: string | null): void {
   if (!ip) return;
-  
+
   const now = Date.now();
   const attempts = failedAttempts.get(ip);
-  
+
   if (!attempts || now - attempts.firstAttempt > RATE_LIMIT_WINDOW) {
     failedAttempts.set(ip, { count: 1, firstAttempt: now });
   } else {
     attempts.count++;
   }
-  
-  metrics.increment('api_key.failed_attempts');
 }
 
 /**
@@ -95,7 +92,6 @@ function hasValidApiKey(req: NextRequest): boolean {
       operation: 'api_key.validation',
       ip,
     });
-    metrics.increment('api_key.rate_limited');
     return false;
   }
 
@@ -104,11 +100,9 @@ function hasValidApiKey(req: NextRequest): boolean {
   if (process.env.FEATURE_FLAG_SECURITY_TIMING_SAFE_AUTH === 'true') {
     // NEW: Timing-safe comparison (Edge Runtime compatible)
     isValid = timingSafeEqual(apiKey, INTERNAL_API_KEY);
-    metrics.increment('api_key.check.timing_safe');
   } else {
     // LEGACY: Simple comparison (timing attack vulnerable)
     isValid = apiKey === INTERNAL_API_KEY;
-    metrics.increment('api_key.check.legacy');
   }
 
   if (!isValid) {
@@ -117,8 +111,6 @@ function hasValidApiKey(req: NextRequest): boolean {
       operation: 'api_key.validation',
       ip,
     });
-  } else {
-    metrics.increment('api_key.success');
   }
 
   return isValid;

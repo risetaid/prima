@@ -1,7 +1,6 @@
 import { createHash } from 'crypto'
 import { redis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import { metrics } from '@/lib/metrics'
 
 /**
  * Check if an event is a duplicate using atomic idempotency key
@@ -17,8 +16,6 @@ export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): 
 
     if (!wasSet) {
       // Key already exists - this is a duplicate
-      metrics.increment('idempotency.duplicate_detected');
-
       logger.debug('Idempotency check - duplicate', {
         operation: 'idempotency.check',
         key,
@@ -30,8 +27,6 @@ export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): 
     }
 
     // Key was set successfully - this is a new event
-    metrics.increment('idempotency.check');
-
     logger.debug('Idempotency check - new', {
       operation: 'idempotency.check',
       key,
@@ -49,7 +44,6 @@ export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): 
         key,
       }
     );
-    metrics.increment('idempotency.error');
     return true; // Fail closed, not open
   }
 }
