@@ -236,42 +236,6 @@ Apakah sudah menyelesaikan rutinitas kesehatan?
   }
 
   /**
-   * Send emergency alert to volunteers
-   */
-  async sendEmergencyAlert(
-    patientPhone: string,
-    patientName: string,
-    message: string,
-    priority: "urgent" | "high" | "medium" = "urgent"
-  ): Promise<WhatsAppMessageResult[]> {
-    // This would send to volunteer WhatsApp numbers
-    // For now, just log the emergency
-    const alertMessage = `🚨 DARURAT MEDIS 🚨
-
-Pasien: ${patientName}
-No. HP: ${patientPhone}
-Pesan: "${message}"
-Prioritas: ${priority.toUpperCase()}
-
-Segera hubungi pasien atau koordinasikan dengan tim medis.
-
-💙 Tim PRIMA`;
-
-    // Emergency alerts require volunteer WhatsApp configuration
-    // Implementation would send to configured volunteer numbers
-    logger.warn(
-      "Emergency alert system requires volunteer WhatsApp configuration",
-      {
-        patientPhone,
-        patientName,
-        priority,
-        alertMessageLength: alertMessage.length,
-      }
-    );
-    return [];
-  }
-
-  /**
    * Send follow-up message for missed reminder
    */
   async sendFollowUpReminder(
