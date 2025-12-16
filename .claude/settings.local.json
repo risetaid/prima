@@ -16,6 +16,7 @@
       "Bash(bun run lint)",
       "Bash(bun run precommit:*)",
       "Bash(bun test:*)",
+      "Bash(git cherry-pick:*)",
       "Bash(git grep:*)",
       "Bash(git checkout:*)"
     ]
