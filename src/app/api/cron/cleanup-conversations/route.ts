@@ -5,7 +5,6 @@
 
 import { createApiHandler } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
-import { featureFlags } from '@/lib/feature-flags'
 
 // Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET
@@ -60,7 +59,7 @@ export const GET = createApiHandler(
         )
 
        // Check if batch operations are enabled
-      const useBatchOperations = featureFlags.isEnabled('PERF_BATCH_CLEANUP');
+      const useBatchOperations = process.env.FEATURE_FLAG_PERF_BATCH_CLEANUP === 'true';
 
       if (useBatchOperations) {
         // NEW: Batch operations - much faster

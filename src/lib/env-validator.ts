@@ -1,6 +1,5 @@
 // src/lib/env-validator.ts
 import { logger } from '@/lib/logger';
-import { featureFlags } from '@/lib/feature-flags';
 
 const REQUIRED_ENV_VARS = [
   'DATABASE_URL',
@@ -25,7 +24,7 @@ const OPTIONAL_ENV_VARS = [
  */
 export function validateRequiredEnv(): void {
   // Only enforce if flag is enabled
-  if (!featureFlags.isEnabled('SECURITY_STRICT_ENV_VALIDATION')) {
+  if (process.env.FEATURE_FLAG_SECURITY_STRICT_ENV_VALIDATION !== 'true') {
     return;
   }
 

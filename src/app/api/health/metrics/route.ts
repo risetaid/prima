@@ -1,7 +1,6 @@
 // src/app/api/health/metrics/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { metrics } from "@/lib/metrics";
-import { featureFlags } from "@/lib/feature-flags";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +30,5 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     timestamp: snapshot.timestamp,
     metrics: snapshot,
-    feature_flags: featureFlags.getAllMetadata(),
   });
 }

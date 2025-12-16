@@ -1,6 +1,5 @@
 // src/lib/shutdown.ts
 import { logger } from './logger';
-import { featureFlags } from './feature-flags';
 
 let isShuttingDown = false;
 
@@ -66,7 +65,7 @@ async function shutdown(signal: string) {
  * Call this once at application startup
  */
 export function registerShutdownHandlers() {
-  if (!featureFlags.isEnabled('PERF_GRACEFUL_SHUTDOWN')) {
+  if (process.env.FEATURE_FLAG_PERF_GRACEFUL_SHUTDOWN !== 'true') {
     logger.info('Graceful shutdown handlers not registered (feature flag disabled)');
     return;
   }

@@ -1,14 +1,13 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import * as schema from '@/db/schema'
-import { featureFlags } from '@/lib/feature-flags'
 import { logger } from '@/lib/logger'
 
 // Railway Pro PostgreSQL - Connection Pool Configuration
 // Railway Pro Plan supports up to 20 concurrent connections
 
 // Determine pool configuration based on feature flag
-const useOptimizedPool = featureFlags.isEnabled('PERF_OPTIMIZED_POOL');
+const useOptimizedPool = process.env.FEATURE_FLAG_PERF_OPTIMIZED_POOL === 'true';
 
 const poolConfig = useOptimizedPool ? {
   // OPTIMIZED: Leave headroom for admin operations and monitoring

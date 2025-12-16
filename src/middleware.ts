@@ -1,7 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
-import { featureFlags } from "@/lib/feature-flags";
 import { metrics } from "@/lib/metrics";
 
 const isProtectedRoute = createRouteMatcher([
@@ -102,7 +101,7 @@ function hasValidApiKey(req: NextRequest): boolean {
 
   let isValid = false;
 
-  if (featureFlags.isEnabled('SECURITY_TIMING_SAFE_AUTH')) {
+  if (process.env.FEATURE_FLAG_SECURITY_TIMING_SAFE_AUTH === 'true') {
     // NEW: Timing-safe comparison (Edge Runtime compatible)
     isValid = timingSafeEqual(apiKey, INTERNAL_API_KEY);
     metrics.increment('api_key.check.timing_safe');

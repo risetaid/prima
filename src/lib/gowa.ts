@@ -1,7 +1,6 @@
 // GOWA (go-whatsapp-web-multidevice) integration for PRIMA
 import * as crypto from "crypto";
 import { logger } from "@/lib/logger";
-import { featureFlags } from "@/lib/feature-flags";
 import { metrics } from "@/lib/metrics";
 
 // Primary WhatsApp provider for Indonesian healthcare system
@@ -191,7 +190,7 @@ export const sendWhatsAppMessage = async (
     };
   }
 
-  const useRetry = featureFlags.isEnabled('PERF_WHATSAPP_RETRY');
+  const useRetry = process.env.FEATURE_FLAG_PERF_WHATSAPP_RETRY === 'true';
   const maxRetries = useRetry ? 3 : 1;
   const baseDelay = 1000; // 1 second
 

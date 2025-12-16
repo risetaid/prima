@@ -1,7 +1,6 @@
 import { createHash } from 'crypto'
 import { redis } from '@/lib/redis'
 import { logger } from '@/lib/logger'
-import { featureFlags } from '@/lib/feature-flags'
 import { metrics } from '@/lib/metrics'
 
 /**
@@ -16,7 +15,7 @@ export async function isDuplicateEvent(key: string, ttlSeconds = 24 * 60 * 60): 
   const startTime = Date.now();
   
   try {
-    if (featureFlags.isEnabled('SECURITY_ATOMIC_IDEMPOTENCY')) {
+    if (process.env.FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY === 'true') {
       // NEW IMPLEMENTATION: Check then set (still has race condition in wrapper)
       // Note: True atomic behavior requires SET NX EX in one command
       // This is an improvement over legacy but not fully atomic

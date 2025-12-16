@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { metrics } from "@/lib/metrics";
-import { featureFlags } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -60,13 +59,11 @@ export async function GET() {
 
   // Gather all migration health data
   const snapshot = metrics.exportMetrics();
-  const flagMetadata = featureFlags.getAllMetadata();
   const connectionPool = await getConnectionPoolStats();
   const indexUsage = await getIndexUsageStats();
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
-    feature_flags: flagMetadata,
     metrics: {
       counters: snapshot.counters,
       histograms: snapshot.histograms,
