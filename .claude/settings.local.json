@@ -15,7 +15,9 @@
       "Bash(git rev-parse:*)",
       "Bash(bun run lint)",
       "Bash(bun run precommit:*)",
-      "Bash(bun test:*)"
+      "Bash(bun test:*)",
+      "Bash(git grep:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
