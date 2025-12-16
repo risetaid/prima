@@ -14,6 +14,7 @@ import { del, CACHE_KEYS } from "@/lib/cache";
 import { logger } from "@/lib/logger";
 import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
 import { formatContentForWhatsApp, ContentItem } from "@/lib/content-formatting";
+import { replaceTemplateVariables } from "@/lib/template-utils";
 
 import { db, patients, reminders } from "@/db";
 import { ReminderError } from "@/services/reminder/reminder.types";
@@ -49,35 +50,6 @@ export class ReminderService {
     this.repository = new ReminderRepository();
     this.whatsappService = new WhatsAppService();
     this.templateService = new ReminderTemplatesService();
-  }
-
-  /**
-   * Replace template variables in message
-   */
-  private replaceTemplateVariables(
-    message: string,
-    patientName: string,
-    additionalVars?: Record<string, string>
-  ): string {
-    let processedMessage = message;
-
-    // Replace patient name
-    processedMessage = processedMessage.replace(/{nama}/g, patientName);
-
-    // Replace additional variables if provided
-    if (additionalVars) {
-      Object.keys(additionalVars).forEach((key) => {
-        const placeholder = `{${key}}`;
-        if (processedMessage.includes(placeholder)) {
-          processedMessage = processedMessage.replace(
-            new RegExp(placeholder, 'g'),
-            additionalVars[key] || ""
-          );
-        }
-      });
-    }
-
-    return processedMessage;
   }
 
   // CREATE operations
@@ -337,7 +309,7 @@ export class ReminderService {
     try {
       const reminderType = params.reminderType as ReminderType;
       // Replace template variables in the message first
-      const processedMessage = this.replaceTemplateVariables(params.message, params.patientName);
+      const processedMessage = replaceTemplateVariables(params.message, params.patientName);
       
       let formattedMessage = this.templateService.formatReminderMessage({
         patientName: params.patientName,
