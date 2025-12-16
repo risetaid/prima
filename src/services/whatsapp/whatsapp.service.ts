@@ -8,7 +8,7 @@ import {
 import { ValidatedContent } from "@/services/reminder/reminder.types";
 import { logger } from "@/lib/logger";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
-import { formatContentForWhatsApp } from "@/lib/content-formatting";
+import { formatContentForWhatsApp, ContentItem } from "@/lib/content-formatting";
 
 export class WhatsAppService {
   private readonly MAX_RETRY_ATTEMPTS = 3;
@@ -83,7 +83,7 @@ export class WhatsAppService {
   }
 
   buildMessage(baseMessage: string, attachments: ValidatedContent[]): string {
-    return formatContentForWhatsApp(baseMessage, attachments as any);
+    return formatContentForWhatsApp(baseMessage, attachments as unknown as ContentItem[]);
   }
 
   async send(toPhoneNumber: string, message: string) {
