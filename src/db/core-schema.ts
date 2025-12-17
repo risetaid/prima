@@ -50,17 +50,15 @@ export const users = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => ({
-    roleIdx: index("users_role_idx").on(table.role),
-    isActiveIdx: index("users_is_active_idx").on(table.isActive),
-    isApprovedIdx: index("users_is_approved_idx").on(table.isApproved),
-    clerkIdIdx: index("users_clerk_id_idx").on(table.clerkId),
-    deletedAtIdx: index("users_deleted_at_idx").on(table.deletedAt),
     // Self-reference foreign key for approvedBy
     approvedByFk: foreignKey({
       columns: [table.approvedBy],
       foreignColumns: [table.id],
       name: "users_approved_by_users_id_fk",
     }),
+    // Note: Removed redundant single-column indexes (role, isActive, isApproved, clerkId, deletedAt)
+    // clerkId and email already have unique constraints which create indexes automatically
+    // Other single-column indexes have low cardinality or are rarely queried alone
   })
 );
 
@@ -111,22 +109,16 @@ export const patients = pgTable(
     unsubscribeMethod: text("unsubscribe_method").$type<"manual" | "llm_analysis" | "keyword_detection" | "api">(),
   },
   (table) => ({
-    isActiveIdx: index("patients_is_active_idx").on(table.isActive),
-    assignedVolunteerIdx: index("patients_assigned_volunteer_idx").on(
-      table.assignedVolunteerId
-    ),
-    phoneNumberIdx: index("patients_phone_number_idx").on(table.phoneNumber),
-    createdAtIdx: index("patients_created_at_idx").on(table.createdAt),
-    verificationStatusIdx: index("patients_verification_status_idx").on(
-      table.verificationStatus
-    ),
-    deletedAtIdx: index("patients_deleted_at_idx").on(table.deletedAt),
     // Foreign key to users
     assignedVolunteerFk: foreignKey({
       columns: [table.assignedVolunteerId],
       foreignColumns: [users.id],
       name: "patients_assigned_volunteer_id_users_id_fk",
     }),
+    // Note: Removed redundant single-column indexes
+    // isActive, deletedAt, createdAt are low-cardinality or rarely queried alone
+    // phoneNumber is queried but not frequently enough to warrant standalone index
+    // assignedVolunteerId and verificationStatus can be added back if profiling shows need
   })
 );
 
@@ -147,22 +139,15 @@ export const medicalRecords = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    patientIdIdx: index("medical_records_patient_id_idx").on(table.patientId),
-    recordTypeIdx: index("medical_records_record_type_idx").on(
-      table.recordType
-    ),
-    recordedDateIdx: index("medical_records_recorded_date_idx").on(
-      table.recordedDate
-    ),
-    recordedByIdx: index("medical_records_recorded_by_idx").on(
-      table.recordedBy
-    ),
     // Foreign key to users
     recordedByFk: foreignKey({
       columns: [table.recordedBy],
       foreignColumns: [users.id],
       name: "medical_records_recorded_by_users_id_fk",
     }),
+    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
+    // Removed all indexes: patientId, recordType, recordedDate, recordedBy
+    // patientId already has foreign key reference which may be used for lookups
   })
 );
 

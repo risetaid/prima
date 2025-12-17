@@ -4,8 +4,8 @@ import { pgEnum } from "drizzle-orm/pg-core";
 // User Management
 export const userRoleEnum = pgEnum("user_role", [
   "ADMIN",
-  "DEVELOPER",
   "RELAWAN",
+  "DEVELOPER",
 ]);
 
 // Patient Management

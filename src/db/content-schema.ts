@@ -45,14 +45,10 @@ export const cmsArticles = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
   (table) => ({
-    slugIdx: index("cms_articles_slug_idx").on(table.slug),
-    statusIdx: index("cms_articles_status_idx").on(table.status),
-    categoryIdx: index("cms_articles_category_idx").on(table.category),
-    publishedAtIdx: index("cms_articles_published_at_idx").on(
-      table.publishedAt
-    ),
-    createdByIdx: index("cms_articles_created_by_idx").on(table.createdBy),
-    deletedAtIdx: index("cms_articles_deleted_at_idx").on(table.deletedAt),
+    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
+    // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
+    // slug already has unique constraint which creates an index automatically
+    // Other indexes should be added based on actual query patterns when table has data
   })
 );
 
@@ -82,12 +78,10 @@ export const cmsVideos = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
   (table) => ({
-    slugIdx: index("cms_videos_slug_idx").on(table.slug),
-    statusIdx: index("cms_videos_status_idx").on(table.status),
-    categoryIdx: index("cms_videos_category_idx").on(table.category),
-    publishedAtIdx: index("cms_videos_published_at_idx").on(table.publishedAt),
-    createdByIdx: index("cms_videos_created_by_idx").on(table.createdBy),
-    deletedAtIdx: index("cms_videos_deleted_at_idx").on(table.deletedAt),
+    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
+    // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
+    // slug already has unique constraint which creates an index automatically
+    // Other indexes should be added based on actual query patterns when table has data
   })
 );
 
@@ -101,9 +95,11 @@ export const rateLimits = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    rateLimitKeyIdx: index('rate_limits_rate_limit_key_idx').on(table.rateLimitKey),
-    createdAtIdx: index('rate_limits_created_at_idx').on(table.createdAt),
+    // Composite index for key cleanup queries (most common pattern)
     rateLimitKeyCreatedAtIdx: index('rate_limits_key_created_at_idx').on(table.rateLimitKey, table.createdAt),
+    // Note: Removed 2 redundant single-column indexes (rateLimitKey, createdAt)
+    // Both are covered by the composite index above
+    // Table is also currently empty (0 rows)
   })
 );
 

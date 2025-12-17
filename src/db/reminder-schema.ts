@@ -55,7 +55,8 @@ export const reminders = pgTable(
     // Delivery tracking
     sentAt: timestamp("sent_at", { withTimezone: true }),
     status: reminderStatusEnum("status").notNull().default("PENDING"),
-    wahaMessageId: text("waha_message_id"),
+    wahaMessageId: text("waha_message_id"), // Legacy column name - actually stores GOWA message IDs
+    fonnteLegacyMessageId: text("fonnte_message_id"), // Legacy: old WhatsApp provider before GOWA
     // Confirmation tracking
     confirmationStatus: confirmationStatusEnum("confirmation_status").default("PENDING"),
     confirmationSentAt: timestamp("confirmation_sent_at", { withTimezone: true }),
@@ -69,28 +70,21 @@ export const reminders = pgTable(
     metadata: jsonb("metadata"),
   },
   (table) => ({
-    patientIdIdx: index("reminders_patient_id_idx").on(table.patientId),
-    isActiveIdx: index("reminders_is_active_idx").on(table.isActive),
-    statusIdx: index("reminders_status_idx").on(table.status),
-    reminderTypeIdx: index("reminders_type_idx").on(table.reminderType),
-    startDateIdx: index("reminders_start_date_idx").on(table.startDate),
-    sentAtIdx: index("reminders_sent_at_idx").on(table.sentAt),
-    confirmationStatusIdx: index("reminders_confirmation_status_idx").on(table.confirmationStatus),
-    deletedAtIdx: index("reminders_deleted_at_idx").on(table.deletedAt),
-    priorityIdx: index("reminders_priority_idx").on(table.priority),
     // Composite indexes for common queries
     patientActiveIdx: index("reminders_patient_active_idx").on(table.patientId, table.isActive),
     patientStatusIdx: index("reminders_patient_status_idx").on(table.patientId, table.status),
     todayRemindersIdx: index("reminders_today_idx").on(table.startDate, table.isActive, table.scheduledTime),
-    typeStatusIdx: index("reminders_type_status_idx").on(table.reminderType, table.status),
     patientTypeIdx: index("reminders_patient_type_idx").on(table.patientId, table.reminderType),
-    activeTypeIdx: index("reminders_active_type_idx").on(table.isActive, table.reminderType),
     // Foreign key to users
     createdByIdFk: foreignKey({
       columns: [table.createdById],
       foreignColumns: [users.id],
       name: "reminders_created_by_id_users_id_fk",
     }),
+    // Note: Removed 9 redundant single-column indexes (patientId, isActive, status, reminderType,
+    // startDate, sentAt, confirmationStatus, deletedAt, priority)
+    // These are covered by composite indexes or have low cardinality
+    // Also removed typeStatusIdx and activeTypeIdx composites (not commonly used)
   })
 );
 
@@ -117,15 +111,8 @@ export const manualConfirmations = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    patientIdIdx: index("manual_confirmations_patient_id_idx").on(table.patientId),
-    volunteerIdIdx: index("manual_confirmations_volunteer_id_idx").on(table.volunteerId),
-    reminderIdIdx: index("manual_confirmations_reminder_id_idx").on(table.reminderId),
-    reminderTypeIdx: index("manual_confirmations_reminder_type_idx").on(table.reminderType),
-    confirmationTypeIdx: index("manual_confirmations_confirmation_type_idx").on(table.confirmationType),
-    visitDateIdx: index("manual_confirmations_visit_date_idx").on(table.visitDate),
-    confirmedAtIdx: index("manual_confirmations_confirmed_at_idx").on(table.confirmedAt),
+    // Composite index for common queries
     patientVolunteerIdx: index("manual_confirmations_patient_volunteer_idx").on(table.patientId, table.volunteerId),
-    reminderConfirmationIdx: index("manual_confirmations_reminder_confirmation_idx").on(table.reminderType, table.confirmationType),
     // Foreign keys
     patientIdFk: foreignKey({
       columns: [table.patientId],
@@ -142,6 +129,11 @@ export const manualConfirmations = pgTable(
       foreignColumns: [reminders.id],
       name: "manual_confirmations_reminder_id_reminders_id_fk",
     }),
+    // Note: Removed 7 redundant single-column indexes (patientId, volunteerId, reminderId,
+    // reminderType, confirmationType, visitDate, confirmedAt)
+    // patientId and volunteerId covered by composite index
+    // Other indexes rarely queried independently
+    // Also removed reminderConfirmationIdx composite (low usage)
   })
 );
 
@@ -160,12 +152,12 @@ export const reminderLogs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    reminderIdIdx: index("reminder_logs_reminder_id_idx").on(table.reminderId),
-    patientIdIdx: index("reminder_logs_patient_id_idx").on(table.patientId),
-    actionIdx: index("reminder_logs_action_idx").on(table.action),
-    timestampIdx: index("reminder_logs_timestamp_idx").on(table.timestamp),
+    // Composite indexes for analytics queries
     reminderActionIdx: index("reminder_logs_reminder_action_idx").on(table.reminderId, table.action),
     patientTimestampIdx: index("reminder_logs_patient_timestamp_idx").on(table.patientId, table.timestamp),
+    // Note: Removed 4 redundant single-column indexes (reminderId, patientId, action, timestamp)
+    // These are all covered by the composite indexes above
+    // Table is also currently empty (0 rows)
   })
 );
 
@@ -188,16 +180,15 @@ export const whatsappTemplates = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => ({
-    categoryIdx: index("whatsapp_templates_category_idx").on(table.category),
-    isActiveIdx: index("whatsapp_templates_is_active_idx").on(table.isActive),
-    createdByIdx: index("whatsapp_templates_created_by_idx").on(table.createdBy),
-    deletedAtIdx: index("whatsapp_templates_deleted_at_idx").on(table.deletedAt),
     // Foreign key to users
     createdByFk: foreignKey({
       columns: [table.createdBy],
       foreignColumns: [users.id],
       name: "whatsapp_templates_created_by_users_id_fk",
     }),
+    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
+    // Removed 4 single-column indexes: category, isActive, createdBy, deletedAt
+    // templateName already has unique constraint which creates an index automatically
   })
 );
 
@@ -231,9 +222,7 @@ export const conversationStates = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
   (table) => ({
-    patientIdIdx: index("conversation_states_patient_id_idx").on(table.patientId),
-    deletedAtIdx: index("conversation_states_deleted_at_idx").on(table.deletedAt),
-    // NEW: Composite index for active conversation lookup (Phase 3 optimization)
+    // Composite index for active conversation lookup (Phase 3 optimization)
     // Query pattern: "Get active conversations for patient that haven't expired"
     patientActiveExpiresIdx: index("conversation_states_patient_active_expires_idx")
       .on(table.patientId, table.isActive, table.expiresAt),
@@ -243,6 +232,9 @@ export const conversationStates = pgTable(
       foreignColumns: [patients.id],
       name: "conversation_states_patient_id_patients_id_fk",
     }),
+    // Note: Removed 2 redundant single-column indexes (patientId, deletedAt)
+    // patientId is covered by composite index patientActiveExpiresIdx
+    // deletedAt is rarely queried independently
   })
 );
 
@@ -268,8 +260,7 @@ export const conversationMessages = pgTable(
       .defaultNow(),
   },
   (table) => ({
-    conversationStateIdIdx: index("conversation_messages_conversation_state_id_idx").on(table.conversationStateId),
-    // NEW: Composite index for message history retrieval (Phase 3 optimization)
+    // Composite index for message history retrieval (Phase 3 optimization)
     // Query pattern: "Get all messages for conversation ordered by time"
     stateCreatedIdx: index("conversation_messages_state_created_idx")
       .on(table.conversationStateId, table.createdAt),
@@ -278,6 +269,8 @@ export const conversationMessages = pgTable(
       foreignColumns: [conversationStates.id],
       name: "conversation_messages_conversation_state_id_conversation_states_id_fk",
     }),
+    // Note: Removed redundant single-column index on conversationStateId
+    // It's covered by the composite index stateCreatedIdx
   })
 );
 

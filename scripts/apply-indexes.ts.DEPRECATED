@@ -1,4 +1,38 @@
 /**
+ * ⚠️ DEPRECATED - DO NOT USE
+ *
+ * This script is deprecated as of 2025-12-17.
+ *
+ * REASON: Creates duplicate indexes that overlap with schema-defined indexes.
+ *         This script was responsible for creating 60+ redundant indexes across
+ *         multiple tables, contributing to index bloat and degraded write performance.
+ *
+ * ROOT CAUSE: Index definitions should exist in ONE place only (schema files).
+ *             Having indexes defined in schemas, migrations, AND scripts creates
+ *             triple-layer duplication.
+ *
+ * ALTERNATIVE: Define indexes in schema files (frontend/src/db/*.ts) only.
+ *              Let Drizzle migrations handle index creation automatically via:
+ *              1. Edit schema file (add index definition)
+ *              2. Run: bunx drizzle-kit generate
+ *              3. Review generated SQL migration
+ *              4. Run: bunx drizzle-kit push
+ *
+ * If you need custom indexes not in the schema, create a targeted migration:
+ *   bunx drizzle-kit generate
+ *   # Edit the generated migration file to add your custom indexes
+ *   bunx drizzle-kit push
+ *
+ * For index optimization and cleanup, use:
+ *   bun run db:optimize-indexes
+ *
+ * For index health monitoring, use:
+ *   bun run db:monitor-indexes
+ *
+ * See INDEX_MANAGEMENT_STRATEGY.md for complete prevention strategy.
+ *
+ * ---
+ * Original description:
  * Apply Database Indexes for Performance Optimization
  * This script adds missing indexes to improve query performance
  */

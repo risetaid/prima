@@ -25,6 +25,8 @@ bun run db:migrate            # Run migrations
 bun run db:studio             # Open Drizzle Studio (DB GUI)
 bun run nuke-recreate-db      # Nuke and recreate database (local only)
 bun run setup-first-user      # Setup first user after DB reset
+bun run db:optimize-indexes   # Clean up redundant/unused indexes
+bun run db:monitor-indexes    # Check index health (monthly maintenance)
 ```
 
 ### Production
@@ -136,6 +138,70 @@ bun run start-message-worker  # Start WhatsApp message worker
 3. Review generated SQL in `drizzle/migrations/`
 4. Run `bunx drizzle-kit push` to apply changes
 5. Update any affected services/queries
+
+### Database Index Management
+
+**CRITICAL: Single Source of Truth for Indexes**
+
+All database indexes MUST be defined in schema files (`src/db/*.ts`) ONLY. Never create indexes in:
+- ❌ Separate scripts (like `apply-indexes.ts`)
+- ❌ Manual migrations (unless temporary/one-off)
+- ❌ Direct SQL execution
+
+**When to Add an Index:**
+
+Add indexes ONLY when:
+- ✅ Query logs show slow queries filtering/sorting by specific columns
+- ✅ You have profiling data proving the index improves performance
+- ✅ The table has significant data (>1000 rows)
+- ✅ The column(s) have high cardinality (many unique values)
+
+Do NOT add indexes when:
+- ❌ "It might be useful someday" (YAGNI principle)
+- ❌ The table is empty or has <100 rows
+- ❌ The column is a boolean flag (low cardinality)
+- ❌ An existing composite index already covers the column as the first column
+
+**Index Strategy Rules:**
+
+1. **Composite Index Coverage**: PostgreSQL can use a composite index `(col1, col2, col3)` for queries on:
+   - ✅ `col1` only
+   - ✅ `col1, col2`
+   - ✅ `col1, col2, col3`
+   - ❌ `col2` only (cannot use index)
+   - ❌ `col3` only (cannot use index)
+
+   **Rule**: If you have a composite index, DON'T create a separate single-column index on the first column.
+
+2. **Unique Constraints**: Unique constraints automatically create indexes. Don't create separate indexes for unique columns.
+
+3. **Foreign Keys**: Don't automatically index every foreign key. Only add if:
+   - You frequently query by that foreign key
+   - Query logs show slow lookups
+   - The table has >1000 rows
+
+4. **Partial Indexes**: Use partial indexes (with WHERE clauses) for frequently queried subsets:
+   ```typescript
+   // Good - Only indexes active, non-deleted records
+   activeIdx: index("table_active_idx")
+     .on(table.id)
+     .where(sql`is_active = true AND deleted_at IS NULL`)
+   ```
+
+5. **Index Naming Convention**: `{table}_{columns}_{type}_idx`
+   - Example: `reminders_patient_active_idx`, `users_email_partial_idx`
+
+**Index Maintenance:**
+
+```bash
+# Monthly: Check for unused indexes
+bun run db:monitor-indexes
+
+# Quarterly: Clean up redundant indexes
+bun run db:optimize-indexes
+```
+
+**See Also**: `INDEX_MANAGEMENT_STRATEGY.md` for complete prevention strategy.
 
 ### Adding API Routes
 
