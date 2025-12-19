@@ -18,7 +18,8 @@
       "Bash(bun test:*)",
       "Bash(git cherry-pick:*)",
       "Bash(git grep:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(rm:*)"
     ]
   }
 }
