@@ -32,7 +32,7 @@ describe('WhatsApp Retry Logic', () => {
           success = true;
           break;
         }
-      } catch (error) {
+      } catch {
         if (attempt < maxRetries - 1) {
           await new Promise(r => setTimeout(r, baseDelay * Math.pow(2, attempt)));
           continue;
@@ -55,7 +55,6 @@ describe('WhatsApp Retry Logic', () => {
       });
     });
 
-    const maxRetries = 3;
     let shouldRetry = false;
 
     try {

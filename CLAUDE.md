@@ -4,47 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRIMA (Patient Reminder and Information Management Application) is a healthcare platform for patient management, reminders, and educational content with WhatsApp integration. Built with Next.js 15 (App Router), Bun runtime, Drizzle ORM, Clerk authentication, and GOWA (go-whatsapp-web-multidevice) for WhatsApp messaging.
+PRIMA (Patient Reminder and Information Management Application) is a healthcare platform for patient management, reminders, and educational content with WhatsApp integration. Built with Next.js 15 (App Router), pnpm runtime, Drizzle ORM, Clerk authentication, and GOWA (go-whatsapp-web-multidevice) for WhatsApp messaging.
 
 ## Essential Commands
 
 ### Development
+
 ```bash
-bun install                    # Install dependencies (Bun required, not npm/yarn)
-bun dev                        # Start dev server with Turbopack
-bun run lint                   # Run ESLint
-bunx tsc --noEmit             # Type check without emitting files
-bun run precommit             # Run lint + typecheck (use before committing)
+pnpm install                    # Install dependencies (pnpm required, not npm/yarn)
+pnpm dev                        # Start dev server with Turbopack
+pnpm run lint                   # Run ESLint
+pnpx tsc --noEmit             # Type check without emitting files
+pnpm run precommit             # Run lint + typecheck (use before committing)
 ```
 
 ### Database
+
 ```bash
-bunx drizzle-kit generate     # Generate migration from schema changes
-bunx drizzle-kit push         # Push schema changes to database
-bun run db:migrate            # Run migrations
-bun run db:studio             # Open Drizzle Studio (DB GUI)
-bun run nuke-recreate-db      # Nuke and recreate database (local only)
-bun run setup-first-user      # Setup first user after DB reset
-bun run db:optimize-indexes   # Clean up redundant/unused indexes
-bun run db:monitor-indexes    # Check index health (monthly maintenance)
+pnpx drizzle-kit generate     # Generate migration from schema changes
+pnpx drizzle-kit push         # Push schema changes to database
+pnpm run db:migrate            # Run migrations
+pnpm run db:studio             # Open Drizzle Studio (DB GUI)
+pnpm run nuke-recreate-db      # Nuke and recreate database (local only)
+pnpm run setup-first-user      # Setup first user after DB reset
+pnpm run db:optimize-indexes   # Clean up redundant/unused indexes
+pnpm run db:monitor-indexes    # Check index health (monthly maintenance)
 ```
 
 ### Production
+
 ```bash
-bun build                     # Build for production
-bun start                     # Start production server
-bun run build:analyze         # Build with bundle analysis
+pnpm build                     # Build for production
+pnpm start                     # Start production server
+pnpm run build:analyze         # Build with bundle analysis
 ```
 
 ### Testing
+
 ```bash
-bun test                      # Run Vitest unit tests
-bun run test:comprehensive    # Run full comprehensive test suite (~8 min)
+pnpm test                      # Run Vitest unit tests
+pnpm run test:comprehensive    # Run full comprehensive test suite (~8 min)
 ```
 
 ### Background Workers
+
 ```bash
-bun run start-message-worker  # Start WhatsApp message worker
+pnpm run start-message-worker  # Start WhatsApp message worker
 ```
 
 ## Architecture Overview
@@ -52,12 +57,14 @@ bun run start-message-worker  # Start WhatsApp message worker
 ### Layered Architecture
 
 **API Layer** (`src/app/api/*`)
+
 - Thin controllers that validate input and delegate to services
 - Use Zod schemas from `src/lib/api-schemas.ts` for validation
 - Return responses via `src/lib/error-handler.ts` helpers
 - Protected routes defined in `src/middleware.ts` (Clerk auth)
 
 **Service Layer** (`src/services/*`)
+
 - Business logic organized by domain:
   - `ai/` - Anthropic/Claude AI integration
   - `patient/` - Patient management and lookup
@@ -67,6 +74,7 @@ bun run start-message-worker  # Start WhatsApp message worker
 - Services are stateless and use dependency injection patterns
 
 **Data Layer** (`src/db/*`)
+
 - Drizzle ORM schemas split by domain:
   - `core-schema.ts` - Users, patients, medical records
   - `reminder-schema.ts` - Reminders, confirmations, templates
@@ -75,6 +83,7 @@ bun run start-message-worker  # Start WhatsApp message worker
 - All database access goes through Drizzle queries (type-safe)
 
 **Utilities** (`src/lib/*`)
+
 - Reusable helpers for validation, error handling, caching, rate limiting
 - Key utilities:
   - `api-schemas.ts` - Zod validation schemas
@@ -85,16 +94,45 @@ bun run start-message-worker  # Start WhatsApp message worker
   - `logger.ts` - Structured logging
   - `content-formatting.ts` - WhatsApp content formatting utilities
   - `template-utils.ts` - Template variable replacement utilities
+  - `phi-mask.ts` - HIPAA-compliant PHI masking for logs
+  - `circuit-breaker.ts` - Circuit breaker pattern for external services
+  - `sliding-window-rate-limiter.ts` - Distributed rate limiting with Redis
+  - `metrics.ts` - Prometheus-compatible metrics collection
+  - `api-versioning.ts` - API versioning headers and helpers
+  - `dataloader.ts` - Batch loading to prevent N+1 queries
+
+### New Infrastructure (Phase 1)
+
+**Audit Logging** (`src/db/audit-schema.ts`, `src/services/audit/`)
+
+- HIPAA-compliant audit logs for patient data access tracking
+- Uses `sanitizeForAudit()` to remove PHI before logging
+- Partitioned by created_at month for retention management
+
+**BullMQ Job Queue** (`src/jobs/`)
+
+- `reminder-queue.ts` - Queue configuration with reliability settings
+- `workers/reminder.worker.ts` - Worker for processing reminder jobs
+- `producers/reminder.producer.ts` - Producer for creating reminder jobs
+- Automatic deduplication, retry with exponential backoff, DLQ support
+
+**Health Checks** (`src/app/api/health/ready/route.ts`)
+
+- Parallel health checks with 2s timeout per check
+- Checks: database, Redis, GOWA, Anthropic, MinIO
+- Overall 3s timeout for entire response
 
 ### Key Integration Points
 
 **Authentication (Clerk)**
+
 - Routes protected via `src/middleware.ts`
 - Webhook handler at `src/app/api/webhooks/clerk/route.ts`
 - User sync between Clerk and local DB
 - Internal API key bypass: `X-API-Key` header with `INTERNAL_API_KEY`
 
 **WhatsApp (GOWA - go-whatsapp-web-multidevice)**
+
 - Provider: GOWA (go-whatsapp-web-multidevice)
 - Webhook receiver: `src/app/api/webhooks/gowa/route.ts`
 - Message sender: `src/lib/gowa.ts`
@@ -104,19 +142,23 @@ bun run start-message-worker  # Start WhatsApp message worker
 - Webhook validation: HMAC SHA256 signature verification
 
 **Database (PostgreSQL via Drizzle)**
+
 - Connection: `src/db/index.ts`
-- Schema changes: Edit `src/db/*.ts` → `bunx drizzle-kit generate` → review SQL → `bunx drizzle-kit push`
+- Schema changes: Edit `src/db/*.ts` → `pnpx drizzle-kit generate` → review SQL → `pnpx drizzle-kit push`
 - Migrations stored in `drizzle/migrations/`
 
 **AI (Anthropic Claude)**
+
 - Service layer: `src/services/ai/*`
 - Used for intelligent message responses and content generation
 
 **File Storage (MinIO)**
+
 - S3-compatible object storage
 - Configuration via `MINIO_*` environment variables
 
 **Caching & Rate Limiting (Redis)**
+
 - Connection: `src/lib/redis.ts`
 - Rate limiter: `src/lib/rate-limiter.ts`
 - Response cache: `src/lib/response-cache.ts`
@@ -128,15 +170,15 @@ bun run start-message-worker  # Start WhatsApp message worker
 1. **Read existing code first** - Never propose changes without reading the file
 2. **Validate inputs** - Use Zod schemas from `src/lib/api-schemas.ts`
 3. **Keep controllers thin** - Business logic belongs in `src/services/*`
-4. **Type safety** - Run `bunx tsc --noEmit` before committing
+4. **Type safety** - Run `pnpx tsc --noEmit` before committing
 5. **Test your changes** - Add unit tests in `tests/` if applicable
 
 ### Database Schema Changes
 
 1. Edit schema files in `src/db/` (core-schema, reminder-schema, or content-schema)
-2. Run `bunx drizzle-kit generate` to create migration SQL
+2. Run `pnpx drizzle-kit generate` to create migration SQL
 3. Review generated SQL in `drizzle/migrations/`
-4. Run `bunx drizzle-kit push` to apply changes
+4. Run `pnpx drizzle-kit push` to apply changes
 5. Update any affected services/queries
 
 ### Database Index Management
@@ -144,6 +186,7 @@ bun run start-message-worker  # Start WhatsApp message worker
 **CRITICAL: Single Source of Truth for Indexes**
 
 All database indexes MUST be defined in schema files (`src/db/*.ts`) ONLY. Never create indexes in:
+
 - ❌ Separate scripts (like `apply-indexes.ts`)
 - ❌ Manual migrations (unless temporary/one-off)
 - ❌ Direct SQL execution
@@ -151,12 +194,14 @@ All database indexes MUST be defined in schema files (`src/db/*.ts`) ONLY. Never
 **When to Add an Index:**
 
 Add indexes ONLY when:
+
 - ✅ Query logs show slow queries filtering/sorting by specific columns
 - ✅ You have profiling data proving the index improves performance
 - ✅ The table has significant data (>1000 rows)
 - ✅ The column(s) have high cardinality (many unique values)
 
 Do NOT add indexes when:
+
 - ❌ "It might be useful someday" (YAGNI principle)
 - ❌ The table is empty or has <100 rows
 - ❌ The column is a boolean flag (low cardinality)
@@ -165,6 +210,7 @@ Do NOT add indexes when:
 **Index Strategy Rules:**
 
 1. **Composite Index Coverage**: PostgreSQL can use a composite index `(col1, col2, col3)` for queries on:
+
    - ✅ `col1` only
    - ✅ `col1, col2`
    - ✅ `col1, col2, col3`
@@ -176,16 +222,18 @@ Do NOT add indexes when:
 2. **Unique Constraints**: Unique constraints automatically create indexes. Don't create separate indexes for unique columns.
 
 3. **Foreign Keys**: Don't automatically index every foreign key. Only add if:
+
    - You frequently query by that foreign key
    - Query logs show slow lookups
    - The table has >1000 rows
 
 4. **Partial Indexes**: Use partial indexes (with WHERE clauses) for frequently queried subsets:
+
    ```typescript
    // Good - Only indexes active, non-deleted records
    activeIdx: index("table_active_idx")
      .on(table.id)
-     .where(sql`is_active = true AND deleted_at IS NULL`)
+     .where(sql`is_active = true AND deleted_at IS NULL`);
    ```
 
 5. **Index Naming Convention**: `{table}_{columns}_{type}_idx`
@@ -195,10 +243,10 @@ Do NOT add indexes when:
 
 ```bash
 # Monthly: Check for unused indexes
-bun run db:monitor-indexes
+pnpm run db:monitor-indexes
 
 # Quarterly: Clean up redundant indexes
-bun run db:optimize-indexes
+pnpm run db:optimize-indexes
 ```
 
 **See Also**: `INDEX_MANAGEMENT_STRATEGY.md` for complete prevention strategy.
@@ -214,6 +262,7 @@ bun run db:optimize-indexes
 ### WhatsApp Integration (GOWA)
 
 **Current Implementation (GOWA):**
+
 - Incoming messages: `src/app/api/webhooks/gowa/route.ts`
 - Outgoing messages: Use `sendWhatsAppMessage()` from `src/lib/gowa.ts`
 - Typing indicators: Use `withTypingIndicator()` wrapper or `sendChatPresence()` from `src/lib/gowa.ts`
@@ -223,7 +272,6 @@ bun run db:optimize-indexes
 - Always check for duplicate events using `isDuplicateEvent()` from `src/lib/idempotency.ts`
 - Conversation state managed via `SimpleConfirmationService` and `ConversationStateService`
 - Message acknowledgments (delivered/read) handled automatically in webhook
-
 
 ## Important Conventions
 
@@ -237,7 +285,8 @@ This codebase follows **YAGNI** (You Aren't Gonna Need It), **DRY** (Don't Repea
 - **Document complexity**: When complexity is justified (retry logic, idempotency), document decisions in ADRs (see `docs/architecture/adr/`)
 
 ### Code Style
-- **Bun only** - Never use npm or yarn commands
+
+- **pnpm only** - Never use npm or yarn commands
 - **TypeScript strict mode** - All code must type-check
 - **Explicit return types** - For exported functions in services
 - **Prefer `unknown` over `any`** - Use Zod for runtime validation at boundaries
@@ -245,11 +294,13 @@ This codebase follows **YAGNI** (You Aren't Gonna Need It), **DRY** (Don't Repea
 - **Extract duplicated code** - If you see the same logic in multiple places, extract it to a shared utility
 
 ### Error Handling
+
 - Services throw typed errors
 - API routes catch and format via `src/lib/error-handler.ts`
 - Use `createApiHandler()` wrapper for consistent error responses
 
 ### Security
+
 - Never commit credentials (use `.env.local`)
 - Validate all user inputs with Zod
 - Check for SQL injection, XSS, command injection
@@ -257,6 +308,7 @@ This codebase follows **YAGNI** (You Aren't Gonna Need It), **DRY** (Don't Repea
 - Use idempotency for webhooks
 
 ### Git Commits
+
 - Follow [Conventional Commits](https://www.conventionalcommits.org/)
 - Format: `<type>(scope): <description>`
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`
@@ -265,6 +317,7 @@ This codebase follows **YAGNI** (You Aren't Gonna Need It), **DRY** (Don't Repea
 ## Environment Variables
 
 Required variables (see `.env.local`):
+
 - `DATABASE_URL` - PostgreSQL connection string
 - `CLERK_SECRET_KEY` - Clerk authentication
 - `CLERK_PUBLISHABLE_KEY` - Clerk public key
@@ -279,13 +332,14 @@ Required variables (see `.env.local`):
 - `INTERNAL_API_KEY` - Internal API key for service-to-service calls
 
 Optional feature flags (simple env vars):
+
 - `FEATURE_FLAG_PERF_WHATSAPP_RETRY` - Enable WhatsApp retry logic with exponential backoff (default: true)
 - `FEATURE_FLAG_SECURITY_ATOMIC_IDEMPOTENCY` - Enable atomic idempotency checking (default: true)
-
 
 ## Common Patterns
 
 ### API Route Structure
+
 ```typescript
 // src/app/api/[domain]/route.ts
 import { createApiHandler } from "@/lib/api-helpers";
@@ -301,6 +355,7 @@ export const POST = createApiHandler(async (req) => {
 ```
 
 ### Service Pattern
+
 ```typescript
 // src/services/my-domain/my-service.ts
 export class MyService {
@@ -313,6 +368,7 @@ export class MyService {
 ```
 
 ### Database Query Pattern
+
 ```typescript
 import { db } from "@/db";
 import { patients } from "@/db/schema";
@@ -320,7 +376,7 @@ import { eq } from "drizzle-orm";
 
 const patient = await db.query.patients.findFirst({
   where: eq(patients.id, patientId),
-  with: { reminders: true }
+  with: { reminders: true },
 });
 ```
 
@@ -337,7 +393,7 @@ const patient = await db.query.patients.findFirst({
 
 - Unit tests use Vitest framework
 - Test files located in `tests/` directory
-- Run tests with `bun test`
+- Run tests with `pnpm test`
 - Mock external services (GOWA, Clerk, Anthropic) in tests
 
 ## Additional Documentation

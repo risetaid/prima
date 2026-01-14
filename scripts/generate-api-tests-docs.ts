@@ -302,7 +302,7 @@ const doc = new Document({
         }),
         new UnorderedList({
           items: [
-            new ListItem({ text: "Node.js/Bun runtime" }),
+            new ListItem({ text: "Node.js/pnpm runtime" }),
             new ListItem({ text: "PostgreSQL database (Neon recommended)" }),
             new ListItem({ text: "Clerk authentication" }),
             new ListItem({ text: "Fonnte WhatsApp integration" }),
@@ -364,20 +364,20 @@ const doc = new Document({
           spacing: { before: 200, after: 100 },
         }),
         new Paragraph({ text: "Run all tests:", spacing: { after: 50 } }),
-        new Paragraph({ text: "  bun test --run", spacing: { after: 200 } }),
+        new Paragraph({ text: "  pnpm test --run", spacing: { after: 200 } }),
         new Paragraph({
           text: "Run with coverage report:",
           spacing: { after: 50 },
         }),
         new Paragraph({
-          text: "  bun test --run --coverage",
+          text: "  pnpm test --run --coverage",
           spacing: { after: 200 },
         }),
         new Paragraph({
           text: "Watch mode (auto-run on changes):",
           spacing: { after: 50 },
         }),
-        new Paragraph({ text: "  bun test", spacing: { after: 200 } }),
+        new Paragraph({ text: "  pnpm test", spacing: { after: 200 } }),
 
         new PageBreak(),
 
@@ -671,14 +671,14 @@ const doc = new Document({
           text: "1. Install dependencies:",
           spacing: { after: 50 },
         }),
-        new Paragraph({ text: "   bun install", spacing: { after: 100 } }),
+        new Paragraph({ text: "   pnpm install", spacing: { after: 100 } }),
         new Paragraph({
           text: "2. Run tests in watch mode:",
           spacing: { after: 50 },
         }),
-        new Paragraph({ text: "   bun test", spacing: { after: 100 } }),
+        new Paragraph({ text: "   pnpm test", spacing: { after: 100 } }),
         new Paragraph({ text: "3. Open Vitest UI:", spacing: { after: 50 } }),
-        new Paragraph({ text: "   bun test --ui", spacing: { after: 200 } }),
+        new Paragraph({ text: "   pnpm test --ui", spacing: { after: 200 } }),
 
         new Heading({
           level: 3,
@@ -690,7 +690,7 @@ const doc = new Document({
           spacing: { after: 50 },
         }),
         new Paragraph({
-          text: "   bun test --run --coverage",
+          text: "   pnpm test --run --coverage",
           spacing: { after: 100 },
         }),
         new Paragraph({
@@ -883,7 +883,7 @@ const doc = new Document({
             new ListItem({
               text: "Cause: Missing node_modules or outdated dependencies",
             }),
-            new ListItem({ text: "Solution: Run bun install" }),
+            new ListItem({ text: "Solution: Run pnpm install" }),
           ],
         }),
 
@@ -934,7 +934,7 @@ const doc = new Document({
             }),
             new ListItem({ text: "3. Use descriptive test names" }),
             new ListItem({ text: "4. Mock external dependencies" }),
-            new ListItem({ text: "5. Run tests locally: bun test" }),
+            new ListItem({ text: "5. Run tests locally: pnpm test" }),
             new ListItem({
               text: "6. Ensure new tests pass before committing",
             }),

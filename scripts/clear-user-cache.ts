@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Clear user session cache by Clerk ID
- * Usage: bun scripts/clear-user-cache.ts <clerk_id>
+ * Usage: pnpm scripts/clear-user-cache.ts <clerk_id>
  */
 
 import { del, CACHE_KEYS } from "../src/lib/cache";
@@ -9,7 +9,7 @@ import { del, CACHE_KEYS } from "../src/lib/cache";
 const clerkId = process.argv[2];
 
 if (!clerkId) {
-  console.error("Usage: bun scripts/clear-user-cache.ts <clerk_id>");
+  console.error("Usage: pnpm scripts/clear-user-cache.ts <clerk_id>");
   process.exit(1);
 }
 

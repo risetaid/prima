@@ -17,28 +17,28 @@ This file surfaces the essential knowledge an AI agent (or Copilot) needs to be 
 
 - Developer workflows & commands:
 
-  - Bun is required—use `bun` / `bunx` instead of npm/yarn.
+  - pnpm is required—use `bun` / `pnpx` instead of npm/yarn.
   - Common commands:
-    - `bun install`
-    - `bun dev` (local dev server with Turbopack)
-    - `bun build` / `bun start` (production)
-    - `bun run lint`; `bunx tsc --noEmit`
-    - `bun run test:comprehensive` (full comprehensive suite). Run specific categories with:
-      - `bun run test:auth`
-      - `bun run test:reminder`
-      - `bun run test:whatsapp`
-      - `bun run test:content`
-      - `bun run test:load`
-    - `bun run precommit` (lint + typecheck) — run before committing to ensure checks pass
-    - DB: `bunx drizzle-kit generate` → `bunx drizzle-kit push` / `bun run db:migrate`
-    - `bun run nuke-recreate-db` and `bun run setup-first-user` for local dumps
+    - `pnpm install`
+    - `pnpm dev` (local dev server with Turbopack)
+    - `pnpm build` / `pnpm start` (production)
+    - `pnpm run lint`; `pnpx tsc --noEmit`
+    - `pnpm run test:comprehensive` (full comprehensive suite). Run specific categories with:
+      - `pnpm run test:auth`
+      - `pnpm run test:reminder`
+      - `pnpm run test:whatsapp`
+      - `pnpm run test:content`
+      - `pnpm run test:load`
+    - `pnpm run precommit` (lint + typecheck) — run before committing to ensure checks pass
+    - DB: `pnpx drizzle-kit generate` → `pnpx drizzle-kit push` / `pnpm run db:migrate`
+    - `pnpm run nuke-recreate-db` and `pnpm run setup-first-user` for local dumps
 
 - Project-specific conventions to follow:
 
   - Thin controllers: keep API route handlers small — validate with Zod then call service functions.
   - Validation: Zod schemas reside under `src/lib` (find `api-schemas`); always validate inputs.
   - Error handling: Services throw typed errors; routes use `src/lib/error-handler` to format responses.
-  - DB Schema changes: update schema in `src/db`, run `bunx drizzle-kit generate`, review SQL in `drizzle/migrations/` and then `bunx drizzle-kit push`.
+  - DB Schema changes: update schema in `src/db`, run `pnpx drizzle-kit generate`, review SQL in `drizzle/migrations/` and then `pnpx drizzle-kit push`.
   - Tests: New code must include Vitest unit tests and (where applicable) add comprehensive integration tests via `tests/comprehensive-suite/`.
   - Auth: Clerk protects routes via `src/middleware.ts`. Check when adding routes that require authentication.
   - WhatsApp/WAHA: Webhook handling is in `src/app/api/webhooks/waha/route.ts`. Be careful with idempotency (`/lib/idempotency`), logging, and rate-limiting.
@@ -54,7 +54,7 @@ This file surfaces the essential knowledge an AI agent (or Copilot) needs to be 
 
 - When making code changes (practical checklist):
 
-  1. Run `bun run lint` and `bunx tsc --noEmit` (or simply `bun run precommit`) locally.
+  1. Run `pnpm run lint` and `pnpx tsc --noEmit` (or simply `pnpm run precommit`) locally.
   2. Add/modify Zod schema for API inputs under `src/lib`.
   3. Add service logic under `src/services/` (no business logic in controllers).
   4. Add/modify Drizzle schema in `src/db/`, generate a migration, and add SQL if needed.
@@ -94,8 +94,8 @@ This file surfaces the essential knowledge an AI agent (or Copilot) needs to be 
 - Safety & best practices:
 
   - Do NOT commit credentials; use `.env.local` for local dev.
-  - Respect type-safety and run `bunx tsc --noEmit` or `bun run precommit` before PRs.
-  - Always run `bun run precommit` before committing; it runs lint and type checks defined in `package.json` (helps prevent CI failures).
+  - Respect type-safety and run `pnpx tsc --noEmit` or `pnpm run precommit` before PRs.
+  - Always run `pnpm run precommit` before committing; it runs lint and type checks defined in `package.json` (helps prevent CI failures).
   - Do NOT write excessive documentation markdown files; keep docs in existing files or inline code comments only unless explicitly requested.
 
 - TypeScript DOs & DON'Ts (quick guide):
@@ -105,7 +105,7 @@ This file surfaces the essential knowledge an AI agent (or Copilot) needs to be 
   - DO: Prefer `unknown` + runtime `Zod` checks at API boundaries instead of `any`.
   - DON'T: Use `any` for public APIs or long-lived code paths (temporary `any` in tests/mocks is okay with a TODO).
   - DO: Use Drizzle's type-safe queries (`src/db/schema.ts`) instead of manual `any`-typed SQL payloads.
-  - DO: Run `bunx tsc --noEmit` (or `bun run precommit`) and resolve typing errors before creating PRs.
+  - DO: Run `pnpx tsc --noEmit` (or `pnpm run precommit`) and resolve typing errors before creating PRs.
 
 - Where to find more detail:
   - `README.md` (project setup & commands)

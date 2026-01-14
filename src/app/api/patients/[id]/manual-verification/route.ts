@@ -6,6 +6,7 @@ import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/gowa";
 import { invalidatePatientCache } from "@/lib/cache";
 
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 // Manual verification by volunteer
 export async function POST(
   request: NextRequest,
@@ -77,11 +78,11 @@ export async function POST(
       await sendConfirmationMessage(patient.phoneNumber, confirmationMessage);
     }
 
-    logger.info("Manual verification completed", {
+    logger.info("Manual verification completed", sanitizeForAudit({
       patientId,
       newStatus: status,
       processedBy: user.id,
-    });
+    }));
 
     return NextResponse.json({
       success: true,

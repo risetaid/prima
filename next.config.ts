@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
     tsconfigPath: "./tsconfig.json",
   },
 
+  // Enable response compression (gzip)
+  compress: true,
+
   // Permanent redirects for old /dashboard paths
   async redirects() {
     return [
@@ -185,10 +188,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // ESLint enabled during builds for code quality
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
 };
 
 export default withPWA({
@@ -196,4 +195,4 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
-})(nextConfig as any);
+})(nextConfig as object);

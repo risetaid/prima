@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * CLI Entry Point for Comprehensive Tests
- * Run: bun run tests/comprehensive-suite/index.ts
+ * Run: pnpm run tests/comprehensive-suite/index.ts
  */
 
 import { ComprehensiveTestRunner } from "./runner";
@@ -51,7 +51,7 @@ PRIMA Comprehensive Test Suite
 ===============================
 
 Usage:
-  bun run tests/comprehensive-suite/index.ts [options]
+  pnpm run tests/comprehensive-suite/index.ts [options]
 
 Options:
   (no args)                    Run all tests
@@ -72,12 +72,12 @@ Categories:
 
 Examples:
   # Test localhost
-  bun run tests/comprehensive-suite/index.ts
-  bun run tests/comprehensive-suite/index.ts --category auth
+  pnpm run tests/comprehensive-suite/index.ts
+  pnpm run tests/comprehensive-suite/index.ts --category auth
   
   # Test Railway deployment
-  bun run tests/comprehensive-suite/index.ts --url https://prima.railway.app
-  bun run tests/comprehensive-suite/index.ts --url https://prima.railway.app --category load
+  pnpm run tests/comprehensive-suite/index.ts --url https://prima.railway.app
+  pnpm run tests/comprehensive-suite/index.ts --url https://prima.railway.app --category load
 
 Output:
   Results are saved to test-results/ directory:

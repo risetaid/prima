@@ -42,5 +42,5 @@ next-env.d.ts
 
 public/sw.js
 
-# Go backend (work in progress)
-/backend
+.claude/
+_bmad*

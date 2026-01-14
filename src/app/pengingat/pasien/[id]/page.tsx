@@ -16,6 +16,7 @@ import { PatientReminderDashboard } from "@/components/pengingat/patient-reminde
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 interface ReminderStats {
   terjadwal: number;
   perluDiperbarui: number;
@@ -113,11 +114,11 @@ export default function PatientReminderPage() {
       if (response.ok) {
         const result = await response.json();
         const patient = result.data || result; // Unwrap createApiHandler response
-        logger.info("👤 Patient data response:", {
+        logger.info("👤 Patient data response:", sanitizeForAudit({
           success: result.success,
           hasData: !!result.data,
           name: patient.name,
-        });
+        }));
         setPatientName(patient.name);
         const allowed =
           patient.verificationStatus === "VERIFIED" &&

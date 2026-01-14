@@ -8,10 +8,8 @@
  */
 
 import { db } from '@/db'
-import { conversationStates } from '@/db'
 import { logger } from '@/lib/logger'
 import { sql } from 'drizzle-orm'
-import { randomUUID } from 'crypto'
 
 async function validateDatabaseSchema() {
   console.log('🔍 Validating Phase 8 Database Schema...\n')
@@ -19,7 +17,7 @@ async function validateDatabaseSchema() {
   try {
     // 1. Check if conversation_states table exists
     console.log('1️⃣ Checking conversation_states table...')
-    const tableExists = await db.execute(sql`
+    await db.execute(sql`
       SELECT EXISTS (
         SELECT FROM information_schema.tables
         WHERE table_schema = 'public'
@@ -40,12 +38,12 @@ async function validateDatabaseSchema() {
     `)
 
     const requiredColumns = ['attempt_count', 'context_set_at', 'last_clarification_sent_at']
-    const rows = Array.isArray(columns) ? columns : (columns.rows || [])
-    const foundColumns = rows.map((row: any) => row.column_name)
+    const rows = Array.isArray(columns) ? columns : ((columns as { rows?: unknown[] }).rows || [])
+    const foundColumns = rows.map((row: { column_name: string }) => row.column_name)
 
     for (const colName of requiredColumns) {
       if (foundColumns.includes(colName)) {
-        const col = rows.find((r: any) => r.column_name === colName)
+        const col = rows.find((r: { column_name: string }) => r.column_name === colName) as { column_name: string; data_type: string; is_nullable: string }
         console.log(`   ✅ ${colName}: ${col.data_type} (nullable: ${col.is_nullable})`)
       } else {
         console.log(`   ❌ MISSING: ${colName}`)
@@ -56,7 +54,7 @@ async function validateDatabaseSchema() {
 
     // 3. Verify attempt_count default value
     console.log('3️⃣ Verifying attempt_count default value...')
-    const attemptCountCol = rows.find((r: any) => r.column_name === 'attempt_count')
+    const attemptCountCol = rows.find((r: { column_name: string }) => r.column_name === 'attempt_count') as { column_name: string; column_default?: string } | undefined
     if (attemptCountCol && attemptCountCol.column_default?.includes('0')) {
       console.log('   ✅ attempt_count default = 0\n')
     } else {
@@ -75,8 +73,8 @@ async function validateDatabaseSchema() {
       WHERE deleted_at IS NULL;
     `)
 
-    const statsRows = Array.isArray(existingStates) ? existingStates : (existingStates.rows || [])
-    const stats = statsRows[0] as any
+    const statsRows = Array.isArray(existingStates) ? existingStates : ((existingStates as { rows?: unknown[] }).rows || [])
+    const stats = statsRows[0] as { total: string; with_attempts: string; with_context_set: string; with_clarification: string }
     console.log(`   📊 Total active conversation states: ${stats.total}`)
     console.log(`   📊 With attempts > 0: ${stats.with_attempts}`)
     console.log(`   📊 With context_set_at: ${stats.with_context_set}`)

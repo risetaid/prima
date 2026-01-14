@@ -2,9 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useUser, useAuth } from "@clerk/nextjs";
-import type { UserResource } from "@clerk/types";
 import { atomicGet, atomicSet, atomicRemove } from "@/lib/atomic-storage";
 import { logger } from "@/lib/logger";
+
+// Define the UserResource type locally since @clerk/types may not be directly installed
+type UserResource = ReturnType<typeof useUser>['user'];
 
 interface UserStatusData {
   role?: "DEVELOPER" | "ADMIN" | "RELAWAN";

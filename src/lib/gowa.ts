@@ -1,6 +1,14 @@
 // GOWA (go-whatsapp-web-multidevice) integration for PRIMA
+// Server-only module - imports Node.js modules (crypto) and Redis-backed services
+import "server-only";
+
 import * as crypto from "crypto";
 import { logger } from "@/lib/logger";
+import { getCircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from "@/lib/circuit-breaker";
+
+// Re-export client-safe functions from phone-format.ts for backward compatibility
+// These can be imported directly from phone-format.ts for client components
+export { formatWhatsAppNumber, formatForWhatsApp } from "@/lib/phone-format";
 
 // Primary WhatsApp provider for Indonesian healthcare system
 
@@ -12,6 +20,13 @@ const GOWA_WEBHOOK_SECRET = process.env.GOWA_WEBHOOK_SECRET;
 // Remove the default fallback - require explicit opt-in
 const ALLOW_UNSIGNED_WEBHOOKS = process.env.ALLOW_UNSIGNED_WEBHOOKS === "true";
 
+// Circuit breaker for GOWA API calls
+const gowaCircuitBreaker = getCircuitBreaker('gowa', {
+  failureThreshold: DEFAULT_CIRCUIT_CONFIGS.external_api.failureThreshold, // 10 failures
+  resetTimeout: DEFAULT_CIRCUIT_CONFIGS.external_api.resetTimeout, // 60s
+  monitoringPeriod: DEFAULT_CIRCUIT_CONFIGS.external_api.monitoringPeriod,
+});
+
 // Add validation check at module load
 if (!GOWA_ENDPOINT || !GOWA_WEBHOOK_SECRET) {
   logger.error('GOWA configuration incomplete', undefined, {
@@ -19,59 +34,6 @@ if (!GOWA_ENDPOINT || !GOWA_WEBHOOK_SECRET) {
     has_secret: !!GOWA_WEBHOOK_SECRET,
   });
 }
-
-/**
- * Convert Markdown formatting to WhatsApp-compatible formatting
- * WhatsApp supports: *bold*, _italic_, ~strikethrough~, ```monospace```
- * Markdown uses: **bold**, *italic*, ~~strikethrough~~, `code`
- *
- * Also handles:
- * - Markdown headers (# ## ###) → remove formatting, keep text
- * - Markdown bullet lists (- or *) → clean numbered or emoji lists
- * - Markdown numbered lists (1. 2. 3.) → keep as-is
- * - Markdown links [text](url) → text: url
- */
-export const formatForWhatsApp = (text: string): string => {
-  let result = text;
-
-  // Convert Markdown bold **text** to WhatsApp bold *text*
-  result = result.replace(/\*\*([^*]+)\*\*/g, "*$1*");
-
-  // Convert Markdown italic _text_ stays same, but handle *text* (single asterisk is italic in MD)
-  // WhatsApp uses _italic_, but we should convert MD italic to WA italic
-  // Note: Be careful not to convert already-converted bold
-  // MD uses *italic* but WA uses _italic_ - convert carefully
-  // Skip this conversion as it may conflict with bold
-
-  // Convert Markdown strikethrough ~~text~~ to WhatsApp ~text~
-  result = result.replace(/~~([^~]+)~~/g, "~$1~");
-
-  // Convert inline code `text` to WhatsApp monospace ```text```
-  // But skip if it's already triple backticks
-  result = result.replace(/(?<!`)`([^`]+)`(?!`)/g, "```$1```");
-
-  // Remove Markdown headers but keep the text
-  // # Heading → Heading (optionally bold it)
-  result = result.replace(/^#{1,6}\s+(.+)$/gm, "*$1*");
-
-  // Convert Markdown bullet lists using - or * at start of line
-  // - item → • item (or just remove the dash)
-  result = result.replace(/^[\s]*[-*]\s+/gm, "• ");
-
-  // Convert Markdown links [text](url) → text: url
-  result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1: $2");
-
-  // Remove horizontal rules (--- or ***)
-  result = result.replace(/^[-*_]{3,}$/gm, "");
-
-  // Clean up excessive newlines (more than 2 consecutive)
-  result = result.replace(/\n{3,}/g, "\n\n");
-
-  // Trim whitespace
-  result = result.trim();
-
-  return result;
-};
 
 export interface WhatsAppMessage {
   to: string; // Format: 6281234567890 (no @ suffix, will be added in sendWhatsAppMessage)
@@ -179,6 +141,36 @@ export const withTypingIndicator = async <T>(
  * - Don't retry on 4xx client errors
  * - Retry on 5xx server errors and network failures
  */
+/**
+ * Core GOWA API call wrapped with circuit breaker
+ * This is the actual HTTP call that the circuit breaker protects
+ */
+async function gowaApiCall(
+  phone: string,
+  messageBody: string
+): Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }> {
+  const payload: Record<string, unknown> = {
+    phone,
+    message: messageBody,
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+  const response = await fetch(`${GOWA_ENDPOINT}/send/message`, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+
+  clearTimeout(timeout);
+  return response;
+}
+
 export const sendWhatsAppMessage = async (
   message: WhatsAppMessage
 ): Promise<WhatsAppMessageResult> => {
@@ -198,28 +190,12 @@ export const sendWhatsAppMessage = async (
       // Format phone number with @s.whatsapp.net suffix for GOWA
       const phone = `${message.to}@s.whatsapp.net`;
 
-      const payload: Record<string, unknown> = {
-        phone: phone,
-        message: message.body,
-      };
+      // Execute through circuit breaker
+      const response = await gowaCircuitBreaker.execute(() =>
+        gowaApiCall(phone, message.body)
+      );
 
-      // Add timeout support
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
-      const response = await fetch(`${GOWA_ENDPOINT}/send/message`, {
-        method: "POST",
-        headers: {
-          Authorization: getBasicAuthHeader(),
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      const result = await response.json();
+      const result = await response.json() as { code?: string; message?: string; results?: { message_id?: string } };
 
       // GOWA response: { code: "SUCCESS", message: "Success", results: { message_id: "xxx", status: "..." } }
       if (result.code === "SUCCESS" || response.ok) {
@@ -428,55 +404,6 @@ export const sendWhatsAppFile = async (
       error: error instanceof Error ? error.message : "Unknown error",
     };
   }
-};
-
-/**
- * Format phone number for WhatsApp (Indonesia format, no @s.whatsapp.net suffix)
- * The suffix will be added by sendWhatsAppMessage
- */
-export const formatWhatsAppNumber = (phoneNumber: string): string => {
-  if (!phoneNumber || typeof phoneNumber !== "string") {
-    throw new Error("Invalid phone number: must be a non-empty string");
-  }
-
-  // Remove all non-numeric characters
-  let cleaned = phoneNumber.replace(/\D/g, "");
-
-  if (!cleaned || cleaned.length < 8) {
-    throw new Error("Invalid phone number: too short after cleaning");
-  }
-
-  // Convert Indonesian numbers with validation
-  if (cleaned.startsWith("08")) {
-    if (cleaned.length < 10 || cleaned.length > 13) {
-      throw new Error("Invalid Indonesian phone number length (08 format)");
-    }
-    cleaned = "628" + cleaned.slice(2); // 08xxxxxxxx -> 628xxxxxxxx
-  } else if (cleaned.startsWith("8") && cleaned.length >= 9) {
-    if (cleaned.length < 9 || cleaned.length > 12) {
-      throw new Error("Invalid Indonesian phone number length (8 format)");
-    }
-    cleaned = "62" + cleaned; // 8xxxxxxxx -> 628xxxxxxxx
-  } else if (cleaned.startsWith("62")) {
-    if (cleaned.length < 11 || cleaned.length > 14) {
-      throw new Error("Invalid Indonesian phone number length (62 format)");
-    }
-    // Already has country code
-  } else {
-    // Assume local Indonesian number
-    if (cleaned.length < 8 || cleaned.length > 11) {
-      throw new Error("Invalid phone number length");
-    }
-    cleaned = "62" + cleaned; // Add Indonesia code
-  }
-
-  // Final validation - Indonesian mobile numbers after 62 should start with 8
-  if (!cleaned.startsWith("628")) {
-    throw new Error("Invalid Indonesian mobile number format");
-  }
-
-  // Return clean number format without @s.whatsapp.net suffix
-  return cleaned;
 };
 
 /**

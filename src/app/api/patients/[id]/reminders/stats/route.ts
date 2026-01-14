@@ -11,6 +11,7 @@ import {
   CACHE_TTL,
 } from '@/lib/cache'
 import { logger } from '@/lib/logger'
+import { sanitizeForAudit } from '@/lib/phi-mask'
 import { z } from 'zod'
 
 // Query schema for cache invalidation
@@ -150,11 +151,11 @@ export const GET = createApiHandler(
     // Cache the stats with shorter TTL since they change more frequently
     await set(cacheKey, stats, CACHE_TTL.REMINDER_STATS);
 
-    logger.info('Patient reminder statistics retrieved', {
+    logger.info('Patient reminder statistics retrieved', sanitizeForAudit({
       patientId: id,
       userId: user!.id,
       stats
-    });
+    }));
 
     return stats;
   }

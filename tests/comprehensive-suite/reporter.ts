@@ -6,9 +6,8 @@
 import {
   TestSuiteReport,
   TestResult,
-  PerformanceMetrics,
-  LoadTestResult,
   HumanReadableReport,
+  LoadTestSummary,
 } from "./types";
 import { TestUtils } from "./utils";
 import { writeFileSync } from "fs";
@@ -78,7 +77,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
     return details;
   }
 
-  private formatCategory(title: string, category: any): string {
+  private formatCategory(title: string, category: { total: number; passed: number; failed: number; duration: number; tests: TestResult[] }): string {
     if (!category || category.total === 0) {
       return `${title}\n  Status: Tidak ada tes\n\n`;
     }
@@ -141,7 +140,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
     return output;
   }
 
-  private formatLoadTests(load: any): string {
+  private formatLoadTests(load: LoadTestSummary): string {
     let output = "🔥 UJI BEBAN (Load Testing)\n\n";
 
     const isProduction = TestUtils.isProduction();
@@ -196,7 +195,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
       // Show tested endpoints if available
       if (data.endpoints && data.endpoints.length > 0) {
         output += `    📍 Endpoint yang ditest:\n`;
-        data.endpoints.forEach((ep: any) => {
+        data.endpoints.forEach((ep: { type: string; method: string; path: string }) => {
           const icon = ep.type === "public" ? "✅" : "🔒";
           output += `       ${icon} ${ep.method} ${ep.path} (${ep.type})\n`;
         });
@@ -262,7 +261,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
 
       if (data.errors.length > 0) {
         output += `    ⚠️ Error yang ditemukan:\n`;
-        data.errors.slice(0, 3).forEach((err: any) => {
+        data.errors.slice(0, 3).forEach((err: { message: string; count: number }) => {
           // Explain what the errors mean
           let explanation = "";
           if (err.message.includes("404") && isProduction) {
@@ -687,7 +686,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
   private generateCategoryHTML(
     id: string,
     title: string,
-    category: any
+    category: { total: number; passed: number; failed: number; duration: number; tests: TestResult[] }
   ): string {
     if (!category || category.total === 0) {
       return `
@@ -763,7 +762,7 @@ Waktu Pengujian: ${new Date(report.timestamp).toLocaleString("id-ID")}
     </div>`;
   }
 
-  private generateLoadTestHTML(load: any): string {
+  private generateLoadTestHTML(load: LoadTestSummary): string {
     const isProduction = TestUtils.isProduction();
 
     // Explanation section

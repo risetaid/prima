@@ -8,6 +8,7 @@ import {
 } from "./ai-prompts";
 import { logger } from "@/lib/logger";
 import { formatForWhatsApp } from "@/lib/gowa";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 import type {
   AIConversationContext,
   AIConversationResponse,
@@ -42,14 +43,14 @@ export class AIConversationService {
     }
 
     try {
-      logger.info("Generating AI conversation response", {
+      logger.info("Generating AI conversation response", sanitizeForAudit({
         patientId: context.patientId,
         patientName: context.patientName,
         messageLength: message.length,
         messagePreview: message.substring(0, 50),
         hasHistory: context.conversationHistory.length > 0,
         historyCount: context.conversationHistory.length,
-      });
+      }));
 
       const startTime = Date.now();
 
@@ -110,7 +111,7 @@ export class AIConversationService {
         },
       };
 
-      logger.info("AI conversation response generated", {
+      logger.info("AI conversation response generated", sanitizeForAudit({
         patientId: context.patientId,
         responseLength: formattedContent.length,
         shouldEscalate,
@@ -118,17 +119,17 @@ export class AIConversationService {
         latencyMs,
         tokensUsed: usage.totalTokens,
         cost: usage.cost.toFixed(6),
-      });
+      }));
 
       return response;
     } catch (error) {
       logger.error(
         "Failed to generate AI conversation response",
         error as Error,
-        {
+        sanitizeForAudit({
           patientId: context.patientId,
           message: message.substring(0, 100),
-        }
+        })
       );
 
       // Return safe fallback response

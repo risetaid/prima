@@ -11,6 +11,7 @@ import {
 import { UserButton } from "@clerk/nextjs";
 
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 interface CompletedReminder {
   id: string;
@@ -55,11 +56,11 @@ export default function CompletedRemindersPage() {
         const result = await response.json();
 
         // Response structure: { success: true, data: { data: [...], pagination: {...} } }
-        logger.info("✅ Completed reminders raw response:", {
+        logger.info("✅ Completed reminders raw response:", sanitizeForAudit({
           patientId,
           hasData: !!result.data,
           hasPagination: !!result.pagination,
-        });
+        }));
 
         // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
         if (
@@ -102,10 +103,10 @@ export default function CompletedRemindersPage() {
         logger.error(
           "Invalid response format for completed reminders",
           new Error("Validation failed"),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-completed",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -113,10 +114,10 @@ export default function CompletedRemindersPage() {
         logger.error(
           "Failed to fetch completed reminders",
           new Error(`HTTP ${response.status}`),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-completed",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -125,7 +126,7 @@ export default function CompletedRemindersPage() {
       logger.error(
         "Error fetching completed reminders:",
         error instanceof Error ? error : new Error(String(error)),
-        { patientId, operation: "fetch-completed" }
+        sanitizeForAudit({ patientId, operation: "fetch-completed" })
       );
       setReminders([]);
       setPagination(null);

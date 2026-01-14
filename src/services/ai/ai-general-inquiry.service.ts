@@ -8,6 +8,7 @@ import { WhatsAppService } from '@/services/whatsapp/whatsapp.service';
 import { logger } from '@/lib/logger';
 import { EMERGENCY_ESCALATION_MESSAGE } from './ai-prompts';
 import type { AIConversationContext } from '@/lib/ai-types';
+import { sanitizeForAudit } from '@/lib/phi-mask';
 
 export interface GeneralInquiryResult {
   success: boolean;
@@ -39,18 +40,18 @@ export class AIGeneralInquiryService {
     }
   ): Promise<GeneralInquiryResult> {
     try {
-      logger.info('Handling general inquiry', {
+      logger.info('Handling general inquiry', sanitizeForAudit({
         patientId: patient.id,
         patientName: patient.name,
         messagePreview: message.substring(0, 100),
-      });
+      }));
 
       // 1. Quick emergency check
       if (this.aiIntentService.isEmergency(message)) {
-        logger.warn('Emergency detected in general inquiry', {
+        logger.warn('Emergency detected in general inquiry', sanitizeForAudit({
           patientId: patient.id,
           message: message.substring(0, 100),
-        });
+        }));
 
         return await this.handleEmergency(message, patient, volunteer);
       }
@@ -96,14 +97,14 @@ export class AIGeneralInquiryService {
       // 6. Generate AI response
       const aiResponse = await this.aiConversationService.respond(message, context);
 
-      logger.info('AI conversation response generated', {
+      logger.info('AI conversation response generated', sanitizeForAudit({
         patientId: patient.id,
         shouldEscalate: aiResponse.shouldEscalate,
         suggestedAction: aiResponse.suggestedAction,
         responseLength: aiResponse.message.length,
         tokensUsed: aiResponse.metadata.tokensUsed,
         cost: aiResponse.metadata.cost.toFixed(6),
-      });
+      }));
 
       // 7. Handle based on suggested action
       if (aiResponse.suggestedAction === 'mark_emergency') {
@@ -136,10 +137,10 @@ export class AIGeneralInquiryService {
         llmCost: aiResponse.metadata.cost,
       });
 
-      logger.info('AI response sent to patient', {
+      logger.info('AI response sent to patient', sanitizeForAudit({
         patientId: patient.id,
         messageLength: aiResponse.message.length,
-      });
+      }));
 
       return {
         success: true,
@@ -147,10 +148,10 @@ export class AIGeneralInquiryService {
         message: aiResponse.message,
       };
     } catch (error) {
-      logger.error('Failed to handle general inquiry', error as Error, {
+      logger.error('Failed to handle general inquiry', error as Error, sanitizeForAudit({
         patientId: patient.id,
         message: message.substring(0, 100),
-      });
+      }));
 
       // Send fallback message to patient
       try {
@@ -159,9 +160,9 @@ export class AIGeneralInquiryService {
           `Maaf ${patient.name}, saya mengalami kesulitan memproses pertanyaan Anda. Relawan PRIMA akan segera membantu Anda. 💙`
         );
       } catch (sendError) {
-        logger.error('Failed to send fallback message', sendError as Error, {
+        logger.error('Failed to send fallback message', sendError as Error, sanitizeForAudit({
           patientId: patient.id,
-        });
+        }));
       }
 
       return {
@@ -187,20 +188,20 @@ export class AIGeneralInquiryService {
       name: string;
     }
   ): Promise<GeneralInquiryResult> {
-    logger.warn('🚨 EMERGENCY detected', {
+    logger.warn('🚨 EMERGENCY detected', sanitizeForAudit({
       patientId: patient.id,
       patientName: patient.name,
       message: message.substring(0, 100),
-    });
+    }));
 
     try {
       // 1. Send emergency guidance to patient
       const emergencyMessage = EMERGENCY_ESCALATION_MESSAGE(patient.name);
       await this.whatsappService.send(patient.phoneNumber, emergencyMessage);
 
-      logger.info('Emergency message sent to patient', {
+      logger.info('Emergency message sent to patient', sanitizeForAudit({
         patientId: patient.id,
-      });
+      }));
 
       // 2. Create volunteer notification
       await this.createVolunteerNotification({
@@ -218,9 +219,9 @@ export class AIGeneralInquiryService {
         escalationReason: 'Emergency keywords detected',
       };
     } catch (error) {
-      logger.error('Failed to handle emergency', error as Error, {
+      logger.error('Failed to handle emergency', error as Error, sanitizeForAudit({
         patientId: patient.id,
-      });
+      }));
 
       return {
         success: false,
@@ -247,10 +248,10 @@ export class AIGeneralInquiryService {
     },
     escalationReason?: string
   ): Promise<GeneralInquiryResult> {
-    logger.info('Escalating conversation to volunteer', {
+    logger.info('Escalating conversation to volunteer', sanitizeForAudit({
       patientId: patient.id,
       reason: escalationReason,
-    });
+    }));
 
     try {
       // 1. Send AI response to patient (includes recommendation to contact volunteer)
@@ -272,9 +273,9 @@ export class AIGeneralInquiryService {
         escalationReason,
       };
     } catch (error) {
-      logger.error('Failed to handle escalation', error as Error, {
+      logger.error('Failed to handle escalation', error as Error, sanitizeForAudit({
         patientId: patient.id,
-      });
+      }));
 
       return {
         success: false,
@@ -313,15 +314,15 @@ export class AIGeneralInquiryService {
         },
       });
 
-      logger.info('Volunteer notification created', {
+      logger.info('Volunteer notification created', sanitizeForAudit({
         patientId: params.patientId,
         priority: params.priority,
         assignedVolunteerId: params.assignedVolunteerId,
-      });
+      }));
     } catch (error) {
-      logger.error('Failed to create volunteer notification', error as Error, {
+      logger.error('Failed to create volunteer notification', error as Error, sanitizeForAudit({
         patientId: params.patientId,
-      });
+      }));
       throw error;
     }
   }

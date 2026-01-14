@@ -9,7 +9,7 @@
  *
  * Easiest setup for authenticated load testing:
  *   $env:TEST_API_KEY = "sk_test_xxx..." # Your CLERK_SECRET_KEY
- *   bun run test:comprehensive --url https://prima-production.up.railway.app
+ *   pnpm run test:comprehensive --url https://prima-production.up.railway.app
  */
 
 import { LoadTestResult, PerformanceMetrics } from "./types";
@@ -71,7 +71,7 @@ export class LoadTests {
           timestamp: new Date().toISOString(),
         };
       }
-    } catch (error) {
+    } catch {
       // Health endpoint might not have metrics yet
     }
     return null;
@@ -265,7 +265,7 @@ export class LoadTests {
     // Simulate concurrent users - each creates their own client with auth
     const userPromises = Array(userCount)
       .fill(null)
-      .map(async (_, userIndex) => {
+      .map(async () => {
         // Create client per user (simulates separate sessions)
         const userClient = TestUtils.createTestClient();
         if (this.apiKey) {
@@ -304,8 +304,9 @@ export class LoadTests {
                 `${scenario.name}: HTTP ${result.status} (auth failed)`
               );
             }
-          } catch (error: any) {
-            errors.push(`${scenario.name}: ${error.message}`);
+          } catch (error: unknown) {
+            const err = error as Error;
+            errors.push(`${scenario.name}: ${err.message}`);
           }
 
           progress.increment();
@@ -388,7 +389,7 @@ export class LoadTests {
     // Simulate stress load - each user creates their own client
     const userPromises = Array(userCount)
       .fill(null)
-      .map(async (_, userIndex) => {
+      .map(async () => {
         const userClient = TestUtils.createTestClient();
         if (this.apiKey) {
           userClient.setApiKey(this.apiKey);
@@ -422,8 +423,9 @@ export class LoadTests {
               );
             }
             // Auth errors without token are expected, don't count as errors
-          } catch (error: any) {
-            errors.push(`${scenario.name}: ${error.message}`);
+          } catch (error: unknown) {
+            const err = error as Error;
+            errors.push(`${scenario.name}: ${err.message}`);
           }
 
           progress.increment();
@@ -571,7 +573,7 @@ export class LoadTests {
             return await this.client.get(endpoint.path);
           });
           times.push(duration);
-        } catch (error) {
+        } catch {
           // Continue even if request fails
         }
         await TestUtils.sleep(50);
@@ -636,8 +638,9 @@ export class LoadTests {
             if (!result.ok) {
               errors.push(`HTTP ${result.status}`);
             }
-          } catch (error: any) {
-            errors.push(error.message);
+          } catch (error: unknown) {
+            const err = error as Error;
+            errors.push(err.message);
           }
         });
 

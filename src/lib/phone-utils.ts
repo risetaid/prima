@@ -3,9 +3,12 @@
  *
  * This module centralizes all phone number handling logic to ensure
  * consistency across the application, especially for Indonesian phone numbers.
+ *
+ * NOTE: This module is client-safe and can be imported in "use client" components.
+ * It imports from phone-format.ts which contains pure functions without Node.js dependencies.
  */
 
-import { formatWhatsAppNumber } from "@/lib/gowa";
+import { formatWhatsAppNumber } from "@/lib/phone-format";
 
 /**
  * Phone number format information

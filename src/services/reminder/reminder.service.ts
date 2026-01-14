@@ -15,6 +15,7 @@ import { logger } from "@/lib/logger";
 import { ReminderTemplatesService } from "@/services/reminder/reminder-templates.service";
 import { formatContentForWhatsApp, ContentItem } from "@/lib/content-formatting";
 import { replaceTemplateVariables } from "@/lib/template-utils";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 import { db, patients, reminders } from "@/db";
 import { ReminderError } from "@/services/reminder/reminder.types";
@@ -332,21 +333,20 @@ export class ReminderService {
       );
 
       // Log reminder send using logger
-      logger.info("Reminder sent", {
+      logger.info("Reminder sent", sanitizeForAudit({
         reminderScheduleId: params.reminderId,
         patientId: params.patientId,
+        patientName: params.patientName,
         reminderType,
         sentAt: getWIBTime(),
         status: result.success ? "DELIVERED" : "FAILED",
         message: formattedMessage,
         phoneNumber: params.phoneNumber,
         wahaMessageId: result.messageId,
-      });
+      }));
 
       // Reminder confirmation now handled by simple direct lookup
       // No complex conversation state management needed
-
-  
 
       await del(CACHE_KEYS.reminderStats(params.patientId));
       return {
@@ -355,10 +355,10 @@ export class ReminderService {
         error: result.error,
       };
     } catch (error) {
-      logger.error("Failed to send reminder", error as Error, {
+      logger.error("Failed to send reminder", error as Error, sanitizeForAudit({
         reminderId: params.reminderId,
         patientId: params.patientId,
-      });
+      }));
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -422,11 +422,11 @@ export class ReminderService {
         .orderBy(reminders.scheduledTime)
         .limit(20);
 
-      logger.info("Retrieved today's reminders for patient", {
+      logger.info("Retrieved today's reminders for patient", sanitizeForAudit({
         patientId,
         remindersCount: todaysReminders.length,
         operation: "get_todays_reminders",
-      });
+      }));
 
       return todaysReminders.map((reminder) => ({
         ...reminder,
@@ -434,10 +434,10 @@ export class ReminderService {
         timeRemaining: this.calculateTimeRemaining(reminder.scheduledTime),
       }));
     } catch (error) {
-      logger.error("Failed to get today's reminders", error as Error, {
+      logger.error("Failed to get today's reminders", error as Error, sanitizeForAudit({
         patientId,
         operation: "get_todays_reminders",
-      });
+      }));
       throw new ReminderError(
         "Failed to retrieve today's reminders",
         "DATABASE_ERROR",

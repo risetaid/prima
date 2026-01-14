@@ -14,20 +14,20 @@
  * ALTERNATIVE: Define indexes in schema files (frontend/src/db/*.ts) only.
  *              Let Drizzle migrations handle index creation automatically via:
  *              1. Edit schema file (add index definition)
- *              2. Run: bunx drizzle-kit generate
+ *              2. Run: pnpx drizzle-kit generate
  *              3. Review generated SQL migration
- *              4. Run: bunx drizzle-kit push
+ *              4. Run: pnpx drizzle-kit push
  *
  * If you need custom indexes not in the schema, create a targeted migration:
- *   bunx drizzle-kit generate
+ *   pnpx drizzle-kit generate
  *   # Edit the generated migration file to add your custom indexes
- *   bunx drizzle-kit push
+ *   pnpx drizzle-kit push
  *
  * For index optimization and cleanup, use:
- *   bun run db:optimize-indexes
+ *   pnpm run db:optimize-indexes
  *
  * For index health monitoring, use:
- *   bun run db:monitor-indexes
+ *   pnpm run db:monitor-indexes
  *
  * See INDEX_MANAGEMENT_STRATEGY.md for complete prevention strategy.
  *

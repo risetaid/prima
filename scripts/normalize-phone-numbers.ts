@@ -10,7 +10,7 @@
 
 import { db } from '../src/db';
 import { patients } from '../src/db/schema';
-import { sql, eq, and, or } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { formatWhatsAppNumber } from '../src/lib/gowa';
 
 interface Patient {
@@ -79,14 +79,14 @@ async function normalizePhoneNumbers(): Promise<NormalizationResult> {
             .where(eq(patients.id, patient.id));
 
           result.normalizedCount++;
-          console.log(`   ✅ ${patient.name} (${patient.phoneNumber} → ${normalized})`);
+          console.log(`   ✅ [PHI-REDACTED] ([PHI-REDACTED] → normalized)`);
         }
       } catch (error) {
         result.errors.push({
           patientId: patient.id,
-          error: `Failed to normalize ${patient.phoneNumber}: ${error instanceof Error ? error.message : String(error)}`,
+          error: `Failed to normalize phone number: ${error instanceof Error ? error.message : String(error)}`,
         });
-        console.log(`   ❌ Failed to normalize ${patient.name} (${patient.phoneNumber})`);
+        console.log(`   ❌ Failed to normalize [PHI-REDACTED] ([PHI-REDACTED])`);
       }
     }
 
@@ -116,11 +116,11 @@ async function normalizePhoneNumbers(): Promise<NormalizationResult> {
 
     // Find groups with duplicates
     const duplicateGroups = Array.from(phoneGroups.entries()).filter(
-      ([_, group]) => group.length > 1
+      ([, group]) => group.length > 1
     );
 
     result.duplicatesFound = duplicateGroups.reduce(
-      (sum, [_, group]) => sum + (group.length - 1),
+      (sum, [, group]) => sum + (group.length - 1),
       0
     );
 
@@ -217,8 +217,10 @@ async function normalizePhoneNumbers(): Promise<NormalizationResult> {
 
     if (result.errors.length > 0) {
       console.log(`\n⚠️  Errors encountered: ${result.errors.length}`);
-      result.errors.forEach(({ patientId, error }) => {
-        console.log(`   - ${patientId}: ${error}`);
+      result.errors.forEach((err) => {
+        // err.patientId is a UUID (safe to log), error message has no PHI
+        const id = err.patientId;
+        console.log(`   - ${id}: ${err.error}`);
       });
     }
 

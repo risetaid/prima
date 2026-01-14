@@ -3,7 +3,7 @@
  * Generates tabular test results for terminal display
  */
 
-import { TestSuiteReport, TestResult, LoadTestResult } from "./types";
+import { TestSuiteReport, TestResult, LoadTestSummary } from "./types";
 import { TestUtils } from "./utils";
 
 interface ResponseTimeResult {
@@ -264,7 +264,7 @@ export class CLIReporter {
   /**
    * Print load testing results table
    */
-  private printLoadTestingResults(load: any) {
+  private printLoadTestingResults(load: LoadTestSummary) {
     console.log(
       "\n┌─────────────────────────────────────────────────────────────────────────────┐"
     );
@@ -305,9 +305,9 @@ export class CLIReporter {
       )}ms, MAX ${data.metrics.maxResponseTime.toFixed(0)}ms`;
 
       const publicCount =
-        data.endpoints?.filter((e: any) => e.type === "public").length || 1;
+        data.endpoints?.filter((e: { type: string }) => e.type === "public").length || 1;
       const protectedCount =
-        data.endpoints?.filter((e: any) => e.type === "protected").length || 2;
+        data.endpoints?.filter((e: { type: string }) => e.type === "protected").length || 2;
 
       const hasAuthToken = !!process.env.TEST_AUTH_TOKEN;
       let notes = "";

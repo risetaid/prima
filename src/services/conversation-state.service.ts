@@ -6,6 +6,7 @@ import { conversationStates, conversationMessages } from '@/db'
 import { eq, and, desc, gte, lt, sql, or } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { generatePhoneAlternatives } from '@/lib/phone-utils'
+import { sanitizeForAudit } from '@/lib/phi-mask'
 
 type ConversationStateRow = typeof conversationStates.$inferSelect
 type ConversationMessageRow = typeof conversationMessages.$inferSelect
@@ -87,19 +88,19 @@ export class ConversationStateService {
         })
         .returning()
 
-      logger.info('Created new conversation state', {
+      logger.info('Created new conversation state', sanitizeForAudit({
         patientId,
         phoneNumber,
         context,
         conversationStateId: newState[0].id
-      })
+      }))
 
       return this.mapConversationState(newState[0])
     } catch (error) {
-      logger.error('Failed to get/create conversation state', error as Error, {
+      logger.error('Failed to get/create conversation state', error as Error, sanitizeForAudit({
         patientId,
         phoneNumber
-      })
+      }))
       throw error
     }
   }
@@ -459,9 +460,9 @@ export class ConversationStateService {
         contextDistribution
       }
     } catch (error) {
-      logger.error('Failed to get conversation stats', error as Error, {
+      logger.error('Failed to get conversation stats', error as Error, sanitizeForAudit({
         patientId
-      })
+      }))
       throw error
     }
   }
@@ -485,9 +486,9 @@ export class ConversationStateService {
 
       return states.map(state => this.mapConversationState(state))
     } catch (error) {
-      logger.error('Failed to get active conversation states', error as Error, {
+      logger.error('Failed to get active conversation states', error as Error, sanitizeForAudit({
         patientId
-      })
+      }))
       throw error
     }
   }
@@ -502,11 +503,11 @@ export class ConversationStateService {
       const phoneAlternatives = generatePhoneAlternatives(phoneNumber)
       const allPhoneNumbers = [phoneNumber, ...phoneAlternatives]
 
-      logger.debug('Finding conversation state by phone', {
+      logger.debug('Finding conversation state by phone', sanitizeForAudit({
         originalPhone: phoneNumber,
         alternatives: phoneAlternatives,
         totalVariations: allPhoneNumbers.length
-      })
+      }))
 
       // Create OR clause for all phone number variations
       const phoneClause = or(
@@ -527,27 +528,27 @@ export class ConversationStateService {
         .limit(1)
 
       if (states.length === 0) {
-        logger.debug('No conversation state found for phone variations', {
+        logger.debug('No conversation state found for phone variations', sanitizeForAudit({
           phoneNumber,
           alternatives: phoneAlternatives
-        })
+        }))
         return null
       }
 
       const foundState = this.mapConversationState(states[0])
 
-      logger.info('Conversation state found by phone', {
+      logger.info('Conversation state found by phone', sanitizeForAudit({
         phoneNumber,
         matchedPhone: foundState.phoneNumber,
         stateId: foundState.id,
         context: foundState.currentContext
-      })
+      }))
 
       return foundState
     } catch (error) {
-      logger.error('Failed to find conversation state by phone number', error as Error, {
+      logger.error('Failed to find conversation state by phone number', error as Error, sanitizeForAudit({
         phoneNumber
-      })
+      }))
       throw error
     }
   }
@@ -598,10 +599,10 @@ export class ConversationStateService {
         lastReminderMessage: lastReminder?.message
       }
     } catch (error) {
-      logger.error('Failed to get recent reminders context', error as Error, {
+      logger.error('Failed to get recent reminders context', error as Error, sanitizeForAudit({
         patientId,
         hoursBack
-      })
+      }))
 
       // Return default context on error
       return {
@@ -741,7 +742,7 @@ export class ConversationStateService {
       })
     }
 
-    logger.info('Context cleared for patient', { patientId })
+    logger.info('Context cleared for patient', sanitizeForAudit({ patientId }))
   }
 
   /**

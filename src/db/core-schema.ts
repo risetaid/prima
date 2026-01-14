@@ -7,6 +7,7 @@ import {
   index,
   foreignKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Import clean enums
 import {
@@ -115,6 +116,14 @@ export const patients = pgTable(
       foreignColumns: [users.id],
       name: "patients_assigned_volunteer_id_users_id_fk",
     }),
+    // Trigram index for fuzzy name search (case-insensitive ILIKE)
+    nameTrgmIdx: index("patients_name_trgm_idx")
+      .on(sql`gin_trgm_ops(${table.name})`)
+      .where(sql`${table.deletedAt} IS NULL`),
+    // Trigram index for phone number fuzzy search
+    phoneTrgmIdx: index("patients_phone_trgm_idx")
+      .on(sql`gin_trgm_ops(${table.phoneNumber})`)
+      .where(sql`${table.deletedAt} IS NULL`),
     // Note: Removed redundant single-column indexes
     // isActive, deletedAt, createdAt are low-cardinality or rarely queried alone
     // phoneNumber is queried but not frequently enough to warrant standalone index
