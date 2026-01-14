@@ -1,0 +1,189 @@
+name: PHI Detection Scan
+
+on:
+  pull_request:
+    paths:
+      - "src/**/*.ts"
+      - "src/**/*.tsx"
+      - "!src/**/*.test.ts"
+      - "!tests/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**/*.ts"
+      - "src/**/*.tsx"
+      - "!src/**/*.test.ts"
+      - "!tests/**"
+
+jobs:
+  phi-scan:
+    name: PHI Detection Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "bun"
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run PHI Detection Test
+        id: phi-scan
+        run: |
+          echo "Running PHI detection scan..."
+          pnpm test --run tests/lib/phi-mask.test.ts
+
+      - name: Run ESLint PHI Rules
+        if: always()
+        run: |
+          echo "Running ESLint PHI detection..."
+          pnpm run lint 2>&1 | tee eslint_output.txt || true
+
+          # Check for PHI-related warnings
+          if grep -q "phi/no-logging-patient-data\|PHI detected" eslint_output.txt 2>/dev/null; then
+            echo "PHI-related ESLint issues found"
+            grep -n "phi/no-logging-patient-data\|PHI detected" eslint_output.txt || true
+            exit 1
+          fi
+
+      - name: Check for sensitive patterns in logs
+        id: log-patterns
+        run: |
+          echo "Checking for PHI in log statements..."
+
+          # Patterns that indicate PHI in logging
+          PHI_PATTERNS=(
+            "patient\.name"
+            "patient\.phoneNumber"
+            "patient\.phone"
+            "patient\.address"
+            "patient\.diagnosis"
+            "patient\.notes"
+            "emergencyContact"
+            "dateOfBirth"
+            "ssn"
+          )
+
+          FOUND_ISSUES=0
+
+          for pattern in "${PHI_PATTERNS[@]}"; do
+            matches=$(grep -rn "$pattern" src --include="*.ts" --include="*.tsx" | grep -E "logger\.(log|info|warn|error|debug)" | grep -v "PHI-REDACTED\|sanitizeForAudit\|maskPatientObject" || true)
+
+            if [ -n "$matches" ]; then
+              echo "❌ Found PHI pattern: $pattern"
+              echo "$matches"
+              FOUND_ISSUES=$((FOUND_ISSUES + 1))
+            fi
+          done
+
+          if [ $FOUND_ISSUES -gt 0 ]; then
+            echo "❌ PHI detection scan failed: $FOUND_ISSUES issues found"
+            exit 1
+          else
+            echo "✅ No PHI patterns found in log statements"
+          fi
+
+      - name: Upload PHI Scan Results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phi-scan-results
+          path: |
+            eslint_output.txt
+          retention-days: 7
+
+      - name: Report Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "failure" ]; then
+            echo "❌ PHI Scan Failed - Review the artifacts for details"
+            exit 1
+          else
+            echo "✅ PHI Scan Passed"
+          fi
+
+  # Additional compliance checks
+  compliance-check:
+    name: Compliance Checks
+    runs-on: ubuntu-latest
+    needs: phi-scan
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "bun"
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Check audit schema exists
+        run: |
+          echo "Checking for audit schema..."
+          if [ -f "src/db/audit-schema.ts" ]; then
+            echo "✅ Audit schema found"
+          else
+            echo "❌ Audit schema not found"
+            exit 1
+
+      - name: Check PHI mask utility exists
+        run: |
+          echo "Checking for PHI mask utility..."
+          if [ -f "src/lib/phi-mask.ts" ]; then
+            echo "✅ PHI mask utility found"
+          else
+            echo "❌ PHI mask utility not found"
+            exit 1
+
+      - name: Verify audit calls in patient repository
+        run: |
+          echo "Checking for audit calls in patient repository..."
+          if grep -q "auditService" src/services/patient/patient.repository.ts 2>/dev/null; then
+            echo "✅ Audit calls found in patient repository"
+          else
+            echo "❌ Audit calls not found in patient repository"
+            exit 1
+
+      - name: Report Compliance Status
+        run: |
+          echo "✅ All compliance checks passed"
+
+  # Summary comment on PR
+  comment-pr:
+    name: Comment on PR
+    runs-on: ubuntu-latest
+    needs: [phi-scan, compliance-check]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Add PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## ✅ PHI Compliance Scan Passed\n\nAll PHI detection checks have passed:\n- No PHI patterns found in log statements\n- Audit schema present\n- PHI mask utility present\n- Audit calls in patient repository\n\nThe PR is cleared for HIPAA compliance review.'
+            })

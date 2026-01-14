@@ -7,6 +7,7 @@ import { PatientLookupService } from "@/services/patient/patient-lookup.service"
 import { SimpleVerificationService } from "@/services/verification/simple-verification.service";
 import { logger } from "@/lib/logger";
 import { validateWebhookRequest, withTypingIndicator } from "@/lib/gowa";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 // GOWA webhook payload structure
 // See: https://github.com/aldinokemal/go-whatsapp-web-multidevice/blob/main/docs/webhook-payload.md
@@ -205,7 +206,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { sender, message, id, name } = validationResult.data;
+    const { sender, message, id } = validationResult.data;
 
     // Check for duplicate events using message ID
     if (id) {
@@ -220,7 +221,6 @@ export async function POST(request: NextRequest) {
 
     logger.info("GOWA incoming webhook received", {
       sender,
-      name,
       hasId: Boolean(id),
       messagePreview: message ? message.substring(0, 50) : "no message",
     });
@@ -247,10 +247,10 @@ export async function POST(request: NextRequest) {
         patient.id
       );
     if (!rateLimitResult.allowed) {
-      logger.warn("Patient response rate limit exceeded", {
+      logger.warn("Patient response rate limit exceeded", sanitizeForAudit({
         patientId: patient.id,
         phoneNumber: sender,
-      });
+      }));
       return NextResponse.json({
         ok: true,
         processed: false,
@@ -260,12 +260,11 @@ export async function POST(request: NextRequest) {
 
     // Priority 1: Check verification responses for pending patients
     if (patient.verificationStatus === "PENDING") {
-      logger.info("🔐 Processing verification response", {
+      logger.info("🔐 Processing verification response", sanitizeForAudit({
         patientId: patient.id,
-        patientName: patient.name,
         patientVerificationStatus: patient.verificationStatus,
-        message: message?.substring(0, 50),
-      });
+        messagePreview: message?.substring(0, 50),
+      }));
 
       try {
         const result = await simpleVerificationService.processResponse(
@@ -273,12 +272,12 @@ export async function POST(request: NextRequest) {
           patient.id
         );
 
-        logger.info("🔐 Verification response processed", {
+        logger.info("🔐 Verification response processed", sanitizeForAudit({
           patientId: patient.id,
           action: result.action,
           processed: result.processed,
           resultMessage: result.message,
-        });
+        }));
 
         return NextResponse.json({
           ok: true,
@@ -293,10 +292,10 @@ export async function POST(request: NextRequest) {
           verificationError instanceof Error
             ? verificationError
             : new Error(String(verificationError)),
-          {
+          sanitizeForAudit({
             patientId: patient.id,
             message: message?.substring(0, 50),
-          }
+          })
         );
         return NextResponse.json(
           {
@@ -310,10 +309,10 @@ export async function POST(request: NextRequest) {
 
     // Priority 2: Process reminder confirmations for verified patients
     if (patient.verificationStatus === "VERIFIED") {
-      logger.info("Processing reminder confirmation", {
+      logger.info("Processing reminder confirmation", sanitizeForAudit({
         patientId: patient.id,
         message: message?.substring(0, 50),
-      });
+      }));
 
       const result = await simpleConfirmationService.processReminderResponse(
         sender,
@@ -324,10 +323,10 @@ export async function POST(request: NextRequest) {
       if (result.action === "invalid_response") {
         logger.info(
           "Not a reminder confirmation, checking for general inquiry",
-          {
+          sanitizeForAudit({
             patientId: patient.id,
             message: message?.substring(0, 50),
-          }
+          })
         );
 
         // Priority 3: Handle general health inquiries with conversational AI
@@ -342,7 +341,7 @@ export async function POST(request: NextRequest) {
             message,
             {
               id: patient.id,
-              name: patient.name,
+              name: patient.name, // Name needed for AI personalization
               phoneNumber: patient.phoneNumber,
               cancerStage: patient.cancerStage,
             },

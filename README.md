@@ -16,21 +16,21 @@ Modern healthcare platform for patient management, reminders, and educational co
 ### Local Development
 
 ```sh
-bun install
-bun dev
+pnpm install
+pnpm dev
 ```
 
 ### Database Setup
 
 ```sh
-bunx drizzle-kit push
+pnpx drizzle-kit push
 ```
 
 ### Build & Production
 
 ```sh
-bun build
-bun start
+pnpm build
+pnpm start
 ```
 
 ---
@@ -53,14 +53,14 @@ docs/            # Documentation
 
 ## ⚙️ Key Workflows
 
-- **Install deps:** `bun install`
-- **Dev server:** `bun dev`
-- **Build:** `bun build` → `bun start`
-- **DB push:** `bunx drizzle-kit push`
-- **DB studio:** `bunx drizzle-kit studio`
-- **Tests:** `bun test`
-- **Typecheck:** `bunx tsc --noEmit`
-- **Lint:** `bun run lint`
+- **Install deps:** `pnpm install`
+- **Dev server:** `pnpm dev`
+- **Build:** `pnpm build` → `pnpm start`
+- **DB push:** `pnpx drizzle-kit push`
+- **DB studio:** `pnpx drizzle-kit studio`
+- **Tests:** `pnpm test`
+- **Typecheck:** `pnpx tsc --noEmit`
+- **Lint:** `pnpm run lint`
 
 ---
 
@@ -93,7 +93,7 @@ See `.env.local` for all required variables. Key vars:
 
 ### Unit Tests
 
-- **Run tests:** `bun test`
+- **Run tests:** `pnpm test`
 - **Vitest** for unit tests (see `tests/`)
 
 ### Comprehensive System Testing
@@ -102,14 +102,14 @@ See `.env.local` for all required variables. Key vars:
 
 ```bash
 # Run all comprehensive tests (~8 minutes)
-bun run test:comprehensive
+pnpm run test:comprehensive
 
 # Run specific categories
-bun run test:auth         # Authentication & Security
-bun run test:reminder     # Reminder System
-bun run test:whatsapp     # WhatsApp Integration
-bun run test:content      # Video & Berita (Articles)
-bun run test:load         # Load Testing (10, 25, 50, 100 users)
+pnpm run test:auth         # Authentication & Security
+pnpm run test:reminder     # Reminder System
+pnpm run test:whatsapp     # WhatsApp Integration
+pnpm run test:content      # Video & Berita (Articles)
+pnpm run test:load         # Load Testing (10, 25, 50, 100 users)
 ```
 
 **Features:**

@@ -28,7 +28,7 @@ export class TestUtils {
     details?: {
       method?: string;
       endpoint?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     }
   ): Promise<TestResult> {
     const start = performance.now();
@@ -304,7 +304,7 @@ export class TestUtils {
         return this.handleResponse(response);
       },
 
-      async post(path: string, body: any, options: RequestInit = {}) {
+      async post(path: string, body: unknown, options: RequestInit = {}) {
         const response = await fetch(`${this.baseURL}${path}`, {
           method: "POST",
           headers: {
@@ -319,7 +319,7 @@ export class TestUtils {
         return this.handleResponse(response);
       },
 
-      async put(path: string, body: any, options: RequestInit = {}) {
+      async put(path: string, body: unknown, options: RequestInit = {}) {
         const response = await fetch(`${this.baseURL}${path}`, {
           method: "PUT",
           headers: {

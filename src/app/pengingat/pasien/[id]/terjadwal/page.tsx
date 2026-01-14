@@ -11,6 +11,7 @@ import { EditScheduledReminderModal } from "@/components/reminder/EditScheduledR
 import { FloatingActionButtons } from "@/components/reminder/FloatingActionButtons";
 
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 interface ContentItem {
   id: string;
   title: string;
@@ -88,11 +89,11 @@ export default function ScheduledRemindersPage() {
         const result = await response.json();
 
         // Response structure: { success: true, data: { data: [...], pagination: {...} } }
-        logger.info("📅 Scheduled reminders raw response:", {
+        logger.info("📅 Scheduled reminders raw response:", sanitizeForAudit({
           patientId,
           hasData: !!result.data,
           hasPagination: !!result.pagination,
-        });
+        }));
 
         // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
         if (
@@ -125,10 +126,10 @@ export default function ScheduledRemindersPage() {
         logger.error(
           "Invalid response format for scheduled reminders",
           new Error("Validation failed"),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-scheduled",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -136,10 +137,10 @@ export default function ScheduledRemindersPage() {
         logger.error(
           "Failed to fetch scheduled reminders",
           new Error(`HTTP ${response.status}`),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-scheduled",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -148,7 +149,7 @@ export default function ScheduledRemindersPage() {
       logger.error(
         "Error fetching scheduled reminders:",
         error instanceof Error ? error : new Error(String(error)),
-        { patientId, operation: "fetch-scheduled" }
+        sanitizeForAudit({ patientId, operation: "fetch-scheduled" })
       );
       setReminders([]);
       setPagination(null);

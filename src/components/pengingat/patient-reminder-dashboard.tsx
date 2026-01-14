@@ -13,6 +13,7 @@ import type {
   ContentItem,
 } from "@/components/pengingat/types";
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 interface ScheduledReminderResponse {
   id: string;
@@ -304,7 +305,7 @@ export function PatientReminderDashboard({
   const fetchAllReminders = useCallback(
     async (retryCount = 0) => {
       try {
-        logger.info("Fetching all reminders for patient", { patientId });
+        logger.info("Fetching all reminders for patient", sanitizeForAudit({ patientId }));
         await Promise.all([
           fetchScheduledReminders(),
           fetchPendingReminders(),

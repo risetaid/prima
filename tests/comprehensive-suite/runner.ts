@@ -5,7 +5,7 @@
 
 import { mkdirSync } from "fs";
 import { join } from "path";
-import { TestSuiteReport, TestCategoryResult } from "./types";
+import { TestSuiteReport, TestCategoryResult, TestResult, LoadTestResult } from "./types";
 import { TestReporter } from "./reporter";
 import { CLIReporter } from "./cli-reporter";
 import { AuthTests } from "./auth.test";
@@ -17,7 +17,7 @@ import { LoadTests } from "./load.test";
 export class ComprehensiveTestRunner {
   private reporter = new TestReporter();
   private cliReporter = new CLIReporter();
-  private responseTimeResults: any[] = [];
+  private responseTimeResults: Array<{ endpoint: string; avg: string; min: string; max: string }> = [];
 
   /**
    * Run all comprehensive tests
@@ -97,11 +97,12 @@ export class ComprehensiveTestRunner {
     };
 
     // Calculate totals
-    Object.values(report.categories).forEach((category: any) => {
-      if ("total" in category) {
-        report.totalTests += category.total;
-        report.passed += category.passed;
-        report.failed += category.failed;
+    Object.values(report.categories).forEach((category) => {
+      if (typeof category === "object" && "total" in category) {
+        const cat = category as { total: number; passed: number; failed: number };
+        report.totalTests += cat.total;
+        report.passed += cat.passed;
+        report.failed += cat.failed;
       }
     });
 
@@ -121,7 +122,7 @@ export class ComprehensiveTestRunner {
   /**
    * Compile test results into category result
    */
-  private compileCategory(results: any[]): TestCategoryResult {
+  private compileCategory(results: TestResult[]): TestCategoryResult {
     const passed = results.filter((r) => r.status === "passed").length;
     const failed = results.filter((r) => r.status === "failed").length;
     const duration = results.reduce((sum, r) => sum + r.duration, 0);
@@ -143,7 +144,7 @@ export class ComprehensiveTestRunner {
     const resultsDir = join(process.cwd(), "test-results");
     try {
       mkdirSync(resultsDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Directory might already exist
     }
 
@@ -180,8 +181,8 @@ export class ComprehensiveTestRunner {
     console.log(`📍 URL: ${baseURL}\n`);
 
     const startTime = Date.now();
-    let results: any;
-    let loadResults: any = null;
+    let results: TestResult[] | null = null;
+    let loadResults: { concurrent10?: LoadTestResult; concurrent25?: LoadTestResult; concurrent50?: LoadTestResult; stress100?: LoadTestResult } | null = null;
 
     switch (category) {
       case "auth":
@@ -216,8 +217,8 @@ export class ComprehensiveTestRunner {
    */
   private printCategorySummary(
     category: string,
-    results: any[] | null,
-    loadResults: any | null,
+    results: TestResult[] | null,
+    loadResults: { concurrent10?: LoadTestResult; concurrent25?: LoadTestResult; concurrent50?: LoadTestResult; stress100?: LoadTestResult } | null,
     duration: number
   ) {
     console.log("\n" + "═".repeat(55));
@@ -255,7 +256,7 @@ export class ComprehensiveTestRunner {
 
       if (this.responseTimeResults.length > 0) {
         console.log(`\n📊 Response Time Analysis:\n`);
-        this.responseTimeResults.forEach((r: any) => {
+        this.responseTimeResults.forEach((r) => {
           const avgNum = parseInt(r.avg);
           const icon = avgNum < 200 ? "✅" : avgNum < 500 ? "⚠️" : "❌";
           console.log(

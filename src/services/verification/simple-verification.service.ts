@@ -3,6 +3,7 @@ import { db, patients } from "@/db";
 import { eq } from "drizzle-orm";
 import { sendWhatsAppMessage, formatWhatsAppNumber } from "@/lib/gowa";
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 import { whatsAppRateLimiter } from "@/services/rate-limit.service";
 import { invalidatePatientCache } from "@/lib/cache";
 import { ConversationStateService } from "@/services/conversation-state.service";
@@ -30,10 +31,10 @@ export class SimpleVerificationService {
         phoneNumber
       );
       if (!rateLimitResult.allowed) {
-        logger.warn("Verification rate limit exceeded", {
+        logger.warn("Verification rate limit exceeded", sanitizeForAudit({
           phoneNumber,
           rateLimitResult,
-        });
+        }));
         return false;
       }
 
@@ -104,29 +105,29 @@ Terima kasih! 💙 Tim PRIMA`;
 
           logger.info(
             "Set conversation context to verification with 48h expiration",
-            {
+            sanitizeForAudit({
               patientId,
               phoneNumber,
               stateId: conversationState.id,
               previousContext: conversationState.currentContext,
-            }
+            })
           );
         } catch (error) {
-          logger.warn("Failed to set verification conversation context", {
+          logger.warn("Failed to set verification conversation context", sanitizeForAudit({
             patientId,
             phoneNumber,
             error: error instanceof Error ? error.message : String(error),
-          });
+          }));
           // Don't fail the verification send if context setting fails
         }
 
         // Invalidate cache
         await invalidatePatientCache(patientId);
 
-        logger.info("Verification message sent successfully", {
+        logger.info("Verification message sent successfully", sanitizeForAudit({
           phoneNumber,
           messageId: result.messageId,
-        });
+        }));
 
         return true;
       } else {
@@ -135,9 +136,9 @@ Terima kasih! 💙 Tim PRIMA`;
           result.error
             ? new Error(result.error)
             : new Error("Unknown WhatsApp error"),
-          {
+          sanitizeForAudit({
             phoneNumber,
-          }
+          })
         );
         return false;
       }
@@ -145,9 +146,9 @@ Terima kasih! 💙 Tim PRIMA`;
       logger.error(
         "Error sending verification message",
         error instanceof Error ? error : new Error(String(error)),
-        {
+        sanitizeForAudit({
           phoneNumber,
-        }
+        })
       );
       return false;
     }
@@ -161,11 +162,11 @@ Terima kasih! 💙 Tim PRIMA`;
     patientId: string
   ): Promise<VerificationResponse> {
     try {
-      logger.info("SimpleVerificationService.processResponse called", {
+      logger.info("SimpleVerificationService.processResponse called", sanitizeForAudit({
         patientId,
         message: message.substring(0, 100),
         messageLength: message.length,
-      });
+      }));
 
       let action: "verified" | "declined" | "invalid_response" =
         "invalid_response";
@@ -182,11 +183,11 @@ Terima kasih! 💙 Tim PRIMA`;
 
         const patientName = patientData[0]?.name;
 
-        logger.info("🤖 Attempting AI verification classification", {
+        logger.info("Attempting AI verification classification", sanitizeForAudit({
           patientId,
           patientName,
           messagePreview: message.substring(0, 50),
-        });
+        }));
 
         const aiResult =
           await this.aiIntentService.classifyVerificationResponse(
@@ -194,13 +195,13 @@ Terima kasih! 💙 Tim PRIMA`;
             patientName
           );
 
-        logger.info("🤖 AI verification classification result", {
+        logger.info("AI verification classification result", sanitizeForAudit({
           patientId,
           intent: aiResult.intent,
           confidence: aiResult.confidence,
           confidenceLevel: aiResult.confidenceLevel,
           reasoning: aiResult.reasoning.substring(0, 100),
-        });
+        }));
 
         // Map AI intent to action if confidence is sufficient
         if (
@@ -209,37 +210,37 @@ Terima kasih! 💙 Tim PRIMA`;
         ) {
           action = "verified";
           classificationMethod = "ai";
-          logger.info("✅ AI classified as ACCEPT", {
+          logger.info("AI classified as ACCEPT", sanitizeForAudit({
             patientId,
             confidence: aiResult.confidence,
-          });
+          }));
         } else if (
           aiResult.intent === "verification_decline" &&
           aiResult.confidenceLevel !== "low"
         ) {
           action = "declined";
           classificationMethod = "ai";
-          logger.info("❌ AI classified as DECLINE", {
+          logger.info("AI classified as DECLINE", sanitizeForAudit({
             patientId,
             confidence: aiResult.confidence,
-          });
+          }));
         } else {
           logger.info(
-            "🔄 AI unclear or low confidence, falling back to keywords",
-            {
+            "AI unclear or low confidence, falling back to keywords",
+            sanitizeForAudit({
               patientId,
               intent: aiResult.intent,
               confidence: aiResult.confidence,
-            }
+            })
           );
         }
       } catch (error) {
         logger.warn(
-          "⚠️ AI verification classification failed, falling back to keywords",
-          {
+          "AI verification classification failed, falling back to keywords",
+          sanitizeForAudit({
             patientId,
             error: error instanceof Error ? error.message : "Unknown",
-          }
+          })
         );
       }
 
@@ -268,34 +269,34 @@ Terima kasih! 💙 Tim PRIMA`;
           "engga",
         ];
 
-        logger.info("🔤 Using keyword fallback for verification", {
+        logger.info("Using keyword fallback for verification", sanitizeForAudit({
           patientId,
           message: msg,
           acceptKeywords,
           declineKeywords,
-        });
+        }));
 
         if (acceptKeywords.some((keyword) => msg.includes(keyword))) {
           action = "verified";
           classificationMethod = "keyword";
-          logger.info("✅ Keyword matched ACCEPT", {
+          logger.info("Keyword matched ACCEPT", sanitizeForAudit({
             patientId,
             action,
             matchedKeyword: acceptKeywords.find((k) => msg.includes(k)),
-          });
+          }));
         } else if (declineKeywords.some((keyword) => msg.includes(keyword))) {
           action = "declined";
           classificationMethod = "keyword";
-          logger.info("❌ Keyword matched DECLINE", {
+          logger.info("Keyword matched DECLINE", sanitizeForAudit({
             patientId,
             action,
             matchedKeyword: declineKeywords.find((k) => msg.includes(k)),
-          });
+          }));
         } else {
-          logger.info("❓ No keyword match, invalid response", {
+          logger.info("No keyword match, invalid response", sanitizeForAudit({
             patientId,
             action,
-          });
+          }));
         }
       }
 
@@ -331,12 +332,12 @@ Terima kasih! 💙 Tim PRIMA`;
       // Update patient status
       const status = action === "verified" ? "VERIFIED" : "DECLINED";
 
-      logger.info("Updating patient verification status in database", {
+      logger.info("Updating patient verification status in database", sanitizeForAudit({
         patientId,
         newStatus: status,
         action,
         classificationMethod, // Track whether AI or keyword was used
-      });
+      }));
 
       const updateResult = await db
         .update(patients)
@@ -347,11 +348,11 @@ Terima kasih! 💙 Tim PRIMA`;
         })
         .where(eq(patients.id, patientId));
 
-      logger.info("Database update completed", {
+      logger.info("Database update completed", sanitizeForAudit({
         patientId,
         updateResult,
         status,
-      });
+      }));
 
       // Invalidate cache
       await invalidatePatientCache(patientId);
@@ -366,55 +367,55 @@ Terima kasih! 💙 Tim PRIMA`;
       if (patient[0]) {
         const ackMessage =
           action === "verified"
-            ? `Terima kasih ${patient[0].name}! ✅\n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n💙 Tim PRIMA`
-            : `Baik ${patient[0].name}, terima kasih atas responsnya.\n\nSemoga sehat selalu! 🙏\n\n💙 Tim PRIMA`;
+            ? `Terima kasih ${patient[0].name}! \n\nAnda akan menerima pengingat dari relawan PRIMA.\n\nUntuk berhenti kapan saja, ketik: *BERHENTI*\n\n Tim PRIMA`
+            : `Baik ${patient[0].name}, terima kasih atas responsnya.\n\nSemoga sehat selalu!\n\n Tim PRIMA`;
 
-        logger.info("📤 Sending verification acknowledgment", {
+        logger.info("Sending verification acknowledgment", sanitizeForAudit({
           patientId,
           patientName: patient[0].name,
           phoneNumber: patient[0].phoneNumber,
           action,
-        });
+        }));
 
         const sendResult = await sendWhatsAppMessage({
           to: formatWhatsAppNumber(patient[0].phoneNumber),
           body: ackMessage,
         });
 
-        logger.info("📤 Verification acknowledgment result", {
+        logger.info("Verification acknowledgment result", sanitizeForAudit({
           patientId,
           success: sendResult.success,
           messageId: sendResult.messageId,
           error: sendResult.error,
-        });
+        }));
       } else {
-        logger.warn("❌ Patient not found for acknowledgment", { patientId });
+        logger.warn("Patient not found for acknowledgment", sanitizeForAudit({ patientId }));
       }
 
       // Clear conversation context after successful verification
       try {
         const conversationService = new ConversationStateService();
         await conversationService.clearContext(patientId);
-        logger.info("Cleared conversation context after verification", {
+        logger.info("Cleared conversation context after verification", sanitizeForAudit({
           patientId,
           action,
-        });
+        }));
       } catch (contextError) {
-        logger.warn("Failed to clear context after verification", {
+        logger.warn("Failed to clear context after verification", sanitizeForAudit({
           patientId,
           error:
             contextError instanceof Error
               ? contextError.message
               : String(contextError),
-        });
+        }));
         // Don't fail the verification if context clearing fails
       }
 
-      logger.info("Verification response processed successfully", {
+      logger.info("Verification response processed successfully", sanitizeForAudit({
         patientId,
         action,
         message: message.substring(0, 50),
-      });
+      }));
 
       return {
         processed: true,
@@ -425,9 +426,9 @@ Terima kasih! 💙 Tim PRIMA`;
       logger.error(
         "Error processing verification response",
         error instanceof Error ? error : new Error(String(error)),
-        {
+        sanitizeForAudit({
           patientId,
-        }
+        })
       );
       return {
         processed: false,

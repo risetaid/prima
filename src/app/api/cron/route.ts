@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { logger } from "@/lib/logger";
 import { reminderProcessingRateLimiter } from "@/services/rate-limit.service";
 import { apiSuccess, apiError } from "@/lib/api-helpers";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 // Import reminder service for follow-up scheduling
 let reminderService:
@@ -228,12 +229,11 @@ async function processRemindersWithLock() {
 
         if (sendResult?.success) {
           successCount++;
-          logger.info("Reminder sent successfully", {
+          logger.info("Reminder sent successfully", sanitizeForAudit({
             reminderId: reminder.id,
-            patientId: reminder.patientId,
             patientName: reminder.patientName,
             messageId: sendResult?.messageId,
-          });
+          }));
         } else {
           failedCount++;
           errors.push(
@@ -241,7 +241,6 @@ async function processRemindersWithLock() {
           );
           logger.warn("Failed to send reminder", {
             reminderId: reminder.id,
-            patientId: reminder.patientId,
             error: sendResult?.error,
           });
         }
@@ -252,7 +251,6 @@ async function processRemindersWithLock() {
         errors.push(`Reminder ${reminder.id}: ${errorMsg}`);
         logger.error("Error processing reminder", error as Error, {
           reminderId: reminder.id,
-          patientId: reminder.patientId,
         });
       }
     }

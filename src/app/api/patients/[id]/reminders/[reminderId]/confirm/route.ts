@@ -4,6 +4,7 @@ import { db, manualConfirmations, reminders } from '@/db'
 import { eq, and } from 'drizzle-orm'
 import { del, CACHE_KEYS } from '@/lib/cache'
 import { logger } from '@/lib/logger'
+import { sanitizeForAudit } from '@/lib/phi-mask'
 import { z } from 'zod'
 
 // Schema for reminder confirmation request
@@ -43,20 +44,20 @@ export const PUT = createApiHandler(
     });
 
     const { id, reminderId: rawReminderId } = params!;
-    logger.info("📋 URL params:", { patientId: id, rawReminderId });
+    logger.info("📋 URL params:", sanitizeForAudit({ patientId: id, rawReminderId }));
 
     const reminderId = rawReminderId;
     const effectiveReminderId = reminderLogId || reminderId;
 
-    logger.info("🔍 Processed IDs:", {
+    logger.info("🔍 Processed IDs:", sanitizeForAudit({
       patientId: id,
       reminderId,
       effectiveReminderId,
       confirmed,
-    });
+    }));
 
     // Get the reminder using separate queries
-    logger.info("🔍 Querying reminder:", { reminderId: effectiveReminderId, patientId: id });
+    logger.info("🔍 Querying reminder:", sanitizeForAudit({ reminderId: effectiveReminderId, patientId: id }));
     const reminderData = await db
       .select({
         id: reminders.id,
@@ -74,7 +75,7 @@ export const PUT = createApiHandler(
     });
 
     if (reminderData.length === 0) {
-      logger.error("❌ REMINDER NOT FOUND:", undefined, { reminderId: effectiveReminderId, patientId: id });
+      logger.error("❌ REMINDER NOT FOUND:", undefined, sanitizeForAudit({ reminderId: effectiveReminderId, patientId: id }));
       throw new Error("Reminder not found");
     }
 
@@ -143,12 +144,12 @@ export const PUT = createApiHandler(
     );
 
     // Create manual confirmation with proper relations
-    logger.info("💾 Creating manual confirmation:", {
+    logger.info("💾 Creating manual confirmation:", sanitizeForAudit({
       patientId: id,
       volunteerId: user!.id,
       reminderLogId: effectiveReminderId,
       confirmed,
-    });
+    }));
 
     try {
       const newManualConfirmation = await db
@@ -188,7 +189,7 @@ export const PUT = createApiHandler(
 
       // Invalidate cache after confirmation
       await del(CACHE_KEYS.reminderStats(id));
-      logger.info("🗑️ Cache invalidated for patient:", { patientId: id });
+      logger.info("🗑️ Cache invalidated for patient:", sanitizeForAudit({ patientId: id }));
 
       logger.info("🎉 REMINDER CONFIRMATION COMPLETED SUCCESSFULLY");
       return newManualConfirmation[0];

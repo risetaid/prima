@@ -13,6 +13,7 @@ import { UserButton } from "@clerk/nextjs";
 import { toast } from "sonner";
 
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 interface PendingReminder {
   id: string;
   scheduledTime: string;
@@ -59,11 +60,11 @@ export default function PendingUpdatePage() {
         const result = await response.json();
 
         // Response structure: { success: true, data: { data: [...], pagination: {...} } }
-        logger.info("⏰ Pending reminders raw response:", {
+        logger.info("⏰ Pending reminders raw response:", sanitizeForAudit({
           patientId,
           hasData: !!result.data,
           hasPagination: !!result.pagination,
-        });
+        }));
 
         // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
         if (
@@ -104,10 +105,10 @@ export default function PendingUpdatePage() {
         logger.error(
           "Invalid response format for pending reminders",
           new Error("Validation failed"),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-pending",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -115,10 +116,10 @@ export default function PendingUpdatePage() {
         logger.error(
           "Failed to fetch pending reminders",
           new Error(`HTTP ${response.status}`),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-pending",
-          }
+          })
         );
         setReminders([]);
         setPagination(null);
@@ -127,7 +128,7 @@ export default function PendingUpdatePage() {
       logger.error(
         "Error fetching pending reminders:",
         error instanceof Error ? error : new Error(String(error)),
-        { patientId, operation: "fetch-pending" }
+        sanitizeForAudit({ patientId, operation: "fetch-pending" })
       );
       setReminders([]);
       setPagination(null);

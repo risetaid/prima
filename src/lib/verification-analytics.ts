@@ -120,41 +120,13 @@ export class VerificationAnalytics {
   }
 
   /**
-   * Track verification sent event
-   */
-  async trackVerificationSent(patientId: string, phoneNumber: string): Promise<void> {
-    try {
-      logger.info('Tracking verification sent', { patientId, phoneNumber })
-      // This is a tracking method - actual logging happens in the verification service
-    } catch (error) {
-      logger.error('Failed to track verification sent', error instanceof Error ? error : new Error(String(error)), { patientId, phoneNumber })
-    }
-  }
-
-  /**
-   * Track verification response event
-   */
-  async trackVerificationResponse(
-    patientId: string, 
-    response: string, 
-    success: boolean
-  ): Promise<void> {
-    try {
-      logger.info('Tracking verification response', { patientId, response, success })
-      // This is a tracking method - actual logging happens in the verification service
-    } catch (error) {
-      logger.error('Failed to track verification response', error instanceof Error ? error : new Error(String(error)), { patientId, response, success })
-    }
-  }
-
-  /**
    * Get verification analytics summary for the last 30 days
    */
   async getLast30DaysSummary(): Promise<VerificationAnalyticsData> {
     const endDate = new Date()
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - 30)
-    
+
     return this.getAnalytics(startDate, endDate)
   }
 
@@ -165,7 +137,7 @@ export class VerificationAnalytics {
     const endDate = new Date()
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - 7)
-    
+
     return this.getAnalytics(startDate, endDate)
   }
 }

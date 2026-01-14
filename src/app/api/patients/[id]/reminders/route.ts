@@ -2,6 +2,7 @@ import { createApiHandler } from "@/lib/api-helpers";
 import { z } from "zod";
 import { PatientAccessControl } from "@/services/patient/patient-access-control";
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 import { db, reminders, manualConfirmations, patients } from "@/db";
 import {
   eq,
@@ -268,7 +269,7 @@ async function getCompletedReminders(
     offset + limitNum
   );
 
-  logger.info("Completed reminders fetched", {
+  logger.info("Completed reminders fetched", sanitizeForAudit({
     patientId,
     userId,
     count: paginatedReminders.length,
@@ -276,7 +277,7 @@ async function getCompletedReminders(
     limit: limitNum,
     total,
     operation: "fetch_completed_reminders",
-  });
+  }));
 
   return {
     data: paginatedReminders,

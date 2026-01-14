@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { WhatsAppService } from "@/services/whatsapp/whatsapp.service";
 import { PatientLookupService } from "@/services/patient/patient-lookup.service";
 import { getAIIntentService } from "@/services/ai/ai-intent.service";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 export class SimpleConfirmationService {
   private whatsappService: WhatsAppService;
@@ -28,101 +29,101 @@ export class SimpleConfirmationService {
     error?: string;
   }> {
     try {
-      logger.info('🔍 Processing reminder response', {
+      logger.info('🔍 Processing reminder response', sanitizeForAudit({
         sender,
         message: message.substring(0, 50),
         messageLength: message.length
-      });
+      }));
 
       // 1. Find patient by phone number
       const patientResult = await this.patientLookup.findPatientByPhone(sender);
       if (!patientResult.found || !patientResult.patient) {
-        logger.info('❌ No patient found for message', { sender, message: message.substring(0, 50) });
+        logger.info('❌ No patient found for message', sanitizeForAudit({ sender, message: message.substring(0, 50) }));
         return { success: true, action: 'no_reminder' };
       }
 
       const patient = patientResult.patient;
-      logger.info('✅ Patient found', {
+      logger.info('✅ Patient found', sanitizeForAudit({
         patientId: patient.id,
         patientName: patient.name,
         verificationStatus: patient.verificationStatus
-      });
+      }));
 
       // 2. Try AI Intent Classification first
       let confirmationType: 'confirmed' | 'missed' | null = null;
       let classificationMethod: 'ai' | 'keyword' | 'none' = 'none';
 
       try {
-        logger.info('🤖 Attempting AI intent classification', {
+        logger.info('🤖 Attempting AI intent classification', sanitizeForAudit({
           patientId: patient.id,
           messagePreview: message.substring(0, 50)
-        });
+        }));
 
         const aiResult = await this.aiIntentService.classifyReminderConfirmation(
           message,
           patient.name
         );
 
-        logger.info('🤖 AI classification result', {
+        logger.info('🤖 AI classification result', sanitizeForAudit({
           patientId: patient.id,
           intent: aiResult.intent,
           confidence: aiResult.confidence,
           confidenceLevel: aiResult.confidenceLevel,
           reasoning: aiResult.reasoning.substring(0, 100)
-        });
+        }));
 
         // Map AI intent to confirmation type if confidence is high enough
         if (aiResult.intent === 'reminder_confirmed' && aiResult.confidenceLevel !== 'low') {
           confirmationType = 'confirmed';
           classificationMethod = 'ai';
-          logger.info('✅ AI classified as CONFIRMED', {
+          logger.info('✅ AI classified as CONFIRMED', sanitizeForAudit({
             patientId: patient.id,
             confidence: aiResult.confidence
-          });
+          }));
         } else if (aiResult.intent === 'reminder_missed' && aiResult.confidenceLevel !== 'low') {
           confirmationType = 'missed';
           classificationMethod = 'ai';
-          logger.info('⏰ AI classified as MISSED', {
+          logger.info('⏰ AI classified as MISSED', sanitizeForAudit({
             patientId: patient.id,
             confidence: aiResult.confidence
-          });
+          }));
         } else {
-          logger.info('🔄 AI unclear or low confidence, falling back to keywords', {
+          logger.info('🔄 AI unclear or low confidence, falling back to keywords', sanitizeForAudit({
             patientId: patient.id,
             intent: aiResult.intent,
             confidence: aiResult.confidence
-          });
+          }));
         }
       } catch (error) {
-        logger.warn('⚠️ AI classification failed, falling back to keywords', {
+        logger.warn('⚠️ AI classification failed, falling back to keywords', sanitizeForAudit({
           patientId: patient.id,
           error: error instanceof Error ? error.message : 'Unknown'
-        });
+        }));
       }
 
       // 3. Fallback to keyword matching if AI didn't provide clear result
       if (!confirmationType) {
         const normalizedMessage = message.toLowerCase().trim();
-        logger.info('🔤 Using keyword fallback', {
+        logger.info('🔤 Using keyword fallback', sanitizeForAudit({
           original: message,
           normalized: normalizedMessage,
           patientId: patient.id
-        });
+        }));
 
         if (['sudah', 'selesai'].includes(normalizedMessage)) {
           confirmationType = 'confirmed';
           classificationMethod = 'keyword';
-          logger.info('✅ Keyword matched CONFIRMED', { normalizedMessage, patientId: patient.id });
+          logger.info('✅ Keyword matched CONFIRMED', sanitizeForAudit({ normalizedMessage, patientId: patient.id }));
         } else if (['belum'].includes(normalizedMessage)) {
           confirmationType = 'missed';
           classificationMethod = 'keyword';
-          logger.info('⏰ Keyword matched MISSED', { normalizedMessage, patientId: patient.id });
+          logger.info('⏰ Keyword matched MISSED', sanitizeForAudit({ normalizedMessage, patientId: patient.id }));
         } else {
-          logger.info('❌ No keyword match, invalid response', {
+          logger.info('❌ No keyword match, invalid response', sanitizeForAudit({
             patientId: patient.id,
             normalizedMessage,
             original: message.substring(0, 50)
-          });
+          }));
           return { success: true, action: 'invalid_response' };
         }
       }
@@ -131,11 +132,11 @@ export class SimpleConfirmationService {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
 
-      logger.info('🔍 Searching for pending reminders', {
+      logger.info('🔍 Searching for pending reminders', sanitizeForAudit({
         patientId: patient.id,
         since: yesterday.toISOString(),
         confirmationType
-      });
+      }));
 
       const recentReminders = await db
         .select()
@@ -156,31 +157,31 @@ export class SimpleConfirmationService {
         .orderBy(desc(reminders.sentAt))
         .limit(1);
 
-      logger.info('📊 Reminder search results', {
+      logger.info('📊 Reminder search results', sanitizeForAudit({
         patientId: patient.id,
         foundCount: recentReminders.length,
         confirmationType
-      });
+      }));
 
       if (recentReminders.length === 0) {
-        logger.warn('⚠️ No pending reminders found', {
+        logger.warn('⚠️ No pending reminders found', sanitizeForAudit({
           patientId: patient.id,
           confirmationType,
           message: message.substring(0, 50)
-        });
+        }));
         return { success: true, action: 'no_reminder' };
       }
 
       const reminder = recentReminders[0];
 
-      logger.info('📝 Found reminder to update', {
+      logger.info('📝 Found reminder to update', sanitizeForAudit({
         reminderId: reminder.id,
         patientId: patient.id,
         reminderStatus: reminder.status,
         reminderConfirmationStatus: reminder.confirmationStatus,
         sentAt: reminder.sentAt,
         confirmationType
-      });
+      }));
 
       // 5. Update reminder based on confirmation (include classification method)
       const updateData: {
@@ -197,24 +198,24 @@ export class SimpleConfirmationService {
         )
       };
 
-      logger.info('💾 Updating reminder with data', {
+      logger.info('💾 Updating reminder with data', sanitizeForAudit({
         reminderId: reminder.id,
         updateData,
         patientId: patient.id,
         classificationMethod // Track whether AI or keyword was used
-      });
+      }));
 
       await db
         .update(reminders)
         .set(updateData)
         .where(eq(reminders.id, reminder.id));
 
-      logger.info('✅ Reminder updated successfully', {
+      logger.info('✅ Reminder updated successfully', sanitizeForAudit({
         patientId: patient.id,
         reminderId: reminder.id,
         confirmationType,
         message: message.substring(0, 50)
-      });
+      }));
 
       // 6. Send acknowledgment
       await this.sendAcknowledgment({
@@ -229,10 +230,10 @@ export class SimpleConfirmationService {
       };
 
     } catch (error) {
-      logger.error('Failed to process reminder confirmation', error as Error, {
+      logger.error('Failed to process reminder confirmation', error as Error, sanitizeForAudit({
         sender,
         message: message.substring(0, 50)
-      });
+      }));
 
       return {
         success: false,
@@ -260,16 +261,16 @@ export class SimpleConfirmationService {
 
       await this.whatsappService.sendAck(patient.phoneNumber, message);
 
-      logger.info('Acknowledgment sent', {
+      logger.info('Acknowledgment sent', sanitizeForAudit({
         patientId: patient.id,
         confirmationType
-      });
+      }));
 
     } catch (error) {
-      logger.error('Failed to send acknowledgment', error as Error, {
+      logger.error('Failed to send acknowledgment', error as Error, sanitizeForAudit({
         patientId: patient.id,
         confirmationType
-      });
+      }));
       // Don't fail the whole operation if ACK fails
     }
   }

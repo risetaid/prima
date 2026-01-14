@@ -102,66 +102,17 @@ export class RateLimiter {
   }
 
   /**
-   * Legacy JSON-based rate limiting (kept for backward compatibility)
-   * @deprecated Use checkRateLimit which uses sorted sets
+   * Check if request should be rate limited using sliding window algorithm
+   * Uses Redis sorted sets for O(log N) operations instead of JSON parsing
+   *
+   * This is an alias for checkRateLimit() to make it explicit that this
+   * implementation uses a sliding window algorithm (not fixed window).
    */
-  static async checkRateLimitLegacy(
+  static async checkSlidingWindow(
     identifier: string,
     config: RateLimitConfig
   ): Promise<RateLimitResult> {
-    const fullConfig = { ...this.DEFAULT_CONFIG, ...config }
-    const key = `${fullConfig.keyPrefix}:${identifier}`
-    const now = Date.now()
-    const windowStart = now - fullConfig.windowMs
-
-    try {
-      const currentData = await redis.get(key)
-      let requestData: { requests: number[]; windowStart: number } = {
-        requests: [],
-        windowStart: now
-      }
-
-      if (currentData) {
-        try {
-          requestData = JSON.parse(currentData)
-        } catch {
-          requestData = { requests: [], windowStart: now }
-        }
-      }
-
-      requestData.requests = requestData.requests.filter(timestamp => timestamp > windowStart)
-      requestData.windowStart = windowStart
-      requestData.requests.push(now)
-
-      const requestCount = requestData.requests.length
-      const allowed = requestCount <= fullConfig.maxRequests
-      const remaining = Math.max(0, fullConfig.maxRequests - requestCount)
-      const resetTime = now + fullConfig.windowMs
-
-      await redis.set(
-        key,
-        JSON.stringify(requestData),
-        Math.ceil(fullConfig.windowMs / 1000) + 60
-      )
-
-      return {
-        allowed,
-        remaining,
-        resetTime,
-        totalRequests: requestCount
-      }
-    } catch (error) {
-      logger.error('Rate limiter legacy error', error instanceof Error ? error : new Error(String(error)), {
-        identifier
-      })
-
-      return {
-        allowed: true,
-        remaining: fullConfig.maxRequests,
-        resetTime: now + fullConfig.windowMs,
-        totalRequests: 0
-      }
-    }
+    return this.checkRateLimit(identifier, config);
   }
 
   /**

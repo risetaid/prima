@@ -12,6 +12,25 @@ import type { InferInsertModel } from "drizzle-orm";
 import type {
   PatientFilters,
 } from "@/services/patient/patient.types";
+import { auditService } from "@/services/audit/audit.service";
+
+// Audit context - set by the service layer
+export let currentAuditContext: { userId?: string; ipAddress?: string; userAgent?: string; requestId?: string } | undefined = undefined;
+
+/**
+ * Set audit context for repository operations
+ * Should be called before any patient data access
+ */
+export function setAuditContext(context: { userId?: string; ipAddress?: string; userAgent?: string; requestId?: string }) {
+  currentAuditContext = context;
+}
+
+/**
+ * Clear audit context after operation
+ */
+export function clearAuditContext() {
+  currentAuditContext = undefined;
+}
 
 export class PatientRepository {
   async patientExists(patientId: string): Promise<boolean> {
@@ -103,35 +122,54 @@ export class PatientRepository {
       .orderBy(orderColumn);
 
     // Note: orderDirection is not applied due to Drizzle limitation in this context; acceptable for now.
+
+    // Audit log for patient list access
+    auditService.logAccess({
+      action: 'READ',
+      resourceType: 'patient',
+      metadata: {
+        operation: 'list_patients',
+        filters: {
+          status,
+          assignedVolunteerId,
+          search: search ? '[PRESENT]' : null,
+          page,
+          limit,
+          resultCount: rows.length,
+        },
+      },
+      context: currentAuditContext,
+    }).catch(() => {});
+
     return rows;
   }
 
-  // ===== Standardized Compliance counts using ComplianceService =====
+  // ===== Optimized Compliance counts using batch queries =====
   async getCompletedComplianceCounts(patientIds: string[]) {
-    if (!patientIds.length)
+    if (!patientIds.length) {
       return [] as Array<{
         patientId: string;
         totalConfirmed: number;
         takenCount: number;
       }>;
+    }
 
     // Import here to avoid circular dependency
     const { ComplianceService } = await import("@/services/patient/compliance.service");
     const complianceService = new ComplianceService();
 
-    const results = await Promise.all(
-      patientIds.map(async (patientId) => {
-        const stats = await complianceService.getPatientComplianceStats(patientId);
+    // Use batch method for O(1) DB queries instead of O(N)
+    const statsMap = await complianceService.getBatchPatientStats(patientIds);
 
-        return {
-          patientId,
-          totalConfirmed: stats.confirmedReminders,
-          takenCount: stats.confirmedReminders,
-        };
-      })
-    );
-
-    return results;
+    // Transform to expected format
+    return patientIds.map(patientId => {
+      const stats = statsMap.get(patientId);
+      return {
+        patientId,
+        totalConfirmed: stats?.completedReminders ?? 0,
+        takenCount: stats?.completedReminders ?? 0,
+      };
+    });
   }
 
 
@@ -174,6 +212,22 @@ export class PatientRepository {
       .leftJoin(users, eq(patients.assignedVolunteerId, users.id))
       .where(and(eq(patients.id, patientId), isNull(patients.deletedAt)))
       .limit(1);
+
+    // Audit log for individual patient access
+    if (result[0]) {
+      auditService.logAccess({
+        action: 'READ',
+        resourceType: 'patient',
+        resourceId: patientId,
+        patientId,
+        metadata: {
+          operation: 'get_patient_basic_data',
+          verificationStatus: result[0].verificationStatus,
+          isActive: result[0].isActive,
+        },
+        context: currentAuditContext,
+      }).catch(() => {});
+    }
 
     return result[0] || null;
   }

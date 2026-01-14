@@ -6,6 +6,7 @@ import { patients } from '@/db'
 import { eq, or, and } from 'drizzle-orm'
 import { logger } from '@/lib/logger'
 import { generatePhoneAlternatives } from '@/lib/phone-utils'
+import { sanitizeForAudit } from '@/lib/phi-mask'
 
 export interface PatientLookupResult {
   found: boolean
@@ -22,6 +23,17 @@ export interface PatientLookupResult {
   error?: string
 }
 
+// Common select fields for patient lookup queries
+const PATIENT_SELECT_FIELDS = {
+  id: patients.id,
+  name: patients.name,
+  phoneNumber: patients.phoneNumber,
+  verificationStatus: patients.verificationStatus,
+  isActive: patients.isActive,
+  cancerStage: patients.cancerStage,
+  assignedVolunteerId: patients.assignedVolunteerId
+} as const
+
 export class PatientLookupService {
   /**
    * Find patient by phone number with fallback formats
@@ -31,22 +43,14 @@ export class PatientLookupService {
       // Generate alternative phone number formats
       const alternatives = generatePhoneAlternatives(phoneNumber)
 
-      logger.info('Looking up patient by phone', {
+      logger.info('Looking up patient by phone', sanitizeForAudit({
         originalPhone: phoneNumber,
         alternativesCount: alternatives.length
-      })
+      }))
 
       // Try to find PENDING patient first (for webhook processing) - ONLY ACTIVE
       let patientResult = await db
-        .select({
-          id: patients.id,
-          name: patients.name,
-          phoneNumber: patients.phoneNumber,
-          verificationStatus: patients.verificationStatus,
-          isActive: patients.isActive,
-          cancerStage: patients.cancerStage,
-          assignedVolunteerId: patients.assignedVolunteerId
-        })
+        .select(PATIENT_SELECT_FIELDS)
         .from(patients)
         .where(and(
           eq(patients.phoneNumber, phoneNumber),
@@ -58,15 +62,7 @@ export class PatientLookupService {
       // If no PENDING patient found, try VERIFIED patients - ONLY ACTIVE
       if (!patientResult.length) {
         patientResult = await db
-          .select({
-            id: patients.id,
-            name: patients.name,
-            phoneNumber: patients.phoneNumber,
-            verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive,
-            cancerStage: patients.cancerStage,
-            assignedVolunteerId: patients.assignedVolunteerId
-          })
+          .select(PATIENT_SELECT_FIELDS)
           .from(patients)
           .where(and(
             eq(patients.phoneNumber, phoneNumber),
@@ -79,15 +75,7 @@ export class PatientLookupService {
       // If still not found, try any status (fallback) - ONLY ACTIVE
       if (!patientResult.length) {
         patientResult = await db
-          .select({
-            id: patients.id,
-            name: patients.name,
-            phoneNumber: patients.phoneNumber,
-            verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive,
-            cancerStage: patients.cancerStage,
-            assignedVolunteerId: patients.assignedVolunteerId
-          })
+          .select(PATIENT_SELECT_FIELDS)
           .from(patients)
           .where(and(
             eq(patients.phoneNumber, phoneNumber),
@@ -104,15 +92,7 @@ export class PatientLookupService {
 
         // Try PENDING patients with alternative phone formats first - ONLY ACTIVE
         patientResult = await db
-          .select({
-            id: patients.id,
-            name: patients.name,
-            phoneNumber: patients.phoneNumber,
-            verificationStatus: patients.verificationStatus,
-            isActive: patients.isActive,
-            cancerStage: patients.cancerStage,
-            assignedVolunteerId: patients.assignedVolunteerId
-          })
+          .select(PATIENT_SELECT_FIELDS)
           .from(patients)
           .where(and(
             whereClause,
@@ -124,15 +104,7 @@ export class PatientLookupService {
         // If no PENDING found, try VERIFIED - ONLY ACTIVE
         if (!patientResult.length) {
           patientResult = await db
-            .select({
-              id: patients.id,
-              name: patients.name,
-              phoneNumber: patients.phoneNumber,
-              verificationStatus: patients.verificationStatus,
-              isActive: patients.isActive,
-              cancerStage: patients.cancerStage,
-              assignedVolunteerId: patients.assignedVolunteerId
-            })
+            .select(PATIENT_SELECT_FIELDS)
             .from(patients)
             .where(and(
               whereClause,
@@ -145,15 +117,7 @@ export class PatientLookupService {
         // Final fallback - any status - ONLY ACTIVE
         if (!patientResult.length) {
           patientResult = await db
-            .select({
-              id: patients.id,
-              name: patients.name,
-              phoneNumber: patients.phoneNumber,
-              verificationStatus: patients.verificationStatus,
-              isActive: patients.isActive,
-              cancerStage: patients.cancerStage,
-              assignedVolunteerId: patients.assignedVolunteerId
-            })
+            .select(PATIENT_SELECT_FIELDS)
             .from(patients)
             .where(and(
               whereClause,
@@ -166,12 +130,12 @@ export class PatientLookupService {
       if (patientResult.length > 0) {
         const patient = patientResult[0]
 
-        logger.info('Patient found by phone lookup', {
-          patientId: patient.id,
-          patientName: patient.name,
+        logger.info('Patient found by phone lookup', sanitizeForAudit({
+          id: patient.id,
+          name: patient.name,
           originalPhone: phoneNumber,
           matchedPhone: patient.phoneNumber
-        })
+        }))
 
         return {
           found: true,
@@ -188,17 +152,17 @@ export class PatientLookupService {
       }
 
       // Patient not found
-      logger.info('Patient not found by phone lookup', {
+      logger.info('Patient not found by phone lookup', sanitizeForAudit({
         phoneNumber,
         alternativesCount: alternatives.length
-      })
+      }))
 
       return {
         found: false,
         alternatives
       }
     } catch (error) {
-      logger.error('Patient lookup failed', error as Error, { phoneNumber })
+      logger.error('Patient lookup failed', error as Error, sanitizeForAudit({ phoneNumber }))
       return {
         found: false,
         error: 'Database lookup failed'
@@ -238,24 +202,16 @@ export class PatientLookupService {
       const newPatient = await db
         .insert(patients)
         .values(patientData)
-        .returning({
-          id: patients.id,
-          name: patients.name,
-          phoneNumber: patients.phoneNumber,
-          verificationStatus: patients.verificationStatus,
-          isActive: patients.isActive,
-          cancerStage: patients.cancerStage,
-          assignedVolunteerId: patients.assignedVolunteerId
-        })
+        .returning(PATIENT_SELECT_FIELDS)
 
       if (newPatient.length > 0) {
         const patient = newPatient[0]
 
-        logger.info('Created new patient for onboarding', {
-          patientId: patient.id,
-          phoneNumber,
+        logger.info('Created new patient for onboarding', sanitizeForAudit({
+          id: patient.id,
+          phone: phoneNumber,
           name: patient.name
-        })
+        }))
 
         return {
           found: true,
@@ -274,8 +230,10 @@ export class PatientLookupService {
       throw new Error('Failed to create patient record')
     } catch (error) {
       logger.error('Failed to create patient for onboarding', error as Error, {
-        phoneNumber,
-        name
+        ...sanitizeForAudit({
+          phoneNumber,
+          name
+        }),
       })
       return {
         found: false,
@@ -324,17 +282,17 @@ export class PatientLookupService {
         })
         .where(eq(patients.id, patientId))
 
-      logger.info('Updated patient information', {
-        patientId,
-        updates: Object.keys(updates)
-      })
+      logger.info('Updated patient information', sanitizeForAudit({
+        id: patientId,
+        updatedFields: Object.keys(updates)
+      }))
 
       return true
     } catch (error) {
-      logger.error('Failed to update patient information', error as Error, {
-        patientId,
+      logger.error('Failed to update patient information', error as Error, sanitizeForAudit({
+        id: patientId,
         updates
-      })
+      }))
       return false
     }
   }

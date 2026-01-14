@@ -79,9 +79,10 @@ export class WhatsAppTests {
           if (response.status >= 500) {
             throw new Error(`WAHA server error: ${response.status}`);
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const err = error as Error;
           // Connection refused is OK (WAHA not running in test)
-          if (error.message?.includes("ECONNREFUSED")) {
+          if (err.message?.includes("ECONNREFUSED")) {
             console.log(
               "   ℹ️  WAHA not running (expected in test environment)"
             );
@@ -163,7 +164,7 @@ export class WhatsAppTests {
         // Import the format function
         const { formatWhatsAppNumber } = await import("@/lib/gowa");
 
-        testCases.forEach(({ input, expected }) => {
+        testCases.forEach(({ input }) => {
           const formatted = formatWhatsAppNumber(input);
           if (!formatted.startsWith("628")) {
             throw new Error(`Phone format error: ${input} -> ${formatted}`);
@@ -274,7 +275,7 @@ export class WhatsAppTests {
         };
 
         // Send same message twice
-        const response1 = await this.client.post(endpoint, webhookPayload, {
+        await this.client.post(endpoint, webhookPayload, {
           headers: {
             "X-Webhook-Token": process.env.WEBHOOK_TOKEN || "test_token",
           },
@@ -506,10 +507,10 @@ export class WhatsAppTests {
           try {
             formatWhatsAppNumber(number);
             throw new Error(`Invalid number ${number} was accepted`);
-          } catch (error: any) {
-            // Should throw validation error
-            if (!error.message?.includes("Invalid")) {
-              throw new Error(`Wrong error for ${number}: ${error.message}`);
+          } catch (error: unknown) {
+            const err = error as Error;
+            if (!err.message?.includes("Invalid")) {
+              throw new Error(`Wrong error for ${number}: ${err.message}`);
             }
           }
         });
@@ -593,8 +594,9 @@ export class WhatsAppTests {
 
           // Note: Actually calling would need valid credentials
           console.log("   ℹ️  WhatsApp service structure validated");
-        } catch (error: any) {
-          if (error.message?.includes("not found")) {
+        } catch (error: unknown) {
+          const err = error as Error;
+          if (err.message?.includes("not found")) {
             throw error;
           }
           // Import errors are OK in test environment

@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { API_VERSION, VERSION_HEADER } from "@/lib/api-versioning";
 
 const isProtectedRoute = createRouteMatcher([
   "/pasien(.*)",
@@ -130,7 +131,7 @@ const clerkProtection = clerkMiddleware(async (auth, req) => {
 });
 
 // Main middleware - check API key first, then Clerk
-export default async function middleware(req: NextRequest) {
+export default async function proxy(req: NextRequest) {
   // CSRF Protection: Verify Origin header for state-changing requests
   const method = req.method;
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
@@ -159,12 +160,20 @@ export default async function middleware(req: NextRequest) {
   
   // Fast path: if valid API key, bypass Clerk entirely
   if (hasValidApiKey(req)) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    // Add version header to all API responses
+    response.headers.set(VERSION_HEADER, API_VERSION);
+    return response;
   }
 
   // Otherwise, use Clerk middleware
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return clerkProtection(req, {} as any);
+  const response = await clerkProtection(req, {} as any);
+  // Add version header to all API responses if response is a Response object
+  if (response && 'headers' in response && response.headers instanceof Headers) {
+    response.headers.set(VERSION_HEADER, API_VERSION);
+  }
+  return response;
 }
 
 export const config = {

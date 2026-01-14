@@ -9,12 +9,11 @@
  *
  * Use with EXTREME caution - this action cannot be undone!
  *
- * Run with: bun run scripts/nuke-recreate-database.ts
+ * Run with: pnpm run scripts/nuke-recreate-database.ts
  */
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { logger } from "@/lib/logger";
@@ -27,7 +26,8 @@ if (!connectionString) {
 }
 
 const client = postgres(connectionString, { prepare: false });
-const db = drizzle(client);
+// Drizzle instance for future use if needed
+drizzle(client);
 
 async function dropAllTables() {
   logger.info("🗑️  Dropping all tables and types...");

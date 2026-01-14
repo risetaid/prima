@@ -1,6 +1,7 @@
 // ComplianceService centralizes compliance calculations for patients
 // Optimized: Batch queries to avoid N+1 problem
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 import { db, reminders, manualConfirmations } from "@/db";
 import { eq, and, isNull, inArray } from "drizzle-orm";
 
@@ -50,7 +51,7 @@ export class ComplianceService {
    * Batch fetch all reminders and confirmations for multiple patients
    * Optimized: 2 queries total instead of 2N queries
    */
-  private async getBatchPatientStats(patientIds: string[]): Promise<Map<string, PatientStatsInternal>> {
+  async getBatchPatientStats(patientIds: string[]): Promise<Map<string, PatientStatsInternal>> {
     if (!patientIds.length) {
       return new Map();
     }
@@ -188,13 +189,13 @@ export class ComplianceService {
     try {
       const stats = await this.getPatientStats(patientId);
 
-      logger.info("Compliance calculation completed", {
+      logger.info("Compliance calculation completed", sanitizeForAudit({
         patientId,
         totalReminders: stats.totalReminders,
         completedReminders: stats.completedReminders,
         complianceRate: stats.complianceRate,
         operation: "compliance_calculation",
-      });
+      }));
 
       return {
         deliveredCount: stats.totalReminders,
@@ -206,9 +207,9 @@ export class ComplianceService {
       logger.error(
         "Failed to calculate patient compliance",
         error instanceof Error ? error : new Error(String(error)),
-        {
+        sanitizeForAudit({
           patientId,
-        }
+        })
       );
 
       return {
@@ -290,7 +291,7 @@ export class ComplianceService {
   async invalidatePatientCompliance(patientId: string): Promise<void> {
     // In a real implementation, this would invalidate Redis cache keys
     // For now, this is a no-op that doesn't throw
-    logger.info("Compliance cache invalidation requested", { patientId });
+    logger.info("Compliance cache invalidation requested", sanitizeForAudit({ patientId }));
   }
 
   /**
@@ -309,7 +310,7 @@ export class ComplianceService {
   > {
     // Placeholder implementation - would query historical data
     // For now, return empty array
-    logger.info("Compliance trends requested", { patientId, days });
+    logger.info("Compliance trends requested", sanitizeForAudit({ patientId, days }));
     return [];
   }
 }

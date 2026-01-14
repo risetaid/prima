@@ -14,9 +14,10 @@ export interface TestResult {
     endpoint?: string;
     statusCode?: number;
     responseTime?: number;
-    requestBody?: any;
-    responseBody?: any;
-    [key: string]: any;
+    requestBody?: unknown;
+    responseBody?: unknown;
+    description?: string;
+    [key: string]: unknown;
   };
 }
 

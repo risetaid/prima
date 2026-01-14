@@ -7,6 +7,7 @@ import { db, patients } from "@/db";
 import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { getWIBTime } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 
 // TypeScript interfaces for analysis data
 
@@ -412,10 +413,10 @@ export class UnsubscribeAnalyticsService {
   ): Promise<void> {
     try {
       // This method can be expanded to store detailed analytics events
-      logger.info("Recording unsubscribe analytics event", {
+      logger.info("Recording unsubscribe analytics event", sanitizeForAudit({
         patientId,
         analysis,
-      });
+      }));
     } catch (error) {
       logger.error(
         "Failed to record unsubscribe analytics event",

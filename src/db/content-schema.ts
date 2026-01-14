@@ -44,7 +44,7 @@ export const cmsArticles = pgTable(
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
-  (table) => ({
+  () => ({
     // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
     // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
     // slug already has unique constraint which creates an index automatically
@@ -77,7 +77,7 @@ export const cmsVideos = pgTable(
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
-  (table) => ({
+  () => ({
     // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
     // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
     // slug already has unique constraint which creates an index automatically

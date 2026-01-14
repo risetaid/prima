@@ -13,10 +13,19 @@ import {
   AIRateLimitError,
   AITimeoutError,
 } from '@/lib/ai-types';
+import { getCircuitBreaker, DEFAULT_CIRCUIT_CONFIGS } from '@/lib/circuit-breaker';
 
 // Pricing per 1M tokens (as of claude-haiku-4-5-20251001)
 const HAIKU_INPUT_COST_PER_1M = 1.0;  // $1.00 per 1M input tokens
 const HAIKU_OUTPUT_COST_PER_1M = 5.0; // $5.00 per 1M output tokens
+
+// Circuit breaker for Anthropic API calls
+// Anthropic is more rate-limited than GOWA, so use lower threshold (5 failures)
+const anthropicCircuitBreaker = getCircuitBreaker('anthropic', {
+  failureThreshold: 5, // Opens after 5 failures (spec says 5)
+  resetTimeout: DEFAULT_CIRCUIT_CONFIGS.external_api.resetTimeout, // 60s
+  monitoringPeriod: DEFAULT_CIRCUIT_CONFIGS.external_api.monitoringPeriod,
+});
 
 export class AIClient {
   private client: Anthropic;
@@ -73,18 +82,20 @@ export class AIClient {
         userMessageLength: params.userMessage.length,
       });
 
-      const response = await this.client.messages.create({
-        model: this.config.model,
-        max_tokens: params.maxTokens || this.config.maxTokens,
-        temperature: params.temperature ?? this.config.temperature,
-        system: params.systemPrompt,
-        messages: [
-          {
-            role: 'user',
-            content: params.userMessage,
-          },
-        ],
-      });
+      const response = await anthropicCircuitBreaker.execute(() =>
+        this.client.messages.create({
+          model: this.config.model,
+          max_tokens: params.maxTokens || this.config.maxTokens,
+          temperature: params.temperature ?? this.config.temperature,
+          system: params.systemPrompt,
+          messages: [
+            {
+              role: 'user',
+              content: params.userMessage,
+            },
+          ],
+        })
+      );
 
       const latencyMs = Date.now() - startTime;
 

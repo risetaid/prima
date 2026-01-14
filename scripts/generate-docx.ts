@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
-// @ts-ignore - html-docx-js types not available
+// @ts-expect-error - html-docx-js types not available
 import { asBlob } from "html-docx-js/dist/html-docx";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -106,7 +106,7 @@ const html = `
     <h2>3. Test Infrastructure Setup</h2>
     <h3>Prerequisites</h3>
     <ul>
-        <li>Node.js/Bun runtime</li>
+        <li>Node.js/pnpm runtime</li>
         <li>PostgreSQL database (Neon recommended)</li>
         <li>Clerk authentication</li>
         <li>Fonnte WhatsApp integration</li>
@@ -132,16 +132,16 @@ const html = `
     <h3>Running Tests</h3>
     <pre>
 # Run all tests
-bun test --run
+pnpm test --run
 
 # Run with coverage report
-bun test --run --coverage
+pnpm test --run --coverage
 
 # Watch mode (auto-run on changes)
-bun test
+pnpm test
 
 # Open Vitest UI
-bun test --ui
+pnpm test --ui
     </pre>
 
     <h2>4. API Endpoint Coverage</h2>
@@ -206,19 +206,19 @@ bun test --ui
     <h3>Local Development</h3>
     <pre>
 # 1. Install dependencies
-bun install
+pnpm install
 
 # 2. Run tests in watch mode
-bun test
+pnpm test
 
 # 3. Open Vitest UI
-bun test --ui
+pnpm test --ui
     </pre>
 
     <h3>CI/CD Pipeline</h3>
     <p>Run full test suite with coverage:</p>
     <pre>
-bun test --run --coverage
+pnpm test --run --coverage
     </pre>
 
     <h2>7. Coverage Metrics</h2>
@@ -245,7 +245,7 @@ bun test --run --coverage
     
     <h4>Issue: Tests fail with module not found error</h4>
     <p><strong>Cause:</strong> Missing node_modules or outdated dependencies</p>
-    <p><strong>Solution:</strong> Run <code>bun install</code></p>
+    <p><strong>Solution:</strong> Run <code>pnpm install</code></p>
 
     <h4>Issue: Timeout errors in tests</h4>
     <p><strong>Cause:</strong> Async operations not completing in time</p>
@@ -261,7 +261,7 @@ bun test --run --coverage
         <li>Follow AAA pattern: Arrange, Act, Assert</li>
         <li>Use descriptive test names</li>
         <li>Mock external dependencies</li>
-        <li>Run tests locally: <code>bun test</code></li>
+        <li>Run tests locally: <code>pnpm test</code></li>
         <li>Ensure new tests pass before committing</li>
     </ol>
 

@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger";
+import { sanitizeForAudit } from "@/lib/phi-mask";
 import { AddReminderModal } from "@/components/pengingat/add-reminder-modal";
 import { PatientHeaderCard } from "@/components/patient/patient-header-card";
 import { PatientProfileTabCombined } from "@/components/patient/patient-profile-tab-combined";
@@ -141,11 +142,11 @@ export default function PatientDetailPage() {
         if (response.ok) {
           const responseJson = await response.json();
           const data = responseJson.data || responseJson; // Handle both old format and new createApiHandler format
-          logger.info("Patient data fetched successfully", {
+          logger.info("Patient data fetched successfully", sanitizeForAudit({
             patientId: id,
             hasName: !!data.name,
             responseFormat: responseJson.data ? "new" : "old",
-          });
+          }));
 
           // Check if verification status changed and show toast notification
           if (
@@ -177,11 +178,11 @@ export default function PatientDetailPage() {
           }
           return;
         } else {
-          logger.error("Failed to fetch patient data", undefined, {
+          logger.error("Failed to fetch patient data", undefined, sanitizeForAudit({
             patientId: id,
             status: response.status,
             statusText: response.statusText,
-          });
+          }));
           setError("Gagal memuat data pasien");
         }
       } catch (error: unknown) {
@@ -216,18 +217,18 @@ export default function PatientDetailPage() {
         const data = responseJson.data || responseJson; // Handle both formats
         setReminderStats(data);
       } else {
-        logger.error("Failed to fetch reminder stats", undefined, {
+        logger.error("Failed to fetch reminder stats", undefined, sanitizeForAudit({
           patientId,
           status: response.status,
           statusText: response.statusText,
-        });
+        }));
         setReminderStats(null);
       }
     } catch (error: unknown) {
       logger.error(
         "Error fetching reminder stats",
         error instanceof Error ? error : new Error(String(error)),
-        { patientId }
+        sanitizeForAudit({ patientId })
       );
       setReminderStats(null);
     }
@@ -249,7 +250,7 @@ export default function PatientDetailPage() {
         const responseJson = await response.json();
 
         // Response structure: { success: true, data: { data: [...], pagination: {...} } }
-        logger.info("Completed reminders raw response:", {
+        logger.info("Completed reminders raw response:", sanitizeForAudit({
           patientId,
           hasData: !!responseJson.data,
           hasPagination: !!responseJson.pagination,
@@ -257,7 +258,7 @@ export default function PatientDetailPage() {
           isResponseArray: Array.isArray(responseJson),
           responseType: typeof responseJson,
           topLevelKeys: Object.keys(responseJson || {}),
-        });
+        }));
 
         // Handle apiSuccess wrapped response: { success: true, data: { data: [...], pagination: {...} } }
         if (
@@ -266,7 +267,7 @@ export default function PatientDetailPage() {
           responseJson.data.pagination &&
           Array.isArray(responseJson.data.data)
         ) {
-          logger.info("Using apiSuccess paginated format", { patientId });
+          logger.info("Using apiSuccess paginated format", sanitizeForAudit({ patientId }));
           setCompletedReminders(responseJson.data.data);
           return;
         }
@@ -277,31 +278,31 @@ export default function PatientDetailPage() {
           responseJson.pagination &&
           Array.isArray(responseJson.data)
         ) {
-          logger.info("Using paginated format", { patientId });
+          logger.info("Using paginated format", sanitizeForAudit({ patientId }));
           setCompletedReminders(responseJson.data);
           return;
         }
 
         // Handle old format where response.data is the reminders array
         if (Array.isArray(responseJson.data)) {
-          logger.info("Using data array format", { patientId });
+          logger.info("Using data array format", sanitizeForAudit({ patientId }));
           setCompletedReminders(responseJson.data);
           return;
         }
 
         // Handle direct array response (legacy)
         if (Array.isArray(responseJson)) {
-          logger.info("Using direct array format", { patientId });
+          logger.info("Using direct array format", sanitizeForAudit({ patientId }));
           setCompletedReminders(responseJson);
           return;
         }
 
         // Check if the endpoint is disabled
         if (responseJson.disabled) {
-          logger.warn("Completed reminders endpoint disabled", {
+          logger.warn("Completed reminders endpoint disabled", sanitizeForAudit({
             patientId,
             reason: responseJson.reason,
-          });
+          }));
           setCompletedReminders([]);
           return;
         }
@@ -310,21 +311,21 @@ export default function PatientDetailPage() {
         logger.error(
           "Invalid response format for completed reminders",
           new Error("Response structure not recognized"),
-          {
+          sanitizeForAudit({
             patientId,
             operation: "fetch-completed-reminders",
-          }
+          })
         );
         setCompletedReminders([]);
       } else {
         logger.error(
           "Failed to fetch completed reminders",
           new Error(`HTTP ${response.status}`),
-          {
+          sanitizeForAudit({
             patientId,
             status: response.status,
             statusText: response.statusText,
-          }
+          })
         );
         setCompletedReminders([]);
       }
@@ -332,7 +333,7 @@ export default function PatientDetailPage() {
       logger.error(
         "Error fetching completed reminders",
         error instanceof Error ? error : new Error(String(error)),
-        { patientId }
+        sanitizeForAudit({ patientId })
       );
       setCompletedReminders([]);
     }

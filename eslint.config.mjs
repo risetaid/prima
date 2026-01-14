@@ -1,39 +1,49 @@
-import { dirname } from "path";
-import { fileURLToPath } from "url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+import parser from '@typescript-eslint/parser';
+import plugin from '@typescript-eslint/eslint-plugin';
+import reactHooks from 'eslint-plugin-react-hooks';
+import phiDetector from './.eslint-rules/phi-detection.js';
 
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // TypeScript/JavaScript files
   {
-    rules: {
-      // Downgrade unused variable warnings to warnings (not errors)
-      "@typescript-eslint/no-unused-vars": "warn",
-
-      // Enforce no explicit any types (strict TypeScript rules)
-      "@typescript-eslint/no-explicit-any": "error",
-
-      // Allow empty object types (common in UI libraries)
-      "@typescript-eslint/no-empty-object-type": "warn",
-
-      // React Hook dependency warnings (can be complex to fix without breaking functionality)
-      "react-hooks/exhaustive-deps": "warn",
-
-      // Allow unescaped entities (common in medical text)
-      "react/no-unescaped-entities": "warn",
-
-      // Allow img elements (Next.js Image might not work in all medical contexts)
-      "@next/next/no-img-element": "warn",
-
-      // Allow const reassignment warnings
-      "prefer-const": "warn",
+    files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
+    languageOptions: {
+      parser,
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
     },
+    plugins: {
+      '@typescript-eslint': plugin,
+      'react-hooks': reactHooks,
+      phi: phiDetector,
+    },
+    rules: {
+      ...plugin.configs.recommended.rules,
+
+      // Custom overrides
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'prefer-const': 'warn',
+
+      // React Hooks
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/rules-of-hooks': 'error',
+
+      // PHI Detection
+      'phi/no-logging-patient-data': 'error',
+    },
+  },
+  {
+    ignores: [
+      '.next/**',
+      'node_modules/**',
+      'public/sw.js',
+      'public/workbox-*.js',
+      '*.d.ts',
+    ],
   },
 ];
 
