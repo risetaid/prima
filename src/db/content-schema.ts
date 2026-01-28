@@ -1,22 +1,10 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // Import clean enums
-import {
-  contentCategoryEnum,
-  contentStatusEnum,
-} from "@/db/enums";
+import { contentCategoryEnum, contentStatusEnum } from "@/db/enums";
 
 // Re-export enums for convenience
-export {
-  contentCategoryEnum,
-  contentStatusEnum,
-};
+export { contentCategoryEnum, contentStatusEnum };
 
 // ===== CMS TABLES =====
 
@@ -44,12 +32,14 @@ export const cmsArticles = pgTable(
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
-  (table) => ({
-    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
-    // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
-    // slug already has unique constraint which creates an index automatically
-    // Other indexes should be added based on actual query patterns when table has data
-  })
+  () => ({
+    // GIN index for tags array searches (e.g., tags @> ARRAY['nutrition'])
+    // Defined in migration SQL - Drizzle doesn't support GIN on arrays in schema
+    // Full-text search index on title, excerpt, content (Indonesian language)
+    // Supports: to_tsquery('indonesian', 'cancer & treatment')
+    // Defined in migration SQL - Drizzle doesn't support generated tsvector columns
+    // Note: slug already has unique constraint which creates an index automatically
+  }),
 );
 
 export const cmsVideos = pgTable(
@@ -77,36 +67,22 @@ export const cmsVideos = pgTable(
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }), // Soft delete
   },
-  (table) => ({
-    // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
-    // Removed all 6 indexes: slug, status, category, publishedAt, createdBy, deletedAt
-    // slug already has unique constraint which creates an index automatically
-    // Other indexes should be added based on actual query patterns when table has data
-  })
+  () => ({
+    // GIN index for tags array searches (e.g., tags @> ARRAY['exercise'])
+    // Defined in migration SQL - Drizzle doesn't support GIN on arrays in schema
+    // Full-text search index on title and description (Indonesian language)
+    // Supports: to_tsquery('indonesian', 'exercise & yoga')
+    // Defined in migration SQL - Drizzle doesn't support generated tsvector columns
+    // Note: slug already has unique constraint which creates an index automatically
+  }),
 );
 
 // ===== RATE LIMITING TABLES =====
-
-export const rateLimits = pgTable(
-  "rate_limits",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    rateLimitKey: text('rate_limit_key').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    // Composite index for key cleanup queries (most common pattern)
-    rateLimitKeyCreatedAtIdx: index('rate_limits_key_created_at_idx').on(table.rateLimitKey, table.createdAt),
-    // Note: Removed 2 redundant single-column indexes (rateLimitKey, createdAt)
-    // Both are covered by the composite index above
-    // Table is also currently empty (0 rows)
-  })
-);
+// NOTE: rateLimits table removed in migration 0016_schema_optimizations.sql
+// Redis handles all rate limiting - table was unused and removed to clean up schema
 
 // ===== TYPE EXPORTS =====
 export type CmsArticle = typeof cmsArticles.$inferSelect;
 export type NewCmsArticle = typeof cmsArticles.$inferInsert;
 export type CmsVideo = typeof cmsVideos.$inferSelect;
 export type NewCmsVideo = typeof cmsVideos.$inferInsert;
-export type RateLimit = typeof rateLimits.$inferSelect;
-export type NewRateLimit = typeof rateLimits.$inferInsert;

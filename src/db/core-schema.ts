@@ -4,7 +4,6 @@ import {
   timestamp,
   boolean,
   uuid,
-  index,
   foreignKey,
 } from "drizzle-orm/pg-core";
 
@@ -59,7 +58,7 @@ export const users = pgTable(
     // Note: Removed redundant single-column indexes (role, isActive, isApproved, clerkId, deletedAt)
     // clerkId and email already have unique constraints which create indexes automatically
     // Other single-column indexes have low cardinality or are rarely queried alone
-  })
+  }),
 );
 
 export const patients = pgTable(
@@ -106,7 +105,9 @@ export const patients = pgTable(
     // Unsubscribe tracking fields
     unsubscribedAt: timestamp("unsubscribed_at", { withTimezone: true }),
     unsubscribeReason: text("unsubscribe_reason"),
-    unsubscribeMethod: text("unsubscribe_method").$type<"manual" | "llm_analysis" | "keyword_detection" | "api">(),
+    unsubscribeMethod: text("unsubscribe_method").$type<
+      "manual" | "llm_analysis" | "keyword_detection" | "api"
+    >(),
   },
   (table) => ({
     // Foreign key to users
@@ -119,7 +120,7 @@ export const patients = pgTable(
     // isActive, deletedAt, createdAt are low-cardinality or rarely queried alone
     // phoneNumber is queried but not frequently enough to warrant standalone index
     // assignedVolunteerId and verificationStatus can be added back if profiling shows need
-  })
+  }),
 );
 
 export const medicalRecords = pgTable(
@@ -148,10 +149,8 @@ export const medicalRecords = pgTable(
     // Note: Table is currently empty (0 rows). Add indexes when table has >1000 rows.
     // Removed all indexes: patientId, recordType, recordedDate, recordedBy
     // patientId already has foreign key reference which may be used for lookups
-  })
+  }),
 );
-
-
 
 // ===== TYPE EXPORTS =====
 export type User = typeof users.$inferSelect;
@@ -160,5 +159,3 @@ export type Patient = typeof patients.$inferSelect;
 export type NewPatient = typeof patients.$inferInsert;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type NewMedicalRecord = typeof medicalRecords.$inferInsert;
-
-
