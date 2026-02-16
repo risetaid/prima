@@ -319,7 +319,7 @@ export class ReminderTests {
   }
 
   private async testScheduledSend() {
-    const endpoint = "/api/reminders/scheduled";
+    const endpoint = "/api/cron";
     const result = await TestUtils.runTest(
       "Scheduled Reminder Execution",
       "reminder",
@@ -334,7 +334,7 @@ export class ReminderTests {
       {
         method: "POST",
         endpoint,
-        description: "Execute scheduled reminders due for sending",
+        description: "Execute scheduled reminders via cron processor",
       }
     );
     this.testResults.push(result);

@@ -169,13 +169,15 @@ export class ContentTests {
   }
 
   private async testVideoYouTubeSync() {
-    const endpoint = "/api/youtube?channelId=test_channel";
+    const endpoint = "/api/youtube/fetch";
     const result = await TestUtils.runTest(
       "YouTube Video Sync",
       "content",
       async () => {
-        // Test YouTube API integration
-        const response = await this.client.get(endpoint);
+        // Test YouTube metadata fetch integration
+        const response = await this.client.post(endpoint, {
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        });
 
         // Should handle YouTube API calls
         if (response.status === 500) {
@@ -183,9 +185,9 @@ export class ContentTests {
         }
       },
       {
-        method: "GET",
+        method: "POST",
         endpoint,
-        description: "Sync videos from YouTube channel",
+        description: "Fetch metadata from a YouTube video URL",
       }
     );
     this.testResults.push(result);

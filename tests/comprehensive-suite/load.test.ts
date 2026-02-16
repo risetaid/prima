@@ -381,7 +381,11 @@ export class LoadTests {
       { name: "Health Check", method: "GET", path: "/api/health" },
       { name: "Dashboard", method: "GET", path: "/api/dashboard/overview" },
       { name: "Patients", method: "GET", path: "/api/patients" },
-      { name: "Reminders", method: "GET", path: "/api/reminders/scheduled" },
+      {
+        name: "Reminders",
+        method: "POST",
+        path: "/api/reminders/instant-send-all",
+      },
       { name: "Content", method: "GET", path: "/api/cms/content" },
     ];
 
@@ -547,13 +551,21 @@ export class LoadTests {
     console.log("\n📊 Running Response Time Analysis...");
 
     const endpoints = [
-      { name: "Health Check", path: "/api/health" },
-      { name: "Dashboard Overview", path: "/api/dashboard/overview" },
-      { name: "Patient List", path: "/api/patients" },
-      { name: "Reminder List", path: "/api/reminders/scheduled" },
-      { name: "Content List", path: "/api/cms/content" },
-      { name: "Video List", path: "/api/cms/videos" },
-      { name: "Article List", path: "/api/cms/articles" },
+      { name: "Health Check", method: "GET", path: "/api/health" },
+      {
+        name: "Dashboard Overview",
+        method: "GET",
+        path: "/api/dashboard/overview",
+      },
+      { name: "Patient List", method: "GET", path: "/api/patients" },
+      {
+        name: "Reminder Trigger",
+        method: "POST",
+        path: "/api/reminders/instant-send-all",
+      },
+      { name: "Content List", method: "GET", path: "/api/cms/content" },
+      { name: "Video List", method: "GET", path: "/api/cms/videos" },
+      { name: "Article List", method: "GET", path: "/api/cms/articles" },
     ];
 
     console.log(
@@ -568,6 +580,9 @@ export class LoadTests {
       for (let i = 0; i < 10; i++) {
         try {
           const { duration } = await TestUtils.measureTime(async () => {
+            if (endpoint.method === "POST") {
+              return await this.client.post(endpoint.path, {});
+            }
             return await this.client.get(endpoint.path);
           });
           times.push(duration);

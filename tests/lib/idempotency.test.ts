@@ -6,9 +6,35 @@ import { redis } from '@/lib/redis';
 describe('isDuplicateEvent', () => {
   const testKey = 'test:event:123';
 
-  afterEach(async () => {
-    // Cleanup
-    await redis.del(testKey);
+  const store = new Map<string, number>();
+
+  beforeEach(() => {
+    store.clear();
+
+    vi.spyOn(redis, 'setnx').mockImplementation(
+      async (key: string, _value: string, ttl?: number) => {
+        const now = Date.now();
+        const currentExpiry = store.get(key);
+
+        if (currentExpiry && currentExpiry > now) {
+          return false;
+        }
+
+        const expiresAt = now + (ttl ? ttl * 1000 : 24 * 60 * 60 * 1000);
+        store.set(key, expiresAt);
+        return true;
+      }
+    );
+
+    vi.spyOn(redis, 'del').mockImplementation(async (key: string) => {
+      store.delete(key);
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    store.clear();
   });
 
   it('should return false for first event', async () => {
@@ -51,12 +77,9 @@ describe('isDuplicateEvent', () => {
 
   it('should fail closed on Redis error', async () => {
     // Mock Redis error
-    const originalSetnx = redis.setnx;
-    redis.setnx = vi.fn().mockRejectedValue(new Error('Redis down'));
+    vi.spyOn(redis, 'setnx').mockRejectedValue(new Error('Redis down'));
 
     const isDuplicate = await isDuplicateEvent(testKey);
     expect(isDuplicate).toBe(true); // Fail closed
-
-    redis.setnx = originalSetnx;
   });
 });

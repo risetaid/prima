@@ -23,7 +23,18 @@
     "start-message-worker": "bun run scripts/start-message-worker.ts",
     "db:optimize-indexes": "bun run scripts/optimize-database-indexes.ts",
     "db:monitor-indexes": "bun run scripts/monitor-index-health.ts",
-    "test:comprehensive": "bun run tests/comprehensive-suite/index.ts"
+    "test": "bun run test:comprehensive",
+    "test:unit": "bunx vitest run",
+    "test:unit:watch": "bunx vitest",
+    "test:comprehensive": "bun run tests/comprehensive-suite/index.ts",
+    "test:auth": "bun run tests/comprehensive-suite/index.ts --category auth",
+    "test:reminder": "bun run tests/comprehensive-suite/index.ts --category reminder",
+    "test:whatsapp": "bun run tests/comprehensive-suite/index.ts --category whatsapp",
+    "test:content": "bun run tests/comprehensive-suite/index.ts --category content",
+    "test:load": "bun run tests/comprehensive-suite/index.ts --category load",
+    "test:all": "bun run test:auth && bun run test:reminder && bun run test:whatsapp && bun run test:content",
+    "test:all:full": "bun run test:all && bun run test:load",
+    "test:ci": "bun run test:unit && bun run test:all"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.63.0",
