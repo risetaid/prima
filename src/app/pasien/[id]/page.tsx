@@ -565,7 +565,7 @@ export default function PatientDetailPage() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div
             className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
-            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+            style={{ backgroundImage: "url(/bg_desktop.webp)" }}
           />
         </div>
 
@@ -603,7 +603,7 @@ export default function PatientDetailPage() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div
             className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
-            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+            style={{ backgroundImage: "url(/bg_desktop.webp)" }}
           />
         </div>
 
@@ -658,7 +658,7 @@ export default function PatientDetailPage() {
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
-          style={{ backgroundImage: "url(/bg_desktop.png)" }}
+          style={{ backgroundImage: "url(/bg_desktop.webp)" }}
         />
       </div>
 
@@ -823,3 +823,4 @@ export default function PatientDetailPage() {
     </div>
   );
 }
+

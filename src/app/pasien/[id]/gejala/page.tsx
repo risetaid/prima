@@ -269,7 +269,7 @@ export default function PatientSymptomsPage() {
         <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
           <div
             className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
-            style={{ backgroundImage: "url(/bg_desktop.png)" }}
+            style={{ backgroundImage: "url(/bg_desktop.webp)" }}
           />
         </div>
         <div className="hidden lg:block relative z-10">
@@ -605,3 +605,4 @@ function EditSymptomDialog({
     </div>
   );
 }
+

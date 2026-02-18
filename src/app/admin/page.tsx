@@ -134,7 +134,7 @@ export default function AdminPanelPage() {
           <div
             className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
             style={{
-              backgroundImage: "url(/bg_desktop.png)",
+              backgroundImage: "url(/bg_desktop.webp)",
             }}
           />
         </div>
@@ -154,7 +154,7 @@ export default function AdminPanelPage() {
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
           style={{
-            backgroundImage: "url(/bg_desktop.png)",
+            backgroundImage: "url(/bg_desktop.webp)",
           }}
         />
       </div>

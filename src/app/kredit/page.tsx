@@ -39,7 +39,7 @@ export default function KreditPage() {
           <div
             className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-90"
             style={{
-              backgroundImage: "url(/bg_desktop.png)",
+              backgroundImage: "url(/bg_desktop.webp)",
             }}
           />
         </div>
@@ -70,7 +70,7 @@ export default function KreditPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Image
-                      src="/david.jpg"
+                      src="/david.webp"
                       alt="David Yusaku Setiyono"
                       width={60}
                       height={60}
@@ -88,7 +88,7 @@ export default function KreditPage() {
                 <div className="flex items-center gap-3">
                   <div className="relative">
                     <Image
-                      src="/stella.jpg"
+                      src="/stella.webp"
                       alt="Stella Maureen Ignacia Santoso"
                       width={60}
                       height={60}
@@ -112,7 +112,7 @@ export default function KreditPage() {
               <div className="flex items-center gap-4">
                 <div className="relative">
                   <Image
-                    src="/windra.jpg"
+                    src="/windra.webp"
                     alt="Windra Swastika, S.Kom., MT., Ph.D."
                     width={80}
                     height={80}

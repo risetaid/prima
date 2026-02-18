@@ -25,7 +25,7 @@ export default function NotFound() {
         <div
           className="fixed inset-0 bg-cover bg-center bg-no-repeat opacity-5"
           style={{
-            backgroundImage: "url(/bg_desktop.png)",
+            backgroundImage: "url(/bg_desktop.webp)",
           }}
         />
         {/* Medical Cross Pattern */}
