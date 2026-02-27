@@ -68,6 +68,15 @@ _bmad*
 .bmad-*/
 .claude/commands/*
 .github/agents/*
+.github/prompts/*
+.github/copilot-instructions.md
 .opencode*
 opencode.jsonc
 AGENTS.md
+.agents*
+
+# ==========================================================================
+# LOCAL AGENT / TEMP OUTPUT
+# ==========================================================================
+.sisyphus/
+.tmp/
